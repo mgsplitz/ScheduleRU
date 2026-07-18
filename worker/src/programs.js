@@ -622,15 +622,29 @@ async function discoverPrograms(env, schoolSlug, indexPath) {
    READ: nested requirement tree for one or more programs
    ============================================================ */
 async function getRequirementTree(env, programId) {
-  const { results: groups } = await env.DB.prepare(
-    `SELECT * FROM requirement_groups WHERE program_id = ? ORDER BY sort_order`
+  // A major can inherit one or more reusable requirement sets. For example,
+  // every RBS-New Brunswick major links to the single RBS Foundational Core
+  // (formerly Pre-Business) set. The set owns its own groups/course rows, so
+  // they are stored once and appear once when a single major is loaded.
+  const { results: sharedSets } = await env.DB.prepare(
+    `SELECT requirement_set_id
+     FROM program_requirement_sets
+     WHERE program_id = ?
+     ORDER BY sort_order, requirement_set_id`
   ).bind(programId).all();
+  const ownerIds = [...sharedSets.map((row) => row.requirement_set_id), programId];
+  const placeholders = ownerIds.map(() => "?").join(",");
+  const { results: groups } = await env.DB.prepare(
+    `SELECT * FROM requirement_groups
+     WHERE program_id IN (${placeholders})
+     ORDER BY CASE WHEN program_id = ? THEN 1 ELSE 0 END, sort_order, id`
+  ).bind(...ownerIds, programId).all();
   const { results: courses } = await env.DB.prepare(
     `SELECT rc.*, c.title as catalog_title, c.credits as catalog_credits, c.prereqs as catalog_prereqs
      FROM requirement_courses rc
      LEFT JOIN courses c ON c.subject_code || ':' || c.course_number = substr(rc.course_code, 4)
-     WHERE rc.group_id IN (SELECT id FROM requirement_groups WHERE program_id = ?)`
-  ).bind(programId).all();
+     WHERE rc.group_id IN (SELECT id FROM requirement_groups WHERE program_id IN (${placeholders}))`
+  ).bind(...ownerIds).all();
 
   const byGroup = {};
   for (const c of courses) {
@@ -656,7 +670,9 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     const type = url.searchParams.get("type");
     // Public program lists intentionally exclude scraped data until a human
     // has reviewed it. Admin routes below remain the review/debug path.
-    let where = " WHERE review_status = 'reviewed'", binds = [];
+    // Shared requirement sets are returned inside a selected program's tree;
+    // they are not majors/minors a student can select in the program list.
+    let where = " WHERE review_status = 'reviewed' AND type != 'shared_requirement_set'", binds = [];
     if (school) { where += " AND school_slug = ?"; binds.push(school); }
     if (type) { where += " AND type = ?"; binds.push(type); }
     const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();

@@ -451,75 +451,11 @@ const AP = [
   {id:"ap-world",  name:"World History",                         equiv:"01:506:101",     credits:3,  fulfills:[]},
 ];
 
-const COURSES = {
-  "01640135":{code:"01:640:135",title:"Calculus I (135/151/130)",credits:4,type:"foundational",prereqs:[]},
-  "01220102":{code:"01:220:102",title:"Intro to Microeconomics",credits:3,type:"foundational",prereqs:[]},
-  "01220103":{code:"01:220:103",title:"Intro to Macroeconomics",credits:3,type:"foundational",prereqs:[]},
-  "01198170":{code:"01:198:170",title:"Computer Applications for Business",credits:3,type:"foundational",prereqs:[]},
-  "01960285":{code:"01:960:285",title:"Introductory Statistics for Business",credits:3,type:"foundational",prereqs:["01640135"]},
-  "33010272":{code:"33:010:272",title:"Intro. to Financial Accounting",credits:3,type:"core",prereqs:[]},
-  "33010275":{code:"33:010:275",title:"Intro. to Managerial Accounting",credits:3,type:"core",prereqs:["33010272"]},
-  "33011301":{code:"33:011:301",title:"Foundations for Your Career Journey",credits:1,type:"core",prereqs:[]},
-  "33011302":{code:"33:011:302",title:"Building Your Brand",credits:1,type:"core",prereqs:["33011301"]},
-  "33011303":{code:"33:011:303",title:"Conquering Your Transition",credits:1,type:"core",prereqs:["33011302"],restriction:"Junior/Senior"},
-  "33136370":{code:"33:136:370",title:"Management Information Systems",credits:3,type:"core",prereqs:["01198170"]},
-  "33136385":{code:"33:136:385",title:"Statistical Methods in Business",credits:3,type:"core",prereqs:["01640135","01960285"]},
-  "33136386":{code:"33:136:386",title:"Operations Management",credits:3,type:"core",prereqs:["01640135"]},
-  "33390300":{code:"33:390:300",title:"Financial Management",credits:3,type:"core",prereqs:["01960285","01220103","33010272"]},
-  "33620301":{code:"33:620:301",title:"Introduction to Management",credits:3,type:"core",prereqs:[]},
-  "33620302":{code:"33:620:302",title:"Management Skills",credits:3,type:"core",prereqs:[]},
-  "33620492":{code:"33:620:492",title:"Business Policy and Strategy",credits:3,type:"core",prereqs:["33390300","33620301","33630301"],restriction:"Seniors only"},
-  "33630301":{code:"33:630:301",title:"Introduction to Marketing",credits:3,type:"core",prereqs:[]},
-  "33799301":{code:"33:799:301",title:"Introduction to Supply Chain Management",credits:3,type:"core",prereqs:[]},
-  "33140320":{code:"33:140:320",title:"Business Law I",credits:3,type:"core-group",group:"law-ethics",prereqs:["01220102","01220103","33010272"]},
-  "33522334":{code:"33:522:334",title:"Business Ethics",credits:3,type:"core-group",group:"law-ethics",prereqs:["01220102","01220103","33010272"]},
-  "33136388":{code:"33:136:388",title:"Foundations of Business Programming",credits:3,type:"major",prereqs:[]},
-  "33136485":{code:"33:136:485",title:"Time Series Modeling for Business",credits:3,type:"major",prereqs:["33136385"]},
-  "33136470":{code:"33:136:470",title:"Business Data Management",credits:3,type:"major",prereqs:["33136370","33136388"]},
-  "33136400":{code:"33:136:400",title:"Business Decision Analytics under Uncertainty",credits:3,type:"major",prereqs:["33136386"]},
-  "33136494":{code:"33:136:494",title:"Data Mining for Business Intelligence",credits:3,type:"major-group",group:"bait-msis",prereqs:[]},
-  "33136465":{code:"33:136:465",title:"Enterprise Architecture",credits:3,type:"major-group",group:"bait-msis",prereqs:["33136370","33136388"]},
-  "33136471":{code:"33:136:471",title:"Information System Security",credits:3,type:"major-group",group:"bait-msis",prereqs:["33136370"]},
-  "33136487":{code:"33:136:487",title:"Large Scale Business Data Analysis",credits:3,type:"major-group",group:"bait-msis",prereqs:["33136370"]},
-  "33136486":{code:"33:136:486",title:"Optimization Modeling",credits:3,type:"major-group",group:"bait-msis",prereqs:["33136386"]},
-  "33136440":{code:"33:136:440",title:"Relational Database and Web Applications",credits:3,type:"major-group",group:"bait-msis",prereqs:["33136370"]},
-  "33136405":{code:"33:136:405",title:"Risk Modeling",credits:3,type:"major-group",group:"bait-msis",prereqs:["33136386"]},
-  "33136455":{code:"33:136:455",title:"Introduction to ERP",credits:3,type:"major-group",group:"bait-msis",prereqs:["33136370"]},
-  "33136450":{code:"33:136:450",title:"Investment Modeling with R",credits:3,type:"major-group",group:"bait-msis",prereqs:["33136370"]},
-  "01960467":{code:"01:960:467",title:"Applied Multivariate Analysis",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198425":{code:"01:198:425",title:"Computer Methods in Statistics",credits:4,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198419":{code:"01:198:419",title:"Computer Security",credits:4,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198439":{code:"01:198:439",title:"Intro to Data Science",credits:4,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198344":{code:"01:198:344",title:"Design & Analysis of Computer Algorithms",credits:4,type:"major-group",group:"bait-out",prereqs:[]},
-  "01220481":{code:"01:220:481",title:"Economics of Uncertainty",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "33799450":{code:"33:799:450",title:"Supply Chain Solutions with SAP",credits:3,type:"major-group",group:"bait-out",prereqs:["33799301"]},
-  "01220482":{code:"01:220:482",title:"Game Theory",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198352":{code:"01:198:352",title:"Internet Technology",credits:4,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198440":{code:"01:198:440",title:"Introduction to Artificial Intelligence",credits:4,type:"major-group",group:"bait-out",prereqs:[]},
-  "01960476":{code:"01:960:476",title:"Introduction to Sampling",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01640478":{code:"01:640:478",title:"Introduction to Stochastic Processes",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01640354":{code:"01:640:354",title:"Linear Optimization",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01220485":{code:"01:220:485",title:"Mathematical Economics",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01220487":{code:"01:220:487",title:"Operations Research II",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198336":{code:"01:198:336",title:"Principles of Information & Data Management",credits:4,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198314":{code:"01:198:314",title:"Principles of Programming Languages",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01960463":{code:"01:960:463",title:"Regression Methods",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198431":{code:"01:198:431",title:"Software Engineering",credits:4,type:"major-group",group:"bait-out",prereqs:[]},
-  "01198213":{code:"01:198:213",title:"Software Methodology",credits:4,type:"major-group",group:"bait-out",prereqs:[]},
-  "33630489":{code:"33:630:489",title:"Marketing Analytics",credits:3,type:"major-group",group:"bait-out",prereqs:["33630301"]},
-  "33630488":{code:"33:630:488",title:"A.I. in Marketing",credits:3,type:"major-group",group:"bait-out",prereqs:["33630301","33136385"]},
-  "01640424":{code:"01:640:424",title:"Stochastic Models in Operations Research",credits:3,type:"major-group",group:"bait-out",prereqs:[]},
-  "01355101":{code:"01:355:101",title:"Expository Writing",credits:3,type:"gen",prereqs:[]},
-  "01830101":{code:"01:830:101",title:"Introduction to Psychology",credits:3,type:"gen",prereqs:[]},
-  "01790101":{code:"01:790:101",title:"American Government",credits:3,type:"gen",prereqs:[]},
-  "07700103":{code:"07:700:103",title:"Introduction to Music Theory",credits:3,type:"gen",prereqs:[]},
-};
-
-const GROUPS = {
-  "law-ethics": {name:"Business Law I OR Business Ethics (choose 1)", rule:"min", count:1},
-  "bait-msis":  {name:"BAIT MSIS Electives — at least 1 from 136 dept.", rule:"min", count:1},
-  "bait-out":   {name:"BAIT Outside Electives — at most 2 count toward major", rule:"max", count:2},
-};
+// Requirement data is populated from the public Worker API at startup.
+// These containers deliberately contain no course or group data in source.
+let COURSES = {};
+let GROUPS = {};
+let ROOT_GROUPS = [];
 
 /* ============================================================
    STATE
@@ -532,7 +468,9 @@ const ST = {
   // The worker reads Rutgers on a cron and serves cached results from D1,
   // so this is a plain same-origin-friendly fetch (the worker sends CORS
   // headers itself) rather than needing a public relay.
-  backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem("bait_backend_url")) || "",
+  backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem("bait_backend_url")) || "https://rutgers-course-sync.housselllaura.workers.dev",
+  availablePrograms:[], activeProgram:null,
+  requirementsLoading:true, requirementsError:"",
   backendSubject:"", backendSearch:"", backendPage:1,
   backendCourses:[], backendTotal:0, backendLoading:false, backendError:"",
   backendSubjects:[], backendStatus:null,
@@ -570,8 +508,10 @@ function prereqsMet(id){
 }
 function groupFulfilled(gk){
   const g = GROUPS[gk];
-  const members = Object.keys(COURSES).filter(id=>COURSES[id].group===gk);
+  if(!g) return false;
+  const members = g.members || [];
   const done = members.filter(id=>isCompleted(id)).length;
+  if(g.rule==="all") return members.every(id=>isCompleted(id)) && (g.children||[]).every(groupFulfilled);
   return g.rule==="min" ? done >= g.count : done <= g.count && done > 0;
 }
 
@@ -730,7 +670,7 @@ document.querySelectorAll(".tab-btn").forEach(b=>b.addEventListener("click",()=>
 function cardHtml(id, opts={}){
   const c=COURSES[id];
   const done=isCompleted(id);
-  const ok=c.type==="gen"||prereqsMet(id);
+  const ok=prereqsMet(id);
   const gray=!done&&!ok;
   return `<div class="cc${gray?" gr":""}${done?" done":""}" draggable="${!gray}" data-cid="${id}">
     <div class="chk${ST.completed[id]?" on":""}" data-chk="${id}"></div>
@@ -760,38 +700,60 @@ function attachCardEvents(el){
 /* ============================================================
    TAB 1: REQUIRED
    ============================================================ */
-const SECTIONS=[
-  {key:"foundational", label:"Foundational Core (\"Pre-Business\")"},
-  {key:"core",         label:"Business Core — All RBS Majors"},
-  {key:"major",        label:"BAIT Required Courses"},
-];
+function groupRuleLabel(g){
+  if(g.rule==="min") return `min ${g.count}`;
+  if(g.rule==="max") return `max ${g.count}`;
+  return "all required";
+}
+function groupDisplayName(g){
+  if(/^choose 1$/i.test(g.name||"") && (g.members||[]).length){
+    return `Choose 1: ${g.members.map(id=>COURSES[id]?.code||id).join(" or ")}`;
+  }
+  return g.name || "Requirement group";
+}
+function groupHtml(gk){
+  const g=GROUPS[gk];
+  if(!g) return "";
+  const ok=groupFulfilled(gk);
+  const members=(g.members||[]).filter(id=>!isCompleted(id));
+  const children=(g.children||[]).map(groupHtml).join("");
+  return `<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
+    <span class="gn">${groupDisplayName(g)}</span>
+    <span class="gm">${groupRuleLabel(g)} · click to expand</span>
+  </div><div class="gr-body" id="gb-${gk}">${members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`:""}${children}</div></div>`;
+}
 function renderRequired(){
   const pb=document.getElementById("pb");
+  if(ST.requirementsLoading){
+    pb.innerHTML=`<div class="empty" style="margin-top:30px;">Loading requirements from Rutgers…</div>`;
+    return;
+  }
+  if(ST.requirementsError){
+    pb.innerHTML=`<div class="api-status err">Could not load degree requirements: ${escapeHtml(ST.requirementsError)}</div>`;
+    return;
+  }
   let h=`<div class="leg">Gray = locked (click to see missing prerequisites). Green = completed or AP-waived. Click ○ to mark taken/waived.</div>`;
-  SECTIONS.forEach(s=>{
-    const ids=Object.keys(COURSES).filter(id=>COURSES[id].type===s.key&&!isCompleted(id));
-    const gks=[...new Set(Object.keys(COURSES).filter(id=>COURSES[id].type===s.key+"-group").map(id=>COURSES[id].group))];
-    if(!ids.length&&!gks.length) return;
-    h+=`<div class="sec-hdr">${s.label}</div>`;
-    if(ids.length) h+=`<div class="cgrid">${ids.map(id=>cardHtml(id)).join("")}</div>`;
-    gks.forEach(gk=>{
-      const g=GROUPS[gk]; const ok=groupFulfilled(gk);
-      const members=Object.keys(COURSES).filter(id=>COURSES[id].group===gk);
-      h+=`<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
-        <span class="gn">${g.name}</span>
-        <span class="gm">${g.rule==="min"?"min":"max"} ${g.count} · click to expand</span>
-      </div><div class="gr-body" id="gb-${gk}"><div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div></div></div>`;
-    });
+  ROOT_GROUPS.forEach(gk=>{
+    const g=GROUPS[gk];
+    if(!g) return;
+    const members=(g.members||[]).filter(id=>!isCompleted(id));
+    const children=(g.children||[]).map(groupHtml).join("");
+    if(g.rule==="all"){
+      h+=`<div class="sec-hdr">${groupDisplayName(g)}</div>`;
+      if(members.length) h+=`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`;
+      h+=children;
+    } else {
+      h+=groupHtml(gk);
+    }
   });
-  // completed
-  const done=Object.keys(COURSES).filter(id=>["foundational","core","major","core-group","major-group"].includes(COURSES[id].type)&&isCompleted(id));
+  const done=Object.keys(COURSES).filter(id=>isCompleted(id));
   if(done.length) h+=`<div class="sec-hdr">✓ Completed / AP-Waived</div><div class="cgrid">${done.map(id=>cardHtml(id)).join("")}</div>`;
+  if(!ROOT_GROUPS.length) h+=`<div class="empty" style="margin-top:30px;">No reviewed requirements are available yet.</div>`;
   pb.innerHTML=h;
   attachCardEvents(pb);
   pb.querySelectorAll("[data-gtog]").forEach(d=>d.addEventListener("click",()=>
     document.getElementById("gb-"+d.dataset.gtog).classList.toggle("open")));
 }
-
 /* ============================================================
    PAGE 2: COURSES — live data from the Cloudflare Worker + D1
    backend (worker.js / schema.sql). No curated/offline fallback
@@ -812,6 +774,86 @@ async function backendFetch(path){
   if(!res.ok) throw new Error(`HTTP ${res.status} — ${text.slice(0,150)}`);
   try{ return JSON.parse(text); }
   catch(e){ throw new Error(`Response wasn't JSON: ${text.slice(0,150)}`); }
+}
+
+function requirementCourseId(code){
+  return String(code||"").replace(/[^0-9A-Za-z]/g, "");
+}
+function prerequisiteIds(row, courseId){
+  // The catalog prerequisite field contains nested AND/OR alternatives. It
+  // is not safe to flatten that grammar into a list of mandatory courses.
+  // Use only a simple scraper note with no alternatives; ambiguous rules are
+  // left unlocked rather than incorrectly blocking a student.
+  const text=String(row.note||"").trim();
+  if(!/^pre-reqs?:/i.test(text) || /;|\bor\b/i.test(text)) return [];
+  const codes = text.match(/\b\d{2}:\d{3}:\d{3}\b/g)||[];
+  return [...new Set(codes.map(requirementCourseId))].filter(id=>id && id!==courseId && COURSES[id]);
+}
+function loadRequirementTree(requirements){
+  const nextCourses={};
+  const nextGroups={};
+  const rootIds=[];
+  const courseRows=[];
+  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : "all";
+
+  function addGroup(raw, parentId=null){
+    const group={
+      id:raw.id, name:raw.name, rule:mapRule(raw.rule), count:raw.count,
+      parentId, members:[], children:[], sourceProgramId:raw.program_id,
+    };
+    nextGroups[group.id]=group;
+    for(const row of raw.courses||[]){
+      const id=requirementCourseId(row.course_code);
+      if(!id) continue;
+      const existing=nextCourses[id];
+      nextCourses[id]={
+        code:row.course_code,
+        title:row.catalog_title||existing?.title||row.course_code,
+        credits:row.catalog_credits||existing?.credits||"",
+        prereqs:[],
+      };
+      group.members.push(id);
+      courseRows.push({id,row});
+    }
+    for(const child of raw.children||[]) group.children.push(addGroup(child, group.id));
+    return group.id;
+  }
+
+  for(const root of requirements||[]) rootIds.push(addGroup(root));
+  COURSES=nextCourses;
+  for(const {id,row} of courseRows) COURSES[id].prereqs=prerequisiteIds(row,id);
+  GROUPS=nextGroups;
+  ROOT_GROUPS=rootIds;
+}
+
+async function loadAvailablePrograms(){
+  // Fetch every reviewed RBS item. Filtering is deliberately client-side so
+  // future concentrations are not hidden by a hardcoded API type parameter.
+  const data=await backendFetch("/api/programs?school=rbsnb");
+  ST.availablePrograms=(data.programs||[]).filter(p=>["major","minor","concentration"].includes(p.type));
+  return ST.availablePrograms;
+}
+async function loadRequirements(programId){
+  const data=await backendFetch(`/api/programs/${encodeURIComponent(programId)}/requirements`);
+  loadRequirementTree(data.requirements||[]);
+  ST.activeProgram=data.program||null;
+  return data;
+}
+async function loadInitialRequirements(){
+  ST.requirementsLoading=true;
+  ST.requirementsError="";
+  renderPanel();
+  try{
+    const programs=await loadAvailablePrograms();
+    const initial=programs.find(p=>p.id==="rbsnb-bait")||programs[0];
+    if(!initial) throw new Error("No reviewed RBS major is available yet.");
+    await loadRequirements(initial.id);
+  }catch(err){
+    ST.requirementsError=err.message||"Unknown error";
+  }finally{
+    ST.requirementsLoading=false;
+    renderPanel();
+  }
 }
 
 async function loadBackendMeta(){
@@ -1535,6 +1577,7 @@ document.querySelectorAll(".sem-plus").forEach(btn=>btn.addEventListener("click"
 
 // Initial load
 renderAll();
+loadInitialRequirements();
 </script>
 </body>
 </html>
