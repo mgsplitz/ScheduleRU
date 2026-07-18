@@ -223,6 +223,29 @@ function sectionsToStatements(env, program, sections) {
       coursesWritten++;
     }
 
+    let subgroupCounter = 0;
+    for (const subgroup of section.subgroups || []) {
+      subgroupCounter++;
+      const subgroupId = `${groupId}-sub${subgroupCounter}`;
+      stmts.push(
+        env.DB.prepare(
+          `INSERT INTO requirement_groups (id, program_id, parent_group_id, name, rule, count, sort_order, auto_generated)
+           VALUES (?,?,?,?,?,?,?,1)`
+        ).bind(subgroupId, program.id, groupId, subgroup.name, subgroup.rule || "all", subgroup.count ?? null, subgroupCounter)
+      );
+      groupsWritten++;
+      for (const item of subgroup.courseItems || []) {
+        stmts.push(
+          env.DB.prepare(
+            `INSERT OR REPLACE INTO requirement_courses
+               (group_id, course_code, note, source_title, source_credits)
+             VALUES (?,?,?,?,?)`
+          ).bind(subgroupId, item.code, item.note || "", item.title || "", item.credits || "")
+        );
+        coursesWritten++;
+      }
+    }
+
     let orCounter = 0;
     for (const orGroup of section.orGroups) {
       orCounter++;
@@ -420,9 +443,12 @@ function parseBizTable(tableHtml, precedingHeading = "") {
   // selectable-course group, but does not reliably state how many to choose.
   const section = {
     name: sectionName,
+    sourceHeading: precedingHeading,
     courseItems: [],
     orGroups: [],
+    subgroups: [],
     prose: [],
+    placeholderElectiveCount: 0,
     rule: needsHeadingFallback ? "min_courses" : "all",
     count: null,
   };
@@ -446,7 +472,16 @@ function parseBizTable(tableHtml, precedingHeading = "") {
     const noteCell = cells[2] || "";
     if (/credit total/i.test(courseCell)) continue;
     const codeMatches = [...courseCell.matchAll(CODE_RE)];
-    if (!codeMatches.length) continue; // e.g. a bare "BAIT elective" placeholder row
+    if (!codeMatches.length) {
+      // Some RBS pages state the required number of electives as repeated
+      // placeholders in the required-course table (for example, four rows
+      // reading "Finance elective"), then list the actual choices in the
+      // next "Elective Courses" table. Retain the count instead of silently
+      // dropping the requirement just because this particular row has no
+      // course code.
+      if (/\belective\b/i.test(courseCell)) section.placeholderElectiveCount++;
+      continue;
+    }
 
     const items = codeMatches.map((cm, i) => {
       const segStart = cm.index + cm[0].length;
@@ -464,6 +499,84 @@ function parseBizTable(tableHtml, precedingHeading = "") {
   return section.courseItems.length || section.orGroups.length ? section : null;
 }
 
+function isLegacyBizCurriculum(section) {
+  // The app currently represents the active catalog path for a program.
+  // Rutgers labels older tables explicitly (for example, "students admitted
+  // prior to Fall 2022"), so excluding those tables prevents students from
+  // being shown both old and current requirements as if they were cumulative.
+  const heading = String(section.sourceHeading || "");
+  return /\bstudents?\b[\s\S]{0,70}\b(?:admitted|entered)\b[\s\S]{0,70}\b(?:prior|before|earlier)\b/i.test(heading);
+}
+
+function linkBizElectivePlaceholders(sections) {
+  for (let index = 0; index < sections.length; index++) {
+    const source = sections[index];
+    if (!source.placeholderElectiveCount) continue;
+
+    // RBS places the selectable course list immediately after the required
+    // course table. Only infer a count for a plainly titled generic elective
+    // table; headings that already say "at least" or "at most" own their
+    // rule and must not be overwritten.
+    const target = sections.slice(index + 1).find((candidate) =>
+      /^elective courses?$/i.test(String(candidate.name || "").trim()) && candidate.count == null
+    );
+    if (!target) continue;
+    target.rule = "min_courses";
+    target.count = source.placeholderElectiveCount;
+  }
+}
+
+function bizNumber(value) {
+  return WORD_NUM[String(value || "").toLowerCase()] || parseInt(value, 10) || 0;
+}
+
+function applyBizElectiveMixPolicies(sections, html) {
+  const text = htmlToFlatText(html).replace(/\s+/g, " ");
+  const policyRe = /at least\s+(\w+)\s+of your\s+(\w+)\s+major electives[\s\S]{0,140}?must come from the\s+(\d{3})\/([^\.]+?)\s+major code\.\s*no more than\s+(\w+)\s+major elective may come from other departments/gi;
+
+  for (const match of text.matchAll(policyRe)) {
+    const [, minimumText, totalText, subjectCode, subjectName, maximumOutsideText] = match;
+    const minimum = bizNumber(minimumText);
+    const total = bizNumber(totalText);
+    const maximumOutside = bizNumber(maximumOutsideText);
+    if (!minimum || !total || !maximumOutside) continue;
+
+    const electiveSection = sections.find((section) =>
+      /^elective courses?$/i.test(String(section.name || "").trim()) &&
+      section.courseItems.some((item) => item.code.startsWith(`33:${subjectCode}:`))
+    );
+    if (!electiveSection) continue;
+
+    const subjectItems = electiveSection.courseItems.filter((item) => item.code.startsWith(`33:${subjectCode}:`));
+    const outsideItems = electiveSection.courseItems.filter((item) => !item.code.startsWith(`33:${subjectCode}:`));
+    if (!subjectItems.length || !outsideItems.length) continue;
+
+    electiveSection.rule = "min_courses";
+    electiveSection.count = total;
+    electiveSection.subgroups.push(
+      {
+        name: `At least ${minimum} ${subjectName.trim()} elective${minimum === 1 ? "" : "s"}`,
+        rule: "min_courses",
+        count: minimum,
+        courseItems: subjectItems,
+      },
+      {
+        name: `Up to ${maximumOutside} approved elective${maximumOutside === 1 ? "" : "s"} from other departments`,
+        rule: "max_courses",
+        count: maximumOutside,
+        courseItems: outsideItems,
+      }
+    );
+  }
+}
+
+function finalizeBizSections(sections, html) {
+  const activeCatalogSections = sections.filter((section) => !isLegacyBizCurriculum(section));
+  linkBizElectivePlaceholders(activeCatalogSections);
+  applyBizElectiveMixPolicies(activeCatalogSections, html);
+  return activeCatalogSections;
+}
+
 function parseBizPageText(html) {
   const sections = [];
   let currentHeading = "";
@@ -474,7 +587,7 @@ function parseBizPageText(html) {
     if (section) sections.push(section);
     lastTableEnd = match.index + match[0].length;
   }
-  return sections;
+  return finalizeBizSections(sections, html);
 }
 
 // parseBizTable/parseBizPageText only ever look INSIDE <table> elements.
@@ -529,6 +642,11 @@ function extractBizProse(html) {
         }
         // else: not under a Special Notes heading, or looks like a link
         // title rather than a policy sentence — skip either way.
+      } else if (/policy on .*electives/i.test(currentHeading) && /\b(?:at least|at most|no more than|must)\b/i.test(line)) {
+        // A small number of majors state a qualifying elective mix in prose
+        // rather than in a table. Save that wording for review instead of
+        // pretending that a plain elective list fully captures the rule.
+        notes.push({ section_name: currentHeading, raw_text: line });
       } else if (/^\*\S/.test(line) && line.length > 8) {
         notes.push({ section_name: currentHeading || "Footnote", raw_text: line });
       }

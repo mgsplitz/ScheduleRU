@@ -610,7 +610,7 @@ function groupFulfilled(gk){
   const members = g.members || [];
   const done = members.filter(id=>isCompleted(id)).length;
   if(g.rule==="all") return members.every(id=>isCompleted(id)) && (g.children||[]).every(groupFulfilled);
-  return g.rule==="min" ? done >= g.count : done <= g.count && done > 0;
+  return g.rule==="min" ? done >= g.count : done <= g.count;
 }
 
 /* ============================================================
@@ -804,9 +804,10 @@ function renderRequirementPicker(){
   if(!g) return;
   const selected=selectedRequirementCourses(g.id);
   const limit=selectionLimit(g);
+  const constraints=(g.children||[]).map(id=>GROUPS[id]).filter(isConstraintGroup);
   const search=String(document.getElementById("pickerSearch")?.value||"").trim().toLowerCase();
   document.getElementById("pickerIntro").textContent=
-    `Choose up to ${limit} approved ${limit===1?"course":"courses"} for this requirement. After those choices are filled, additional courses from this list can be saved to your wishlist.`;
+    `Choose up to ${limit} approved ${limit===1?"course":"courses"} for this requirement.${constraints.length?` Your choices must also satisfy: ${constraints.map(child=>`${groupDisplayName(child)} (${groupRuleLabel(child)})`).join("; ")}.`:""} After those choices are filled, additional courses from this list can be saved to your wishlist.`;
   const ids=(g.members||[]).filter(id=>{
     const c=COURSES[id];
     return c && (!search || `${c.code} ${c.title} ${c.fullTitle||""}`.toLowerCase().includes(search));
@@ -833,7 +834,13 @@ function renderRequirementPicker(){
     if(current.includes(id)){
       ST.groupSelections[g.id]=current.filter(item=>item!==id);
     }else if(current.length<limit){
-      ST.groupSelections[g.id]=[...current,id];
+      const proposed=[...current,id];
+      const violation=parentSelectionConstraintViolation(g, proposed);
+      if(violation){
+        alert(violation);
+        return;
+      }
+      ST.groupSelections[g.id]=proposed;
     }else{
       ST.wishlist[id]=true;
     }
@@ -986,6 +993,48 @@ function selectedRequirementCourses(gk){
 function selectionLimit(g){
   return Math.max(1,Number(g?.count)||1);
 }
+function isConstraintGroup(g){
+  const parent=GROUPS[g?.parentId];
+  if(!parent || !g?.members?.length || !parent.members?.length) return false;
+  const parentMembers=new Set(parent.members);
+  return g.members.every(id=>parentMembers.has(id));
+}
+function constraintSelectionCount(g){
+  const parent=GROUPS[g?.parentId];
+  if(!parent) return 0;
+  const plannedOrCompleted=new Set([
+    ...selectedRequirementCourses(parent.id),
+    ...(parent.members||[]).filter(id=>isCompleted(id)),
+  ]);
+  return (g.members||[]).filter(id=>plannedOrCompleted.has(id)).length;
+}
+function parentSelectionConstraintViolation(parent, proposed){
+  const limit=selectionLimit(parent);
+  const planned=new Set(proposed);
+  for(const childId of parent.children||[]){
+    const child=GROUPS[childId];
+    if(!isConstraintGroup(child)) continue;
+    const chosen=(child.members||[]).filter(id=>planned.has(id)).length;
+    if(child.rule==="max" && chosen>child.count){
+      return `${groupDisplayName(child)} allows at most ${child.count} course${child.count===1?"":"s"}.`;
+    }
+    if(child.rule==="min"){
+      const remainingSlots=limit-proposed.length;
+      if(chosen+remainingSlots<child.count){
+        return `Keep enough room for ${groupDisplayName(child)}: at least ${child.count} course${child.count===1?"":"s"} are required.`;
+      }
+      if(proposed.length===limit && chosen<child.count){
+        return `${groupDisplayName(child)} needs at least ${child.count} selected course${child.count===1?"":"s"}.`;
+      }
+    }
+  }
+  return "";
+}
+function constraintSummaryHtml(g){
+  const selected=constraintSelectionCount(g);
+  const requirement=g.rule==="min" ? `at least ${g.count}` : `up to ${g.count}`;
+  return `<div class="choice-summary">${selected} selected or completed · ${requirement} required. Choose these through the approved list above.</div>`;
+}
 function pickerSummaryHtml(gk){
   const g=GROUPS[gk];
   const selected=selectedRequirementCourses(gk);
@@ -1005,7 +1054,7 @@ function groupHtml(gk){
   const ok=groupFulfilled(gk);
   const members=(g.members||[]).filter(id=>!isCompleted(id));
   const children=(g.children||[]).map(groupHtml).join("");
-  const body=isPickerGroup(g) ? pickerSummaryHtml(gk) : (members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`:"");
+  const body=isConstraintGroup(g) ? constraintSummaryHtml(g) : (isPickerGroup(g) ? pickerSummaryHtml(gk) : (members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>` : ""));
   return `<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
     <span class="gn">${groupDisplayName(g)}</span>
     <span class="gm">${groupRuleLabel(g)} · click to expand</span>
