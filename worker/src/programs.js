@@ -617,7 +617,9 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
   if (path === "/api/programs" && request.method === "GET") {
     const school = url.searchParams.get("school");
     const type = url.searchParams.get("type");
-    let where = " WHERE 1=1", binds = [];
+    // Public program lists intentionally exclude scraped data until a human
+    // has reviewed it. Admin routes below remain the review/debug path.
+    let where = " WHERE review_status = 'reviewed'", binds = [];
     if (school) { where += " AND school_slug = ?"; binds.push(school); }
     if (type) { where += " AND type = ?"; binds.push(type); }
     const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();
@@ -626,7 +628,11 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
 
   if (path.match(/^\/api\/programs\/[^/]+\/requirements$/) && request.method === "GET") {
     const programId = decodeURIComponent(path.split("/")[3]);
-    const program = await env.DB.prepare(`SELECT * FROM programs WHERE id = ?`).bind(programId).first();
+    // Treat unreviewed programs exactly like unknown ids to avoid exposing
+    // unreviewed requirements through the public endpoint.
+    const program = await env.DB.prepare(
+      `SELECT * FROM programs WHERE id = ? AND review_status = 'reviewed'`
+    ).bind(programId).first();
     if (!program) return json({ error: "not found" }, 404);
     const tree = await getRequirementTree(env, programId);
     return json({ program, requirements: tree });
@@ -636,10 +642,23 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     const ids = (url.searchParams.get("programs") || "").split(",").map((s) => s.trim()).filter(Boolean);
     if (!ids.length) return json({ error: "pass ?programs=id1,id2" }, 400);
     const out = {};
-    for (const id of ids) out[id] = await getRequirementTree(env, id);
-    const { results: doubleCounts } = await env.DB.prepare(
-      `SELECT * FROM double_count_rules WHERE program_a IN (${ids.map(() => "?").join(",")}) OR program_b IN (${ids.map(() => "?").join(",")})`
-    ).bind(...ids, ...ids).all();
+    const { results: reviewedPrograms } = await env.DB.prepare(
+      `SELECT id FROM programs WHERE review_status = 'reviewed' AND id IN (${ids.map(() => "?").join(",")})`
+    ).bind(...ids).all();
+    const reviewedIds = new Set(reviewedPrograms.map((program) => program.id));
+    const visibleIds = ids.filter((id) => reviewedIds.has(id));
+
+    // Silently omit unknown or unreviewed ids, keeping the response useful
+    // for any reviewed programs requested alongside them.
+    for (const id of visibleIds) out[id] = await getRequirementTree(env, id);
+
+    let doubleCounts = [];
+    if (visibleIds.length) {
+      const { results } = await env.DB.prepare(
+        `SELECT * FROM double_count_rules WHERE program_a IN (${visibleIds.map(() => "?").join(",")}) OR program_b IN (${visibleIds.map(() => "?").join(",")})`
+      ).bind(...visibleIds, ...visibleIds).all();
+      doubleCounts = results;
+    }
     return json({ requirements: out, double_count_rules: doubleCounts });
   }
 
