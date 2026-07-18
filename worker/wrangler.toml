@@ -1,0 +1,41 @@
+name = "rutgers-course-sync"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# Every run now does ONE full-catalog fetch (Rutgers ignores subject filters
+# server-side, so per-subject looping was just re-fetching the same ~4,400
+# courses redundantly — see the comment at the top of worker.js). Cheap
+# enough to run every 15 minutes; the write side is chunked separately via
+# COURSES_PER_RUN below so a single invocation never tries to write all
+# ~15,000 course/section/meeting rows at once.
+[triggers]
+crons = ["*/15 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rutgers_courses"
+database_id = "d2faadfd-d361-46a9-a4eb-ae380b295748"   # printed by `wrangler d1 create`
+
+[vars]
+CURRENT_YEAR = "2026"
+CURRENT_TERM = "9"          # 0=Winter 1=Spring 7=Summer 9=Fall
+COURSES_PER_RUN = "400"     # courses written per cron run (~4,400 total courses / 400 ≈ 11 runs ≈ ~2.75hrs for a full pass at 15min cron)
+
+# Catalog subdomain for the degree-requirements scraper (src/programs.js).
+# Rutgers/Coursedog publish a new subdomain per catalog year, e.g.
+# "newbrunswick-undergrad-25-26" -> "newbrunswick-undergrad-26-27" next
+# fall. Bump this once a year rather than editing programs.js.
+CATALOG_SUBDOMAIN = "newbrunswick-undergrad-25-26"
+
+# ADMIN_SECRET is still NOT set here as a plain [vars] line — wrangler.toml
+# (and the Cloudflare dashboard's vars view) shows plaintext, so anything
+# here is effectively public. It still needs to be set as an encrypted
+# secret instead, same mechanism as before, just keeping the value you
+# asked for:
+#
+#   wrangler secret put ADMIN_SECRET
+#   (paste: RutgersGaps)
+#
+# worker.js/programs.js both read it as env.ADMIN_SECRET either way, so no
+# code change is needed here — just don't add a line like
+# ADMIN_SECRET="RutgersGaps" directly into this file.
