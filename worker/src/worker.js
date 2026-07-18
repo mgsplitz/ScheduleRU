@@ -161,7 +161,10 @@ function mapCourseJson(course, env, openSet, now) {
       course_number: num,
       year,
       term,
-      title: course.title || course.expandedTitle || "(untitled)",
+      // Rutgers supplies a short display label and, for many courses, a
+      // complete expanded title. Prefer the latter so the catalog and degree
+      // requirements use understandable names instead of abbreviations.
+      title: course.expandedTitle || course.title || "(untitled)",
       credits: String(course.credits ?? course.creditsObject?.value ?? ""),
       description: course.courseDescription || "",
       prereqs: course.preReqNotes || "",

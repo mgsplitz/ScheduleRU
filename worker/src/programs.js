@@ -214,8 +214,11 @@ function sectionsToStatements(env, program, sections) {
 
     for (const item of section.courseItems) {
       stmts.push(
-        env.DB.prepare(`INSERT OR REPLACE INTO requirement_courses (group_id, course_code, note) VALUES (?,?,?)`)
-          .bind(groupId, item.code, item.note || "")
+        env.DB.prepare(
+          `INSERT OR REPLACE INTO requirement_courses
+             (group_id, course_code, note, source_title, source_credits)
+           VALUES (?,?,?,?,?)`
+        ).bind(groupId, item.code, item.note || "", item.title || "", item.credits || "")
       );
       coursesWritten++;
     }
@@ -233,8 +236,11 @@ function sectionsToStatements(env, program, sections) {
       groupsWritten++;
       for (const item of orGroup) {
         stmts.push(
-          env.DB.prepare(`INSERT OR REPLACE INTO requirement_courses (group_id, course_code, note) VALUES (?,?,?)`)
-            .bind(orGroupId, item.code, item.note || "")
+          env.DB.prepare(
+            `INSERT OR REPLACE INTO requirement_courses
+               (group_id, course_code, note, source_title, source_credits)
+             VALUES (?,?,?,?,?)`
+          ).bind(orGroupId, item.code, item.note || "", item.title || "", item.credits || "")
         );
         coursesWritten++;
       }
@@ -640,9 +646,16 @@ async function getRequirementTree(env, programId) {
      ORDER BY CASE WHEN program_id = ? THEN 1 ELSE 0 END, sort_order, id`
   ).bind(...ownerIds, programId).all();
   const { results: courses } = await env.DB.prepare(
-    `SELECT rc.*, c.title as catalog_title, c.credits as catalog_credits, c.prereqs as catalog_prereqs
+    `SELECT rc.*, c.title as catalog_title, c.credits as catalog_credits,
+            c.description as catalog_description, c.prereqs as catalog_prereqs,
+            c.subject_notes as catalog_subject_notes,
+            (
+              SELECT GROUP_CONCAT(DISTINCT s.restrictions)
+              FROM sections s
+              WHERE s.course_id = c.id AND NULLIF(TRIM(s.restrictions), '') IS NOT NULL
+            ) as section_restrictions
      FROM requirement_courses rc
-     LEFT JOIN courses c ON c.subject_code || ':' || c.course_number = substr(rc.course_code, 4)
+     LEFT JOIN courses c ON c.school || ':' || c.subject_code || ':' || c.course_number = rc.course_code
      WHERE rc.group_id IN (SELECT id FROM requirement_groups WHERE program_id IN (${placeholders}))`
   ).bind(...ownerIds).all();
 

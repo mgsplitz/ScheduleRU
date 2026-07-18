@@ -27,6 +27,9 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .topbar-title{font-size:14px;font-weight:700;border-left:1px solid rgba(255,255,255,.4);padding-left:14px;}
 .topbar .sp{flex:1;}
 .topbar-user{font-size:11px;text-align:right;line-height:1.5;}
+.program-btn{background:#fff;color:var(--scarlet);border:none;border-radius:4px;padding:6px 9px;
+  font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.program-btn:hover{background:#ffe6ec;}
 
 /* PAGE NAV (Degree Navigator / Courses) */
 .pagenav{background:var(--black);display:flex;align-items:center;
@@ -116,14 +119,15 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   border-radius:3px;margin:14px 0 7px;}
 .cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
 .cc{background:var(--card);border:1px solid var(--line);border-radius:5px;
-  padding:6px;cursor:grab;transition:.12s;position:relative;}
-.cc:hover:not(.gr){box-shadow:var(--shadow);transform:translateY(-1px);border-color:var(--scarlet);}
+  padding:6px;cursor:pointer;transition:.12s;position:relative;}
+.cc:hover{box-shadow:var(--shadow);transform:translateY(-1px);border-color:var(--scarlet);}
+.cc[draggable="true"]{cursor:grab;}
 .cc .code{font-family:var(--fmono);font-weight:700;font-size:9.5px;color:var(--scarlet);}
 .cc .ttl{font-size:10.5px;font-weight:600;line-height:1.2;margin:2px 0 3px;}
 .cc .meta{font-size:9px;color:var(--muted);}
 .cc .restr{display:inline-block;margin-top:2px;font-size:8px;
   background:#fdf1da;color:#8a6d1f;padding:1px 4px;border-radius:3px;}
-.cc.gr{background:var(--gray);color:var(--grayt);cursor:not-allowed;}
+.cc.gr{background:var(--gray);color:var(--grayt);cursor:pointer;}
 .cc.gr .code,.cc.gr .ttl{color:var(--grayt);}
 .cc.done{background:var(--green);border-color:var(--green-l);}
 .chk{position:absolute;top:4px;left:4px;width:12px;height:12px;
@@ -142,6 +146,15 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .gr-hdr.ok .gn::after{content:" ✓";color:#3a8a3a;}
 .gr-body{padding:7px;display:none;}
 .gr-body.open{display:block;}
+.choice-summary{font-size:11px;color:var(--muted);line-height:1.4;margin:1px 0 8px;}
+.choice-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:8px;}
+.choice-btn,.picker-btn{background:var(--scarlet);color:#fff;border:none;border-radius:4px;
+  padding:6px 9px;font-size:10.5px;font-weight:700;cursor:pointer;}
+.choice-btn:hover,.picker-btn:hover{background:var(--scarlet-d);}
+.choice-btn.secondary,.picker-btn.secondary{background:#fff;color:var(--scarlet);border:1px solid var(--scarlet);}
+.choice-btn.secondary:hover,.picker-btn.secondary:hover{background:#fff5f7;}
+.choice-picked{background:#f9f7f0;border:1px solid var(--line);border-radius:4px;padding:7px;}
+.choice-picked .cgrid{margin-top:6px;}
 
 /* COURSES PAGE */
 .courses-page{padding:20px 28px;overflow-y:auto;}
@@ -212,6 +225,16 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 /* LEGEND NOTE */
 .leg{font-size:10px;color:var(--muted);background:#f9f7f0;
   border:1px solid var(--line);border-radius:4px;padding:7px 9px;margin-bottom:8px;}
+.dc-banner{font-size:10.5px;line-height:1.45;border-radius:4px;padding:8px 9px;margin-bottom:8px;
+  border:1px solid var(--line);background:#f9f7f0;}
+.dc-banner.warn{background:#fff5f7;border-color:#f3c9ce;color:#7a1d34;}
+.dc-banner.ok{background:#f2faef;border-color:#b8d8b1;color:#32662d;}
+.dc-banner b{display:block;font-size:11px;margin-bottom:2px;}
+.program-option{display:flex;align-items:flex-start;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:12px;cursor:pointer;}
+.program-option input{margin-top:2px;}
+.program-option small{display:block;color:var(--muted);margin-top:2px;}
+.program-picker-note{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:9px;}
+.modal-footer{display:flex;justify-content:flex-end;gap:7px;margin-top:14px;}
 
 /* MODALS */
 .ov{position:fixed;inset:0;background:rgba(20,15,10,.5);
@@ -234,6 +257,23 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .src-note{font-size:10px;color:var(--muted);margin-top:14px;
   border-top:1px solid var(--line);padding-top:8px;}
 .src-note a{color:var(--scarlet);}
+
+/* REQUIREMENT COURSE PICKER */
+.picker-intro{font-size:12px;line-height:1.45;margin-bottom:10px;color:var(--black);}
+.picker-search{width:100%;border:1px solid var(--line);border-radius:4px;padding:8px 10px;
+  font-size:12px;font-family:var(--ff);margin-bottom:10px;}
+.picker-list{display:flex;flex-direction:column;gap:6px;}
+.picker-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:center;
+  border:1px solid var(--line);border-radius:5px;padding:8px 9px;}
+.picker-row.selected{border-color:var(--green-l);background:var(--green);}
+.picker-code{font-family:var(--fmono);font-weight:700;font-size:10px;color:var(--scarlet);}
+.picker-name{font-size:12px;font-weight:700;margin-top:2px;}
+.picker-meta{font-size:10px;color:var(--muted);margin-top:2px;}
+.picker-actions{display:flex;gap:5px;align-items:center;}
+.picker-btn{padding:5px 7px;font-size:10px;white-space:nowrap;}
+.picker-btn.view{background:#fff;color:var(--scarlet);border:1px solid var(--scarlet);}
+.picker-btn.view:hover{background:#fff5f7;}
+.detail-empty{color:var(--muted);font-style:italic;}
 
 /* PREREQ HOVER TOOLTIP (Courses page only) */
 .prereq-hint{position:relative;display:inline-block;font-size:9.5px;color:var(--scarlet);
@@ -329,9 +369,10 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 <div class="topbar">
   <div class="block-r">R</div>
   <div class="brand"><b>RUTGERS</b><span>BUSINESS SCHOOL · NB</span></div>
-  <div class="topbar-title">BAIT Degree Navigator</div>
+  <div class="topbar-title" id="topProgramTitle">Degree Navigator</div>
+  <button class="program-btn" id="programBtn">Programs</button>
   <div class="sp"></div>
-  <div class="topbar-user"><b>Fall 2026</b><br/>Business Analytics &amp; IT</div>
+  <div class="topbar-user"><b>Fall 2026</b><br/><span id="topProgramMeta">Business Analytics &amp; IT</span></div>
 </div>
 
 <div class="pagenav">
@@ -402,8 +443,32 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 <!-- PREREQ MODAL -->
 <div class="ov" id="prOv">
   <div class="modal">
-    <div class="mhdr"><span id="prTitle">Prerequisites</span><button class="xbtn" id="prClose">✕</button></div>
+    <div class="mhdr"><span id="prTitle">Course details</span><button class="xbtn" id="prClose">✕</button></div>
     <div class="mbody" id="prBody"></div>
+  </div>
+</div>
+
+<!-- REQUIREMENT COURSE PICKER -->
+<div class="ov" id="pickerOv">
+  <div class="modal">
+    <div class="mhdr"><span id="pickerTitle">Choose a course</span><button class="xbtn" id="pickerClose">✕</button></div>
+    <div class="mbody">
+      <div class="picker-intro" id="pickerIntro"></div>
+      <input class="picker-search" id="pickerSearch" placeholder="Search this approved course list" />
+      <div class="picker-list" id="pickerList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRAM SELECTOR -->
+<div class="ov" id="programOv">
+  <div class="modal" style="width:500px">
+    <div class="mhdr">Choose RBS programs <button class="xbtn" id="programClose">✕</button></div>
+    <div class="mbody">
+      <div class="program-picker-note">Choose one to three reviewed RBS programs. Shared requirements are shown once; the app will flag potential double-counting outside those shared groups.</div>
+      <div id="programList"></div>
+      <div class="modal-footer"><button class="choice-btn secondary" id="programCancel">Cancel</button><button class="choice-btn" id="programApply">Apply programs</button></div>
+    </div>
   </div>
 </div>
 
@@ -461,7 +526,7 @@ let ROOT_GROUPS = [];
    STATE
    ============================================================ */
 const ST = {
-  apOn:{}, completed:{}, schedule:{}, wishlist:{},
+  apOn:{}, completed:{}, schedule:{}, wishlist:{}, groupSelections:{},
   year:1, tab:"required", panelFull:false,
   page:"nav", // top-level page: "nav" (Degree Navigator) | "courses" (Courses)
   // Backend (Cloudflare Worker + D1) integration — see worker.js/schema.sql.
@@ -469,7 +534,8 @@ const ST = {
   // so this is a plain same-origin-friendly fetch (the worker sends CORS
   // headers itself) rather than needing a public relay.
   backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem("bait_backend_url")) || "https://rutgers-course-sync.housselllaura.workers.dev",
-  availablePrograms:[], activeProgram:null,
+  availablePrograms:[], activeProgram:null, selectedPrograms:[],
+  requirementTrees:{}, doubleCountPolicies:[], doubleCountRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   backendSubject:"", backendSearch:"", backendPage:1,
   backendCourses:[], backendTotal:0, backendLoading:false, backendError:"",
@@ -506,6 +572,18 @@ function prereqsMet(id){
   if(!c || !c.prereqs.length) return true;
   return c.prereqs.every(p => isCompleted(p));
 }
+function standingRequirement(c){
+  const text=[c?.restrictions,...(c?.requirementNotes||[])].join(" ").toLowerCase();
+  if(/senior\s+(year|standing|status)|4th\s+year/.test(text)) return {year:4,label:"Senior (4th-year) standing required"};
+  if(/junior\s*(\/|or|and|-)?\s*senior|junior\s+(year|standing|status)|3rd\s+year/.test(text)) return {year:3,label:"Junior (3rd-year) standing required"};
+  if(/all\s+except\s+(?:1st|first)[ -]?year|not\s+open\s+to\s+(?:1st|first)[ -]?year|except\s+(?:1st|first)[ -]?year/.test(text)) return {year:2,label:"Not open to first-year students"};
+  return null;
+}
+function courseAvailable(id){
+  const c=COURSES[id];
+  const standing=standingRequirement(c);
+  return prereqsMet(id) && (!standing || ST.year>=standing.year);
+}
 function groupFulfilled(gk){
   const g = GROUPS[gk];
   if(!g) return false;
@@ -526,6 +604,69 @@ document.querySelectorAll(".pagenav-btn").forEach(b=>b.addEventListener("click",
   document.getElementById("page-courses").style.display = ST.page==="courses" ? "" : "none";
   if(ST.page==="courses") renderCoursesPage();
 }));
+
+/* ============================================================
+   PROGRAM SELECTION (one to three reviewed RBS programs)
+   ============================================================ */
+const MAX_MAJORS=3;
+function selectedProgramRows(){
+  const selected=new Set(ST.selectedPrograms);
+  return (ST.availablePrograms||[]).filter(program=>selected.has(program.id));
+}
+function updateProgramTitle(){
+  const names=selectedProgramRows().map(program=>program.name);
+  document.getElementById("topProgramTitle").textContent=names.length?`${names.join(" + ")} Degree Navigator`:"Degree Navigator";
+  document.getElementById("topProgramMeta").textContent=names.join(" + ")||"RBS New Brunswick";
+}
+function closeProgramPicker(){
+  document.getElementById("programOv").classList.remove("open");
+  delete ST.programDraft;
+}
+function openProgramPicker(){
+  ST.programDraft=[...ST.selectedPrograms];
+  const list=document.getElementById("programList");
+  list.innerHTML=(ST.availablePrograms||[]).map(program=>`<label class="program-option">
+    <input type="checkbox" data-program-choice="${program.id}" ${ST.programDraft.includes(program.id)?"checked":""}/>
+    <span><strong>${escapeHtml(program.name)}</strong><small>${escapeHtml(program.type||"program")}</small></span>
+  </label>`).join("") || `<div class="api-status">No reviewed RBS programs are available yet.</div>`;
+  list.querySelectorAll("[data-program-choice]").forEach(input=>input.addEventListener("change",()=>{
+    const id=input.dataset.programChoice;
+    const draft=new Set(ST.programDraft||[]);
+    if(input.checked){
+      if(draft.size>=MAX_MAJORS){
+        input.checked=false;
+        alert(`You can compare up to ${MAX_MAJORS} programs at a time.`);
+        return;
+      }
+      draft.add(id);
+    }else{
+      draft.delete(id);
+    }
+    ST.programDraft=[...draft];
+  }));
+  document.getElementById("programOv").classList.add("open");
+}
+document.getElementById("programBtn").addEventListener("click", openProgramPicker);
+document.getElementById("programClose").addEventListener("click", closeProgramPicker);
+document.getElementById("programCancel").addEventListener("click", closeProgramPicker);
+document.getElementById("programApply").addEventListener("click", async()=>{
+  const ids=(ST.programDraft||[]);
+  if(!ids.length){ alert("Choose at least one program."); return; }
+  ST.selectedPrograms=ids;
+  closeProgramPicker();
+  ST.requirementsLoading=true;
+  ST.requirementsError="";
+  renderPanel();
+  try{
+    await loadSelectedRequirements(ids);
+    updateProgramTitle();
+  }catch(err){
+    ST.requirementsError=err.message||"Could not load the selected programs.";
+  }finally{
+    ST.requirementsLoading=false;
+    renderPanel();
+  }
+});
 
 /* ============================================================
    PANEL EXPAND
@@ -558,34 +699,119 @@ document.getElementById("apClose").addEventListener("click", () =>
   document.getElementById("apOv").classList.remove("open"));
 
 /* ============================================================
-   PREREQ MODAL
+   COURSE DETAILS MODAL
    ============================================================ */
-function openPrereqModal(id){
+function detailRow(label, value, emptyText="Not listed"){
+  const text=cleanApiText(value);
+  return `<tr><td>${escapeHtml(label)}</td><td>${text?escapeHtml(text):`<span class="detail-empty">${escapeHtml(emptyText)}</span>`}</td></tr>`;
+}
+function openCourseDetails(id){
   const c = COURSES[id];
-  document.getElementById("prTitle").textContent = "Prerequisites — " + c.title;
+  if(!c) return;
+  document.getElementById("prTitle").textContent = "Course details";
   const body = document.getElementById("prBody");
-  if(!c.prereqs.length){
-    body.innerHTML = "<p>No prerequisites — course is available now.</p>";
-  } else {
-    body.innerHTML = c.prereqs.map(pid => {
-      const p = COURSES[pid];
-      const done = isCompleted(pid);
-      return `<div class="prereq-row">${done?"✅":"▢"} <strong>${p?p.code:pid}</strong> — ${p?p.title:""}</div>`;
-    }).join("") +
-    `<p style="margin-top:10px;font-size:11px;color:var(--muted);">
-      Mark courses as taken/waived (circle icon) or add AP credits to unlock this course.</p>`;
-  }
+  const plannedPrereqs=(c.prereqs||[]).map(pid=>{
+    const p=COURSES[pid];
+    return `${p?p.code:pid}${p?` — ${p.title}`:""}`;
+  }).join("; ");
+  const requirementNotes=(c.requirementNotes||[]).join("; ");
+  const standing=standingRequirement(c);
+  const status=courseAvailable(id)
+    ? (c.prereqs?.length ? "Available based on the simple prerequisite rules the app can verify." : "No simple prerequisite rule is blocking this course in the app. Read the official prerequisite text below.")
+    : (!prereqsMet(id) ? "Not yet available based on the simple prerequisite rules the app can verify." : `Not yet available in the ${YL[ST.year]||"selected"} plan year because ${standing?.label?.toLowerCase()||"of an enrollment restriction"}.`);
+  body.innerHTML=`
+    <table class="dtable">
+      ${detailRow("Course code",c.code)}
+      ${detailRow("Full course title",c.fullTitle||c.title)}
+      ${detailRow("Credits",c.credits,"Not listed on the current source")}
+      ${detailRow("Official prerequisites",c.catalogPrereqs,"None listed in the current course catalog")}
+      ${detailRow("Course description",c.description,"Not available from the current catalog record")}
+      ${detailRow("Enrollment restrictions",c.restrictions,"No current-term restriction was published")}
+      ${standing?detailRow("Academic-standing rule",standing.label):""}
+      ${detailRow("Special notes",c.subjectNotes,"None listed")}
+      ${detailRow("Requirement note",requirementNotes,"None listed")}
+      ${plannedPrereqs?detailRow("App-checked prerequisites",plannedPrereqs):""}
+    </table>
+    <p class="src-note">${escapeHtml(status)} Course details come from the official degree requirement and the current Rutgers course catalog when that course is offered this term.</p>`;
   document.getElementById("prOv").classList.add("open");
 }
-document.getElementById("prClose").addEventListener("click", () =>
-  document.getElementById("prOv").classList.remove("open"));
+function closeCourseDetails(){
+  document.getElementById("prOv").classList.remove("open");
+  if(ST.returnToPicker && ST.pickerGroupId){
+    ST.returnToPicker=false;
+    document.getElementById("pickerOv").classList.add("open");
+    renderRequirementPicker();
+  }
+}
+document.getElementById("prClose").addEventListener("click", closeCourseDetails);
+
+/* ============================================================
+   LARGE REQUIREMENT GROUP PICKER
+   ============================================================ */
+function closeRequirementPicker(){
+  document.getElementById("pickerOv").classList.remove("open");
+  ST.pickerGroupId=null;
+}
+function openRequirementPicker(gk){
+  const g=GROUPS[gk];
+  if(!isPickerGroup(g)) return;
+  ST.pickerGroupId=gk;
+  document.getElementById("pickerTitle").textContent=groupDisplayName(g);
+  document.getElementById("pickerOv").classList.add("open");
+  renderRequirementPicker();
+  document.getElementById("pickerSearch").focus();
+}
+function renderRequirementPicker(){
+  const g=GROUPS[ST.pickerGroupId];
+  if(!g) return;
+  const selected=selectedRequirementCourses(g.id);
+  const limit=selectionLimit(g);
+  const search=String(document.getElementById("pickerSearch")?.value||"").trim().toLowerCase();
+  document.getElementById("pickerIntro").textContent=
+    `Choose up to ${limit} approved ${limit===1?"course":"courses"} for this requirement. After those choices are filled, additional courses from this list can be saved to your wishlist.`;
+  const ids=(g.members||[]).filter(id=>{
+    const c=COURSES[id];
+    return c && (!search || `${c.code} ${c.title} ${c.fullTitle||""}`.toLowerCase().includes(search));
+  });
+  const list=document.getElementById("pickerList");
+  list.innerHTML=ids.length?ids.map(id=>{
+    const c=COURSES[id];
+    const picked=selected.includes(id);
+    const selectSlotAvailable=selected.length<limit;
+    const mainLabel=picked?"Remove":selectSlotAvailable?"Use for requirement":"+ Wishlist";
+    return `<div class="picker-row${picked?" selected":""}">
+      <div><div class="picker-code">${escapeHtml(c.code)}</div><div class="picker-name">${escapeHtml(c.fullTitle||c.title)}</div><div class="picker-meta">${escapeHtml(c.credits||"?")} credits</div></div>
+      <div class="picker-actions"><button class="picker-btn view" data-pview="${id}">Details</button><button class="picker-btn" data-pchoose="${id}">${mainLabel}</button></div>
+    </div>`;
+  }).join(""):`<div class="api-status">No approved course matches that search.</div>`;
+  list.querySelectorAll("[data-pview]").forEach(b=>b.addEventListener("click",()=>{
+    ST.returnToPicker=true;
+    document.getElementById("pickerOv").classList.remove("open");
+    openCourseDetails(b.dataset.pview);
+  }));
+  list.querySelectorAll("[data-pchoose]").forEach(b=>b.addEventListener("click",()=>{
+    const id=b.dataset.pchoose;
+    const current=selectedRequirementCourses(g.id);
+    if(current.includes(id)){
+      ST.groupSelections[g.id]=current.filter(item=>item!==id);
+    }else if(current.length<limit){
+      ST.groupSelections[g.id]=[...current,id];
+    }else{
+      ST.wishlist[id]=true;
+    }
+    renderAll();
+    renderRequirementPicker();
+  }));
+}
+document.getElementById("pickerClose").addEventListener("click", closeRequirementPicker);
+document.getElementById("pickerSearch").addEventListener("input", renderRequirementPicker);
 
 /* ============================================================
    SCHEDULE
    ============================================================ */
 const YL = {1:"1st Year",2:"2nd Year",3:"3rd Year",4:"4th Year"};
-document.getElementById("yPrev").addEventListener("click", ()=>{if(ST.year>1){ST.year--;renderSchedule();}});
-document.getElementById("yNext").addEventListener("click", ()=>{if(ST.year<4){ST.year++;renderSchedule();}});
+document.getElementById("yPrev").addEventListener("click", ()=>{if(ST.year>1){ST.year--;renderAll();}});
+document.getElementById("yNext").addEventListener("click", ()=>{if(ST.year<4){ST.year++;renderAll();}});
 
 function renderSchedule(){
   document.getElementById("yLabel").textContent = YL[ST.year];
@@ -634,7 +860,7 @@ function setupDropZones(){
       if(!cid) return;
       let code, title, credits;
       if(COURSES[cid]){
-        if(COURSES[cid].type!=="gen"&&!prereqsMet(cid)) return;
+        if(COURSES[cid].type!=="gen"&&!courseAvailable(cid)) return;
         code=COURSES[cid].code; title=COURSES[cid].title; credits=COURSES[cid].credits;
       } else {
         code=cid; title=cid; credits="";
@@ -669,8 +895,9 @@ document.querySelectorAll(".tab-btn").forEach(b=>b.addEventListener("click",()=>
    ============================================================ */
 function cardHtml(id, opts={}){
   const c=COURSES[id];
+  if(!c) return "";
   const done=isCompleted(id);
-  const ok=prereqsMet(id);
+  const ok=courseAvailable(id);
   const gray=!done&&!ok;
   return `<div class="cc${gray?" gr":""}${done?" done":""}" draggable="${!gray}" data-cid="${id}">
     <div class="chk${ST.completed[id]?" on":""}" data-chk="${id}"></div>
@@ -678,15 +905,14 @@ function cardHtml(id, opts={}){
     <div class="code">${c.code}</div>
     <div class="ttl">${c.title}</div>
     <div class="meta">${c.credits} cr</div>
-    ${c.restriction?`<div class="restr">${c.restriction}</div>`:""}
+    ${standingRequirement(c)?`<div class="restr">${standingRequirement(c).label}</div>`:c.restrictions?`<div class="restr">${c.restrictions}</div>`:""}
   </div>`;
 }
 
 function attachCardEvents(el){
   el.querySelectorAll("[data-cid]").forEach(card=>{
     card.addEventListener("dragstart",e=>e.dataTransfer.setData("cid",card.dataset.cid));
-    if(card.classList.contains("gr"))
-      card.addEventListener("click",()=>openPrereqModal(card.dataset.cid));
+    card.addEventListener("click",()=>openCourseDetails(card.dataset.cid));
   });
   el.querySelectorAll("[data-chk]").forEach(d=>d.addEventListener("click",e=>{
     e.stopPropagation(); const id=d.dataset.chk;
@@ -701,8 +927,8 @@ function attachCardEvents(el){
    TAB 1: REQUIRED
    ============================================================ */
 function groupRuleLabel(g){
-  if(g.rule==="min") return `min ${g.count}`;
-  if(g.rule==="max") return `max ${g.count}`;
+  if(g.rule==="min") return `choose at least ${g.count}`;
+  if(g.rule==="max") return `choose up to ${g.count}`;
   return "all required";
 }
 function groupDisplayName(g){
@@ -711,16 +937,41 @@ function groupDisplayName(g){
   }
   return g.name || "Requirement group";
 }
+const PICKER_THRESHOLD=6;
+function isPickerGroup(g){
+  return !!g && g.rule!=="all" && (g.members||[]).length>PICKER_THRESHOLD;
+}
+function selectedRequirementCourses(gk){
+  const valid=new Set(GROUPS[gk]?.members||[]);
+  return [...new Set(ST.groupSelections[gk]||[])].filter(id=>valid.has(id));
+}
+function selectionLimit(g){
+  return Math.max(1,Number(g?.count)||1);
+}
+function pickerSummaryHtml(gk){
+  const g=GROUPS[gk];
+  const selected=selectedRequirementCourses(gk);
+  const limit=selectionLimit(g);
+  const noun=limit===1?"course":"courses";
+  const selectionText=selected.length
+    ? `${selected.length} ${selected.length===1?"course":"courses"} selected for this requirement.`
+    : `No course selected yet. Choose up to ${limit} ${noun} from the approved list.`;
+  return `<div class="choice-summary">${selectionText}</div>
+    ${selected.length?`<div class="choice-picked"><strong style="font-size:10px;">Selected for this requirement</strong><div class="cgrid">${selected.map(id=>cardHtml(id)).join("")}</div></div>`:""}
+    <div class="choice-actions"><button class="choice-btn" data-gpicker="${gk}">${selected.length?"Change selection":"Browse approved courses"}</button>
+      ${selected.length?`<button class="choice-btn secondary" data-gclear="${gk}">Clear selection</button>`:""}</div>`;
+}
 function groupHtml(gk){
   const g=GROUPS[gk];
   if(!g) return "";
   const ok=groupFulfilled(gk);
   const members=(g.members||[]).filter(id=>!isCompleted(id));
   const children=(g.children||[]).map(groupHtml).join("");
+  const body=isPickerGroup(g) ? pickerSummaryHtml(gk) : (members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`:"");
   return `<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
     <span class="gn">${groupDisplayName(g)}</span>
     <span class="gm">${groupRuleLabel(g)} · click to expand</span>
-  </div><div class="gr-body" id="gb-${gk}">${members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`:""}${children}</div></div>`;
+  </div><div class="gr-body" id="gb-${gk}">${body}${children}</div></div>`;
 }
 function renderRequired(){
   const pb=document.getElementById("pb");
@@ -732,7 +983,7 @@ function renderRequired(){
     pb.innerHTML=`<div class="api-status err">Could not load degree requirements: ${escapeHtml(ST.requirementsError)}</div>`;
     return;
   }
-  let h=`<div class="leg">Gray = locked (click to see missing prerequisites). Green = completed or AP-waived. Click ○ to mark taken/waived.</div>`;
+  let h=`<div class="leg">Gray = not yet unlocked. Green = completed or AP-waived. Click any course card for full details; click ○ to mark a course taken/waived.</div>${doubleCountBannerHtml()}`;
   ROOT_GROUPS.forEach(gk=>{
     const g=GROUPS[gk];
     if(!g) return;
@@ -753,6 +1004,12 @@ function renderRequired(){
   attachCardEvents(pb);
   pb.querySelectorAll("[data-gtog]").forEach(d=>d.addEventListener("click",()=>
     document.getElementById("gb-"+d.dataset.gtog).classList.toggle("open")));
+  pb.querySelectorAll("[data-gpicker]").forEach(b=>b.addEventListener("click",e=>{
+    e.stopPropagation(); openRequirementPicker(b.dataset.gpicker);
+  }));
+  pb.querySelectorAll("[data-gclear]").forEach(b=>b.addEventListener("click",e=>{
+    e.stopPropagation(); delete ST.groupSelections[b.dataset.gclear]; renderPanel();
+  }));
 }
 /* ============================================================
    PAGE 2: COURSES — live data from the Cloudflare Worker + D1
@@ -806,11 +1063,25 @@ function loadRequirementTree(requirements){
       const id=requirementCourseId(row.course_code);
       if(!id) continue;
       const existing=nextCourses[id];
+      const sourceTitle=cleanApiText(row.source_title);
+      const catalogTitle=cleanApiText(row.catalog_title);
+      const sourceCredits=cleanApiText(row.source_credits);
+      const note=cleanApiText(row.note);
       nextCourses[id]={
+        ...existing,
         code:row.course_code,
-        title:row.catalog_title||existing?.title||row.course_code,
-        credits:row.catalog_credits||existing?.credits||"",
-        prereqs:[],
+        // The official program page is the stable source for requirement
+        // titles. The term-specific catalog fills in richer information
+        // whenever the course is offered in the current term.
+        title:sourceTitle||catalogTitle||existing?.title||row.course_code,
+        fullTitle:sourceTitle||catalogTitle||existing?.fullTitle||row.course_code,
+        credits:sourceCredits||cleanApiText(row.catalog_credits)||existing?.credits||"",
+        description:cleanApiText(row.catalog_description)||existing?.description||"",
+        catalogPrereqs:cleanApiText(row.catalog_prereqs)||existing?.catalogPrereqs||"",
+        subjectNotes:cleanApiText(row.catalog_subject_notes)||existing?.subjectNotes||"",
+        restrictions:cleanApiText(row.section_restrictions)||existing?.restrictions||"",
+        requirementNotes:[...new Set([...(existing?.requirementNotes||[]),note].filter(Boolean))],
+        prereqs:existing?.prereqs||[],
       };
       group.members.push(id);
       courseRows.push({id,row});
@@ -821,9 +1092,112 @@ function loadRequirementTree(requirements){
 
   for(const root of requirements||[]) rootIds.push(addGroup(root));
   COURSES=nextCourses;
-  for(const {id,row} of courseRows) COURSES[id].prereqs=prerequisiteIds(row,id);
+  for(const {id,row} of courseRows){
+    COURSES[id].prereqs=[...new Set([...(COURSES[id].prereqs||[]),...prerequisiteIds(row,id)])];
+  }
   GROUPS=nextGroups;
   ROOT_GROUPS=rootIds;
+  ST.groupSelections={};
+}
+
+/* ============================================================
+   MULTI-PROGRAM REQUIREMENTS + DOUBLE-COUNT CHECK
+   ============================================================ */
+function collectRawCourseCodes(group, into=new Set()){
+  for(const course of group?.courses||[]) if(course?.course_code) into.add(course.course_code);
+  for(const child of group?.children||[]) collectRawCourseCodes(child,into);
+  return into;
+}
+function normalizedRequirementName(name){
+  return String(name||"").replace(/\s+/g," ").trim().toLowerCase();
+}
+function rootRequirementSignature(root){
+  const codes=[...collectRawCourseCodes(root)].sort();
+  return JSON.stringify([normalizedRequirementName(root?.name),root?.rule||"",root?.count??null,codes]);
+}
+function sharedRootGroups(requirementTrees, programIds){
+  const found=new Map();
+  for(const id of programIds){
+    for(const root of requirementTrees[id]||[]){
+      const signature=rootRequirementSignature(root);
+      const entry=found.get(signature)||{signature,name:root.name||"Shared requirement",programs:new Set()};
+      entry.programs.add(id);
+      found.set(signature,entry);
+    }
+  }
+  return [...found.values()].filter(entry=>entry.programs.size>1);
+}
+function requirementsForDisplay(requirementTrees, programIds){
+  const seen=new Set();
+  const roots=[];
+  for(const id of programIds){
+    for(const root of requirementTrees[id]||[]){
+      const signature=rootRequirementSignature(root);
+      // Identical named groups with the exact same course set (such as RBS
+      // Business Core) are shared requirements, not a major-to-major
+      // overlap. Show the first copy only.
+      if(seen.has(signature)) continue;
+      seen.add(signature);
+      roots.push(root);
+    }
+  }
+  return roots;
+}
+function computeDoubleCountOverlaps(requirementTrees, programIds){
+  const shared=sharedRootGroups(requirementTrees,programIds);
+  const sharedKeys=new Set(shared.map(entry=>entry.signature));
+  const programsById=Object.fromEntries((ST.availablePrograms||[]).map(program=>[program.id,program]));
+  const coursePrograms=new Map();
+  for(const id of programIds){
+    const codes=new Set();
+    for(const root of requirementTrees[id]||[]){
+      if(sharedKeys.has(rootRequirementSignature(root))) continue;
+      collectRawCourseCodes(root,codes);
+    }
+    for(const code of codes){
+      const ids=coursePrograms.get(code)||new Set();
+      ids.add(id);
+      coursePrograms.set(code,ids);
+    }
+  }
+  const overlaps=[...coursePrograms.entries()]
+    .filter(([,ids])=>ids.size>1)
+    .map(([code,ids])=>({code,programs:[...ids]}))
+    .sort((a,b)=>a.code.localeCompare(b.code));
+  const codesForScope=(scope)=>overlaps.filter(overlap=>{
+    const types=overlap.programs.map(id=>programsById[id]?.type||"");
+    const majorCount=types.filter(type=>type==="major").length;
+    const concentrationCount=types.filter(type=>type==="concentration").length;
+    return scope==="major_major" ? majorCount>=2 : majorCount>=1 && concentrationCount>=1;
+  });
+  const scopeResults=["major_major","major_concentration"].map(scope=>{
+    const policy=(ST.doubleCountPolicies||[]).find(item=>item.scope===scope);
+    const codes=codesForScope(scope);
+    const cap=policy?.max_shared_courses===null||policy?.max_shared_courses===undefined ? null : Number(policy.max_shared_courses);
+    return {scope,policy,codes,cap,violates:cap!==null&&codes.length>cap};
+  });
+  return {shared,overlaps,scopeResults};
+}
+function doubleCountBannerHtml(){
+  const result=ST.doubleCount;
+  if(!result || ST.selectedPrograms.length<2) return "";
+  const sharedNames=[...new Set(result.shared.map(item=>item.name))];
+  const activeScopes=result.scopeResults.filter(item=>item.codes.length);
+  const violates=activeScopes.some(item=>item.violates);
+  let content=sharedNames.length?`Shared requirements shown once: ${escapeHtml(sharedNames.join(", "))}. `:"";
+  if(!activeScopes.length){
+    content+="No non-shared course overlap was found among the selected programs.";
+  }else{
+    content+=activeScopes.map(item=>{
+      const label=item.scope==="major_major"?"major ↔ major":"major ↔ concentration";
+      const cap=item.cap===null?"no published cap":`${item.cap} course${item.cap===1?"":"s"}`;
+      const listed=item.codes.map(overlap=>overlap.code).join(", ");
+      return `${label}: ${item.codes.length} potential shared course${item.codes.length===1?"":"s"} (${escapeHtml(listed)}); cap: ${cap}.`;
+    }).join(" ");
+  }
+  const title=violates?"Double-count rule needs attention":"Double-count planning check";
+  const suffix=" This is a planning flag, not a degree audit; confirm a final double-count decision with RBS advising.";
+  return `<div class="dc-banner ${violates?"warn":"ok"}"><b>${title}</b>${content}${suffix}</div>`;
 }
 
 async function loadAvailablePrograms(){
@@ -834,10 +1208,26 @@ async function loadAvailablePrograms(){
   return ST.availablePrograms;
 }
 async function loadRequirements(programId){
-  const data=await backendFetch(`/api/programs/${encodeURIComponent(programId)}/requirements`);
-  loadRequirementTree(data.requirements||[]);
-  ST.activeProgram=data.program||null;
-  return data;
+  return loadSelectedRequirements([programId]);
+}
+async function loadSelectedRequirements(programIds){
+  const ids=[...new Set((programIds||[]).filter(Boolean))];
+  if(!ids.length) throw new Error("Choose at least one program.");
+  const [data,policies]=await Promise.all([
+    backendFetch(`/api/requirements?programs=${ids.map(encodeURIComponent).join(",")}`),
+    backendFetch("/api/double-count-policies?school=rbsnb"),
+  ]);
+  const returned=data.requirements||{};
+  const visibleIds=ids.filter(id=>Array.isArray(returned[id]));
+  if(!visibleIds.length) throw new Error("None of the selected programs has reviewed requirements yet.");
+  ST.selectedPrograms=visibleIds;
+  ST.requirementTrees=returned;
+  ST.doubleCountPolicies=policies.policies||[];
+  ST.doubleCountRules=data.double_count_rules||[];
+  loadRequirementTree(requirementsForDisplay(returned,visibleIds));
+  ST.doubleCount=computeDoubleCountOverlaps(returned,visibleIds);
+  ST.activeProgram=visibleIds.length===1 ? (ST.availablePrograms||[]).find(program=>program.id===visibleIds[0])||null : null;
+  return {requirements:returned,policies:ST.doubleCountPolicies};
 }
 async function loadInitialRequirements(){
   ST.requirementsLoading=true;
@@ -847,7 +1237,9 @@ async function loadInitialRequirements(){
     const programs=await loadAvailablePrograms();
     const initial=programs.find(p=>p.id==="rbsnb-bait")||programs[0];
     if(!initial) throw new Error("No reviewed RBS major is available yet.");
-    await loadRequirements(initial.id);
+    ST.selectedPrograms=[initial.id];
+    await loadSelectedRequirements(ST.selectedPrograms);
+    updateProgramTitle();
   }catch(err){
     ST.requirementsError=err.message||"Unknown error";
   }finally{
