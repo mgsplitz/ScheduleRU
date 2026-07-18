@@ -234,7 +234,7 @@ function sectionsToStatements(env, program, sections) {
       for (const item of orGroup) {
         stmts.push(
           env.DB.prepare(`INSERT OR REPLACE INTO requirement_courses (group_id, course_code, note) VALUES (?,?,?)`)
-            .bind(orGroupId, item.code, "")
+            .bind(orGroupId, item.code, item.note || "")
         );
         coursesWritten++;
       }
@@ -387,7 +387,7 @@ function parseBizTable(tableHtml, precedingHeading = "") {
   if (!rows.length) return null;
   const cellsOf = (row) =>
     [...row.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((c) =>
-      htmlToFlatText(c[1]).replace(/\s*\n\s*/g, "; ").trim()
+      htmlToFlatText(c[1]).replace(/[\u0001\u0002]/g, "").replace(/\s*\n\s*/g, "; ").trim()
     );
 
   let idx = 0;
