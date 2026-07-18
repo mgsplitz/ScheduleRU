@@ -347,6 +347,33 @@ const BIZ_SLUG_MAP = {
 };
 const WORD_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
 
+// RBS also uses bold text for headings placed immediately before tables.
+// Keep this heading detection shared by the table and prose parsers.
+function readBizHeadingLine(line) {
+  if (!line.startsWith("\u0001")) return { heading: "", rest: line };
+  const end = line.indexOf("\u0002");
+  if (end === -1) return { heading: "", rest: line };
+  const boldSpan = line.slice(1, end).trim();
+  if (!looksLikeHeading(boldSpan)) return { heading: "", rest: line };
+  return { heading: boldSpan, rest: line.slice(end + 1).trim() };
+}
+
+function findLatestBizHeading(html, currentHeading = "") {
+  let heading = currentHeading;
+  const lines = htmlToFlatText(html).split("\n").map((line) => line.trim()).filter(Boolean);
+  for (const line of lines) {
+    const found = readBizHeadingLine(line).heading;
+    if (found) heading = found;
+  }
+  return heading;
+}
+
+function isBizColumnHeader(cells) {
+  const words = cells.join(" ").toLowerCase().match(/[a-z]+/g) || [];
+  const headerWords = new Set(["course", "courses", "credit", "credits", "note", "notes", "and", "prerequisite", "prerequisites"]);
+  return words.length > 0 && words.includes("course") && words.every((word) => headerWords.has(word));
+}
+
 // Turns one <table>...</table> block into a section. Row 0 is a caption
 // spanning the table ("Business Core", "At most TWO courses from the
 // following electives", ...); row 1 is usually the Course/Credits/Notes
@@ -355,7 +382,7 @@ const WORD_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
 // "BAIT elective" rows inside the Required-Courses table — real options
 // for those live in the separate Elective-Courses table below) are
 // skipped rather than mis-recorded as real requirements.
-function parseBizTable(tableHtml) {
+function parseBizTable(tableHtml, precedingHeading = "") {
   const rows = [...tableHtml.matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((m) => m[0]);
   if (!rows.length) return null;
   const cellsOf = (row) =>
@@ -374,22 +401,35 @@ function parseBizTable(tableHtml) {
   // "at least/at most" never matched because the string started with \u0001,
   // not "A".
   const caption = (captionCells.find((c) => c) || "").replace(/[\u0001\u0002]/g, "").trim();
-  if (!caption) return null; // unrecognized table shape — let the caller log it and skip
+  const needsHeadingFallback = !caption || isBizColumnHeader(captionCells);
+  const sectionName = needsHeadingFallback ? precedingHeading : caption;
+  if (!sectionName) return null; // unrecognized table shape — let the caller log it and skip
 
   if (rows[idx]) {
     const hdr = cellsOf(rows[idx]).join(" ").toLowerCase();
     if (hdr.includes("course") && hdr.includes("credit")) idx++; // skip literal column-header row
   }
 
-  const section = { name: caption, courseItems: [], orGroups: [], prose: [], rule: "all", count: null };
-  const atLeast = caption.match(/^at least (\w+)/i);
-  const atMost = caption.match(/^at most (\w+)/i);
-  if (atLeast) {
-    section.rule = "min_courses";
-    section.count = WORD_NUM[atLeast[1].toLowerCase()] || parseInt(atLeast[1], 10) || 1;
-  } else if (atMost) {
-    section.rule = "max_courses";
-    section.count = WORD_NUM[atMost[1].toLowerCase()] || parseInt(atMost[1], 10) || 1;
+  // A heading outside a Course/Credits/Notes table confirms this is a
+  // selectable-course group, but does not reliably state how many to choose.
+  const section = {
+    name: sectionName,
+    courseItems: [],
+    orGroups: [],
+    prose: [],
+    rule: needsHeadingFallback ? "min_courses" : "all",
+    count: null,
+  };
+  if (!needsHeadingFallback) {
+    const atLeast = caption.match(/^at least (\w+)/i);
+    const atMost = caption.match(/^at most (\w+)/i);
+    if (atLeast) {
+      section.rule = "min_courses";
+      section.count = WORD_NUM[atLeast[1].toLowerCase()] || parseInt(atLeast[1], 10) || 1;
+    } else if (atMost) {
+      section.rule = "max_courses";
+      section.count = WORD_NUM[atMost[1].toLowerCase()] || parseInt(atMost[1], 10) || 1;
+    }
   }
 
   for (; idx < rows.length; idx++) {
@@ -419,11 +459,14 @@ function parseBizTable(tableHtml) {
 }
 
 function parseBizPageText(html) {
-  const tables = [...html.matchAll(/<table[\s\S]*?<\/table>/gi)].map((m) => m[0]);
   const sections = [];
-  for (const t of tables) {
-    const section = parseBizTable(t);
+  let currentHeading = "";
+  let lastTableEnd = 0;
+  for (const match of html.matchAll(/<table[\s\S]*?<\/table>/gi)) {
+    currentHeading = findLatestBizHeading(html.slice(lastTableEnd, match.index), currentHeading);
+    const section = parseBizTable(match[0], currentHeading);
     if (section) sections.push(section);
+    lastTableEnd = match.index + match[0].length;
   }
   return sections;
 }
@@ -458,17 +501,11 @@ function extractBizProse(html) {
     const text = htmlToFlatText(gap);
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
     for (let line of lines) {
-      if (line.startsWith("\u0001")) {
-        const end = line.indexOf("\u0002");
-        if (end !== -1) {
-          const boldSpan = line.slice(1, end).trim();
-          const rest = line.slice(end + 1).trim();
-          if (looksLikeHeading(boldSpan)) {
-            currentHeading = boldSpan;
-            line = rest; // fall through in case a bullet trails the heading on the same line
-            if (!line) continue;
-          }
-        }
+      const headingLine = readBizHeadingLine(line);
+      if (headingLine.heading) {
+        currentHeading = headingLine.heading;
+        line = headingLine.rest; // fall through in case a bullet trails the heading on the same line
+        if (!line) continue;
       }
       line = line.replace(/\u0001/g, "").replace(/\u0002/g, "");
       if (line.startsWith("• ")) {
