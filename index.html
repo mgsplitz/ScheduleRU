@@ -574,7 +574,7 @@ function prereqsMet(id){
 }
 function standingRequirement(c){
   const text=[c?.restrictions,...(c?.requirementNotes||[])].join(" ").toLowerCase();
-  if(/senior\s+(year|standing|status)|4th\s+year/.test(text)) return {year:4,label:"Senior (4th-year) standing required"};
+  if(/seniors?\s+(year|standing|status|only)|4th\s+year/.test(text)) return {year:4,label:"Senior (4th-year) standing required"};
   if(/junior\s*(\/|or|and|-)?\s*senior|junior\s+(year|standing|status)|3rd\s+year/.test(text)) return {year:3,label:"Junior (3rd-year) standing required"};
   if(/all\s+except\s+(?:1st|first)[ -]?year|not\s+open\s+to\s+(?:1st|first)[ -]?year|except\s+(?:1st|first)[ -]?year/.test(text)) return {year:2,label:"Not open to first-year students"};
   return null;
