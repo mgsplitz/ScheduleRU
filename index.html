@@ -199,6 +199,9 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .cr-prereqs{font-size:12px;margin-bottom:12px;line-height:1.4;}
 .cr-prereqs b{color:var(--muted);text-transform:uppercase;font-size:9.5px;
   letter-spacing:.06em;display:block;margin-bottom:3px;}
+.catalog-advanced{border-top:1px solid var(--line);margin:10px 0;padding-top:9px;}
+.catalog-advanced summary{font-size:10.5px;font-weight:700;color:var(--scarlet);cursor:pointer;}
+.catalog-advanced p{font-size:11px;line-height:1.45;margin:8px 0 0;}
 .cr-desc{font-size:12.5px;line-height:1.5;margin-bottom:12px;color:var(--black);}
 .sec-table{width:100%;border-collapse:collapse;font-size:11.5px;}
 .sec-table th{text-align:left;font-size:9.5px;text-transform:uppercase;
@@ -257,6 +260,23 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .src-note{font-size:10px;color:var(--muted);margin-top:14px;
   border-top:1px solid var(--line);padding-top:8px;}
 .src-note a{color:var(--scarlet);}
+.detail-overview{border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:13px;}
+.detail-overview h2{font-family:var(--fserif);font-size:21px;line-height:1.15;margin-bottom:4px;}
+.detail-overview .detail-code{font-family:var(--fmono);font-size:11px;color:var(--scarlet);font-weight:700;}
+.detail-status{margin-top:10px;background:#f9f7f0;border-left:3px solid var(--scarlet);padding:8px 10px;
+  font-size:12px;line-height:1.4;}
+.detail-status.ready{border-left-color:var(--green-l);background:#f2faef;}
+.detail-section{margin:12px 0;}
+.detail-section h3{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:5px;}
+.detail-section p{font-size:12px;line-height:1.5;}
+.detail-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.detail-chip{background:#f9f7f0;border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:11px;line-height:1.3;}
+.detail-chip code{font-family:var(--fmono);font-size:9.5px;color:var(--scarlet);display:block;margin-top:2px;}
+.detail-advanced{border-top:1px solid var(--line);margin-top:14px;padding-top:10px;}
+.detail-advanced summary{font-size:11px;font-weight:700;color:var(--scarlet);cursor:pointer;user-select:none;}
+.detail-advanced-body{padding:10px 0 0;font-size:11px;line-height:1.45;color:var(--black);}
+.detail-advanced-body p{margin:0 0 9px;}
+.detail-advanced-body b{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
 
 /* REQUIREMENT COURSE PICKER */
 .picker-intro{font-size:12px;line-height:1.45;margin-bottom:10px;color:var(--black);}
@@ -701,38 +721,56 @@ document.getElementById("apClose").addEventListener("click", () =>
 /* ============================================================
    COURSE DETAILS MODAL
    ============================================================ */
-function detailRow(label, value, emptyText="Not listed"){
-  const text=cleanApiText(value);
-  return `<tr><td>${escapeHtml(label)}</td><td>${text?escapeHtml(text):`<span class="detail-empty">${escapeHtml(emptyText)}</span>`}</td></tr>`;
+function courseCodesFromText(text){
+  return [...new Set((String(text||"").match(/\b\d{2}:\d{3}:\d{3}\b/g)||[]))];
+}
+function planningPrerequisiteCodes(course){
+  const fromChecked=(course.prereqs||[]).map(id=>COURSES[id]?.code).filter(Boolean);
+  const fromRequirementNotes=(course.requirementNotes||[])
+    .filter(note=>/^pre-?reqs?:/i.test(String(note).trim()))
+    .flatMap(courseCodesFromText);
+  return [...new Set([...fromChecked,...fromRequirementNotes])];
+}
+function courseByCode(code){
+  return Object.values(COURSES).find(course=>course.code===code);
+}
+function compactRestriction(course, standing){
+  if(standing) return standing.label;
+  const text=cleanApiText(course.restrictions);
+  if(/all\s+except\s+(?:1st|first)[ -]?year|not\s+open\s+to\s+(?:1st|first)[ -]?year/i.test(text)) return "Not open to first-year students";
+  return text ? "See official catalog details" : "No special enrollment restriction listed";
 }
 function openCourseDetails(id){
   const c = COURSES[id];
   if(!c) return;
   document.getElementById("prTitle").textContent = "Course details";
   const body = document.getElementById("prBody");
-  const plannedPrereqs=(c.prereqs||[]).map(pid=>{
-    const p=COURSES[pid];
-    return `${p?p.code:pid}${p?` — ${p.title}`:""}`;
-  }).join("; ");
+  const prerequisiteCodes=planningPrerequisiteCodes(c);
+  const prerequisiteChips=prerequisiteCodes.map(code=>{
+    const prerequisite=courseByCode(code);
+    return `<div class="detail-chip">${escapeHtml(prerequisite?.fullTitle||prerequisite?.title||code)}<code>${escapeHtml(code)}</code></div>`;
+  }).join("");
   const requirementNotes=(c.requirementNotes||[]).join("; ");
   const standing=standingRequirement(c);
   const status=courseAvailable(id)
-    ? (c.prereqs?.length ? "Available based on the simple prerequisite rules the app can verify." : "No simple prerequisite rule is blocking this course in the app. Read the official prerequisite text below.")
+    ? (c.prereqs?.length ? "Available based on the simple prerequisite rules the app can verify." : "No simple prerequisite rule is blocking this course in the app.")
     : (!prereqsMet(id) ? "Not yet available based on the simple prerequisite rules the app can verify." : `Not yet available in the ${YL[ST.year]||"selected"} plan year because ${standing?.label?.toLowerCase()||"of an enrollment restriction"}.`);
   body.innerHTML=`
-    <table class="dtable">
-      ${detailRow("Course code",c.code)}
-      ${detailRow("Full course title",c.fullTitle||c.title)}
-      ${detailRow("Credits",c.credits,"Not listed on the current source")}
-      ${detailRow("Official prerequisites",c.catalogPrereqs,"None listed in the current course catalog")}
-      ${detailRow("Course description",c.description,"Not available from the current catalog record")}
-      ${detailRow("Enrollment restrictions",c.restrictions,"No current-term restriction was published")}
-      ${standing?detailRow("Academic-standing rule",standing.label):""}
-      ${detailRow("Special notes",c.subjectNotes,"None listed")}
-      ${detailRow("Requirement note",requirementNotes,"None listed")}
-      ${plannedPrereqs?detailRow("App-checked prerequisites",plannedPrereqs):""}
-    </table>
-    <p class="src-note">${escapeHtml(status)} Course details come from the official degree requirement and the current Rutgers course catalog when that course is offered this term.</p>`;
+    <div class="detail-overview">
+      <h2>${escapeHtml(c.fullTitle||c.title)}</h2>
+      <div class="detail-code">${escapeHtml(c.code)} · ${escapeHtml(c.credits||"?")} credits</div>
+      <div class="detail-status${courseAvailable(id)?" ready":""}">${escapeHtml(status)}</div>
+    </div>
+    <div class="detail-section"><h3>${standing?"When you can take it":"Enrollment"}</h3><p>${escapeHtml(compactRestriction(c,standing))}</p></div>
+    ${prerequisiteChips?`<div class="detail-section"><h3>Plan these first</h3><div class="detail-chips">${prerequisiteChips}</div>${c.catalogPrereqs?`<p class="src-note">The official catalog includes alternative prerequisite paths; use the details below when your situation differs.</p>`:""}</div>`:""}
+    ${c.description?`<div class="detail-section"><h3>About this course</h3><p>${escapeHtml(cleanApiText(c.description))}</p></div>`:""}
+    ${(c.catalogPrereqs||c.subjectNotes||requirementNotes||c.restrictions)?`<details class="detail-advanced"><summary>Official catalog details</summary><div class="detail-advanced-body">
+      ${c.catalogPrereqs?`<p><b>Official prerequisite wording</b><br/>${escapeHtml(cleanApiText(c.catalogPrereqs))}</p>`:""}
+      ${c.subjectNotes?`<p><b>Special notes</b><br/>${escapeHtml(cleanApiText(c.subjectNotes))}</p>`:""}
+      ${requirementNotes?`<p><b>Degree requirement note</b><br/>${escapeHtml(requirementNotes)}</p>`:""}
+      ${c.restrictions&&!standing?`<p><b>Catalog enrollment wording</b><br/>${escapeHtml(cleanApiText(c.restrictions))}</p>`:""}
+    </div></details>`:""}
+    <p class="src-note">Course details come from the official degree requirement and the current Rutgers course catalog when that course is offered this term.</p>`;
   document.getElementById("prOv").classList.add("open");
 }
 function closeCourseDetails(){
@@ -1355,7 +1393,9 @@ function courseRowHtml(c){
       bodyHtml = `
         ${c.subject_notes ? `<div class="subj-notes"><b>Subject Notes:</b>${escapeHtml(cleanApiText(c.subject_notes))}</div>` : ""}
         ${c.description ? `<div class="cr-desc">${escapeHtml(cleanApiText(c.description))}</div>` : ""}
-        <div class="cr-prereqs"><b>Prerequisites</b>${escapeHtml(cleanApiText(c.prereqs)) || "None listed"}</div>
+        ${cleanApiText(c.prereqs)
+          ? `<details class="catalog-advanced"><summary>Official prerequisite details</summary><p>${escapeHtml(cleanApiText(c.prereqs))}</p></details>`
+          : `<div class="cr-prereqs"><b>Prerequisites</b>None listed</div>`}
         ${sections.length ? `<table class="sec-table">
           <thead><tr><th>Sec</th><th>Status</th><th>Index</th><th>Meeting</th><th>Instructor</th></tr></thead>
           <tbody>${sections.map(s=>{
@@ -1380,7 +1420,7 @@ function courseRowHtml(c){
     <div class="course-row-hdr" data-toggle="${c.id}">
       <span class="cr-arrow${isOpen?" open":""}">▶</span>
       <span class="cr-code">${escapeHtml(code)}</span>
-      ${cleanApiText(c.prereqs) ? `<span class="prereq-hint" onclick="event.stopPropagation()">Prereqs<span class="tip">${escapeHtml(cleanApiText(c.prereqs))}</span></span>` : ""}
+      ${cleanApiText(c.prereqs) ? `<span class="prereq-hint" onclick="event.stopPropagation()">Prereqs listed</span>` : ""}
       <span class="cr-title">${escapeHtml(c.title)}<span class="sub"> ${escapeHtml(c.subject_description||"")}</span></span>
       <span class="cr-credits">${c.credits||"?"} cr</span>
       <span class="cr-sections" style="color:${openCt>0?'#3a8a3a':'var(--grayt)'}">${openCt}/${totalCt} open</span>
