@@ -955,6 +955,42 @@ function groupAppliesToSelection(groupId, conditionsByGroup, selectedProgramIds)
   return true;
 }
 
+const COURSE_ELIGIBILITY_CODE = /^\d{2}:\d{3}:\d{3}$/;
+const COURSE_ELIGIBILITY_BATCH_SIZE = 200;
+
+function reviewedCourseCodes(values) {
+  return [...new Set((values || [])
+    .map((value) => String(value || "").trim())
+    .filter((code) => COURSE_ELIGIBILITY_CODE.test(code)))];
+}
+
+async function getReviewedCourseEligibility(env, rawCodes) {
+  const codes = reviewedCourseCodes(rawCodes);
+  const output = {};
+  for (let offset = 0; offset < codes.length; offset += COURSE_ELIGIBILITY_BATCH_SIZE) {
+    const batch = codes.slice(offset, offset + COURSE_ELIGIBILITY_BATCH_SIZE);
+    const placeholders = batch.map(() => "?").join(",");
+    const [reviews, conditions] = await env.DB.batch([
+      env.DB.prepare(
+        `SELECT course_code, review_status, no_known_conditions, source_url, source_label, source_date
+         FROM course_eligibility_reviews
+         WHERE review_status = 'reviewed' AND course_code IN (${placeholders})`
+      ).bind(...batch),
+      env.DB.prepare(
+        `SELECT course_code, condition_key, condition_type, condition_value_json, review_status, source_url, source_label, source_date
+         FROM course_eligibility_conditions
+         WHERE review_status = 'reviewed' AND course_code IN (${placeholders})
+         ORDER BY course_code, condition_key`
+      ).bind(...batch),
+    ]);
+    for (const review of reviews.results || []) output[review.course_code] = { review, conditions: [] };
+    for (const condition of conditions.results || []) {
+      if (output[condition.course_code]) output[condition.course_code].conditions.push(condition);
+    }
+  }
+  return output;
+}
+
 async function getRequirementTree(env, programId, selectedProgramIds = [programId]) {
   // A major can inherit one or more reusable requirement sets. For example,
   // every RBS-New Brunswick major links to the single RBS Foundational Core
@@ -1022,6 +1058,7 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
      LEFT JOIN courses c ON c.school || ':' || c.subject_code || ':' || c.course_number = rc.course_code
      WHERE rc.group_id IN (${visibleGroupIds.map(() => "?").join(",")})`
   ).bind(...visibleGroupIds).all() : { results: [] };
+  const eligibilityByCode = await getReviewedCourseEligibility(env, courses.map((course) => course.course_code));
 
   // Alternatives are scoped to the requirement-set/program that owns the
   // course row. This lets Degree Navigator-only families be entered once as
@@ -1041,6 +1078,7 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
   const byGroup = {};
   for (const c of courses) {
     c.alternatives = alternativesByRequirement[`${c.owner_program_id}::${c.course_code}`] || [];
+    c.eligibility = eligibilityByCode[c.course_code] || null;
     (byGroup[c.group_id] ||= []).push(c);
   }
   const byId = {};
@@ -1200,6 +1238,14 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     }
     const eligibilityRules = await getProgramEligibilityRules(env, visibleIds);
     return json({ requirements: out, double_count_rules: doubleCounts, double_count_exceptions: doubleCountExceptions, eligibility_rules: eligibilityRules });
+  }
+
+  if (path === "/api/course-eligibility" && request.method === "GET") {
+    const codes = reviewedCourseCodes((url.searchParams.get("codes") || "").split(","));
+    if (!codes.length || codes.length > 25) {
+      return json({ error: "pass up to 25 valid course codes in ?codes=" }, 400);
+    }
+    return json({ eligibility: await getReviewedCourseEligibility(env, codes) });
   }
 
   // School-scoped double-count caps (e.g. "RBS majors may share at most 1

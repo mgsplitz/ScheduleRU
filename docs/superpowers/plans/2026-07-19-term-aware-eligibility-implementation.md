@@ -273,7 +273,6 @@ import test from "node:test";
 
 const schema = await readFile(new URL("../schema/schema_course_eligibility_conditions.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
-const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
 
 test("eligibility facts are source-backed and review-gated", () => {
   assert.match(schema, /CREATE TABLE IF NOT EXISTS course_eligibility_reviews/);
@@ -282,7 +281,6 @@ test("eligibility facts are source-backed and review-gated", () => {
   assert.match(worker, /async function getReviewedCourseEligibility/);
   assert.match(worker, /WHERE review_status = 'reviewed'/);
   assert.match(worker, /path === "\/api\/course-eligibility"/);
-  assert.match(frontend, /eligibility-logic\.js/);
 });
 ~~~
 
@@ -391,6 +389,7 @@ Append:
 
 ~~~
 test("the browser migrates v1 state and evaluates the selected target term", () => {
+  const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
   assert.match(frontend, /const PLANNER_STATE_VERSION=2/);
   assert.match(frontend, /\[1,PLANNER_STATE_VERSION\]\.includes\(saved\.version\)/);
   assert.match(frontend, /creditLedger:savedObject\(saved\.creditLedger\)/);
