@@ -247,6 +247,10 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .program-category:first-child{margin-top:0;}
 .program-category-title{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 4px;}
 .program-picker-note{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:9px;}
+.program-school-field{display:block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 7px;}
+.program-school-field select{display:block;width:100%;margin-top:4px;border:1px solid var(--line);border-radius:4px;padding:7px 8px;background:#fff;font:600 12px var(--ff);color:var(--black);}
+.program-school-field select:disabled{color:var(--muted);background:#f9f7f0;cursor:default;}
+.program-school-help{font-size:10.5px;color:var(--muted);line-height:1.4;margin:-2px 0 10px;}
 .program-policy-feedback{font-size:11px;line-height:1.4;margin:0 0 10px;}
 .program-policy-feedback.warn{background:#fff5f7;border:1px solid #f3c9ce;border-radius:4px;color:#7a1d34;padding:8px;}
 .program-policy-feedback.info{background:#f5f8fb;border:1px solid #cdd8e7;border-radius:4px;color:#38516c;padding:8px;}
@@ -506,6 +510,10 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
     <div class="mhdr">Choose programs of study <button class="xbtn" id="programClose">✕</button></div>
     <div class="mbody">
       <div class="program-picker-note" id="programPickerNote">Choose reviewed programs of study. Shared requirements are shown once; the app checks reviewed selection and double-count policies before it saves your plan.</div>
+      <label class="program-school-field" for="programSchoolSelect">Your Rutgers school
+        <select id="programSchoolSelect" aria-describedby="programSchoolHelp"></select>
+      </label>
+      <div class="program-school-help" id="programSchoolHelp"></div>
       <div class="program-policy-feedback" id="programPolicyFeedback" aria-live="polite"></div>
       <div id="programList"></div>
       <div class="modal-footer"><button class="choice-btn secondary" id="programCancel">Cancel</button><button class="choice-btn" id="programApply">Apply programs</button></div>
@@ -582,27 +590,29 @@ function defaultBackendUrl(){
    STATE
    ============================================================ */
 // A home school owns the catalog rules that apply to a student's plan. The
-// current reviewed data set is RBS New Brunswick; a future school adds one
-// entry here and reviewed API data instead of changing the planner flow.
-const DEFAULT_HOME_SCHOOL_SLUG="rbsnb";
-const SCHOOL_CONTEXTS={
-  rbsnb:{
-    label:"RBS New Brunswick",
-    defaultProgramId:"rbsnb-bait",
-    advisingLabel:"RBS advising",
-    sharedRequirementReferenceTypes:["major"],
-    coreFallbackLabel:"RBS Core Curriculum",
-    coreIntro:"RBS requires a minimum of 27 Core credits. Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed Core goals. One course is used once within each Core family, while Rutgers permits it to satisfy goals in different families. Click any course for details.",
-  },
+// reviewed school profiles come from the Worker, so future schools can define
+// their own labels and curriculum context without a separate frontend page.
+const FALLBACK_SCHOOL_CONTEXT={
+  label:"your home school",
+  shortName:"your home school",
+  defaultProgramId:null,
+  advisingLabel:"your school advising office",
+  sharedRequirementReferenceTypes:["major"],
+  coreFallbackLabel:"Core Curriculum",
+  coreIntro:"Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed curriculum goals. Click any course for details.",
+  programTypeSections:[],
 };
+function schoolProfileBySlug(slug){
+  return (ST.availableSchools||[]).find(school=>school.slug===slug)||null;
+}
 function activeSchoolContext(){
-  return SCHOOL_CONTEXTS[ST.homeSchoolSlug]||{
-    label:ST.homeSchoolSlug||"your home school",
-    defaultProgramId:null,
-    advisingLabel:"your school advising office",
-    sharedRequirementReferenceTypes:["major"],
-    coreFallbackLabel:"Core Curriculum",
-    coreIntro:"Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed curriculum goals. Click any course for details.",
+  const school=schoolProfileBySlug(ST.homeSchoolSlug);
+  if(!school) return FALLBACK_SCHOOL_CONTEXT;
+  return {
+    ...FALLBACK_SCHOOL_CONTEXT,
+    ...(school.context||{}),
+    label:school.short_name||school.name||FALLBACK_SCHOOL_CONTEXT.label,
+    shortName:school.short_name||school.name||FALLBACK_SCHOOL_CONTEXT.shortName,
   };
 }
 function activeCoreLabel(){
@@ -618,8 +628,8 @@ const ST = {
   // so this is a plain same-origin-friendly fetch (the worker sends CORS
   // headers itself) rather than needing a public relay.
   backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || defaultBackendUrl(),
-  availablePrograms:[], activeProgram:null, selectedPrograms:[],
-  homeSchoolSlug:DEFAULT_HOME_SCHOOL_SLUG, programSelectionPolicies:{limits:[],combination_policies:[]},
+  availableSchools:[], availablePrograms:[], activeProgram:null, selectedPrograms:[],
+  homeSchoolSlug:"", programSelectionPolicies:{limits:[],combination_policies:[]},
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
@@ -743,14 +753,27 @@ document.querySelectorAll(".pagenav-btn").forEach(b=>b.addEventListener("click",
 /* ============================================================
    PROGRAM SELECTION (reviewed programs of study)
    ============================================================ */
-const PROGRAM_TYPE_SECTIONS=[
+const DEFAULT_PROGRAM_TYPE_SECTIONS=[
   {type:"major",label:"Majors",singular:"Major"},
   {type:"minor",label:"Minors",singular:"Minor"},
   {type:"concentration",label:"Concentrations and tracks",singular:"Concentration or track"},
   {type:"certificate",label:"Certificates",singular:"Certificate"},
 ];
+function programTypeSections(){
+  const configured=activeSchoolContext().programTypeSections;
+  if(!Array.isArray(configured)) return DEFAULT_PROGRAM_TYPE_SECTIONS;
+  const byType=new Map(configured.filter(section=>section&&typeof section.type==="string").map(section=>[section.type,section]));
+  return DEFAULT_PROGRAM_TYPE_SECTIONS.map(fallback=>{
+    const section=byType.get(fallback.type)||{};
+    return {
+      type:fallback.type,
+      label:typeof section.label==="string"&&section.label.trim()?section.label.trim():fallback.label,
+      singular:typeof section.singular==="string"&&section.singular.trim()?section.singular.trim():fallback.singular,
+    };
+  });
+}
 function programTypeLabel(type){
-  const section=PROGRAM_TYPE_SECTIONS.find(item=>item.type===type);
+  const section=programTypeSections().find(item=>item.type===type);
   return section?.singular||"Program";
 }
 function eligibilityRuleValues(rule){
@@ -797,6 +820,51 @@ function updateProgramTitle(){
   document.getElementById("topProgramTitle").textContent=names.length?`${names.join(" + ")} Degree Navigator`:"Degree Navigator";
   document.getElementById("topProgramMeta").textContent=names.join(" + ")||activeHomeSchoolLabel();
 }
+function renderProgramSchoolSelector(){
+  const select=document.getElementById("programSchoolSelect");
+  const help=document.getElementById("programSchoolHelp");
+  const schools=ST.availableSchools||[];
+  select.innerHTML=schools.map(school=>`<option value="${escapeHtml(school.slug)}">${escapeHtml(school.name||school.short_name||school.slug)}</option>`).join("");
+  select.value=ST.homeSchoolSlug;
+  select.disabled=schools.length<2;
+  help.textContent=schools.length<2
+    ? "More Rutgers schools will appear here only after their curriculum and policy data are reviewed."
+    : "Changing your home school re-evaluates your program requirements. Your planned courses stay in your browser.";
+  select.onchange=()=>changeHomeSchool(select.value);
+}
+async function changeHomeSchool(nextSchoolSlug){
+  const next=schoolProfileBySlug(nextSchoolSlug);
+  if(!next || next.slug===ST.homeSchoolSlug) return;
+  const prior=ST.homeSchoolSlug;
+  const priorName=activeHomeSchoolLabel();
+  if(ST.selectedPrograms.length && !confirm(`Change your home school from ${priorName} to ${next.name||next.short_name||next.slug}? Your planned courses stay saved, but program selections and requirement choices will be re-evaluated.`)){
+    const select=document.getElementById("programSchoolSelect");
+    if(select) select.value=prior;
+    return;
+  }
+  ST.homeSchoolSlug=next.slug;
+  ST.selectedPrograms=[];
+  ST.groupSelections={};
+  ST.requirementTrees={};
+  ST.referenceRequirementTrees={};
+  ST.majorRequirementTree=null;
+  ST.activeProgram=null;
+  ST.doubleCount=null;
+  savePlannerState();
+  ST.requirementsLoading=true;
+  ST.requirementsError="";
+  renderPanel();
+  renderProgramSchoolSelector();
+  try{
+    await loadInitialRequirements({reloadSchools:false});
+  }catch(err){
+    ST.requirementsError=err.message||"Could not load the selected school.";
+  }finally{
+    ST.requirementsLoading=false;
+    renderPanel();
+    openProgramPicker();
+  }
+}
 function closeProgramPicker(){
   document.getElementById("programOv").classList.remove("open");
   delete ST.programDraft;
@@ -805,9 +873,10 @@ function openProgramPicker(){
   ST.programDraft=[...ST.selectedPrograms];
   delete ST.programDraftWarningSignature;
   document.getElementById("programPickerNote").textContent=`Choose reviewed programs of study. ${selectionLimitSummary()} Shared requirements are shown once, and the app checks reviewed policies before saving your plan.`;
+  renderProgramSchoolSelector();
   showProgramPolicyFeedback(null);
   const list=document.getElementById("programList");
-  const categories=PROGRAM_TYPE_SECTIONS.map(section=>({
+  const categories=programTypeSections().map(section=>({
     ...section,
     programs:(ST.availablePrograms||[]).filter(program=>program.type===section.type),
   })).filter(section=>section.programs.length);
@@ -1932,6 +2001,19 @@ async function loadAvailablePrograms(){
   ST.programSelectionPolicies=policyData||{limits:[],combination_policies:[]};
   return ST.availablePrograms;
 }
+async function loadAvailableSchools(){
+  const data=await backendFetch("/api/schools");
+  const schools=Array.isArray(data.schools)?data.schools.filter(school=>school&&typeof school.slug==="string"&&school.slug):[];
+  if(!schools.length) throw new Error("No reviewed Rutgers school profiles are available yet.");
+  ST.availableSchools=schools;
+  if(!schoolProfileBySlug(ST.homeSchoolSlug)){
+    ST.homeSchoolSlug=schools[0].slug;
+    ST.selectedPrograms=[];
+    ST.groupSelections={};
+    savePlannerState();
+  }
+  return ST.availableSchools;
+}
 async function loadRequirements(programId){
   return loadSelectedRequirements([programId]);
 }
@@ -1984,11 +2066,12 @@ async function loadCoreCurriculum(){
     if(ST.tab==="core") renderPanel();
   }
 }
-async function loadInitialRequirements(){
+async function loadInitialRequirements({reloadSchools=true}={}){
   ST.requirementsLoading=true;
   ST.requirementsError="";
   renderPanel();
   try{
+    if(reloadSchools) await loadAvailableSchools();
     const programs=await loadAvailablePrograms();
     // This one read lets the UI derive a shared requirement baseline from the
     // reviewed school data, including when a program's own table contains

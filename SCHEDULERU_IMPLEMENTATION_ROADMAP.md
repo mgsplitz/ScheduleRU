@@ -1,10 +1,10 @@
 # ScheduleRU Implementation Roadmap
 
-**Status:** Planning document only. This roadmap does not authorize or include application changes.
+**Status:** Active implementation roadmap. The first committed milestone is a reviewed, school-aware Programs foundation; it does not claim coverage for a school until that school's data and policies are reviewed.
 
 **Scope:** Rutgers-New Brunswick first; Rutgers-wide second; multi-institution later.
 
-**Purpose:** Build ScheduleRU into a trustworthy planning product that can combine majors, minors, concentrations, general education, and term schedules without concealing policy uncertainty or making degree-audit claims it cannot support.
+**Purpose:** Build ScheduleRU into a trustworthy, planner-first Rutgers student app. It should combine majors, minors, concentrations, general education, and term schedules without concealing policy uncertainty or making degree-audit claims it cannot support. The long-term product may serve other institutions, but Rutgers-New Brunswick is the first reviewed implementation.
 
 ## 1. The product we are building
 
@@ -19,6 +19,8 @@ ScheduleRU should eventually let a student:
 7. Later, save, compare, and access plans across devices through an account.
 
 The product is a planning assistant, not a replacement for Rutgers Degree Navigator or academic advising. It should always explain what it knows, what it inferred, and what still needs advisor confirmation.
+
+It should feel like a focused student tool, not a generic dashboard. The plan and schedule are the default experience; a new screen, card, or metric is added only when it helps a student make a real decision or complete a real task.
 
 ## 2. Non-negotiable product principles
 
@@ -42,6 +44,10 @@ Every plan or AI suggestion must show why it was made: requirements satisfied, p
 
 The student owns the plan. The app must make it easy to edit assumptions, remove a recommendation, export a plan, and later delete account data. Do not scrape authenticated Degree Navigator or transcript data without explicit permission and a secure integration strategy.
 
+### Planner-first, no dashboard bloat
+
+The student should be able to open ScheduleRU and immediately continue planning. The default home experience may surface the current or next term and a small number of actionable suggestions, but it must not become a second dashboard that repeats information without helping the student choose a course, solve a schedule problem, or address a requirement.
+
 ### A staged rollout is safer than a broad claim
 
 The product should expand school by school and catalog year by catalog year. “All Rutgers programs” is the destination, not a reason to publish unreviewed requirements.
@@ -57,6 +63,7 @@ ScheduleRU already has a useful Rutgers-New Brunswick foundation:
 | Scheduling | Four-year plan area plus a current-term section builder and calendar | A real long-range plan generator, offering forecasts, workload balancing, and robust preference handling |
 | Student state | Private same-browser/device saving for the plan, wishlist, AP credit, selected programs, and completion marks | Cross-device sync, plan history, exports, recovery, and account privacy controls |
 | Course discovery | Catalog browsing and requirement pickers | Interest-aware discovery, semantic search, and transparent AI recommendations |
+| School context | A safe RBS-New Brunswick home-school baseline | Reviewed, data-backed school profiles and school-specific terminology, policies, and program availability |
 
 The most important architectural advantage is that the current requirements are already represented as data: programs, requirement groups, course rows, shared sets, reviewed alternatives, and policy records. We should extend that model instead of replacing it.
 
@@ -75,14 +82,26 @@ The student starts with a lightweight academic profile:
 
 “Primary major” matters later for policies, graduation ownership, and account organization. It does not need to restrict a student from adding multiple programs now.
 
-The Programs selector should eventually use separate, clearly labeled sections or tabs:
+The Programs modal is the initial home for school and program setup. It should first identify the student's reviewed Rutgers school, then show only the program types and wording that apply there. For example, RBS can say "Concentrations" while a future school can use "Tracks" only if that is its actual terminology. The same modal can later offer cross-school programs only when a reviewed policy explicitly permits the combination.
+
+The Programs selector should use separate, clearly labeled sections or tabs when they help scanning:
 
 1. Majors.
 2. Minors.
 3. Concentrations/tracks.
 4. Certificates and special programs.
 
-The selector should be driven by program type and school data, not by a hard-coded three-major limit. The product can impose school-specific limits only when a reviewed policy requires one.
+The selector should be driven by program type and school data, not by a hard-coded three-major limit. The product can impose school-specific limits only when a reviewed policy requires one. A school must never appear as selectable merely because its name is known; it appears after its program data and support boundary are reviewed.
+
+### Home and onboarding (future account era)
+
+Accounts are not needed for the current local-first planner. When they are introduced, onboarding should be short and purposeful:
+
+1. Choose campus, school, catalog/admission year, and programs.
+2. Enter AP, transfer, completed, and in-progress work manually, with an optional transcript upload/import path only after its privacy and review design is approved.
+3. Continue into a planner-first home showing the current or next term, unfinished planning work, and useful suggestions.
+
+Uploaded transcripts must not become an opaque source of truth. Imported course decisions need to be visible, correctable, and attributable, and raw files need a defined retention and deletion policy before upload is offered.
 
 ### Degree map
 
@@ -149,6 +168,7 @@ The data model needs the following reusable concepts before broad expansion:
 | Concept | Why it is needed |
 |---|---|
 | Institution, campus, school, catalog year | Prevents Rutgers-New Brunswick rules from leaking into Newark, Camden, or another university |
+| School profile | Supplies reviewed school labels, available program categories, curriculum context, advising language, and default starting state without embedding them in the interface |
 | Program and program type | Supports majors, minors, concentrations, tracks, certificates, and future special programs |
 | Curriculum module | Lets multiple schools share a Core while allowing another school, such as Engineering, to use a different general-education structure |
 | Requirement expression | Represents all/any/minimum/distinct-credit/choice/conditional rules without UI-only exceptions |
@@ -195,6 +215,8 @@ Account-era plan records should include:
 - A revision history so a student can recover from a bad edit.
 - Export/import capability.
 
+Raw transcript files, if eventually supported, should be stored separately from the normalized academic-plan records and never be required for ongoing planning after a student confirms the imported entries.
+
 ## 6. Rollout plan
 
 The phases below are ordered by dependency, not by calendar date. Each phase should have a written acceptance checklist before the next one begins.
@@ -208,7 +230,7 @@ Work:
 1. Inventory every existing RBS rule, source, catalog year, and review status.
 2. Build a library of anonymous Degree Navigator comparison cases for majors, double majors, AP credit, alternatives, junior/senior restrictions, and electives.
 3. Resolve remaining known data gaps before claiming broad RBS coverage.
-4. Replace remaining RBS-specific UI assumptions with school/curriculum configuration.
+4. Replace remaining RBS-specific UI assumptions with reviewed school/curriculum configuration, beginning with the Programs modal and category wording.
 5. Define the copy used whenever the app is a planning aid rather than an official audit.
 
 Exit gate:
@@ -216,6 +238,7 @@ Exit gate:
 - Each reviewed RBS program has a source and catalog year.
 - Known test cases have expected requirement allocations.
 - New requirement data can be added without editing frontend logic.
+- A reviewed school can define its own terminology and planner context without a duplicate page.
 
 ### Phase 1: Complete program selection and multi-program planning for RBS
 
@@ -224,7 +247,7 @@ Exit gate:
 Work:
 
 1. Replace the “up to three majors” concept with a generic program collection.
-2. Organize the selector by Majors, Minors, Concentrations/Tracks, and Certificates.
+2. Organize the selector by the reviewed school-specific labels for Majors, Minors, Concentrations/Tracks, and Certificates.
 3. Add the RBS programs one batch at a time through reviewed source data.
 4. Show shared requirements once while preserving program-specific exceptions.
 5. Extend double-count policies from simple overlap warnings to reviewed, explainable outcomes where the policy is sufficiently clear.
@@ -242,6 +265,8 @@ Exit gate:
 
 SAS is the best next school because it shares the Rutgers-New Brunswick Core model, so the initial work validates reusable curriculum modules instead of inventing a new visual system. Engineering is the first major test of a genuinely different school curriculum.
 
+Before either pilot becomes visible in Programs, create a reviewed school profile with its exact public name, campus, catalog-year support boundary, program-category labels, curriculum module, and links to the reviewed sources. The Programs modal remains one interface; it does not gain a separate SAS or Engineering page.
+
 #### SAS pilot
 
 Work:
@@ -250,6 +275,7 @@ Work:
 2. Attach it to SAS and RBS where officially applicable.
 3. Pilot one SAS major, one SAS minor, and one cross-school combination before importing all SAS programs.
 4. Record SAS residency, double-count, and major/minor policy rules with sources.
+5. Add SAS to the Programs school selector only after the pilot's acceptance checks pass.
 
 #### Engineering pilot
 
@@ -259,6 +285,7 @@ Work:
 2. Model approved Humanities/Social Science electives as a reviewed rule/list, not as SAS Core choices.
 3. Add one Engineering major end-to-end, including technical electives, departmental electives, and major-specific prerequisites.
 4. Test a cross-school combination involving Engineering and another school only after the relevant official policy is reviewed.
+5. Add Engineering to the Programs school selector only after the pilot's acceptance checks pass.
 
 Exit gate for each school:
 
@@ -285,6 +312,7 @@ Work:
    - double-major-friendly path.
 6. Explain every bottleneck, unsatisfied prerequisite, and assumption.
 7. Let the user lock a course or term and regenerate the remainder around that decision.
+8. Keep Core/elective choices as explicit placeholders until the student chooses them or asks for reviewed recommendations.
 
 Exit gate:
 
@@ -315,7 +343,7 @@ Exit gate:
 
 **Goal:** Let students use normal language while keeping course and policy results deterministic and inspectable.
 
-AI should be introduced as a translator and explainer, not as the source of academic truth.
+AI should be introduced as a translator and explainer, not as the source of academic truth. It can interpret a request and rank valid results, but the deterministic requirement and scheduling engines remain responsible for eligibility, conflicts, and policy results.
 
 #### 5.1 Scheduling preferences
 
@@ -330,6 +358,8 @@ Flow:
 
 The AI must not claim a section is available, a policy is satisfied, or a schedule is conflict-free without calling the corresponding data/evaluation tool.
 
+The result should make every tradeoff visible: for example, a preferred morning schedule might require a Friday class, a different campus, or a waitlist. The student should be able to revise the interpreted preferences and rerun the search without accepting an opaque recommendation.
+
 #### 5.2 Interest-based course discovery
 
 Example request: “Show cool philosophy courses with roots in STEM.”
@@ -343,6 +373,8 @@ Every recommendation should display:
 - its current-term availability, if any;
 - prerequisites and restrictions;
 - a direct path to course details.
+
+Course-sniping or automated enrollment monitoring is a later, separate capability. It must not be implied by the first natural-language filtering feature.
 
 #### 5.3 AI safety and evaluation
 
@@ -375,7 +407,8 @@ Work:
 2. Create a separate personal-plan database area with user IDs, plan IDs, version history, and deletion controls.
 3. Migrate a user’s existing local plan only after they explicitly approve it.
 4. Add account recovery, export, delete-account, and data-retention behavior.
-5. Treat optional transcript/import integrations as a separate security project, not a shortcut.
+5. Treat optional AP/college transcript upload and import as a separate security project, not a shortcut; manual entry stays available.
+6. Keep raw uploads separate from normal plan data, with explicit retention, export, correction, and deletion behavior.
 
 Exit gate:
 
@@ -463,18 +496,19 @@ These decisions shape the next build phase and should be made deliberately:
 
 ## 11. Recommended next implementation milestone
 
-**Milestone: Rutgers-New Brunswick Academic Model v1.**
+**Milestone: School-aware Rutgers-New Brunswick Academic Model v1.**
 
 This is the correct place to start, before accounts or AI.
 
 Deliverables:
 
 1. A formal program/curriculum taxonomy: institution, campus, school, catalog year, major, minor, concentration, and certificate.
-2. A source inventory for all intended RBS programs and their policies.
-3. A reusable requirement/policy schema gap analysis.
-4. A reviewed RBS program-import plan, in small batches with test cases.
-5. A redesigned Program selector specification with Majors, Minors, Concentrations/Tracks, and Certificates.
-6. A test matrix for shared requirements, double counts, course alternatives, AP/transfer equivalencies, and standing restrictions.
+2. Reviewed school profiles that drive Programs-modal school labels, program-category wording, curriculum context, and safe starting state.
+3. A source inventory for all intended RBS programs and their policies.
+4. A reusable requirement/policy schema gap analysis.
+5. A reviewed RBS program-import plan, in small batches with test cases.
+6. A Programs selector specification that uses each reviewed school's exact Majors, Minors, Concentrations/Tracks, and Certificates wording.
+7. A test matrix for shared requirements, double counts, course alternatives, AP/transfer equivalencies, and standing restrictions.
 
 Only after that milestone should we add SAS or Engineering data. Only after the prerequisite/policy engine is proven across more than one school should we build the automatic four-year planner. AI and accounts should build on those dependable foundations rather than compensate for missing data.
 

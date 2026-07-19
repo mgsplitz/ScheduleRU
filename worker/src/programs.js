@@ -30,6 +30,7 @@
  */
 
 import { evaluateProgramSelection } from "./program-selection-policy.js";
+import { publicSchoolProfile } from "./school-profiles.js";
 
 /* ============================================================
    CONFIG
@@ -1081,6 +1082,20 @@ function isSafeProgramId(value) {
    ============================================================ */
 export async function handleProgramsApi(request, env, ctx, path, url, json, checkAdmin) {
   // ---- Public reads ----
+  // School profiles are the reviewed, data-backed source of Programs-modal
+  // wording and context. An unreviewed row is intentionally invisible here:
+  // adding a name alone must never make a school appear supported.
+  if (path === "/api/schools" && request.method === "GET") {
+    const { results } = await env.DB.prepare(
+      `SELECT slug, institution_slug, campus_slug, name, short_name,
+              catalog_year, configuration_json, source_url, source_title
+       FROM school_profiles
+       WHERE review_status = 'reviewed'
+       ORDER BY sort_order, name`
+    ).all();
+    return json({ schools: (results || []).map(publicSchoolProfile).filter((school) => school.slug) });
+  }
+
   if (path === "/api/programs" && request.method === "GET") {
     const school = url.searchParams.get("school");
     const type = url.searchParams.get("type");
