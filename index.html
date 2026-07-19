@@ -556,6 +556,18 @@ let COURSES = {};
 let GROUPS = {};
 let ROOT_GROUPS = [];
 
+// Production and the named development Pages branch deliberately use different
+// Workers. This keeps experiments with catalog syncing and degree rules away
+// from the live application. A student can still intentionally override the
+// URL in the Course Catalog connection bar; that override remains private to
+// the current browser and site address.
+const PRODUCTION_BACKEND_URL="https://rutgers-course-sync.housselllaura.workers.dev";
+const DEVELOPMENT_BACKEND_URL="https://rutgers-course-sync-dev.housselllaura.workers.dev";
+function defaultBackendUrl(){
+  const host=(typeof location!=="undefined" && location.hostname)||"";
+  return host.startsWith("dev-next.") ? DEVELOPMENT_BACKEND_URL : PRODUCTION_BACKEND_URL;
+}
+
 /* ============================================================
    STATE
    ============================================================ */
@@ -567,7 +579,7 @@ const ST = {
   // The worker reads Rutgers on a cron and serves cached results from D1,
   // so this is a plain same-origin-friendly fetch (the worker sends CORS
   // headers itself) rather than needing a public relay.
-  backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem("bait_backend_url")) || "https://rutgers-course-sync.housselllaura.workers.dev",
+  backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem("bait_backend_url")) || defaultBackendUrl(),
   availablePrograms:[], activeProgram:null, selectedPrograms:[],
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",

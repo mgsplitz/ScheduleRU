@@ -27,6 +27,32 @@ COURSES_PER_RUN = "400"     # courses written per cron run (~4,400 total courses
 # fall. Bump this once a year rather than editing programs.js.
 CATALOG_SUBDOMAIN = "newbrunswick-undergrad-25-26"
 
+# Development is an entirely separate Worker and D1 database. Deploy it with
+# `wrangler deploy --env dev`; Cloudflare publishes it as
+# `rutgers-course-sync-dev`, so development Pages never write to the
+# production catalog or reviewed-requirements data.
+#
+# Bindings and vars are intentionally repeated here because Wrangler
+# environments do not inherit them from the top-level production config.
+[env.dev]
+workers_dev = true
+
+# A daily refresh is enough for feature testing and avoids duplicating the
+# production catalog's 15-minute write workload.
+[env.dev.triggers]
+crons = ["0 10 * * *"]
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "rutgers_courses_dev"
+database_id = "566147eb-e368-4293-a65a-41429e44a3cf"
+
+[env.dev.vars]
+CURRENT_YEAR = "2026"
+CURRENT_TERM = "9"
+COURSES_PER_RUN = "400"
+CATALOG_SUBDOMAIN = "newbrunswick-undergrad-25-26"
+
 # ADMIN_SECRET is still NOT set here as a plain [vars] line — wrangler.toml
 # (and the Cloudflare dashboard's vars view) shows plaintext, so anything
 # here is effectively public. It still needs to be set as an encrypted
