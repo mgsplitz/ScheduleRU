@@ -221,6 +221,8 @@ Raw transcript files, if eventually supported, should be stored separately from 
 
 The phases below are ordered by dependency, not by calendar date. Each phase should have a written acceptance checklist before the next one begins.
 
+**Scope note (2026-07-19):** The active expansion and release target is **reviewed Rutgers–New Brunswick undergraduate programs only**. Newark and Camden are out of scope for this release and must not be surfaced as supported choices. The automatic eight-semester planner remains a later phase: it should be designed around student locks, preferences, optional summer/online study, Honors requirements, and transparent tradeoffs, but it will not be implemented until reviewed Rutgers–New Brunswick program and eligibility coverage is sufficiently broad. This preserves the current roadmap and keeps the eventual generator from being built on partial academic rules.
+
 ### Phase 0: Stabilize the Rutgers-New Brunswick foundation
 
 **Goal:** Make the current RBS experience an auditable reference implementation.
