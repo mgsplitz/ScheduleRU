@@ -243,6 +243,9 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .program-option{display:flex;align-items:flex-start;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:12px;cursor:pointer;}
 .program-option input{margin-top:2px;}
 .program-option small{display:block;color:var(--muted);margin-top:2px;}
+.program-category{margin:12px 0 16px;}
+.program-category:first-child{margin-top:0;}
+.program-category-title{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 4px;}
 .program-picker-note{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:9px;}
 .modal-footer{display:flex;justify-content:flex-end;gap:7px;margin-top:14px;}
 
@@ -497,9 +500,9 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 <!-- PROGRAM SELECTOR -->
 <div class="ov" id="programOv">
   <div class="modal" style="width:500px">
-    <div class="mhdr">Choose RBS programs <button class="xbtn" id="programClose">✕</button></div>
+    <div class="mhdr">Choose programs of study <button class="xbtn" id="programClose">✕</button></div>
     <div class="mbody">
-      <div class="program-picker-note">Choose one to three reviewed RBS programs. Shared requirements are shown once; the app will flag potential double-counting outside those shared groups.</div>
+      <div class="program-picker-note">Choose any reviewed RBS major, minor, concentration, track, or certificate. Shared requirements are shown once; the app flags known double-count policies and clearly marks policy coverage that still needs review.</div>
       <div id="programList"></div>
       <div class="modal-footer"><button class="choice-btn secondary" id="programCancel">Cancel</button><button class="choice-btn" id="programApply">Apply programs</button></div>
     </div>
@@ -614,7 +617,7 @@ function restorePlannerState(){
     ST.groupSelections=savedObject(saved.groupSelections);
     const year=Number(saved.year);
     if(Number.isInteger(year) && year>=1 && year<=4) ST.year=year;
-    if(Array.isArray(saved.selectedPrograms)) ST.selectedPrograms=saved.selectedPrograms.filter(id=>typeof id==="string").slice(0,3);
+    if(Array.isArray(saved.selectedPrograms)) ST.selectedPrograms=saved.selectedPrograms.filter(id=>typeof id==="string");
   }catch(e){
     // A malformed or outdated local value should never prevent the planner
     // from opening; the user can continue with a fresh in-browser plan.
@@ -713,9 +716,18 @@ document.querySelectorAll(".pagenav-btn").forEach(b=>b.addEventListener("click",
 }));
 
 /* ============================================================
-   PROGRAM SELECTION (one to three reviewed RBS programs)
+   PROGRAM SELECTION (reviewed programs of study)
    ============================================================ */
-const MAX_MAJORS=3;
+const PROGRAM_TYPE_SECTIONS=[
+  {type:"major",label:"Majors",singular:"Major"},
+  {type:"minor",label:"Minors",singular:"Minor"},
+  {type:"concentration",label:"Concentrations and tracks",singular:"Concentration or track"},
+  {type:"certificate",label:"Certificates",singular:"Certificate"},
+];
+function programTypeLabel(type){
+  const section=PROGRAM_TYPE_SECTIONS.find(item=>item.type===type);
+  return section?.singular||"Program";
+}
 function selectedProgramRows(){
   const selected=new Set(ST.selectedPrograms);
   return (ST.availablePrograms||[]).filter(program=>selected.has(program.id));
@@ -732,19 +744,21 @@ function closeProgramPicker(){
 function openProgramPicker(){
   ST.programDraft=[...ST.selectedPrograms];
   const list=document.getElementById("programList");
-  list.innerHTML=(ST.availablePrograms||[]).map(program=>`<label class="program-option">
-    <input type="checkbox" data-program-choice="${program.id}" ${ST.programDraft.includes(program.id)?"checked":""}/>
-    <span><strong>${escapeHtml(program.name)}</strong><small>${escapeHtml(program.type||"program")}</small></span>
-  </label>`).join("") || `<div class="api-status">No reviewed RBS programs are available yet.</div>`;
+  const categories=PROGRAM_TYPE_SECTIONS.map(section=>({
+    ...section,
+    programs:(ST.availablePrograms||[]).filter(program=>program.type===section.type),
+  })).filter(section=>section.programs.length);
+  list.innerHTML=categories.map(section=>`<section class="program-category">
+    <h3 class="program-category-title">${escapeHtml(section.label)}</h3>
+    ${section.programs.map(program=>`<label class="program-option">
+      <input type="checkbox" data-program-choice="${escapeHtml(program.id)}" ${ST.programDraft.includes(program.id)?"checked":""}/>
+      <span><strong>${escapeHtml(program.name)}</strong><small>${escapeHtml(programTypeLabel(program.type))} · ${escapeHtml(program.catalog_year||"Catalog year not listed")}</small></span>
+    </label>`).join("")}
+  </section>`).join("") || `<div class="api-status">No reviewed RBS programs are available yet.</div>`;
   list.querySelectorAll("[data-program-choice]").forEach(input=>input.addEventListener("change",()=>{
     const id=input.dataset.programChoice;
     const draft=new Set(ST.programDraft||[]);
     if(input.checked){
-      if(draft.size>=MAX_MAJORS){
-        input.checked=false;
-        alert(`You can compare up to ${MAX_MAJORS} programs at a time.`);
-        return;
-      }
       draft.add(id);
     }else{
       draft.delete(id);
@@ -1754,16 +1768,19 @@ function computeDoubleCountOverlaps(requirementTrees, programIds){
     const cap=policy?.max_shared_courses===null||policy?.max_shared_courses===undefined ? null : Number(policy.max_shared_courses);
     return {scope,policy,codes,cap,violates:cap!==null&&codes.length>cap};
   });
-  return {shared,overlaps,scopeResults};
+  const scopedCodes=new Set(scopeResults.flatMap(result=>result.codes.map(overlap=>overlap.code)));
+  const unscoped=overlaps.filter(overlap=>!scopedCodes.has(overlap.code));
+  return {shared,overlaps,scopeResults,unscoped};
 }
 function doubleCountBannerHtml(){
   const result=ST.doubleCount;
   if(!result || ST.selectedPrograms.length<2) return "";
   const sharedNames=[...new Set(result.shared.map(item=>item.name))];
   const activeScopes=result.scopeResults.filter(item=>item.codes.length);
-  const violates=activeScopes.some(item=>item.violates);
+  const unscoped=result.unscoped||[];
+  const violates=activeScopes.some(item=>item.violates) || unscoped.length>0;
   let content=sharedNames.length?`Shared requirements shown once: ${escapeHtml(sharedNames.join(", "))}. `:"";
-  if(!activeScopes.length){
+  if(!activeScopes.length && !unscoped.length){
     content+="No non-shared course overlap was found among the selected programs.";
   }else{
     content+=activeScopes.map(item=>{
@@ -1772,6 +1789,10 @@ function doubleCountBannerHtml(){
       const listed=item.codes.map(overlap=>overlap.code).join(", ");
       return `${label}: ${item.codes.length} potential shared course${item.codes.length===1?"":"s"} (${escapeHtml(listed)}); cap: ${cap}.`;
     }).join(" ");
+    if(unscoped.length){
+      const listed=unscoped.map(overlap=>overlap.code).join(", ");
+      content+=`${activeScopes.length?" ":""}Additional overlap (${escapeHtml(listed)}) involves program types without a reviewed double-count policy in ScheduleRU yet.`;
+    }
   }
   const title=violates?"Double-count rule needs attention":"Double-count planning check";
   const suffix=" This is a planning flag, not a degree audit; confirm a final double-count decision with RBS advising.";
@@ -1780,9 +1801,10 @@ function doubleCountBannerHtml(){
 
 async function loadAvailablePrograms(){
   // Fetch every reviewed RBS item. Filtering is deliberately client-side so
-  // future concentrations are not hidden by a hardcoded API type parameter.
+  // majors, minors, concentrations/tracks, and certificates all remain
+  // available as soon as reviewed data is added.
   const data=await backendFetch("/api/programs?school=rbsnb");
-  ST.availablePrograms=(data.programs||[]).filter(p=>["major","minor","concentration"].includes(p.type));
+  ST.availablePrograms=(data.programs||[]).filter(p=>["major","minor","concentration","certificate"].includes(p.type));
   return ST.availablePrograms;
 }
 async function loadRequirements(programId){
@@ -1844,10 +1866,13 @@ async function loadInitialRequirements(){
     // This one read lets the UI derive the common Business Core from the
     // reviewed school data, including when a program's own table contains
     // additional major-only rows. It is not a hard-coded course list.
-    try{ await loadSchoolReferenceRequirementTrees(programs); }catch(e){ ST.referenceRequirementTrees={}; }
+    // RBS's current shared Business Core is a major-level concept. Keep the
+    // comparison baseline limited to majors so a future minor or certificate
+    // cannot accidentally be treated as part of that shared school core.
+    try{ await loadSchoolReferenceRequirementTrees(programs.filter(program=>program.type==="major")); }catch(e){ ST.referenceRequirementTrees={}; }
     const restored=ST.selectedPrograms.filter(id=>programs.some(program=>program.id===id));
-    const initial=programs.find(p=>p.id==="rbsnb-bait")||programs[0];
-    if(!initial) throw new Error("No reviewed RBS major is available yet.");
+    const initial=programs.find(p=>p.id==="rbsnb-bait")||programs.find(p=>p.type==="major")||programs[0];
+    if(!initial) throw new Error("No reviewed RBS program is available yet.");
     ST.selectedPrograms=restored.length ? restored : [initial.id];
     await loadSelectedRequirements(ST.selectedPrograms);
     updateProgramTitle();
