@@ -997,6 +997,17 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
     return true;
   });
   const visibleGroupIds = visibleGroups.map((group) => group.id);
+  const selectorsByGroup = {};
+  if (visibleGroupIds.length) {
+    const { results: selectors } = await env.DB.prepare(
+      `SELECT group_id, selector_key, selector_json, source_url, source_label
+       FROM requirement_course_selectors
+       WHERE review_status = 'reviewed'
+         AND group_id IN (${visibleGroupIds.map(() => "?").join(",")})
+       ORDER BY group_id, selector_key`
+    ).bind(...visibleGroupIds).all();
+    for (const selector of selectors || []) (selectorsByGroup[selector.group_id] ||= []).push(selector);
+  }
   const { results: courses } = visibleGroupIds.length ? await env.DB.prepare(
     `SELECT rc.*, g.program_id as owner_program_id, c.title as catalog_title, c.credits as catalog_credits,
             c.description as catalog_description, c.prereqs as catalog_prereqs,
@@ -1033,7 +1044,9 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
     (byGroup[c.group_id] ||= []).push(c);
   }
   const byId = {};
-  for (const g of visibleGroups) byId[g.id] = { ...g, courses: byGroup[g.id] || [], children: [] };
+  for (const g of visibleGroups) byId[g.id] = {
+    ...g, courses: byGroup[g.id] || [], course_selectors: selectorsByGroup[g.id] || [], children: [],
+  };
   const roots = [];
   for (const g of visibleGroups) {
     if (g.parent_group_id && byId[g.parent_group_id]) byId[g.parent_group_id].children.push(byId[g.id]);

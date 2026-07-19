@@ -7,6 +7,16 @@
  * approved list; its nested children restrict how that list may be used.
  */
 (function exposeRequirementGroupLogic(root) {
+  function appliedCourseIds(group, completed, options) {
+    const automatic = typeof options?.appliedCourseIds === "function"
+      ? options.appliedCourseIds(group)
+      : [];
+    return [...new Set([
+      ...(group?.members || []).filter((id) => completed(id)),
+      ...(Array.isArray(automatic) ? automatic : []),
+    ].filter(Boolean))];
+  }
+
   function groupFulfilled(groupId, groups, options) {
     const g = groups?.[groupId];
     if (!g) return false;
@@ -19,20 +29,25 @@
       ? options.isConstraintGroup
       : () => false;
     const members = g.members || [];
-    const completedCount = members.filter((id) => completed(id)).length;
+    const applied = appliedCourseIds(g, completed, options);
+    const completedCount = applied.length;
 
     if (g.rule === "all") {
-      return members.every((id) => completed(id))
+      // A selector describes a set, not a fixed every-course checklist. A
+      // reviewed selector-only group must therefore use a counted rule; do
+      // not silently treat it as complete because its explicit list is empty.
+      if (!members.length && (g.courseSelectors || []).length) return false;
+      return members.every((id) => applied.includes(id))
         && (g.children || []).every((childId) => groupFulfilled(childId, groups, options));
     }
 
     if (g.rule === "distinct") {
       const applied = new Set([
         ...selected(g.id),
-        ...members.filter((id) => completed(id)),
+        ...appliedCourseIds(g, completed, options),
       ]);
       const distinct = (g.children || []).map((childId) => groups[childId]).filter(Boolean)
-        .filter((child) => (child.members || []).some((id) => applied.has(id))).length;
+        .filter((child) => appliedCourseIds(child, completed, options).some((id) => applied.has(id))).length;
       return applied.size >= g.count && distinct >= g.count;
     }
 
@@ -188,6 +203,7 @@
 
   root.ScheduleRURequirementLogic = {
     groupFulfilled,
+    appliedCourseIds,
     requirementsForDisplay,
     sharedRequirementRootKey,
     sharedRequirementGroups,

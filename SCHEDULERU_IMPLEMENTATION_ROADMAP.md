@@ -281,6 +281,8 @@ Progress note (development, 2026-07-19): item 1 is implemented as the reviewed `
 
 The program model now also carries an official academic-program code, degree type, and program-family identifier. This allows a future B.A. and B.S. path to have independently reviewed requirements rather than being presented as one ambiguous major.
 
+Progress note (development, 2026-07-19): the reusable reviewed course-selector foundation is implemented and deployed to development. It can safely apply a scheduled or completed course to a requirement expressed as either an explicit reviewed code list or a New Brunswick-scoped subject-and-level rule (for example, reviewed 300/400-level courses in one subject). Each selector requires a source URL and review status; malformed or unreviewed selectors fail closed. No SAS selector, program, school profile, or policy data has been published yet. The next SAS step is to turn the chosen public-source rule into a reviewed row and comparison case, not to expose a partial course list.
+
 #### Engineering pilot
 
 Work:
