@@ -565,8 +565,8 @@ Create and verify a unique temporary public-only folder, deploy it, then remove 
 
 ~~~
 $previewDir=Join-Path ([IO.Path]::GetTempPath()) ("scheduleru-public-"+[guid]::NewGuid().ToString("N"))
-New-Item -ItemType Directory -LiteralPath $previewDir | Out-Null
-$publicFiles=@("index.html","requirement-group-logic.js","course-selector-logic.js","eligibility-logic.js","_headers")
+New-Item -ItemType Directory -Path $previewDir | Out-Null
+$publicFiles=@("index.html","requirement-group-logic.js","course-selector-logic.js","eligibility-logic.js")
 foreach($file in $publicFiles){ Copy-Item -LiteralPath (Join-Path $PWD $file) -Destination (Join-Path $previewDir $file) }
 $actualFiles=@(Get-ChildItem -LiteralPath $previewDir -File | ForEach-Object Name | Sort-Object)
 if((Compare-Object $publicFiles $actualFiles)){ throw "Preview bundle contains an unexpected file or is missing a required public file." }
