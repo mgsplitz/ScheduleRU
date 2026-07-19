@@ -32,10 +32,11 @@ The two RBS minors are for non-RBS students. They are deliberately in the academ
 1. The [current concentrations landing page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/concentrations) lists nine concentrations and says a student may declare one after 45 credits. The [RBS policies page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures) has a shorter/older-looking list and describes a different declaration timing. ScheduleRU will not choose between those statements silently.
 2. Several detail pages call the courses “certificate courses” while their own landing page calls the programs concentrations. They remain `concentration` records for selector organization, with the wording preserved in provenance notes until RBS confirms the formal transcript label.
 3. The existing RBS-wide rule says a major and concentration may not overlap, but the Professional Selling and Real Estate pages state named Finance/Marketing exceptions. The reviewed implementation stores each exception as a tested, program-pair-and-course-code rule; it does not weaken the no-overlap rule for any other course.
+4. The Global Business detail page still displayed `22:620:320`, but the [current 2025-26 undergraduate catalog](https://newbrunswick-undergrad-25-26.catalogs.rutgers.edu/pages/tZghCvs9mjVhRGvNWqgC) confirms the New Brunswick elective is `33:620:320`. The reviewed metadata migration corrects that code and stores full source titles and credits for every reviewed manually entered requirement row, so display does not depend on a course being offered in the currently synced term.
 
 ## Before publication
 
-For every row, we need a dated catalog source (or written RBS confirmation), a reviewed requirement tree, and a comparison case. The first comparison set will cover:
+For every row, we need a dated catalog source (or written RBS confirmation), a reviewed requirement tree, durable source title/credit metadata, and a comparison case. The first comparison set will cover:
 
 1. A non-RBS student selecting each RBS minor.
 2. An RBS student being blocked from those minors.

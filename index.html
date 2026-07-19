@@ -581,6 +581,34 @@ function defaultBackendUrl(){
 /* ============================================================
    STATE
    ============================================================ */
+// A home school owns the catalog rules that apply to a student's plan. The
+// current reviewed data set is RBS New Brunswick; a future school adds one
+// entry here and reviewed API data instead of changing the planner flow.
+const DEFAULT_HOME_SCHOOL_SLUG="rbsnb";
+const SCHOOL_CONTEXTS={
+  rbsnb:{
+    label:"RBS New Brunswick",
+    defaultProgramId:"rbsnb-bait",
+    advisingLabel:"RBS advising",
+    sharedRequirementReferenceTypes:["major"],
+    coreFallbackLabel:"RBS Core Curriculum",
+    coreIntro:"RBS requires a minimum of 27 Core credits. Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed Core goals. One course is used once within each Core family, while Rutgers permits it to satisfy goals in different families. Click any course for details.",
+  },
+};
+function activeSchoolContext(){
+  return SCHOOL_CONTEXTS[ST.homeSchoolSlug]||{
+    label:ST.homeSchoolSlug||"your home school",
+    defaultProgramId:null,
+    advisingLabel:"your school advising office",
+    sharedRequirementReferenceTypes:["major"],
+    coreFallbackLabel:"Core Curriculum",
+    coreIntro:"Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed curriculum goals. Click any course for details.",
+  };
+}
+function activeCoreLabel(){
+  return ST.activeCoreCurriculum?.name||activeSchoolContext().coreFallbackLabel;
+}
+
 const ST = {
   apOn:{}, completed:{}, schedule:{}, wishlist:{}, groupSelections:{},
   year:1, tab:"required", panelFull:false,
@@ -591,7 +619,7 @@ const ST = {
   // headers itself) rather than needing a public relay.
   backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || defaultBackendUrl(),
   availablePrograms:[], activeProgram:null, selectedPrograms:[],
-  homeSchoolSlug:"rbsnb", programSelectionPolicies:{limits:[],combination_policies:[]},
+  homeSchoolSlug:DEFAULT_HOME_SCHOOL_SLUG, programSelectionPolicies:{limits:[],combination_policies:[]},
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
@@ -745,8 +773,7 @@ function selectedProgramRows(){
   return (ST.availablePrograms||[]).filter(program=>selected.has(program.id));
 }
 function activeHomeSchoolLabel(){
-  if(ST.homeSchoolSlug==="rbsnb") return "RBS New Brunswick";
-  return ST.homeSchoolSlug||"your home school";
+  return activeSchoolContext().label;
 }
 function selectionLimitSummary(){
   const limits=ST.programSelectionPolicies?.limits||[];
@@ -768,7 +795,7 @@ function showProgramPolicyFeedback(check){
 function updateProgramTitle(){
   const names=selectedProgramRows().map(program=>program.name);
   document.getElementById("topProgramTitle").textContent=names.length?`${names.join(" + ")} Degree Navigator`:"Degree Navigator";
-  document.getElementById("topProgramMeta").textContent=names.join(" + ")||"RBS New Brunswick";
+  document.getElementById("topProgramMeta").textContent=names.join(" + ")||activeHomeSchoolLabel();
 }
 function closeProgramPicker(){
   document.getElementById("programOv").classList.remove("open");
@@ -790,7 +817,7 @@ function openProgramPicker(){
       <input type="checkbox" data-program-choice="${escapeHtml(program.id)}" ${ST.programDraft.includes(program.id)?"checked":""}/>
       <span><strong>${escapeHtml(program.name)}</strong><small>${escapeHtml(programTypeLabel(program.type))} · ${escapeHtml(program.catalog_year||"Catalog year not listed")}</small></span>
     </label>`).join("")}
-  </section>`).join("") || `<div class="api-status">No reviewed RBS programs are available yet.</div>`;
+  </section>`).join("") || `<div class="api-status">No reviewed programs are available yet for ${escapeHtml(activeHomeSchoolLabel())}.</div>`;
   list.querySelectorAll("[data-program-choice]").forEach(input=>input.addEventListener("change",()=>{
     const id=input.dataset.programChoice;
     const draft=new Set(ST.programDraft||[]);
@@ -884,6 +911,11 @@ document.getElementById("apClose").addEventListener("click", () =>
 function courseCodesFromText(text){
   return [...new Set((String(text||"").match(/\b\d{2}:\d{3}:\d{3}\b/g)||[]))];
 }
+function courseCreditsLabel(credits, abbreviated=false){
+  const value=String(credits??"").trim();
+  if(!value) return "Credits not listed";
+  return abbreviated?`${value} cr`:`${value} credits`;
+}
 function planningPrerequisiteCodes(course){
   const fromChecked=(Array.isArray(course.prereqs)?course.prereqs:[]).map(id=>COURSES[id]?.code).filter(Boolean);
   const fromCatalog=courseCodesFromText(course.catalogPrereqs||(!Array.isArray(course.prereqs)?course.prereqs:"")||"");
@@ -933,7 +965,7 @@ function openCourseDetails(id){
   body.innerHTML=`
     <div class="detail-overview">
       <h2>${escapeHtml(c.fullTitle||c.title)}</h2>
-      <div class="detail-code">${escapeHtml(c.code)} · ${escapeHtml(c.credits||"?")} credits</div>
+      <div class="detail-code">${escapeHtml(c.code)} · ${escapeHtml(courseCreditsLabel(c.credits))}</div>
     <div class="detail-status${(available||completedAlternative)?" ready":""}">${escapeHtml(status)}</div>
     </div>
     <div class="detail-section"><h3>${standing?"When you can take it":"Enrollment"}</h3><p>${escapeHtml(compactRestriction(c,standing))}</p></div>
@@ -999,7 +1031,7 @@ function renderRequirementPicker(){
     const selectSlotAvailable=new Set([...applied,...selected]).size<limit;
     const mainLabel=alreadyApplied?"In schedule":picked?"Remove":selectSlotAvailable?"Use for requirement":"+ Wishlist";
     return `<div class="picker-row${picked||alreadyApplied?" selected":""}">
-      <div><div class="picker-code">${escapeHtml(c.code)}</div><div class="picker-name">${escapeHtml(c.fullTitle||c.title)}</div><div class="picker-meta">${escapeHtml(c.credits||"?")} credits</div></div>
+      <div><div class="picker-code">${escapeHtml(c.code)}</div><div class="picker-name">${escapeHtml(c.fullTitle||c.title)}</div><div class="picker-meta">${escapeHtml(courseCreditsLabel(c.credits))}</div></div>
       <div class="picker-actions"><button class="picker-btn view" data-pview="${id}">Details</button><button class="picker-btn" data-pchoose="${id}" ${alreadyApplied?"disabled":""}>${mainLabel}</button></div>
     </div>`;
   }).join(""):`<div class="api-status">No approved course matches that search.</div>`;
@@ -1124,7 +1156,7 @@ function renderSchedule(){
           <div class="sc-card-main">
             <div class="sn">${escapeHtml(e.code)}${e.locked?' <span class="sched-locked">SET</span>':''}</div>
             <div class="stitle" title="${escapeHtml(e.fullTitle||e.title||e.code)}">${escapeHtml(e.fullTitle||e.title||e.code)}</div>
-            <span class="sct">${e.credits||"?"} cr${e.section_number?` · Sec ${escapeHtml(e.section_number)}`:''}</span>
+            <span class="sct">${escapeHtml(courseCreditsLabel(e.credits,true))}${e.section_number?` · Sec ${escapeHtml(e.section_number)}`:''}</span>
           </div>
           <button class="rx" data-rem="${escapeHtml(code)}">✕</button></div>`;
       }).join("");
@@ -1553,12 +1585,12 @@ function renderRequired(){
 }
 
 /* ============================================================
-   TAB 2: RBS CORE CURRICULUM
+   TAB 2: REVIEWED CORE CURRICULUM
    ============================================================ */
 function renderCore(){
   const pb=document.getElementById("pb");
   if(ST.coreLoading){
-    pb.innerHTML=`<div class="empty" style="margin-top:30px;">Loading the reviewed RBS Core Curriculum…</div>`;
+    pb.innerHTML=`<div class="empty" style="margin-top:30px;">Loading the reviewed ${escapeHtml(activeCoreLabel())}…</div>`;
     return;
   }
   if(ST.coreError){
@@ -1566,13 +1598,13 @@ function renderCore(){
     return;
   }
   if(!ST.coreRequirementTree){
-    pb.innerHTML=`<div class="empty" style="margin-top:30px;">The reviewed RBS Core Curriculum is not available yet.</div>`;
+    pb.innerHTML=`<div class="empty" style="margin-top:30px;">The reviewed ${escapeHtml(activeCoreLabel())} is not available yet.</div>`;
     return;
   }
   useRequirementTree(ST.coreRequirementTree);
   const allocation=computeCoreAllocation();
   ST.coreAllocation=allocation;
-  let h=`<div class="leg">RBS requires a minimum of 27 Core credits. Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed Core goals. One course is used once within each Core family, while Rutgers permits it to satisfy goals in different families. Click any course for details.</div>`;
+  let h=`<div class="leg">${escapeHtml(activeSchoolContext().coreIntro)}</div>`;
   ROOT_GROUPS.forEach(gk=>{
     const g=GROUPS[gk];
     if(!g) return;
@@ -1882,12 +1914,12 @@ function doubleCountBannerHtml(){
     }
   }
   const title=violates?"Plan adjustment needed":"Course-overlap check";
-  const suffix=violates?`<span> This is a planning check, not a final degree audit; confirm the final decision with RBS advising.</span>`:"";
+  const suffix=violates?`<span> This is a planning check, not a final degree audit; confirm the final decision with ${escapeHtml(activeSchoolContext().advisingLabel)}.</span>`:"";
   return `<div class="dc-banner ${violates?"warn":"ok"}"><b>${title}</b>${content}${suffix}</div>`;
 }
 
 async function loadAvailablePrograms(){
-  // Fetch every reviewed RBS item. Filtering is deliberately client-side so
+  // Fetch every reviewed item for the active home school. Filtering is deliberately client-side so
   // majors, minors, concentrations/tracks, and certificates all remain
   // available as soon as reviewed data is added.
   const [data,policyData]=await Promise.all([
@@ -1908,7 +1940,7 @@ async function loadSelectedRequirements(programIds){
   if(!ids.length) throw new Error("Choose at least one program.");
   const [data,policies]=await Promise.all([
     backendFetch(`/api/requirements?programs=${ids.map(encodeURIComponent).join(",")}`),
-    backendFetch("/api/double-count-policies?school=rbsnb"),
+    backendFetch(`/api/double-count-policies?school=${encodeURIComponent(ST.homeSchoolSlug)}`),
   ]);
   const returned=data.requirements||{};
   const visibleIds=ids.filter(id=>Array.isArray(returned[id]));
@@ -1938,9 +1970,9 @@ async function loadCoreCurriculum(){
   ST.coreError="";
   renderPanel();
   try{
-    const data=await backendFetch("/api/core-curricula?school=rbsnb");
+    const data=await backendFetch(`/api/core-curricula?school=${encodeURIComponent(ST.homeSchoolSlug)}`);
     const curriculum=(data.curricula||[])[0];
-    if(!curriculum) throw new Error("No reviewed RBS Core Curriculum is available yet.");
+    if(!curriculum) throw new Error(`No reviewed ${activeCoreLabel()} is available yet.`);
     const detail=await backendFetch(`/api/programs/${encodeURIComponent(curriculum.id)}/requirements`);
     ST.coreCurricula=data.curricula||[];
     ST.activeCoreCurriculum=curriculum;
@@ -1958,16 +1990,17 @@ async function loadInitialRequirements(){
   renderPanel();
   try{
     const programs=await loadAvailablePrograms();
-    // This one read lets the UI derive the common Business Core from the
+    // This one read lets the UI derive a shared requirement baseline from the
     // reviewed school data, including when a program's own table contains
     // additional major-only rows. It is not a hard-coded course list.
-    // RBS's current shared Business Core is a major-level concept. Keep the
-    // comparison baseline limited to majors so a future minor or certificate
-    // cannot accidentally be treated as part of that shared school core.
-    try{ await loadSchoolReferenceRequirementTrees(programs.filter(program=>program.type==="major")); }catch(e){ ST.referenceRequirementTrees={}; }
+    // The active school configuration determines which program types participate;
+    // this prevents a future minor or certificate from accidentally becoming
+    // part of a shared major-level baseline.
+    const referenceTypes=activeSchoolContext().sharedRequirementReferenceTypes||[];
+    try{ await loadSchoolReferenceRequirementTrees(programs.filter(program=>referenceTypes.includes(program.type))); }catch(e){ ST.referenceRequirementTrees={}; }
     const restored=ST.selectedPrograms.filter(id=>programs.some(program=>program.id===id));
-    const initial=programs.find(p=>p.id==="rbsnb-bait")||programs.find(p=>p.type==="major")||programs[0];
-    if(!initial) throw new Error("No reviewed RBS program is available yet.");
+    const initial=programs.find(p=>p.id===activeSchoolContext().defaultProgramId)||programs.find(p=>p.type==="major")||programs[0];
+    if(!initial) throw new Error(`No reviewed programs are available yet for ${activeHomeSchoolLabel()}.`);
     ST.selectedPrograms=restored.length ? restored : [initial.id];
     await loadSelectedRequirements(ST.selectedPrograms);
     updateProgramTitle();
@@ -2118,7 +2151,7 @@ function courseRowHtml(c){
       <span class="cr-code">${escapeHtml(code)}</span>
       ${cleanApiText(c.prereqs) ? `<span class="prereq-hint" onclick="event.stopPropagation()">Prereqs listed</span>` : ""}
       <span class="cr-title">${escapeHtml(c.title)}<span class="sub"> ${escapeHtml(c.subject_description||"")}</span></span>
-      <span class="cr-credits">${c.credits||"?"} cr</span>
+      <span class="cr-credits">${escapeHtml(courseCreditsLabel(c.credits,true))}</span>
       <span class="cr-sections" style="color:${openCt>0?'#3a8a3a':'var(--grayt)'}">${openCt}/${totalCt} open</span>
       <button class="cr-wish" data-wadd="${escapeHtml(code)}" ${inW?"disabled":""}>${inW?"✓ Added":"+ Wishlist"}</button>
     </div>
@@ -2261,7 +2294,7 @@ function renderWishlist(){
     <div class="cc wish-card${scheduled?" done":""}" data-cid="${escapeHtml(record.code)}" draggable="true" title="${scheduled?"Already added to your semester plan":""}">
       <div class="code">${escapeHtml(record.code)}</div>
       <div class="ttl">${escapeHtml(record.fullTitle||record.title||record.code)}</div>
-      <div class="meta">${escapeHtml(record.credits||"?")} credits${scheduled?" · In your plan":""}</div>
+      <div class="meta">${escapeHtml(courseCreditsLabel(record.credits))}${scheduled?" · In your plan":""}</div>
       <button class="rx" data-wrem="${escapeHtml(record.key)}" title="Remove from wishlist">×</button>
     </div>`;}).join("")}</div>`;
   attachCardEvents(pb);

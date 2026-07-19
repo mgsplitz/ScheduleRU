@@ -184,7 +184,7 @@ VALUES
   ('rbsnb-fixed-income-credit-analysis-concentration-required', '33:390:491', 'Prerequisite: 33:390:380.'),
   ('rbsnb-global-business-concentration-required', '33:620:402', ''),
   ('rbsnb-global-business-concentration-required', '33:620:369', ''),
-  ('rbsnb-global-business-concentration-elective', '22:620:320', ''),
+  ('rbsnb-global-business-concentration-elective', '33:620:320', ''),
   ('rbsnb-global-business-concentration-elective', '33:620:479', ''),
   ('rbsnb-global-business-concentration-elective', '33:620:410', ''),
   ('rbsnb-global-business-concentration-elective', '33:390:320', ''),
