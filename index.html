@@ -795,6 +795,13 @@ function groupFulfilled(gk){
     selectedRequirementCourses,
     isConstraintGroup,
     appliedCourseIds:groupAppliedCourseIds,
+    courseCredits:id=>creditNumber(COURSES[id]?.credits),
+  });
+}
+function groupProgress(g){
+  return ScheduleRURequirementLogic.groupProgress(g,isCompleted,{
+    appliedCourseIds:groupAppliedCourseIds,
+    courseCredits:id=>creditNumber(COURSES[id]?.credits),
   });
 }
 function reviewedGroupSelectors(g){
@@ -1485,8 +1492,13 @@ function attachCardEvents(el){
 function groupRuleLabel(g){
   if(g.rule==="min") return `choose at least ${g.count}`;
   if(g.rule==="max") return `choose up to ${g.count}`;
+  if(g.rule==="min_credits") return `complete at least ${g.count} credits`;
+  if(g.rule==="max_credits") return `apply up to ${g.count} credits`;
   if(g.rule==="distinct") return `choose ${g.count} across distinct goals`;
   return "all required";
+}
+function isCreditRule(g){
+  return g?.rule==="min_credits"||g?.rule==="max_credits";
 }
 function groupDisplayName(g){
   if(/^choose 1$/i.test(g.name||"") && (g.members||[]).length){
@@ -1560,6 +1572,11 @@ function parentSelectionConstraintViolation(parent, proposed){
   return "";
 }
 function constraintSummaryHtml(g){
+  if(isCreditRule(g)){
+    const progress=groupProgress(g);
+    const requirement=g.rule==="min_credits" ? `at least ${g.count}` : `up to ${g.count}`;
+    return `<div class="choice-summary">${progress.courses} courses / ${progress.credits} credits applied · ${requirement} credits required. Matching scheduled and completed courses apply automatically.</div>`;
+  }
   const selected=constraintSelectionCount(g);
   const requirement=g.rule==="min" ? `at least ${g.count}` : `up to ${g.count}`;
   return `<div class="choice-summary">${selected} selected or completed · ${requirement} required. Choose these through the approved list above.</div>`;
@@ -1599,11 +1616,15 @@ function groupHtml(gk){
       : `${appliedHtml}${members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`:""}`);
   body=isConstraintGroup(g)||isPickerGroup(g) ? body : `${selectorGuidanceHtml(g)}${body}`;
   const selectorCount=reviewedGroupSelectors(g).length;
+  const appliedProgress=groupProgress(g);
+  const creditProgress=isCreditRule(g)
+    ? ` · ${appliedProgress.courses} courses / ${appliedProgress.credits}/${g.count} credits applied`
+    : "";
   const selectorProgress=selectorCount ? ` · ${applied.length}/${Math.max(1,Number(g.count)||1)} applied` : "";
   const explicitProgress=g.members?.length
     ? ` · ${applied.length}/${g.rule==="all"?g.members.length:Math.min(Number(g.count)||1,g.members.length)} applied`
     : "";
-  const progress=selectorCount ? selectorProgress : explicitProgress;
+  const progress=creditProgress || selectorCount ? (creditProgress||selectorProgress) : explicitProgress;
   return `<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
     <span class="gn">${groupDisplayName(g)}</span>
     <span class="gm">${groupRuleLabel(g)}${progress} · click to expand</span>
@@ -1904,7 +1925,7 @@ function buildRequirementTree(requirements){
   const nextGroups={};
   const rootIds=[];
   const courseRows=[];
-  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : rule==="min_distinct_children" ? "distinct" : "all";
+  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : rule==="min_credits" ? "min_credits" : rule==="max_credits" ? "max_credits" : rule==="min_distinct_children" ? "distinct" : "all";
 
   function addGroup(raw, parentId=null){
     const group={

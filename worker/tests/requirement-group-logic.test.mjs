@@ -3,14 +3,15 @@ import test from "node:test";
 
 await import("../../requirement-group-logic.js");
 
-const { groupFulfilled } = globalThis.ScheduleRURequirementLogic;
+const { groupFulfilled, groupProgress } = globalThis.ScheduleRURequirementLogic;
 
-function evaluate(groups, completed, appliedByGroup = {}) {
+function evaluate(groups, completed, appliedByGroup = {}, creditsByCourse = {}) {
   const taken = new Set(completed);
   return (groupId) => groupFulfilled(groupId, groups, {
     isCompleted: (courseId) => taken.has(courseId),
     selectedRequirementCourses: () => [],
     appliedCourseIds: (group) => appliedByGroup[group?.id] || [],
+    courseCredits: (courseId) => creditsByCourse[courseId],
     isConstraintGroup: (group) => {
       const parent = groups[group?.parentId];
       if (!parent || parent.rule === "distinct" || !(group?.members || []).length || !(parent.members || []).length) return false;
@@ -19,6 +20,30 @@ function evaluate(groups, completed, appliedByGroup = {}) {
     },
   });
 }
+
+test("a minimum-credit group sums applied courses with different credit values", () => {
+  const groups = {
+    elective: { id: "elective", rule: "min_credits", count: 7, members: ["three-credit", "four-credit", "one-credit"], children: [] },
+  };
+  const credits = { "three-credit": 3, "four-credit": 4, "one-credit": 1 };
+
+  assert.equal(evaluate(groups, ["three-credit", "four-credit"], {}, credits)("elective"), true);
+  assert.deepEqual(
+    groupProgress(groups.elective, () => false, { appliedCourseIds: () => ["three-credit", "one-credit"], courseCredits: (id) => credits[id] }),
+    { courses: 2, credits: 4 }
+  );
+});
+
+test("a maximum-credit constraint rejects an over-limit partially completed group", () => {
+  const groups = {
+    electives: { id: "electives", rule: "min", count: 2, members: ["three-credit", "four-credit", "one-credit"], children: ["upper-level"] },
+    "upper-level": { id: "upper-level", parentId: "electives", rule: "max_credits", count: 4, members: ["three-credit", "four-credit", "one-credit"], children: [] },
+  };
+  const credits = { "three-credit": 3, "four-credit": 4, "one-credit": 1 };
+
+  assert.equal(evaluate(groups, ["three-credit", "one-credit"], {}, credits)("electives"), true);
+  assert.equal(evaluate(groups, ["three-credit", "four-credit"], {}, credits)("electives"), false);
+});
 
 const leadershipElectives = {
   electives: {

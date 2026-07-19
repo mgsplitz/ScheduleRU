@@ -17,6 +17,18 @@
     ].filter(Boolean))];
   }
 
+  function groupProgress(group, completed, options) {
+    const applied = appliedCourseIds(group, completed, options);
+    const courseCredits = typeof options?.courseCredits === "function"
+      ? options.courseCredits
+      : () => 0;
+    const credits = applied.reduce((total, courseId) => {
+      const value = Number(courseCredits(courseId));
+      return total + (Number.isFinite(value) ? value : 0);
+    }, 0);
+    return { courses: applied.length, credits };
+  }
+
   function groupFulfilled(groupId, groups, options) {
     const g = groups?.[groupId];
     if (!g) return false;
@@ -30,7 +42,8 @@
       : () => false;
     const members = g.members || [];
     const applied = appliedCourseIds(g, completed, options);
-    const completedCount = applied.length;
+    const progress = groupProgress(g, completed, options);
+    const completedCount = progress.courses;
 
     if (g.rule === "all") {
       // A selector describes a set, not a fixed every-course checklist. A
@@ -53,7 +66,11 @@
 
     const ownRequirementMet = g.rule === "min"
       ? completedCount >= g.count
-      : completedCount <= g.count;
+      : g.rule === "min_credits"
+        ? progress.credits >= g.count
+        : g.rule === "max_credits"
+          ? progress.credits <= g.count
+          : completedCount <= g.count;
     if (!ownRequirementMet) return false;
 
     // Nested children are constraints only when each child is a subset of the
@@ -204,6 +221,7 @@
   root.ScheduleRURequirementLogic = {
     groupFulfilled,
     appliedCourseIds,
+    groupProgress,
     requirementsForDisplay,
     sharedRequirementRootKey,
     sharedRequirementGroups,

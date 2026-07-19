@@ -22,3 +22,11 @@ test("the browser loads selector matching and uses schedule/completed records fo
   assert.match(frontend, /appliedCourseIds:groupAppliedCourseIds/);
   assert.match(frontend, /courseSelectors:Array\.isArray\(raw\.course_selectors\)/);
 });
+
+test("reviewed credit-count group rules survive normalization and render course and credit progress", () => {
+  assert.match(worker, /SELECT \* FROM requirement_groups/);
+  assert.match(frontend, /rule===\"min_credits\" \? \"min_credits\"/);
+  assert.match(frontend, /rule===\"max_credits\" \? \"max_credits\"/);
+  assert.match(frontend, /groupProgress\(g\)/);
+  assert.match(frontend, /courses.*credits applied/);
+});
