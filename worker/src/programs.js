@@ -988,6 +988,20 @@ async function getProgramSelectionPolicies(env, homeSchoolSlug) {
   };
 }
 
+async function getProgramEligibilityRules(env, programIds) {
+  const ids = [...new Set((Array.isArray(programIds) ? programIds : []).filter(isSafeProgramId))];
+  if (!ids.length) return [];
+  const { results } = await env.DB.prepare(
+    `SELECT rule_key, program_id, condition_type, condition_value_json,
+            decision, note, source_url
+     FROM program_eligibility_rules
+     WHERE review_status = 'reviewed'
+       AND program_id IN (${ids.map(() => "?").join(",")})
+     ORDER BY program_id, rule_key`
+  ).bind(...ids).all();
+  return results || [];
+}
+
 function isSafeHomeSchoolSlug(value) {
   return typeof value === "string" && /^[a-z0-9-]{2,80}$/.test(value);
 }
@@ -1031,8 +1045,11 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       `SELECT * FROM programs WHERE id = ? AND review_status = 'reviewed'`
     ).bind(programId).first();
     if (!program) return json({ error: "not found" }, 404);
-    const tree = await getRequirementTree(env, programId);
-    return json({ program, requirements: tree });
+    const [tree, eligibilityRules] = await Promise.all([
+      getRequirementTree(env, programId),
+      getProgramEligibilityRules(env, [programId]),
+    ]);
+    return json({ program, requirements: tree, eligibility_rules: eligibilityRules });
   }
 
   if (path === "/api/requirements" && request.method === "GET") {
@@ -1056,7 +1073,8 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       ).bind(...visibleIds, ...visibleIds).all();
       doubleCounts = results;
     }
-    return json({ requirements: out, double_count_rules: doubleCounts });
+    const eligibilityRules = await getProgramEligibilityRules(env, visibleIds);
+    return json({ requirements: out, double_count_rules: doubleCounts, eligibility_rules: eligibilityRules });
   }
 
   // School-scoped double-count caps (e.g. "RBS majors may share at most 1
@@ -1113,13 +1131,17 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       ).bind(...ids).all();
       programs = results || [];
     }
-    const policyData = await getProgramSelectionPolicies(env, homeSchoolSlug);
+    const [policyData, eligibilityRules] = await Promise.all([
+      getProgramSelectionPolicies(env, homeSchoolSlug),
+      getProgramEligibilityRules(env, programs.map((program) => program.id)),
+    ]);
     return json(evaluateProgramSelection({
       homeSchoolSlug,
       selectedProgramIds: ids,
       programs,
       limits: policyData.limits,
       combinationPolicies: policyData.combination_policies,
+      eligibilityRules,
     }));
   }
 

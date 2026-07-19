@@ -8,6 +8,7 @@
  */
 
 const REJECTING_DECISIONS = new Set(["blocked", "requires_transfer"]);
+const ELIGIBILITY_BLOCKING_DECISIONS = new Set(["blocked"]);
 
 function nonEmptyText(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -43,6 +44,55 @@ function policyMessage(policy) {
   return policy.note || "This combination requires a reviewed school policy.";
 }
 
+function parseConditionValue(rule) {
+  try {
+    const value = JSON.parse(rule?.condition_value_json || "null");
+    return value === null ? {} : value;
+  } catch {
+    // An invalid reviewed JSON value must never quietly approve a selection.
+    // Surface it to the user as an advising issue until the data row is fixed.
+    return null;
+  }
+}
+
+function stringList(value) {
+  return Array.isArray(value) ? value.filter(nonEmptyText).map((item) => item.trim()) : [];
+}
+
+function eligibilityFailure(rule, homeSchoolSlug, selectedProgramIds) {
+  const value = parseConditionValue(rule);
+  if (value === null) return { failed: true, dataError: true };
+  const values = stringList(value);
+  const selected = new Set(selectedProgramIds);
+  switch (rule.condition_type) {
+    case "home_school_must_be_one_of":
+      return { failed: !values.includes(homeSchoolSlug) };
+    case "home_school_must_not_be_one_of":
+      return { failed: values.includes(homeSchoolSlug) };
+    case "selected_program_must_include_one_of":
+      return { failed: !values.some((id) => selected.has(id)) };
+    case "selected_program_must_not_include_any":
+      return { failed: values.some((id) => selected.has(id)) };
+    // These conditions are material to formal declaration but cannot be
+    // verified from a program selection alone. The caller should explain
+    // them instead of pretending browser state proves eligibility.
+    case "minimum_total_credits":
+    case "minimum_gpa":
+    case "minimum_course_grade":
+    case "course_completion_or_placement":
+    case "application_required":
+    case "advisor_confirmation":
+      return { failed: true, needsAdvising: true };
+    default:
+      return { failed: true, dataError: true };
+  }
+}
+
+function eligibilityMessage(rule, failure) {
+  if (failure.dataError) return "A reviewed program eligibility rule needs data correction before this selection can be confirmed.";
+  return rule.note || "This program has a formal eligibility condition to confirm with advising.";
+}
+
 /**
  * Evaluate a proposed list of program ids against reviewed policy rows.
  *
@@ -56,6 +106,7 @@ export function evaluateProgramSelection({
   programs,
   limits,
   combinationPolicies,
+  eligibilityRules,
 }) {
   const ids = uniqueStrings(selectedProgramIds);
   const allPrograms = Array.isArray(programs) ? programs : [];
@@ -117,6 +168,26 @@ export function evaluateProgramSelection({
     else if (policy.decision === "requires_approval") warnings.push(issue);
   }
 
+  const selectedIds = selected.map((program) => program.id);
+  const matchingEligibilityRules = (Array.isArray(eligibilityRules) ? eligibilityRules : [])
+    .filter((rule) => selectedIds.includes(rule.program_id));
+  for (const rule of matchingEligibilityRules) {
+    const failure = eligibilityFailure(rule, homeSchoolSlug, selectedIds);
+    if (!failure.failed) continue;
+    const issue = {
+      code: `eligibility:${rule.rule_key}`,
+      kind: "eligibility",
+      decision: rule.decision,
+      program_id: rule.program_id,
+      condition_type: rule.condition_type,
+      note: rule.note || null,
+      source_url: rule.source_url || null,
+      message: eligibilityMessage(rule, failure),
+    };
+    if (ELIGIBILITY_BLOCKING_DECISIONS.has(rule.decision) || failure.dataError) errors.push(issue);
+    else warnings.push(issue);
+  }
+
   return {
     allowed: errors.length === 0,
     selected_program_ids: ids,
@@ -124,5 +195,6 @@ export function evaluateProgramSelection({
     warnings,
     limits: matchingLimits,
     combination_policies: matchingCombinations,
+    eligibility_rules: matchingEligibilityRules,
   };
 }

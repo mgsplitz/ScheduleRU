@@ -591,7 +591,7 @@ const ST = {
   backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || defaultBackendUrl(),
   availablePrograms:[], activeProgram:null, selectedPrograms:[],
   homeSchoolSlug:"rbsnb", programSelectionPolicies:{limits:[],combination_policies:[]},
-  requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCount:null,
+  requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], programEligibilityRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
   backendSubject:"", backendSearch:"", backendPage:1,
@@ -1517,7 +1517,7 @@ function renderRequired(){
     pb.innerHTML=`<div class="api-status err">Could not load degree requirements: ${escapeHtml(ST.requirementsError)}</div>`;
     return;
   }
-  let h=`<div class="leg">Gray = not yet unlocked. Green = completed or AP-waived. Click any course card for full details; click ○ to mark a course taken/waived.</div>${doubleCountBannerHtml()}`;
+  let h=`<div class="leg">Gray = not yet unlocked. Green = completed or AP-waived. Click any course card for full details; click ○ to mark a course taken/waived.</div>${programEligibilityBannerHtml()}${doubleCountBannerHtml()}`;
   ROOT_GROUPS.forEach(gk=>{
     const g=GROUPS[gk];
     if(!g) return;
@@ -1825,6 +1825,16 @@ function computeDoubleCountOverlaps(requirementTrees, programIds){
   const unscoped=overlaps.filter(overlap=>!scopedCodes.has(overlap.code));
   return {shared,overlaps,scopeResults,unscoped};
 }
+function programEligibilityBannerHtml(){
+  const rules=(ST.programEligibilityRules||[]).filter(rule=>ST.selectedPrograms.includes(rule.program_id));
+  if(!rules.length) return "";
+  const programsById=Object.fromEntries((ST.availablePrograms||[]).map(program=>[program.id,program]));
+  const facts=rules.map(rule=>{
+    const name=programsById[rule.program_id]?.name||"Selected program";
+    return `<li><strong>${escapeHtml(name)}:</strong> ${escapeHtml(rule.note||"Formal eligibility condition; confirm with advising.")}</li>`;
+  }).join("");
+  return `<div class="dc-banner warn"><b>Formal program conditions</b><ul style="margin:5px 0 0;padding-left:18px;">${facts}</ul><span>These are planning notes from reviewed program sources. ScheduleRU does not verify grades, GPA, formal applications, or advisor approvals.</span></div>`;
+}
 function doubleCountBannerHtml(){
   const result=ST.doubleCount;
   if(!result || ST.selectedPrograms.length<2) return "";
@@ -1882,6 +1892,7 @@ async function loadSelectedRequirements(programIds){
   ST.requirementTrees=normalized;
   ST.doubleCountPolicies=policies.policies||[];
   ST.doubleCountRules=data.double_count_rules||[];
+  ST.programEligibilityRules=data.eligibility_rules||[];
   ST.majorRequirementTree=buildRequirementTree(requirementsForDisplay(normalized,visibleIds));
   if(ST.tab!=="core") useRequirementTree(ST.majorRequirementTree);
   ST.doubleCount=computeDoubleCountOverlaps(normalized,visibleIds);
