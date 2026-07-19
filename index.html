@@ -563,9 +563,11 @@ let ROOT_GROUPS = [];
 // the current browser and site address.
 const PRODUCTION_BACKEND_URL="https://rutgers-course-sync.housselllaura.workers.dev";
 const DEVELOPMENT_BACKEND_URL="https://rutgers-course-sync-dev.housselllaura.workers.dev";
+const CURRENT_HOST=(typeof location!=="undefined" && location.hostname)||"";
+const IS_DEVELOPMENT_SITE=CURRENT_HOST.endsWith(".scheduleru-9fb.pages.dev") && CURRENT_HOST!=="scheduleru-9fb.pages.dev";
+const BACKEND_URL_STORAGE_KEY=IS_DEVELOPMENT_SITE ? "scheduleru_dev_backend_url" : "bait_backend_url";
 function defaultBackendUrl(){
-  const host=(typeof location!=="undefined" && location.hostname)||"";
-  return host.startsWith("dev-next.") ? DEVELOPMENT_BACKEND_URL : PRODUCTION_BACKEND_URL;
+  return IS_DEVELOPMENT_SITE ? DEVELOPMENT_BACKEND_URL : PRODUCTION_BACKEND_URL;
 }
 
 /* ============================================================
@@ -579,7 +581,7 @@ const ST = {
   // The worker reads Rutgers on a cron and serves cached results from D1,
   // so this is a plain same-origin-friendly fetch (the worker sends CORS
   // headers itself) rather than needing a public relay.
-  backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem("bait_backend_url")) || defaultBackendUrl(),
+  backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || defaultBackendUrl(),
   availablePrograms:[], activeProgram:null, selectedPrograms:[],
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
@@ -1527,7 +1529,7 @@ function renderCore(){
    ============================================================ */
 function saveBackendUrl(u){
   ST.backendUrl = (u||"").trim().replace(/\/$/,"");
-  try{ localStorage.setItem("bait_backend_url", ST.backendUrl); }catch(e){}
+  try{ localStorage.setItem(BACKEND_URL_STORAGE_KEY, ST.backendUrl); }catch(e){}
 }
 
 async function backendFetch(path){
