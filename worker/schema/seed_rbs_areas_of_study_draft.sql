@@ -119,13 +119,14 @@ VALUES
   ('rbsnb-global-business-concentration-required', 'rbsnb-global-business-concentration', NULL, 'Required courses', 'all', NULL, 1, 0),
   ('rbsnb-global-business-concentration-elective', 'rbsnb-global-business-concentration', NULL, 'Global Business elective', 'min_courses', 1, 2, 0),
   ('rbsnb-leadership-skills-concentration-required', 'rbsnb-leadership-skills-concentration', NULL, 'Required course', 'all', NULL, 1, 0),
-  ('rbsnb-leadership-skills-concentration-primary-elective', 'rbsnb-leadership-skills-concentration', NULL, 'Select at least one primary elective', 'min_courses', 1, 2, 0),
+  ('rbsnb-leadership-skills-concentration-electives', 'rbsnb-leadership-skills-concentration', NULL, 'Leadership Skills electives (choose 2)', 'min_courses', 2, 2, 0),
+  ('rbsnb-leadership-skills-concentration-primary-elective', 'rbsnb-leadership-skills-concentration', 'rbsnb-leadership-skills-concentration-electives', 'At least one primary elective', 'min_courses', 1, 1, 0),
   ('rbsnb-management-information-systems-concentration-required', 'rbsnb-management-information-systems-concentration', NULL, 'Required courses', 'all', NULL, 1, 0),
   ('rbsnb-management-information-systems-concentration-elective', 'rbsnb-management-information-systems-concentration', NULL, 'Management Information Systems elective', 'min_courses', 1, 2, 0),
   ('rbsnb-professional-selling-concentration-required', 'rbsnb-professional-selling-concentration', NULL, 'Required courses', 'all', NULL, 1, 0),
   ('rbsnb-professional-selling-concentration-elective', 'rbsnb-professional-selling-concentration', NULL, 'Professional Selling elective', 'min_courses', 1, 2, 0)
 ON CONFLICT(id) DO UPDATE SET
-  name=excluded.name, rule=excluded.rule, count=excluded.count,
+  parent_group_id=excluded.parent_group_id, name=excluded.name, rule=excluded.rule, count=excluded.count,
   sort_order=excluded.sort_order, auto_generated=excluded.auto_generated;
 
 INSERT INTO requirement_courses (group_id, course_code, note)
@@ -194,6 +195,12 @@ VALUES
   ('rbsnb-global-business-concentration-elective', '33:620:350', ''),
   ('rbsnb-global-business-concentration-elective', '33:799:305', ''),
   ('rbsnb-leadership-skills-concentration-required', '33:620:410', ''),
+  ('rbsnb-leadership-skills-concentration-electives', '33:620:362', ''),
+  ('rbsnb-leadership-skills-concentration-electives', '33:620:350', ''),
+  ('rbsnb-leadership-skills-concentration-electives', '33:620:320', 'Prerequisite: 33:620:301.'),
+  ('rbsnb-leadership-skills-concentration-electives', '33:620:370', ''),
+  ('rbsnb-leadership-skills-concentration-electives', '33:620:430', 'Prerequisite: 33:620:301.'),
+  ('rbsnb-leadership-skills-concentration-electives', '33:620:330', 'Prerequisites: 33:620:301 and junior or senior standing.'),
   ('rbsnb-leadership-skills-concentration-primary-elective', '33:620:362', ''),
   ('rbsnb-leadership-skills-concentration-primary-elective', '33:620:350', ''),
   ('rbsnb-management-information-systems-concentration-required', '33:136:470', ''),
@@ -210,13 +217,32 @@ VALUES
   ('rbsnb-professional-selling-concentration-elective', '33:630:370', '')
 ON CONFLICT(group_id, course_code) DO UPDATE SET note=excluded.note;
 
+-- Keep the official page's full titles available even when a course is not
+-- present in the term-specific catalog sync.
+UPDATE requirement_courses
+SET source_title = CASE course_code
+  WHEN '33:620:410' THEN 'Executive Leadership'
+  WHEN '33:620:362' THEN 'Effective Leadership Communications'
+  WHEN '33:620:350' THEN 'Negotiations'
+  WHEN '33:620:320' THEN 'Cross-Cultural Management'
+  WHEN '33:620:370' THEN 'Diversity, Equity, and Inclusion in Management and Organizations'
+  WHEN '33:620:430' THEN 'Team Building and Group Processes'
+  WHEN '33:620:330' THEN 'Women Leading in Business'
+END,
+source_credits = '3'
+WHERE group_id IN (
+  'rbsnb-leadership-skills-concentration-required',
+  'rbsnb-leadership-skills-concentration-electives',
+  'rbsnb-leadership-skills-concentration-primary-elective'
+);
+
 -- Elective list not enumerated on the official Fixed Income page; it is kept
 -- as a group with no children rather than inventing a list of finance courses.
 INSERT INTO requirement_raw_notes (program_id, section_name, raw_text, resolved)
 VALUES
   ('rbsnb-fixed-income-credit-analysis-concentration', 'Finance elective', 'Choose one additional finance elective. The official page does not enumerate the approved elective list.', 0),
   ('rbsnb-real-estate-concentration', 'Path logic', 'Non-Finance path: 33:851:350, 33:851:380, 33:851:470, 33:851:432; 33:390:300 precedes 33:851:380. Finance path: 33:851:350, 33:390:435, 33:851:470, 33:851:432; page names 33:390:310 as the prerequisite for 33:390:435, but the Finance concentration page says 33:390:310 is no longer offered. The current schema cannot express this mutually exclusive path safely; do not mark reviewed until reconciled.', 0),
-  ('rbsnb-leadership-skills-concentration', 'Three-course rule', 'Take 33:620:410 and at least one of 33:620:362 or 33:620:350. If only one primary elective is selected, take one of 33:620:320, 33:620:370, 33:620:430, or 33:620:330. 33:620:320 and 33:620:430 require 33:620:301; 33:620:330 requires 33:620:301 plus junior or senior standing. The current schema cannot make the third group conditional.', 0),
+  ('rbsnb-leadership-skills-concentration', 'Three-course rule', 'Take 33:620:410 plus two electives, including at least one of 33:620:362 or 33:620:350. The reviewed requirement tree models this total-plus-subset rule. 33:620:320 and 33:620:430 require 33:620:301; 33:620:330 requires 33:620:301 plus junior or senior standing.', 0),
   ('rbsnb-business-administration-minor', 'Formal admission', 'Requires application/admission, good academic standing with GPA 2.0+, pre-calculus completion or placement, and Statistics I or one listed approved substitute. The minor page also limits transfer-course use.', 0),
   ('rbsnb-entrepreneurship-minor', 'Formal admission', 'For non-RBS students; the page says students may not double minor in Business Administration and Entrepreneurship.', 0),
   ('rbsnb-business-analytics-concentration', 'Formal declaration', 'RBS-New Brunswick students only; BAIT majors may not declare this concentration; RBS-NB Undergraduate Programs Office contact is required to enroll in the courses.', 0),

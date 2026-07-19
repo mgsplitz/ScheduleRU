@@ -513,6 +513,7 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   </div>
 </div>
 
+<script src="requirement-group-logic.js"></script>
 <script>
 /* ============================================================
    DATA — scraped from official Rutgers pages June 2026!
@@ -692,21 +693,11 @@ function courseAvailable(id){
   return prereqsMet(id) && (!standing || ST.year>=standing.year);
 }
 function groupFulfilled(gk){
-  const g = GROUPS[gk];
-  if(!g) return false;
-  const members = g.members || [];
-  const done = members.filter(id=>isCompleted(id)).length;
-  if(g.rule==="all") return members.every(id=>isCompleted(id)) && (g.children||[]).every(groupFulfilled);
-  if(g.rule==="distinct"){
-    const selected=new Set([
-      ...selectedRequirementCourses(g.id),
-      ...members.filter(id=>isCompleted(id)),
-    ]);
-    const distinct=(g.children||[]).map(id=>GROUPS[id]).filter(Boolean)
-      .filter(child=>(child.members||[]).some(id=>selected.has(id))).length;
-    return selected.size>=g.count && distinct>=g.count;
-  }
-  return g.rule==="min" ? done >= g.count : done <= g.count;
+  return ScheduleRURequirementLogic.groupFulfilled(gk,GROUPS,{
+    isCompleted,
+    selectedRequirementCourses,
+    isConstraintGroup,
+  });
 }
 
 /* ============================================================

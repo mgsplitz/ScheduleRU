@@ -1,6 +1,6 @@
 # RBS New Brunswick minors and concentrations: import inventory
 
-Status: development source inventory, started on 2026-07-19. Six clear programs are reviewed and enabled on the development site; the remaining five stay hidden until their specific source conflict or rule-model gap is resolved. Production is unchanged.
+Status: development source inventory, started on 2026-07-19. Seven source-backed programs are reviewed and enabled on the development site; the remaining four stay hidden until their specific source conflict or rule-model gap is resolved. Production is unchanged.
 
 ## What this import covers
 
@@ -22,7 +22,7 @@ The two RBS minors are for non-RBS students. They are deliberately in the academ
 | Finance | Concentration | [detail page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/finance-concentration) | Reviewed / dev enabled | Finance-major exclusion is enforced; B-grade declaration condition is shown as an advising note. |
 | Fixed Income and Credit Analysis | Concentration | [detail page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/fixed-income-credit-analysis-concentration) | Needs reconciliation | Detail page does not enumerate the required finance elective; landing page’s Finance-major-only condition needs catalog confirmation. |
 | Global Business | Concentration | [detail page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/global-business-concentration) | Reviewed / dev enabled | RBS-only and Leadership & Management exclusion are enforced. |
-| Leadership Skills | Concentration | [detail page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/leadership-skills-concentration) | Needs reconciliation | Its third-course condition depends on whether one or two primary electives are used. |
+| Leadership Skills | Concentration | [detail page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/leadership-skills-concentration) | Reviewed / dev enabled | The reusable requirement engine enforces two electives total, including at least one primary elective; declaration timing remains a transparent RBS-advising confirmation. |
 | Management Information Systems | Concentration | [detail page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/management-information-systems-concentration) | Reviewed / dev enabled | RBS-only, BAIT exclusion, and required office contact are enforced/shown. |
 | Professional Selling | Concentration | [detail page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/professional-selling-concentration) | Needs reconciliation | The page promises a transcript certification and creates a Marketing-major overlap exception. |
 | Real Estate | Concentration | [detail page](https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/real-estate-concentration) | Needs reconciliation | Two mutually exclusive major paths plus a Finance overlap exception; page references a retired 33:390:310 prerequisite. |

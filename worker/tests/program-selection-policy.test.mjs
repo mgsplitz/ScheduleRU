@@ -78,6 +78,30 @@ test("a named major exclusion blocks a BAIT student from the Business Analytics 
   assert.deepEqual(result.errors.map((issue) => issue.code), ["eligibility:rbsnb-business-analytics-concentration-no-bait"]);
 });
 
+test("a Leadership and Management major cannot add the Leadership Skills concentration", () => {
+  const programs = [...fixture.programs,
+    { id: "rbsnb-leadership-management", school_slug: "rbsnb", type: "major" },
+    { id: "rbsnb-leadership-skills-concentration", school_slug: "rbsnb", type: "concentration" },
+  ];
+  const result = evaluateProgramSelection({
+    homeSchoolSlug: "rbsnb",
+    selectedProgramIds: ["rbsnb-leadership-management", "rbsnb-leadership-skills-concentration"],
+    programs,
+    limits: [],
+    combinationPolicies: [],
+    eligibilityRules: [{
+      rule_key: "rbsnb-leadership-skills-concentration-no-lm",
+      program_id: "rbsnb-leadership-skills-concentration",
+      condition_type: "selected_program_must_not_include_any",
+      condition_value_json: '["rbsnb-leadership-management"]',
+      decision: "blocked",
+      note: "Leadership and Management majors may not declare the Leadership Skills concentration.",
+    }],
+  });
+  assert.equal(result.allowed, false);
+  assert.deepEqual(result.errors.map((issue) => issue.code), ["eligibility:rbsnb-leadership-skills-concentration-no-lm"]);
+});
+
 test("a grade condition remains a transparent advising warning, not a fake automatic check", () => {
   const result = evaluateProgramSelection({
     homeSchoolSlug: "rbsnb",
