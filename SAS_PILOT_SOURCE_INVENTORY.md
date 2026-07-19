@@ -38,3 +38,27 @@
 ## Current support boundary
 
 ScheduleRU currently supports reviewed RBS-New Brunswick data only. The Programs modal deliberately lists no SAS option until the evidence above is modeled, tested, and marked reviewed.
+
+## Selected pilot candidate: Political Science B.A. + PPE minor
+
+**Status:** Candidate selected for modeling only. Neither program, the SAS school profile, nor this combination is visible in the app yet.
+
+This is the best first pilot because it tests three reusable concerns at once without assuming that a general SAS rule solves every case:
+
+| Item | Official evidence | What the future model must represent |
+| --- | --- | --- |
+| Political Science major | [Political Science major page](https://polisci.rutgers.edu/academics/undergraduate/major-in-political-science) and [SAS program profile](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/political-science) | Official code 790, B.A. path, 13 courses/39 credits, declaration condition, the named foundation/research/seminar requirements, thematic 300/400-level areas, elective limits, and C-or-better rule. |
+| Philosophy, Politics, and Economics minor | [PPE minor requirements](https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics) and [SAS program profile](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/1746-philosophy-politics-and-economics-ppe) | Official code 792, 27 credits across philosophy, political science, and economics; the course-list and level constraints; Rutgers-New Brunswick residency limits; and C-or-better rule. |
+| Published overlap outcome | [PPE minor requirements](https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics) | A Political Science major may use the Political Science component toward both the major and PPE minor. This is a specific, source-backed overlap permission, not an assumption from SAS's general overlap policy. |
+| School-level bounds | [SAS degree requirements](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/degree-requirements) and [SAS major/minor restrictions](https://www.sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-restrictions) | Major/minor/credit/GPA baseline, conditional minor exceptions, and prohibition records that must remain separate from this permitted PPE overlap. |
+
+### Required implementation before import
+
+Both source pages include honest rule types that a flat approved-course list cannot express, such as “any Political Science course at the 300/400 level,” “no more than one 100-level Philosophy course,” and a course category defined by the department. The next code slice is therefore a **reviewed course-selector rule** attached to a requirement group. It must:
+
+1. Match only source-backed attributes (school/campus, subject, course level, and a finite reviewed list where one is published).
+2. Apply a scheduled or completed course even when the student did not choose it through that group’s browse button.
+3. Keep source-defined maximums, grade/residency, and named category boundaries visible as separate rules instead of silently treating every departmental course as approved.
+4. Fail closed: an unrecognized selector or incomplete category source must show an advising/review notice, not mark a requirement complete.
+
+The pilot will stay hidden until this selector behavior, the minor-waiver rule, the named SAS restrictions, and one RBS-plus-SAS advising-only case have passing comparison tests.
