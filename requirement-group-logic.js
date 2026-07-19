@@ -49,5 +49,44 @@
       .every((childId) => groupFulfilled(childId, groups, options));
   }
 
-  root.ScheduleRURequirementLogic = { groupFulfilled };
+  function asDisplayPriority(root) {
+    const value = Number(root?.display_priority);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function requirementsForDisplay(requirementTrees, programIds, signatureForRoot) {
+    const signature = typeof signatureForRoot === "function"
+      ? signatureForRoot
+      : (root) => JSON.stringify(root || {});
+    const roots = [];
+    const seenSignatures = new Set();
+    const familyIndexes = new Map();
+
+    for (const programId of programIds || []) {
+      for (const root of requirementTrees?.[programId] || []) {
+        const family = typeof root?.display_family === "string" ? root.display_family.trim() : "";
+        if (!family) {
+          const rootSignature = signature(root);
+          if (seenSignatures.has(rootSignature)) continue;
+          seenSignatures.add(rootSignature);
+          roots.push(root);
+          continue;
+        }
+
+        const existingIndex = familyIndexes.get(family);
+        if (existingIndex === undefined) {
+          familyIndexes.set(family, roots.length);
+          roots.push(root);
+          continue;
+        }
+
+        if (asDisplayPriority(root) > asDisplayPriority(roots[existingIndex])) {
+          roots[existingIndex] = root;
+        }
+      }
+    }
+    return roots;
+  }
+
+  root.ScheduleRURequirementLogic = { groupFulfilled, requirementsForDisplay };
 })(globalThis);

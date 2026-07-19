@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS requirement_groups (
   program_id TEXT NOT NULL REFERENCES programs(id),
   parent_group_id TEXT REFERENCES requirement_groups(id),
   name TEXT,                        -- e.g. "Business Core", "Law/Ethics (choose 1)"
+  display_family TEXT,              -- optional shared display family, e.g. 'rbsnb-business-core'
+  display_priority INTEGER DEFAULT 0, -- higher reviewed variant replaces lower variants in one family
   rule TEXT NOT NULL,               -- 'all' | 'min_courses' | 'max_courses' | 'min_credits'
   count INTEGER,                    -- N for min/max_courses, credit count for min_credits
   sort_order INTEGER DEFAULT 0,

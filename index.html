@@ -1638,6 +1638,8 @@ function buildRequirementTree(requirements){
     const group={
       id:raw.id, name:raw.name, rule:mapRule(raw.rule), count:raw.count,
       parentId, members:[], children:[], sourceProgramId:raw.program_id,
+      display_family:cleanApiText(raw.display_family),
+      display_priority:Number(raw.display_priority)||0,
     };
     nextGroups[group.id]=group;
     for(const row of raw.courses||[]){
@@ -1779,20 +1781,9 @@ function normalizedCoreRequirementTrees(requirementTrees, programIds){
   return out;
 }
 function requirementsForDisplay(requirementTrees, programIds){
-  const seen=new Set();
-  const roots=[];
-  for(const id of programIds){
-    for(const root of requirementTrees[id]||[]){
-      const signature=rootRequirementSignature(root);
-      // Identical named groups with the exact same course set (such as RBS
-      // Business Core) are shared requirements, not a major-to-major
-      // overlap. Show the first copy only.
-      if(seen.has(signature)) continue;
-      seen.add(signature);
-      roots.push(root);
-    }
-  }
-  return roots;
+  return ScheduleRURequirementLogic.requirementsForDisplay(
+    requirementTrees,programIds,rootRequirementSignature
+  );
 }
 function computeDoubleCountOverlaps(requirementTrees, programIds){
   const shared=sharedRootGroups(requirementTrees,programIds);
