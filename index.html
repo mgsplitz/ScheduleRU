@@ -734,6 +734,21 @@ function programTypeLabel(type){
   const section=PROGRAM_TYPE_SECTIONS.find(item=>item.type===type);
   return section?.singular||"Program";
 }
+function eligibilityRuleValues(rule){
+  try{
+    const parsed=JSON.parse(rule?.condition_value_json||"[]");
+    return Array.isArray(parsed)?parsed.filter(value=>typeof value==="string"):[];
+  }catch(err){ return []; }
+}
+function programIsAvailableForHomeSchool(program){
+  return !(program?.eligibility_rules||[]).some(rule=>{
+    if(rule.decision!=="blocked") return false;
+    const values=eligibilityRuleValues(rule);
+    if(rule.condition_type==="home_school_must_be_one_of") return !values.includes(ST.homeSchoolSlug);
+    if(rule.condition_type==="home_school_must_not_be_one_of") return values.includes(ST.homeSchoolSlug);
+    return false;
+  });
+}
 function selectedProgramRows(){
   const selected=new Set(ST.selectedPrograms);
   return (ST.availablePrograms||[]).filter(program=>selected.has(program.id));
@@ -1870,7 +1885,9 @@ async function loadAvailablePrograms(){
     backendFetch(`/api/programs?school=${encodeURIComponent(ST.homeSchoolSlug)}`),
     backendFetch(`/api/program-selection-policies?home_school=${encodeURIComponent(ST.homeSchoolSlug)}`),
   ]);
-  ST.availablePrograms=(data.programs||[]).filter(p=>["major","minor","concentration","certificate"].includes(p.type));
+  ST.availablePrograms=(data.programs||[])
+    .filter(p=>["major","minor","concentration","certificate"].includes(p.type))
+    .filter(programIsAvailableForHomeSchool);
   ST.programSelectionPolicies=policyData||{limits:[],combination_policies:[]};
   return ST.availablePrograms;
 }

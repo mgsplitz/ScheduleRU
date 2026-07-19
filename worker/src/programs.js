@@ -1026,7 +1026,15 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     if (school) { where += " AND school_slug = ?"; binds.push(school); }
     if (type) { where += " AND type = ?"; binds.push(type); }
     const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();
-    return json({ programs: results });
+    const eligibilityRules = await getProgramEligibilityRules(env, (results || []).map((program) => program.id));
+    const rulesByProgram = {};
+    for (const rule of eligibilityRules) (rulesByProgram[rule.program_id] ||= []).push(rule);
+    return json({
+      programs: (results || []).map((program) => ({
+        ...program,
+        eligibility_rules: rulesByProgram[program.id] || [],
+      })),
+    });
   }
 
   if (path === "/api/core-curricula" && request.method === "GET") {
