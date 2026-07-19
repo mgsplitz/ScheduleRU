@@ -592,7 +592,7 @@ const ST = {
   backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || defaultBackendUrl(),
   availablePrograms:[], activeProgram:null, selectedPrograms:[],
   homeSchoolSlug:"rbsnb", programSelectionPolicies:{limits:[],combination_policies:[]},
-  requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], programEligibilityRules:[], doubleCount:null,
+  requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
   backendSubject:"", backendSearch:"", backendPage:1,
@@ -1802,21 +1802,16 @@ function computeDoubleCountOverlaps(requirementTrees, programIds){
     .filter(([,ids])=>ids.size>1)
     .map(([code,ids])=>({code,programs:[...ids]}))
     .sort((a,b)=>a.code.localeCompare(b.code));
-  const codesForScope=(scope)=>overlaps.filter(overlap=>{
-    const types=overlap.programs.map(id=>programsById[id]?.type||"");
-    const majorCount=types.filter(type=>type==="major").length;
-    const concentrationCount=types.filter(type=>type==="concentration").length;
-    return scope==="major_major" ? majorCount>=2 : majorCount>=1 && concentrationCount>=1;
-  });
+  const partition=ScheduleRURequirementLogic.partitionDoubleCountOverlaps(
+    overlaps,programsById,ST.doubleCountExceptions||[]
+  );
   const scopeResults=["major_major","major_concentration"].map(scope=>{
     const policy=(ST.doubleCountPolicies||[]).find(item=>item.scope===scope);
-    const codes=codesForScope(scope);
+    const codes=partition.scopes[scope]||[];
     const cap=policy?.max_shared_courses===null||policy?.max_shared_courses===undefined ? null : Number(policy.max_shared_courses);
     return {scope,policy,codes,cap,violates:cap!==null&&codes.length>cap};
   });
-  const scopedCodes=new Set(scopeResults.flatMap(result=>result.codes.map(overlap=>overlap.code)));
-  const unscoped=overlaps.filter(overlap=>!scopedCodes.has(overlap.code));
-  return {shared,overlaps,scopeResults,unscoped};
+  return {shared,overlaps,scopeResults,unscoped:partition.unscoped||[],exceptions:partition.exceptions||[]};
 }
 function programEligibilityBannerHtml(){
   const rules=(ST.programEligibilityRules||[]).filter(rule=>ST.selectedPrograms.includes(rule.program_id));
@@ -1858,17 +1853,25 @@ function doubleCountMeaning(item){
   }
   return `ScheduleRU found overlapping requirement lists. Confirm with advising whether any of these courses may count toward both programs.`;
 }
+function doubleCountExceptionHtml(exception,programsById){
+  const names=(exception.programs||[]).map(id=>programsById[id]?.name||id).join(" + ");
+  const codes=(exception.courses||[]).map(course=>course.code).join(", ");
+  const sourceNote=exception.note||"Rutgers publishes a specific exception for this program combination.";
+  return `<div style="margin-top:6px;"><strong>Published exception</strong><ul style="margin:3px 0 4px;padding-left:18px;"><li><strong>${escapeHtml(names)}:</strong> ${escapeHtml(codes)}</li></ul><strong>What this means:</strong> ${escapeHtml(sourceNote)} The exception applies only to the course${(exception.courses||[]).length===1?"":"s"} listed above; any other overlap still follows the normal policy.</div>`;
+}
 function doubleCountBannerHtml(){
   const result=ST.doubleCount;
   if(!result || ST.selectedPrograms.length<2) return "";
   const sharedNames=[...new Set(result.shared.map(item=>item.name))];
   const activeScopes=result.scopeResults.filter(item=>item.codes.length);
   const unscoped=result.unscoped||[];
+  const exceptions=result.exceptions||[];
   const violates=activeScopes.some(item=>item.violates) || unscoped.length>0;
   const programsById=Object.fromEntries((ST.availablePrograms||[]).map(program=>[program.id,program]));
   let content=sharedNames.length?`<div>Shared requirements are shown once: ${escapeHtml(sharedNames.join(", "))}. You do not need to take those shared sections twice.</div>`:"";
+  content+=exceptions.map(exception=>doubleCountExceptionHtml(exception,programsById)).join("");
   if(!activeScopes.length && !unscoped.length){
-    content+=`<div>No additional course-overlap adjustment is currently needed.</div>`;
+    content+=`<div>${exceptions.length?"Apart from the published exception above, ":""}No additional course-overlap adjustment is currently needed.</div>`;
   }else{
     content+=activeScopes.map(item=>{
       const label=item.scope==="major_major"?"Major-to-major overlap":"Major-to-concentration overlap";
@@ -1915,6 +1918,7 @@ async function loadSelectedRequirements(programIds){
   ST.requirementTrees=normalized;
   ST.doubleCountPolicies=policies.policies||[];
   ST.doubleCountRules=data.double_count_rules||[];
+  ST.doubleCountExceptions=data.double_count_exceptions||[];
   ST.programEligibilityRules=data.eligibility_rules||[];
   ST.majorRequirementTree=buildRequirementTree(requirementsForDisplay(normalized,visibleIds));
   if(ST.tab!=="core") useRequirementTree(ST.majorRequirementTree);

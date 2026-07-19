@@ -676,7 +676,7 @@ function parseBizTable(tableHtml, precedingHeading = "") {
   return section.courseItems.length || section.orGroups.length ? section : null;
 }
 
-export { parseBizTable };
+export { parseBizTable, groupAppliesToSelection };
 
 function isLegacyBizCurriculum(section) {
   // The app currently represents the active catalog path for a program.
@@ -924,7 +924,35 @@ async function discoverPrograms(env, schoolSlug, indexPath) {
 /* ============================================================
    READ: nested requirement tree for one or more programs
    ============================================================ */
-async function getRequirementTree(env, programId) {
+function conditionProgramIds(condition) {
+  try {
+    const values = JSON.parse(condition?.condition_value_json || "[]");
+    return Array.isArray(values) ? new Set(values.filter(isSafeProgramId)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function groupAppliesToSelection(groupId, conditionsByGroup, selectedProgramIds) {
+  const selected = new Set((selectedProgramIds || []).filter(isSafeProgramId));
+  for (const condition of conditionsByGroup[groupId] || []) {
+    const expected = conditionProgramIds(condition);
+    if (condition.condition_type === "selected_program_must_include_one_of") {
+      if (![...expected].some((id) => selected.has(id))) return false;
+      continue;
+    }
+    if (condition.condition_type === "selected_program_must_not_include_any") {
+      if ([...expected].some((id) => selected.has(id))) return false;
+      continue;
+    }
+    // An unrecognized condition must never expose a path that has not been
+    // deliberately implemented and tested.
+    return false;
+  }
+  return true;
+}
+
+async function getRequirementTree(env, programId, selectedProgramIds = [programId]) {
   // A major can inherit one or more reusable requirement sets. For example,
   // every RBS-New Brunswick major links to the single RBS Foundational Core
   // (formerly Pre-Business) set. The set owns its own groups/course rows, so
@@ -942,7 +970,31 @@ async function getRequirementTree(env, programId) {
      WHERE program_id IN (${placeholders})
      ORDER BY CASE WHEN program_id = ? THEN 1 ELSE 0 END, sort_order, id`
   ).bind(...ownerIds, programId).all();
-  const { results: courses } = await env.DB.prepare(
+  const groupIds = groups.map((group) => group.id);
+  const conditionsByGroup = {};
+  if (groupIds.length) {
+    const { results: conditions } = await env.DB.prepare(
+      `SELECT group_id, condition_type, condition_value_json
+       FROM requirement_group_conditions
+       WHERE review_status = 'reviewed'
+         AND group_id IN (${groupIds.map(() => "?").join(",")})`
+    ).bind(...groupIds).all();
+    for (const condition of conditions || []) (conditionsByGroup[condition.group_id] ||= []).push(condition);
+  }
+  const eligibleGroupIds = new Set(groups
+    .filter((group) => groupAppliesToSelection(group.id, conditionsByGroup, selectedProgramIds))
+    .map((group) => group.id));
+  const visibleGroups = groups.filter((group) => {
+    if (!eligibleGroupIds.has(group.id)) return false;
+    let parentId = group.parent_group_id;
+    while (parentId) {
+      if (!eligibleGroupIds.has(parentId)) return false;
+      parentId = groups.find((candidate) => candidate.id === parentId)?.parent_group_id || null;
+    }
+    return true;
+  });
+  const visibleGroupIds = visibleGroups.map((group) => group.id);
+  const { results: courses } = visibleGroupIds.length ? await env.DB.prepare(
     `SELECT rc.*, g.program_id as owner_program_id, c.title as catalog_title, c.credits as catalog_credits,
             c.description as catalog_description, c.prereqs as catalog_prereqs,
             c.subject_notes as catalog_subject_notes,
@@ -954,8 +1006,8 @@ async function getRequirementTree(env, programId) {
      FROM requirement_courses rc
      INNER JOIN requirement_groups g ON g.id = rc.group_id
      LEFT JOIN courses c ON c.school || ':' || c.subject_code || ':' || c.course_number = rc.course_code
-     WHERE rc.group_id IN (SELECT id FROM requirement_groups WHERE program_id IN (${placeholders}))`
-  ).bind(...ownerIds).all();
+     WHERE rc.group_id IN (${visibleGroupIds.map(() => "?").join(",")})`
+  ).bind(...visibleGroupIds).all() : { results: [] };
 
   // Alternatives are scoped to the requirement-set/program that owns the
   // course row. This lets Degree Navigator-only families be entered once as
@@ -978,9 +1030,9 @@ async function getRequirementTree(env, programId) {
     (byGroup[c.group_id] ||= []).push(c);
   }
   const byId = {};
-  for (const g of groups) byId[g.id] = { ...g, courses: byGroup[g.id] || [], children: [] };
+  for (const g of visibleGroups) byId[g.id] = { ...g, courses: byGroup[g.id] || [], children: [] };
   const roots = [];
-  for (const g of groups) {
+  for (const g of visibleGroups) {
     if (g.parent_group_id && byId[g.parent_group_id]) byId[g.parent_group_id].children.push(byId[g.id]);
     else roots.push(byId[g.id]);
   }
@@ -1086,17 +1138,29 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
 
     // Silently omit unknown or unreviewed ids, keeping the response useful
     // for any reviewed programs requested alongside them.
-    for (const id of visibleIds) out[id] = await getRequirementTree(env, id);
+    for (const id of visibleIds) out[id] = await getRequirementTree(env, id, visibleIds);
 
     let doubleCounts = [];
     if (visibleIds.length) {
       const { results } = await env.DB.prepare(
-        `SELECT * FROM double_count_rules WHERE program_a IN (${visibleIds.map(() => "?").join(",")}) OR program_b IN (${visibleIds.map(() => "?").join(",")})`
+        `SELECT * FROM double_count_rules
+         WHERE program_a IN (${visibleIds.map(() => "?").join(",")})
+           AND program_b IN (${visibleIds.map(() => "?").join(",")})`
       ).bind(...visibleIds, ...visibleIds).all();
       doubleCounts = results;
     }
+    let doubleCountExceptions = [];
+    if (visibleIds.length) {
+      const { results } = await env.DB.prepare(
+        `SELECT * FROM double_count_exceptions
+         WHERE review_status = 'reviewed'
+           AND program_a IN (${visibleIds.map(() => "?").join(",")})
+           AND program_b IN (${visibleIds.map(() => "?").join(",")})`
+      ).bind(...visibleIds, ...visibleIds).all();
+      doubleCountExceptions = results || [];
+    }
     const eligibilityRules = await getProgramEligibilityRules(env, visibleIds);
-    return json({ requirements: out, double_count_rules: doubleCounts, eligibility_rules: eligibilityRules });
+    return json({ requirements: out, double_count_rules: doubleCounts, double_count_exceptions: doubleCountExceptions, eligibility_rules: eligibilityRules });
   }
 
   // School-scoped double-count caps (e.g. "RBS majors may share at most 1

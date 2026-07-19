@@ -3,7 +3,12 @@ import test from "node:test";
 
 await import("../../requirement-group-logic.js");
 
-const { requirementsForDisplay, sharedRequirementGroups, sharedRequirementRootKey } = globalThis.ScheduleRURequirementLogic;
+const {
+  requirementsForDisplay,
+  sharedRequirementGroups,
+  sharedRequirementRootKey,
+  partitionDoubleCountOverlaps,
+} = globalThis.ScheduleRURequirementLogic;
 
 function root(id, family = null, priority = 0, courses = []) {
   return { id, name: id, display_family: family, display_priority: priority, courses, children: [] };
@@ -48,4 +53,23 @@ test("shared display families are excluded from cross-program overlap checks eve
   assert.deepEqual(shared.map((item) => item.name), ["accounting-core"]);
   assert.equal(sharedRequirementRootKey(trees.accounting[0], (item) => item.id), "family:rbsnb-business-core");
   assert.equal(sharedRequirementRootKey(trees.finance[0], (item) => item.id), "family:rbsnb-business-core");
+});
+
+test("course-specific pair exceptions do not weaken the RBS major-concentration rule for other courses", () => {
+  const programs = {
+    marketing: { type: "major" },
+    selling: { type: "concentration" },
+    finance: { type: "major" },
+    realEstate: { type: "concentration" },
+  };
+  const result = partitionDoubleCountOverlaps([
+    { code: "33:630:401", programs: ["marketing", "selling"] },
+    { code: "33:390:435", programs: ["finance", "realEstate"] },
+    { code: "33:390:380", programs: ["finance", "realEstate"] },
+  ], programs, [
+    { program_a: "marketing", program_b: "selling", allowed_course_codes_json: '["33:630:401"]' },
+    { program_a: "finance", program_b: "realEstate", allowed_course_codes_json: '["33:390:435"]' },
+  ]);
+  assert.deepEqual(result.exceptions.flatMap((item) => item.courses.map((course) => course.code)).sort(), ["33:390:435", "33:630:401"]);
+  assert.deepEqual(result.scopes.major_concentration.map((course) => course.code), ["33:390:380"]);
 });

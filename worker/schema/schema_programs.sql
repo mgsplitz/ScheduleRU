@@ -44,6 +44,21 @@ CREATE TABLE IF NOT EXISTS requirement_groups (
 CREATE INDEX IF NOT EXISTS idx_reqgroups_program ON requirement_groups(program_id);
 CREATE INDEX IF NOT EXISTS idx_reqgroups_parent ON requirement_groups(parent_group_id);
 
+-- A reviewed group can apply only in a particular program combination. This
+-- keeps path-specific requirements in data (for example, a Finance-major
+-- path) instead of introducing a frontend exception for every school.
+CREATE TABLE IF NOT EXISTS requirement_group_conditions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id TEXT NOT NULL REFERENCES requirement_groups(id),
+  condition_type TEXT NOT NULL,     -- selected_program_must_include_one_of | selected_program_must_not_include_any
+  condition_value_json TEXT NOT NULL,
+  note TEXT,
+  source_url TEXT,
+  review_status TEXT DEFAULT 'unreviewed',
+  UNIQUE(group_id, condition_type, condition_value_json)
+);
+CREATE INDEX IF NOT EXISTS idx_reqgroupconditions_group ON requirement_group_conditions(group_id);
+
 CREATE TABLE IF NOT EXISTS requirement_courses (
   group_id TEXT NOT NULL REFERENCES requirement_groups(id),
   course_code TEXT NOT NULL,        -- "33:136:370" — matches courses.subject_code/course_number combined
@@ -75,6 +90,23 @@ CREATE TABLE IF NOT EXISTS double_count_rules (
   note TEXT,
   PRIMARY KEY (program_a, program_b)
 );
+
+-- Narrow published exceptions to a school-wide double-count policy. Every
+-- exception names both programs and the exact course codes it permits, so a
+-- special case never silently opens the door to unrelated overlaps.
+CREATE TABLE IF NOT EXISTS double_count_exceptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  program_a TEXT NOT NULL REFERENCES programs(id),
+  program_b TEXT NOT NULL REFERENCES programs(id),
+  allowed_course_codes_json TEXT NOT NULL,
+  note TEXT,
+  source_url TEXT,
+  review_status TEXT DEFAULT 'unreviewed',
+  verified_at INTEGER,
+  UNIQUE(program_a, program_b)
+);
+CREATE INDEX IF NOT EXISTS idx_doublecountexceptions_program_a ON double_count_exceptions(program_a);
+CREATE INDEX IF NOT EXISTS idx_doublecountexceptions_program_b ON double_count_exceptions(program_b);
 
 -- Mirrors sync_log's role for the course sync — every scrape attempt logged
 -- with a raw text sample, so parsing failures are diagnosable via

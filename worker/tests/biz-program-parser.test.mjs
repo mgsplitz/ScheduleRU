@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseBizTable } from "../src/programs.js";
+import { groupAppliesToSelection, parseBizTable } from "../src/programs.js";
 
 test("a Business Core cross-reference is retained as source prose, not a duplicate major requirement", () => {
   const section = parseBizTable(`
@@ -26,4 +26,21 @@ test("a regular listed course remains a requirement", () => {
   `);
   assert.deepEqual(section.courseItems.map((item) => item.code), ["33:010:326"]);
   assert.equal(section.prose.length, 0);
+});
+
+test("a reviewed requirement path follows the selected major rather than a frontend special case", () => {
+  const conditions = {
+    financePath: [{
+      condition_type: "selected_program_must_include_one_of",
+      condition_value_json: '["rbsnb-finance"]',
+    }],
+    otherPath: [{
+      condition_type: "selected_program_must_not_include_any",
+      condition_value_json: '["rbsnb-finance"]',
+    }],
+  };
+  assert.equal(groupAppliesToSelection("financePath", conditions, ["rbsnb-finance", "rbsnb-real-estate-concentration"]), true);
+  assert.equal(groupAppliesToSelection("otherPath", conditions, ["rbsnb-finance", "rbsnb-real-estate-concentration"]), false);
+  assert.equal(groupAppliesToSelection("financePath", conditions, ["rbsnb-marketing", "rbsnb-real-estate-concentration"]), false);
+  assert.equal(groupAppliesToSelection("otherPath", conditions, ["rbsnb-marketing", "rbsnb-real-estate-concentration"]), true);
 });
