@@ -579,6 +579,47 @@ const ST = {
   sectionsCache: {},        // course id -> { sections } | { error }, lazy-loaded
   builder: null,            // { year, sem, pool:[{code,title,credits,sections,checked,loading,error}], permutations, permIndex } | null
 };
+
+// This is intentionally device-local, not an account. It keeps a student's
+// plan private while still surviving reloads and Pages deployments at this
+// same site address. Catalog and requirement data stay on the Worker, so the
+// saved payload remains small and can be re-evaluated against updated rules.
+const PLANNER_STATE_KEY="scheduleru_planner_state_v1";
+function savedObject(value){
+  return value && typeof value==="object" && !Array.isArray(value) ? value : {};
+}
+function restorePlannerState(){
+  try{
+    if(typeof localStorage==="undefined") return;
+    const saved=JSON.parse(localStorage.getItem(PLANNER_STATE_KEY)||"null");
+    if(!saved || saved.version!==1) return;
+    ST.apOn=savedObject(saved.apOn);
+    ST.completed=savedObject(saved.completed);
+    ST.schedule=savedObject(saved.schedule);
+    ST.wishlist=savedObject(saved.wishlist);
+    ST.groupSelections=savedObject(saved.groupSelections);
+    const year=Number(saved.year);
+    if(Number.isInteger(year) && year>=1 && year<=4) ST.year=year;
+    if(Array.isArray(saved.selectedPrograms)) ST.selectedPrograms=saved.selectedPrograms.filter(id=>typeof id==="string").slice(0,3);
+  }catch(e){
+    // A malformed or outdated local value should never prevent the planner
+    // from opening; the user can continue with a fresh in-browser plan.
+  }
+}
+function savePlannerState(){
+  try{
+    if(typeof localStorage==="undefined") return;
+    localStorage.setItem(PLANNER_STATE_KEY,JSON.stringify({
+      version:1, savedAt:Date.now(), apOn:ST.apOn, completed:ST.completed,
+      schedule:ST.schedule, wishlist:ST.wishlist, groupSelections:ST.groupSelections,
+      year:ST.year, selectedPrograms:ST.selectedPrograms,
+    }));
+  }catch(e){
+    // Browsers can disable or limit local storage. Planning still works for
+    // the current visit even when persistence is unavailable.
+  }
+}
+restorePlannerState();
 const PAGE_SIZE = 25;
 
 // Must match CURRENT_YEAR/CURRENT_TERM in wrangler.toml — used to turn a bare
@@ -851,13 +892,14 @@ function renderRequirementPicker(){
   const g=GROUPS[ST.pickerGroupId];
   if(!g) return;
   const selected=selectedRequirementCourses(g.id);
+  const applied=(g.members||[]).filter(id=>isCompleted(id));
   const limit=selectionLimit(g);
   const constraints=(g.children||[]).map(id=>GROUPS[id]).filter(isConstraintGroup);
   const search=String(document.getElementById("pickerSearch")?.value||"").trim().toLowerCase();
   document.getElementById("pickerIntro").textContent=
     g.rule==="distinct"
       ? `Choose ${limit} approved courses that cover ${g.count} distinct Arts and Humanities learning goals. After those choices are filled, additional courses from this list can be saved to your wishlist.`
-      : `Choose up to ${limit} approved ${limit===1?"course":"courses"} for this requirement.${constraints.length?` Your choices must also satisfy: ${constraints.map(child=>`${groupDisplayName(child)} (${groupRuleLabel(child)})`).join("; ")}.`:""} After those choices are filled, additional courses from this list can be saved to your wishlist.`;
+      : `Scheduled and completed courses apply here automatically. Choose up to ${Math.max(0,limit-applied.length)} additional approved ${limit===1?"course":"courses"} for this requirement.${constraints.length?` Your choices must also satisfy: ${constraints.map(child=>`${groupDisplayName(child)} (${groupRuleLabel(child)})`).join("; ")}.`:""} After those choices are filled, additional courses from this list can be saved to your wishlist.`;
   const ids=(g.members||[]).filter(id=>{
     const c=COURSES[id];
     return c && (!search || `${c.code} ${c.title} ${c.fullTitle||""}`.toLowerCase().includes(search));
@@ -866,11 +908,12 @@ function renderRequirementPicker(){
   list.innerHTML=ids.length?ids.map(id=>{
     const c=COURSES[id];
     const picked=selected.includes(id);
-    const selectSlotAvailable=selected.length<limit;
-    const mainLabel=picked?"Remove":selectSlotAvailable?"Use for requirement":"+ Wishlist";
-    return `<div class="picker-row${picked?" selected":""}">
+    const alreadyApplied=applied.includes(id);
+    const selectSlotAvailable=new Set([...applied,...selected]).size<limit;
+    const mainLabel=alreadyApplied?"In schedule":picked?"Remove":selectSlotAvailable?"Use for requirement":"+ Wishlist";
+    return `<div class="picker-row${picked||alreadyApplied?" selected":""}">
       <div><div class="picker-code">${escapeHtml(c.code)}</div><div class="picker-name">${escapeHtml(c.fullTitle||c.title)}</div><div class="picker-meta">${escapeHtml(c.credits||"?")} credits</div></div>
-      <div class="picker-actions"><button class="picker-btn view" data-pview="${id}">Details</button><button class="picker-btn" data-pchoose="${id}">${mainLabel}</button></div>
+      <div class="picker-actions"><button class="picker-btn view" data-pview="${id}">Details</button><button class="picker-btn" data-pchoose="${id}" ${alreadyApplied?"disabled":""}>${mainLabel}</button></div>
     </div>`;
   }).join(""):`<div class="api-status">No approved course matches that search.</div>`;
   list.querySelectorAll("[data-pview]").forEach(b=>b.addEventListener("click",()=>{
@@ -881,9 +924,12 @@ function renderRequirementPicker(){
   list.querySelectorAll("[data-pchoose]").forEach(b=>b.addEventListener("click",()=>{
     const id=b.dataset.pchoose;
     const current=selectedRequirementCourses(g.id);
-    if(current.includes(id)){
+    const currentlyApplied=(g.members||[]).filter(memberId=>isCompleted(memberId));
+    if(currentlyApplied.includes(id)){
+      return;
+    }else if(current.includes(id)){
       ST.groupSelections[g.id]=current.filter(item=>item!==id);
-    }else if(current.length<limit){
+    }else if(new Set([...currentlyApplied,...current]).size<limit){
       const proposed=[...current,id];
       const violation=parentSelectionConstraintViolation(g, proposed);
       if(violation){
@@ -954,6 +1000,7 @@ function addToWishlist(ref, explicitRecord=null){
   // a degree requirement and a scheduled section. Storing the full record here
   // prevents title/credit data from disappearing during drag-and-drop.
   ST.wishlist[record.code]={...record,id:record.id||record.code,code:record.code};
+  savePlannerState();
 }
 function wishlistRecords(){
   const seen=new Set();
@@ -1117,7 +1164,10 @@ function isPickerGroup(g){
 }
 function selectedRequirementCourses(gk){
   const valid=new Set(GROUPS[gk]?.members||[]);
-  return [...new Set(ST.groupSelections[gk]||[])].filter(id=>valid.has(id));
+  // Once a course is scheduled or marked complete, it is applied
+  // automatically. Preserve an older manual selection in saved state so it
+  // can reappear if that course is later removed from the plan.
+  return [...new Set(ST.groupSelections[gk]||[])].filter(id=>valid.has(id)&&!isCompleted(id));
 }
 function selectionLimit(g){
   return Math.max(1,Number(g?.count)||1);
@@ -1174,12 +1224,17 @@ function constraintSummaryHtml(g){
 function pickerSummaryHtml(gk){
   const g=GROUPS[gk];
   const selected=selectedRequirementCourses(gk);
+  const applied=(g.members||[]).filter(id=>isCompleted(id));
   const limit=selectionLimit(g);
   const noun=limit===1?"course":"courses";
-  const selectionText=selected.length
-    ? `${selected.length} ${selected.length===1?"course":"courses"} selected for this requirement.`
-    : `No course selected yet. Choose up to ${limit} ${noun} from the approved list.`;
-  return `<div class="choice-summary">${selectionText}</div>
+  const selectionText=applied.length
+    ? `${applied.length} course${applied.length===1?"":"s"} automatically applied from your schedule or completed courses.`
+    : `No scheduled or completed course is applied yet.`;
+  const manualText=selected.length
+    ? ` ${selected.length} additional course${selected.length===1?"":"s"} selected to consider.`
+    : ` Choose up to ${Math.max(0,limit-applied.length)} additional ${noun} from the approved list.`;
+  return `<div class="choice-summary">${selectionText}${manualText}</div>
+    ${applied.length?`<div class="choice-picked"><strong style="font-size:10px;">Applied here</strong><div class="cgrid">${applied.map(id=>cardHtml(id)).join("")}</div></div>`:""}
     ${selected.length?`<div class="choice-picked"><strong style="font-size:10px;">Selected for this requirement</strong><div class="cgrid">${selected.map(id=>cardHtml(id)).join("")}</div></div>`:""}
     <div class="choice-actions"><button class="choice-btn" data-gpicker="${gk}">${selected.length?"Change selection":"Browse approved courses"}</button>
       ${selected.length?`<button class="choice-btn secondary" data-gclear="${gk}">Clear selection</button>`:""}</div>`;
@@ -1188,12 +1243,23 @@ function groupHtml(gk){
   const g=GROUPS[gk];
   if(!g) return "";
   const ok=groupFulfilled(gk);
+  const applied=(g.members||[]).filter(id=>isCompleted(id));
   const members=(g.members||[]).filter(id=>!isCompleted(id));
-  const children=(g.rule==="distinct" ? [] : (g.children||[])).map(groupHtml).join("");
-  const body=isConstraintGroup(g) ? constraintSummaryHtml(g) : (isPickerGroup(g) ? pickerSummaryHtml(gk) : (members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>` : ""));
+  const children=(g.children||[]).map(groupHtml).join("");
+  const appliedHtml=applied.length
+    ? `<div class="choice-picked"><strong style="font-size:10px;">Applied here</strong><div class="cgrid">${applied.map(id=>cardHtml(id)).join("")}</div></div>`
+    : "";
+  const body=isConstraintGroup(g)
+    ? `${constraintSummaryHtml(g)}${appliedHtml}`
+    : (isPickerGroup(g)
+      ? pickerSummaryHtml(gk)
+      : `${appliedHtml}${members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`:""}`);
+  const progress=g.members?.length
+    ? ` · ${applied.length}/${g.rule==="all"?g.members.length:Math.min(Number(g.count)||1,g.members.length)} applied`
+    : "";
   return `<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
     <span class="gn">${groupDisplayName(g)}</span>
-    <span class="gm">${groupRuleLabel(g)} · click to expand</span>
+    <span class="gm">${groupRuleLabel(g)}${progress} · click to expand</span>
   </div><div class="gr-body" id="gb-${gk}">${body}${children}</div></div>`;
 }
 
@@ -1374,18 +1440,18 @@ function renderRequired(){
   ROOT_GROUPS.forEach(gk=>{
     const g=GROUPS[gk];
     if(!g) return;
+    const applied=(g.members||[]).filter(id=>isCompleted(id));
     const members=(g.members||[]).filter(id=>!isCompleted(id));
     const children=(g.children||[]).map(groupHtml).join("");
     if(g.rule==="all"){
       h+=`<div class="sec-hdr">${groupDisplayName(g)}</div>`;
+      if(applied.length) h+=`<div class="choice-picked"><strong style="font-size:10px;">Applied here</strong><div class="cgrid">${applied.map(id=>cardHtml(id)).join("")}</div></div>`;
       if(members.length) h+=`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`;
       h+=children;
     } else {
       h+=groupHtml(gk);
     }
   });
-  const done=Object.keys(COURSES).filter(id=>isCompleted(id));
-  if(done.length) h+=`<div class="sec-hdr">✓ Completed / AP-Waived</div><div class="cgrid">${done.map(id=>cardHtml(id)).join("")}</div>`;
   if(!ROOT_GROUPS.length) h+=`<div class="empty" style="margin-top:30px;">No reviewed requirements are available yet.</div>`;
   pb.innerHTML=h;
   attachCardEvents(pb);
@@ -1765,9 +1831,10 @@ async function loadInitialRequirements(){
     // reviewed school data, including when a program's own table contains
     // additional major-only rows. It is not a hard-coded course list.
     try{ await loadSchoolReferenceRequirementTrees(programs); }catch(e){ ST.referenceRequirementTrees={}; }
+    const restored=ST.selectedPrograms.filter(id=>programs.some(program=>program.id===id));
     const initial=programs.find(p=>p.id==="rbsnb-bait")||programs[0];
     if(!initial) throw new Error("No reviewed RBS major is available yet.");
-    ST.selectedPrograms=[initial.id];
+    ST.selectedPrograms=restored.length ? restored : [initial.id];
     await loadSelectedRequirements(ST.selectedPrograms);
     updateProgramTitle();
   }catch(err){
@@ -2066,7 +2133,7 @@ function renderWishlist(){
   attachCardEvents(pb);
   pb.querySelectorAll("[data-wrem]").forEach(b=>b.addEventListener("click",e=>{
     e.stopPropagation();
-    delete ST.wishlist[e.target.dataset.wrem]; renderWishlist();
+    delete ST.wishlist[e.target.dataset.wrem]; savePlannerState(); renderWishlist();
   }));
 }
 
@@ -2074,6 +2141,7 @@ function renderWishlist(){
    RENDER ALL
    ============================================================ */
 function renderPanel(){
+  savePlannerState();
   if(ST.tab==="required") renderRequired();
   else if(ST.tab==="core") renderCore();
   else renderWishlist();
