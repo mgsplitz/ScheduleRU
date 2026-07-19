@@ -655,6 +655,18 @@ function parseBizTable(tableHtml, precedingHeading = "") {
       return { code: cm[0], title, credits: (creditCell.match(/[\d.]+/) || [""])[0] };
     });
     const note = noteCell;
+    // Some official RBS tables repeat a course in a major-specific section
+    // only to say it is already fulfilled by the Business Core. It is a
+    // cross-reference, not a second requirement or additional credit. Keep
+    // the source statement as reviewable prose but do not render a duplicate
+    // course card outside the Core.
+    if (
+      !/business core/i.test(section.name) &&
+      /\bfulfilled in (?:the )?business core requirements?\b/i.test(note)
+    ) {
+      section.prose.push(`${items.map((item) => `${item.code} ${item.title}`.trim()).join(" / ")}: ${note}`);
+      continue;
+    }
     if (items.length > 1) {
       section.orGroups.push(items.map((it) => ({ ...it, note })));
     } else {
@@ -663,6 +675,8 @@ function parseBizTable(tableHtml, precedingHeading = "") {
   }
   return section.courseItems.length || section.orGroups.length ? section : null;
 }
+
+export { parseBizTable };
 
 function isLegacyBizCurriculum(section) {
   // The app currently represents the active catalog path for a program.

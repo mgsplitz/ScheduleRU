@@ -3,7 +3,7 @@ import test from "node:test";
 
 await import("../../requirement-group-logic.js");
 
-const { requirementsForDisplay } = globalThis.ScheduleRURequirementLogic;
+const { requirementsForDisplay, sharedRequirementGroups, sharedRequirementRootKey } = globalThis.ScheduleRURequirementLogic;
 
 function root(id, family = null, priority = 0, courses = []) {
   return { id, name: id, display_family: family, display_priority: priority, courses, children: [] };
@@ -37,4 +37,15 @@ test("unrelated requirement roots remain visible alongside a shared family", () 
     finance: [root("finance-core", "rbsnb-business-core", 10), root("finance-required")],
   }, ["accounting", "finance"], (item) => item.id);
   assert.deepEqual(selected.map((item) => item.id), ["accounting-core", "accounting-required", "finance-required"]);
+});
+
+test("shared display families are excluded from cross-program overlap checks even when their course lists differ", () => {
+  const trees = {
+    accounting: [root("accounting-core", "rbsnb-business-core", 100, [{ course_code: "33:010:458" }])],
+    finance: [root("finance-core", "rbsnb-business-core", 10, [{ course_code: "33:136:370" }])],
+  };
+  const shared = sharedRequirementGroups(trees, ["accounting", "finance"], (item) => item.id);
+  assert.deepEqual(shared.map((item) => item.name), ["accounting-core"]);
+  assert.equal(sharedRequirementRootKey(trees.accounting[0], (item) => item.id), "family:rbsnb-business-core");
+  assert.equal(sharedRequirementRootKey(trees.finance[0], (item) => item.id), "family:rbsnb-business-core");
 });

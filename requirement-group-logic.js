@@ -88,5 +88,32 @@
     return roots;
   }
 
-  root.ScheduleRURequirementLogic = { groupFulfilled, requirementsForDisplay };
+  function sharedRequirementRootKey(root, signatureForRoot) {
+    const family = typeof root?.display_family === "string" ? root.display_family.trim() : "";
+    if (family) return `family:${family}`;
+    const signature = typeof signatureForRoot === "function"
+      ? signatureForRoot(root)
+      : JSON.stringify(root || {});
+    return `signature:${signature}`;
+  }
+
+  function sharedRequirementGroups(requirementTrees, programIds, signatureForRoot) {
+    const found = new Map();
+    for (const programId of programIds || []) {
+      for (const root of requirementTrees?.[programId] || []) {
+        const key = sharedRequirementRootKey(root, signatureForRoot);
+        const entry = found.get(key) || { key, name: root?.name || "Shared requirement", programs: new Set() };
+        entry.programs.add(programId);
+        found.set(key, entry);
+      }
+    }
+    return [...found.values()].filter((entry) => entry.programs.size > 1);
+  }
+
+  root.ScheduleRURequirementLogic = {
+    groupFulfilled,
+    requirementsForDisplay,
+    sharedRequirementRootKey,
+    sharedRequirementGroups,
+  };
 })(globalThis);

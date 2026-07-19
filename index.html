@@ -1712,16 +1712,12 @@ function rootRequirementSignature(root){
   return JSON.stringify([normalizedRequirementName(root?.name),root?.rule||"",root?.count??null,codes]);
 }
 function sharedRootGroups(requirementTrees, programIds){
-  const found=new Map();
-  for(const id of programIds){
-    for(const root of requirementTrees[id]||[]){
-      const signature=rootRequirementSignature(root);
-      const entry=found.get(signature)||{signature,name:root.name||"Shared requirement",programs:new Set()};
-      entry.programs.add(id);
-      found.set(signature,entry);
-    }
-  }
-  return [...found.values()].filter(entry=>entry.programs.size>1);
+  return ScheduleRURequirementLogic.sharedRequirementGroups(
+    requirementTrees,programIds,rootRequirementSignature
+  );
+}
+function sharedRootKey(root){
+  return ScheduleRURequirementLogic.sharedRequirementRootKey(root,rootRequirementSignature);
 }
 function rootCourseCodes(root){
   return (root?.courses||[]).map(course=>course?.course_code).filter(Boolean);
@@ -1787,13 +1783,13 @@ function requirementsForDisplay(requirementTrees, programIds){
 }
 function computeDoubleCountOverlaps(requirementTrees, programIds){
   const shared=sharedRootGroups(requirementTrees,programIds);
-  const sharedKeys=new Set(shared.map(entry=>entry.signature));
+  const sharedKeys=new Set(shared.map(entry=>entry.key));
   const programsById=Object.fromEntries((ST.availablePrograms||[]).map(program=>[program.id,program]));
   const coursePrograms=new Map();
   for(const id of programIds){
     const codes=new Set();
     for(const root of requirementTrees[id]||[]){
-      if(sharedKeys.has(rootRequirementSignature(root))) continue;
+      if(sharedKeys.has(sharedRootKey(root))) continue;
       collectRawCourseCodes(root,codes);
     }
     for(const code of codes){
@@ -1832,6 +1828,36 @@ function programEligibilityBannerHtml(){
   }).join("");
   return `<div class="dc-banner warn"><b>Formal program conditions</b><ul style="margin:5px 0 0;padding-left:18px;">${facts}</ul><span>These are planning notes from reviewed program sources. ScheduleRU does not verify grades, GPA, formal applications, or advisor approvals.</span></div>`;
 }
+function overlapProgramPairsHtml(overlaps,programsById){
+  const byPrograms=new Map();
+  for(const overlap of overlaps||[]){
+    const ids=[...new Set(overlap.programs||[])].sort();
+    const key=ids.join("|");
+    const entry=byPrograms.get(key)||{ids,codes:[]};
+    entry.codes.push(overlap.code);
+    byPrograms.set(key,entry);
+  }
+  return [...byPrograms.values()].map(entry=>{
+    const names=entry.ids.map(id=>programsById[id]?.name||id).join(" + ");
+    return `<li><strong>${escapeHtml(names)}:</strong> ${escapeHtml(entry.codes.join(", "))}</li>`;
+  }).join("");
+}
+function doubleCountMeaning(item){
+  const count=item.codes.length;
+  if(item.scope==="major_concentration" && item.cap===0){
+    return `These ${count===1?"course":"courses"} cannot fulfill both a major and a concentration. You can still pursue both programs; use different approved course${count===1?"":"s"} for the concentration requirement.`;
+  }
+  if(item.scope==="major_major" && item.cap!==null){
+    if(item.violates){
+      return `RBS permits up to ${item.cap} shared course${item.cap===1?"":"s"} across your RBS majors. Your selected requirement lists contain ${count} potential overlaps, so only ${item.cap} may count toward both majors; satisfy the other requirement${count-item.cap===1?"":"s"} with different approved course${count-item.cap===1?"":"s"}.`;
+    }
+    return `RBS permits up to ${item.cap} shared course${item.cap===1?"":"s"} across your RBS majors. If you use this course for both majors, it uses that allowance.`;
+  }
+  if(item.cap===0){
+    return `These courses cannot fulfill both programs. Use different approved courses for one program's requirement.`;
+  }
+  return `ScheduleRU found overlapping requirement lists. Confirm with advising whether any of these courses may count toward both programs.`;
+}
 function doubleCountBannerHtml(){
   const result=ST.doubleCount;
   if(!result || ST.selectedPrograms.length<2) return "";
@@ -1839,23 +1865,21 @@ function doubleCountBannerHtml(){
   const activeScopes=result.scopeResults.filter(item=>item.codes.length);
   const unscoped=result.unscoped||[];
   const violates=activeScopes.some(item=>item.violates) || unscoped.length>0;
-  let content=sharedNames.length?`Shared requirements shown once: ${escapeHtml(sharedNames.join(", "))}. `:"";
+  const programsById=Object.fromEntries((ST.availablePrograms||[]).map(program=>[program.id,program]));
+  let content=sharedNames.length?`<div>Shared requirements are shown once: ${escapeHtml(sharedNames.join(", "))}. You do not need to take those shared sections twice.</div>`:"";
   if(!activeScopes.length && !unscoped.length){
-    content+="No non-shared course overlap was found among the selected programs.";
+    content+=`<div>No additional course-overlap adjustment is currently needed.</div>`;
   }else{
     content+=activeScopes.map(item=>{
-      const label=item.scope==="major_major"?"major ↔ major":"major ↔ concentration";
-      const cap=item.cap===null?"no published cap":`${item.cap} course${item.cap===1?"":"s"}`;
-      const listed=item.codes.map(overlap=>overlap.code).join(", ");
-      return `${label}: ${item.codes.length} potential shared course${item.codes.length===1?"":"s"} (${escapeHtml(listed)}); cap: ${cap}.`;
-    }).join(" ");
+      const label=item.scope==="major_major"?"Major-to-major overlap":"Major-to-concentration overlap";
+      return `<div style="margin-top:6px;"><strong>${label}</strong><ul style="margin:3px 0 4px;padding-left:18px;">${overlapProgramPairsHtml(item.codes,programsById)}</ul><strong>What this means:</strong> ${escapeHtml(doubleCountMeaning(item))}</div>`;
+    }).join("");
     if(unscoped.length){
-      const listed=unscoped.map(overlap=>overlap.code).join(", ");
-      content+=`${activeScopes.length?" ":""}Additional overlap (${escapeHtml(listed)}) involves program types without a reviewed double-count policy in ScheduleRU yet.`;
+      content+=`<div style="margin-top:6px;"><strong>Policy confirmation needed</strong><ul style="margin:3px 0 4px;padding-left:18px;">${overlapProgramPairsHtml(unscoped,programsById)}</ul>ScheduleRU does not yet have a reviewed rule for this program combination, so confirm with advising before relying on the same course twice.</div>`;
     }
   }
-  const title=violates?"Double-count rule needs attention":"Double-count planning check";
-  const suffix=" This is a planning flag, not a degree audit; confirm a final double-count decision with RBS advising.";
+  const title=violates?"Plan adjustment needed":"Course-overlap check";
+  const suffix=violates?`<span> This is a planning check, not a final degree audit; confirm the final decision with RBS advising.</span>`:"";
   return `<div class="dc-banner ${violates?"warn":"ok"}"><b>${title}</b>${content}${suffix}</div>`;
 }
 
