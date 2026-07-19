@@ -13,3 +13,21 @@ test("eligibility facts are source-backed and review-gated", () => {
   assert.match(worker, /WHERE review_status = 'reviewed'/);
   assert.match(worker, /path === "\/api\/course-eligibility"/);
 });
+
+test("the browser migrates v1 state and evaluates the selected target term", async () => {
+  const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
+  assert.match(frontend, /<script src="eligibility-logic\.js"><\/script>/);
+  assert.match(frontend, /const PLANNER_STATE_VERSION=2/);
+  assert.match(frontend, /\[1,PLANNER_STATE_VERSION\]\.includes\(saved\.version\)/);
+  assert.match(frontend, /ST\.creditLedger\s*=\s*savedObject\(saved\.creditLedger\)/);
+  assert.match(frontend, /function confirmedAcademicCreditEntries\(/);
+  assert.match(frontend, /function plannedScheduleCreditEntries\(/);
+  assert.match(frontend, /function courseEligibilityForTerm\(/);
+  assert.match(frontend, /function loadCourseEligibilityForCodes\(/);
+  assert.match(frontend, /function reviewedEligibilityForCourse\(/);
+  assert.match(frontend, /function courseEligibilityNotice\(/);
+  assert.match(frontend, /Planning eligibility/);
+  assert.match(frontend, /eligibilityStatus:eligibility\.status/);
+  assert.match(frontend, /courseEligibilityForTerm\(record,\{year:ST\.year,sem\}\)/);
+  assert.match(frontend, /eligibility:row\.eligibility\|\|existing\?\.eligibility\|\|null/);
+});

@@ -392,11 +392,11 @@ test("the browser migrates v1 state and evaluates the selected target term", () 
   const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
   assert.match(frontend, /const PLANNER_STATE_VERSION=2/);
   assert.match(frontend, /\[1,PLANNER_STATE_VERSION\]\.includes\(saved\.version\)/);
-  assert.match(frontend, /creditLedger:savedObject\(saved\.creditLedger\)/);
+  assert.match(frontend, /ST\.creditLedger\s*=\s*savedObject\(saved\.creditLedger\)/);
   assert.match(frontend, /function confirmedAcademicCreditEntries\(/);
   assert.match(frontend, /function plannedScheduleCreditEntries\(/);
   assert.match(frontend, /function courseEligibilityForTerm\(/);
-  assert.match(frontend, /targetTerm:\{year:ST\.year,sem\}/);
+  assert.match(frontend, /courseEligibilityForTerm\(record,\{year:ST\.year,sem\}\)/);
 });
 ~~~
 
@@ -512,9 +512,9 @@ if(result.status==="blocked"){
 }
 ~~~
 
-For planned_assumption, allow the drop and persist eligibilityStatus plus eligibilityAssumptions. For needs_review, allow manual planning but persist eligibilityStatus:"needs_review"; show the neutral warning and never call the course eligible.
+For planned_assumption, allow the drop and persist eligibilityStatus plus eligibilityAssumptions. For needs_review, allow manual planning but persist eligibilityStatus:"needs_review" and never call the course eligible. Do not show a generic needs-review warning on every course with no reviewed payload; that would create clutter while adding no useful information.
 
-Replace the main details-modal availability sentence with a concise Planning eligibility section based on courseEligibilityForTerm(c,{year:ST.year,sem:"fall"}). Preserve raw catalog wording in the existing collapsed Official catalog details section. Show brief card copy only for blocked, planned_assumption, or needs_review; preserve green completion state and do not disable a card solely because its eligibility is unreviewed.
+Add a concise Planning eligibility section in the details modal and a schedule-card note only when the course has reviewed eligibility data and the result is not eligible_now. Preserve raw catalog wording in the existing collapsed Official catalog details section. Preserve green completion state and do not disable a card solely because its eligibility is unreviewed.
 
 - [ ] **Step 6: Run focused tests and commit**
 
