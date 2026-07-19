@@ -17,6 +17,7 @@ for (const comparisonCase of fixture.cases) {
       programs: fixture.programs,
       limits: fixture.policy_snapshot.limits,
       combinationPolicies: fixture.policy_snapshot.combination_policies,
+      eligibilityRules: comparisonCase.eligibility_rules || [],
     });
     assert.equal(result.allowed, comparisonCase.expected.allowed);
     assert.deepEqual(result.errors.map((issue) => issue.code).sort(), [...comparisonCase.expected.error_codes].sort());
