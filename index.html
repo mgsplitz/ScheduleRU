@@ -1266,7 +1266,7 @@ function coreSlotsForRoot(rootId){
       const choices=[[]];
       for(let count=1;count<=Math.min(coreGroupNeeded(g),children.length);count++){
         chooseCoreGroups(children,count).forEach(subset=>{
-          choices.push(subset.map(child=>({groupId:g.id,courseIds:new Set(child.members||[]),apAllowed:coreApAllowedForGroup(g)})));
+          choices.push(subset.map(child=>({groupId:g.id,subgroupId:child.id,courseIds:new Set(child.members||[]),apAllowed:coreApAllowedForGroup(g)})));
         });
       }
       variants=variants.flatMap(base=>choices.map(choice=>[...base,...choice]));
@@ -1310,7 +1310,10 @@ function computeCoreAllocation(){
       const matches=coreMaximumMatching(slots,tokens);
       if(matches.length>best.length) best=matches;
     });
-    best.forEach(({slot,token})=>(byGroup[slot.groupId] ||= []).push(token));
+    best.forEach(({slot,token})=>{
+      (byGroup[slot.groupId] ||= []).push(token);
+      if(slot.subgroupId) (byGroup[slot.subgroupId] ||= []).push(token);
+    });
   });
   return {tokens,byGroup};
 }
@@ -1332,6 +1335,18 @@ function coreGroupHtml(gk,allocation){
   const applied=allocation.byGroup[gk]||[];
   const needed=coreGroupNeeded(g);
   const ok=needed>0 && applied.length>=needed;
+  // Arts & Humanities is one requirement that needs two courses across two
+  // different goals. Keep that shared rule at the parent, but show AHo,
+  // AHp, AHq and AHr as their own browsable subgroups beneath it.
+  if(g.rule==="distinct" && (g.children||[]).length){
+    const subgroups=(g.children||[]).map(id=>coreGroupHtml(id,allocation)).join("");
+    const summary=applied.length
+      ? `${applied.length} of ${needed} distinct Arts & Humanities goals automatically applied. The app will reassign credit when that completes more Core requirements.`
+      : `Choose ${needed} courses across ${needed} different Arts & Humanities goals. Browse any goal below at any time.`;
+    return `<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
+      <span class="gn">${groupDisplayName(g)}</span><span class="gm">${applied.length}/${needed} distinct goals applied Â· click to expand</span>
+    </div><div class="gr-body" id="gb-${gk}"><div class="choice-summary">${summary}</div>${subgroups}</div></div>`;
+  }
   const selected=selectedRequirementCourses(gk);
   const selectedHtml=selected.length?`<div class="choice-picked"><strong style="font-size:10px;">Courses you picked to consider</strong><div class="cgrid">${selected.map(id=>cardHtml(id)).join("")}</div></div>`:"";
   const summary=applied.length
