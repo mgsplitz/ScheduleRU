@@ -887,6 +887,12 @@ function openProgramPicker(){
       <span><strong>${escapeHtml(program.name)}</strong><small>${escapeHtml(programTypeLabel(program.type))} · ${escapeHtml(program.catalog_year||"Catalog year not listed")}</small></span>
     </label>`).join("")}
   </section>`).join("") || `<div class="api-status">No reviewed programs are available yet for ${escapeHtml(activeHomeSchoolLabel())}.</div>`;
+  for(const option of list.querySelectorAll("[data-program-choice]")){
+    const degreeType=cleanApiText((ST.availablePrograms||[]).find(program=>program.id===option.dataset.programChoice)?.degree_type);
+    if(!degreeType) continue;
+    const metadata=option.closest(".program-option")?.querySelector("small");
+    if(metadata) metadata.textContent=`${metadata.textContent} | ${degreeType}`;
+  }
   list.querySelectorAll("[data-program-choice]").forEach(input=>input.addEventListener("change",()=>{
     const id=input.dataset.programChoice;
     const draft=new Set(ST.programDraft||[]);

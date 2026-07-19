@@ -20,7 +20,7 @@
 
 1. **School-level completion rules:** add a reusable, reviewed rule for requirements such as an SAS major, normally an SAS minor, 120 credits, and GPA. The existing program selector cannot be used as a proxy for graduation rules.
 2. **Exception logic:** represent “second major waives minor” and credit-intensive exceptions as reviewed conditions. Do not make a generic assumption that a second selected program waives every school's minor requirement.
-3. **Program degree metadata:** SAS has BA/BS distinctions for some programs. The program data needs a degree-type field or a reviewed program-variant structure before a BA and BS path can be shown as separate, trustworthy choices.
+3. **Program degree metadata:** SAS has BA/BS distinctions for some programs. The program data now supports official program code, degree type, and a reviewed program-family identifier, so a B.A. and B.S. path can own separate requirements. No SAS program path has been entered or exposed yet.
 4. **Combination policies:** encode specific prohibited pairs and permitted overlap outcomes in reviewed data. The SAS general overlap statement is not a substitute for program-level restrictions.
 5. **Cross-school status:** a cross-school request must remain “needs advisor confirmation” unless an official, combination-specific policy supports a stronger result.
 6. **Core module review:** the existing reviewed Core is now stored as the canonical `rutgers-nb-core-curriculum` module and attached to RBS through reviewed data. Compare the published SAS Core course-goal rules and catalog year with that module before attaching it to SAS; no SAS attachment exists yet.

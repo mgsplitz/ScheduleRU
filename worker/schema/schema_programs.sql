@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS programs (
   program_slug TEXT NOT NULL,       -- catalog URL segment, e.g. "bait"
   type TEXT NOT NULL,               -- 'major' | 'minor' | 'concentration' | 'certificate'
   catalog_year TEXT,                -- e.g. "25-26", informational
+  academic_program_code TEXT,       -- official academic program code, e.g. '790'
+  degree_type TEXT,                 -- e.g. 'B.A.' or 'B.S.'; blank for minors/concentrations
+  program_family_id TEXT,           -- joins reviewed degree paths for one academic program
   source_url TEXT,
   review_status TEXT DEFAULT 'unreviewed',  -- 'unreviewed' | 'reviewed' | 'needs_fix'
   last_scraped_at INTEGER

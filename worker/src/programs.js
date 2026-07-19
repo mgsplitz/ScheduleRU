@@ -1268,11 +1268,19 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       const items = Array.isArray(body) ? body : [body];
       const stmts = items.map((p) =>
         env.DB.prepare(
-          `INSERT INTO programs (id, name, school_slug, program_slug, type, catalog_year, source_url)
-           VALUES (?,?,?,?,?,?,?)
+          `INSERT INTO programs (
+             id, name, school_slug, program_slug, type, catalog_year,
+             academic_program_code, degree_type, program_family_id, source_url
+           ) VALUES (?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(id) DO UPDATE SET name=excluded.name, school_slug=excluded.school_slug,
-             program_slug=excluded.program_slug, type=excluded.type, catalog_year=excluded.catalog_year`
-        ).bind(p.id, p.name, p.school_slug, p.program_slug, p.type, p.catalog_year || null, p.source_url || null)
+             program_slug=excluded.program_slug, type=excluded.type, catalog_year=excluded.catalog_year,
+             academic_program_code=excluded.academic_program_code, degree_type=excluded.degree_type,
+             program_family_id=excluded.program_family_id, source_url=excluded.source_url`
+        ).bind(
+          p.id, p.name, p.school_slug, p.program_slug, p.type, p.catalog_year || null,
+          p.academic_program_code || null, p.degree_type || null, p.program_family_id || null,
+          p.source_url || null
+        )
       );
       await env.DB.batch(stmts);
       return json({ ok: true, seeded: items.length });

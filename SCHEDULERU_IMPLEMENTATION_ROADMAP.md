@@ -279,6 +279,8 @@ Work:
 
 Progress note (development, 2026-07-19): item 1 is implemented as the reviewed `rutgers-nb-core-curriculum` module and is attached to RBS through reviewed school-to-module data. SAS is deliberately **not** attached or visible yet; its catalog-year compatibility and its own program/policy pilot still need review.
 
+The program model now also carries an official academic-program code, degree type, and program-family identifier. This allows a future B.A. and B.S. path to have independently reviewed requirements rather than being presented as one ambiguous major.
+
 #### Engineering pilot
 
 Work:
