@@ -598,6 +598,14 @@ function isCompleted(id){
   if(ST.completed[id]) return true;
   const c = COURSES[id];
   if(c && Object.values(ST.schedule).some(e=>e.code===c.code)) return true;
+  // A reviewed requirement may name a course that has an approved
+  // alternative in Degree Navigator. Keep that relationship in the
+  // requirements database; the interface only evaluates the data it gets.
+  if(c && (c.alternatives||[]).some(alt=>{
+    const code=alt.code||alt.course_code||"";
+    const altId=requirementCourseId(code);
+    return !!ST.completed[altId] || Object.values(ST.schedule).some(e=>e.code===code);
+  })) return true;
   // check if any checked AP credit fulfills this course
   const aps = AP_FULFILLS[id] || [];
   return aps.some(apId => ST.apOn[apId]);
@@ -610,7 +618,7 @@ function prereqsMet(id){
 function standingRequirement(c){
   const text=[c?.restrictions,...(c?.requirementNotes||[])].join(" ").toLowerCase();
   if(/seniors?\s+(year|standing|status|only)|4th\s+year/.test(text)) return {year:4,label:"Senior (4th-year) standing required"};
-  if(/junior\s*(\/|or|and|-)?\s*senior|junior\s+(year|standing|status)|3rd\s+year/.test(text)) return {year:3,label:"Junior (3rd-year) standing required"};
+  if(/juniors?\s*(\/|or|and|-)?\s*seniors?|juniors?\s+(year|standing|status)|3rd\s+year/.test(text)) return {year:3,label:"Junior (3rd-year) standing required"};
   if(/all\s+except\s+(?:1st|first)[ -]?year|not\s+open\s+to\s+(?:1st|first)[ -]?year|except\s+(?:1st|first)[ -]?year/.test(text)) return {year:2,label:"Not open to first-year students"};
   return null;
 }
@@ -779,16 +787,29 @@ function openCourseDetails(id){
   const requirementId=COURSES[id] ? id : Object.keys(COURSES).find(key=>COURSES[key].code===c.code);
   const standing=standingRequirement(c);
   const available=!requirementId || courseAvailable(requirementId);
-  const status=available
+  const approvedAlternatives=(c.alternatives||[]).filter(alt=>alt.code||alt.equivalent_course_code);
+  const completedAlternative=approvedAlternatives.find(alt=>{
+    const code=alt.code||alt.equivalent_course_code;
+    return !!ST.completed[requirementCourseId(code)] || Object.values(ST.schedule).some(entry=>entry.code===code);
+  });
+  const alternativeDetails=approvedAlternatives.map(alt=>{
+    const code=alt.code||alt.equivalent_course_code;
+    const label=alt.title ? `${alt.title} (${code})` : code;
+    return `<div class="detail-chip">${escapeHtml(label)}<code>${escapeHtml(code)}</code></div>`;
+  }).join("");
+  const status=completedAlternative
+    ? `This requirement is already fulfilled by ${completedAlternative.title||completedAlternative.code||completedAlternative.equivalent_course_code}.`
+    : available
     ? (c.prereqs?.length ? "Available based on the simple prerequisite rules the app can verify." : "No simple prerequisite rule is blocking this course in the app.")
     : (!prereqsMet(id) ? "Not yet available based on the simple prerequisite rules the app can verify." : `Not yet available in the ${YL[ST.year]||"selected"} plan year because ${standing?.label?.toLowerCase()||"of an enrollment restriction"}.`);
   body.innerHTML=`
     <div class="detail-overview">
       <h2>${escapeHtml(c.fullTitle||c.title)}</h2>
       <div class="detail-code">${escapeHtml(c.code)} · ${escapeHtml(c.credits||"?")} credits</div>
-    <div class="detail-status${available?" ready":""}">${escapeHtml(status)}</div>
+    <div class="detail-status${(available||completedAlternative)?" ready":""}">${escapeHtml(status)}</div>
     </div>
     <div class="detail-section"><h3>${standing?"When you can take it":"Enrollment"}</h3><p>${escapeHtml(compactRestriction(c,standing))}</p></div>
+    ${alternativeDetails?`<div class="detail-section"><h3>Also accepted for this requirement</h3><div class="detail-chips">${alternativeDetails}</div><p class="src-note">This reviewed equivalency comes from the degree-audit rule recorded for this requirement.</p></div>`:""}
     ${prerequisiteChips?`<div class="detail-section"><h3>Plan these first</h3><div class="detail-chips">${prerequisiteChips}</div>${c.catalogPrereqs?`<p class="src-note">The official catalog includes alternative prerequisite paths; use the details below when your situation differs.</p>`:""}</div>`:""}
     ${c.description?`<div class="detail-section"><h3>About this course</h3><p>${escapeHtml(cleanApiText(c.description))}</p></div>`:""}
     ${(c.catalogPrereqs||c.subjectNotes||requirementNotes||c.restrictions)?`<details class="detail-advanced"><summary>Official catalog details</summary><div class="detail-advanced-body">
@@ -893,7 +914,7 @@ function requirementCourseRecord(id){
     id, code:c.code, title:c.title||c.fullTitle||c.code, fullTitle:c.fullTitle||c.title||c.code,
     credits:c.credits??"", description:c.description||"", catalogPrereqs:c.catalogPrereqs||"",
     subjectNotes:c.subjectNotes||"", restrictions:c.restrictions||"", requirementNotes:c.requirementNotes||[],
-    prereqs:Array.isArray(c.prereqs)?c.prereqs:[], requirementId:id,
+    prereqs:Array.isArray(c.prereqs)?c.prereqs:[], alternatives:Array.isArray(c.alternatives)?c.alternatives:[], requirementId:id,
   };
 }
 function backendCourseRecord(c){
@@ -1047,13 +1068,17 @@ function cardHtml(id, opts={}){
   const done=isCompleted(id);
   const ok=courseAvailable(id);
   const gray=!done&&!ok;
+  const alternative=(c.alternatives||[]).find(alt=>{
+    const code=alt.code||alt.course_code||"";
+    return !!ST.completed[requirementCourseId(code)] || Object.values(ST.schedule).some(e=>e.code===code);
+  });
   return `<div class="cc${gray?" gr":""}${done?" done":""}" draggable="${!gray}" data-cid="${id}">
-    <div class="chk${ST.completed[id]?" on":""}" data-chk="${id}"></div>
+    <div class="chk${done?" on":""}" data-chk="${id}"></div>
     ${opts.plus?`<div class="plus-btn" data-plus="${id}">+</div>`:""}
     <div class="code">${c.code}</div>
     <div class="ttl">${c.title}</div>
     <div class="meta">${c.credits} cr</div>
-    ${standingRequirement(c)?`<div class="restr">${standingRequirement(c).label}</div>`:c.restrictions?`<div class="restr">${c.restrictions}</div>`:""}
+    ${alternative?`<div class="restr">Satisfied by ${escapeHtml(alternative.code||alternative.course_code||"approved alternative")}</div>`:standingRequirement(c)?`<div class="restr">${standingRequirement(c).label}</div>`:c.restrictions?`<div class="restr">${c.restrictions}</div>`:""}
   </div>`;
 }
 
@@ -1171,6 +1196,154 @@ function groupHtml(gk){
     <span class="gm">${groupRuleLabel(g)} · click to expand</span>
   </div><div class="gr-body" id="gb-${gk}">${body}${children}</div></div>`;
 }
+
+/* ============================================================
+   CORE CREDIT ALLOCATION
+   ============================================================
+   Rutgers' Core audit may move a completed course between compatible goals
+   as new courses are added, so the app calculates an assignment instead of
+   letting one course silently satisfy every tag on its record. A course may
+   still count once in each top-level Core family, as Rutgers permits.
+*/
+function directlyCompletedCoreCourse(id){
+  if(ST.completed[id]) return true;
+  const c=COURSES[id];
+  return !!c && Object.values(ST.schedule).some(entry=>entry.code===c.code);
+}
+function coreApAllowedForGroup(g){
+  // Rutgers' published Core FAQ excludes AP credit from CCD, CCO, and WCr.
+  return !/\[(?:CCD|CCO|WCr)\]/.test(g?.name||"");
+}
+function coreRequirementGroups(rootId){
+  const out=[];
+  function visit(groupId){
+    const g=GROUPS[groupId];
+    if(!g) return;
+    if(g.rule==="distinct" || (g.rule!=="all" && (g.members||[]).length)){
+      out.push(groupId);
+      return;
+    }
+    (g.children||[]).forEach(visit);
+  }
+  visit(rootId);
+  return out;
+}
+function coreGroupNeeded(g){
+  return g?.rule==="min" || g?.rule==="distinct" ? Math.max(1,Number(g.count)||1) : 0;
+}
+function chooseCoreGroups(items, size, start=0, picked=[], out=[]){
+  if(picked.length===size){ out.push([...picked]); return out; }
+  for(let i=start;i<=items.length-(size-picked.length);i++){
+    picked.push(items[i]);
+    chooseCoreGroups(items,size,i+1,picked,out);
+    picked.pop();
+  }
+  return out;
+}
+function coreCompletionTokens(){
+  const coreIds=new Set(Object.values(GROUPS).flatMap(g=>g.members||[]));
+  const tokens=[];
+  [...coreIds].filter(directlyCompletedCoreCourse).sort().forEach(id=>{
+    tokens.push({key:`course:${id}`,kind:"course",courseIds:new Set([id]),courseId:id});
+  });
+  AP.filter(ap=>ST.apOn[ap.id]).forEach(ap=>{
+    const equivalentIds=new Set([
+      ...courseCodesFromText(ap.equiv).map(requirementCourseId),
+      ...(ap.fulfills||[]),
+    ]);
+    const courseIds=[...coreIds].filter(id=>equivalentIds.has(id));
+    if(courseIds.length) tokens.push({key:`ap:${ap.id}`,kind:"ap",ap,courseIds:new Set(courseIds)});
+  });
+  return tokens;
+}
+function coreSlotsForRoot(rootId){
+  const fixed=[];
+  let variants=[[]];
+  coreRequirementGroups(rootId).forEach(groupId=>{
+    const g=GROUPS[groupId];
+    if(g.rule==="distinct"){
+      const children=(g.children||[]).map(id=>GROUPS[id]).filter(child=>(child?.members||[]).length);
+      const choices=[[]];
+      for(let count=1;count<=Math.min(coreGroupNeeded(g),children.length);count++){
+        chooseCoreGroups(children,count).forEach(subset=>{
+          choices.push(subset.map(child=>({groupId:g.id,courseIds:new Set(child.members||[]),apAllowed:coreApAllowedForGroup(g)})));
+        });
+      }
+      variants=variants.flatMap(base=>choices.map(choice=>[...base,...choice]));
+      return;
+    }
+    for(let i=0;i<coreGroupNeeded(g);i++){
+      fixed.push({groupId:g.id,courseIds:new Set(g.members||[]),apAllowed:coreApAllowedForGroup(g)});
+    }
+  });
+  return variants.map(variant=>[...fixed,...variant].map((slot,index)=>({...slot,key:`${rootId}:${slot.groupId}:${index}`})));
+}
+function coreMaximumMatching(slots,tokens){
+  const tokenByKey=new Map(tokens.map(token=>[token.key,token]));
+  const candidates=new Map(slots.map(slot=>[slot.key,tokens.filter(token=>
+    (token.kind!=="ap" || slot.apAllowed) && [...slot.courseIds].some(id=>token.courseIds.has(id))
+  ).map(token=>token.key)]));
+  const tokenToSlot=new Map();
+  const slotByKey=new Map(slots.map(slot=>[slot.key,slot]));
+  function place(slotKey,seenTokens){
+    for(const tokenKey of candidates.get(slotKey)||[]){
+      if(seenTokens.has(tokenKey)) continue;
+      seenTokens.add(tokenKey);
+      const previous=tokenToSlot.get(tokenKey);
+      if(previous===undefined || place(previous,seenTokens)){
+        tokenToSlot.set(tokenKey,slotKey);
+        return true;
+      }
+    }
+    return false;
+  }
+  [...slots].sort((a,b)=>(candidates.get(a.key)||[]).length-(candidates.get(b.key)||[]).length)
+    .forEach(slot=>place(slot.key,new Set()));
+  return [...tokenToSlot.entries()].map(([tokenKey,slotKey])=>({token:tokenByKey.get(tokenKey),slot:slotByKey.get(slotKey)}));
+}
+function computeCoreAllocation(){
+  const tokens=coreCompletionTokens();
+  const byGroup={};
+  ROOT_GROUPS.forEach(rootId=>{
+    let best=[];
+    coreSlotsForRoot(rootId).forEach(slots=>{
+      const matches=coreMaximumMatching(slots,tokens);
+      if(matches.length>best.length) best=matches;
+    });
+    best.forEach(({slot,token})=>(byGroup[slot.groupId] ||= []).push(token));
+  });
+  return {tokens,byGroup};
+}
+function coreAppliedCardHtml(token){
+  if(token.kind==="ap"){
+    const codes=[...token.courseIds].map(id=>COURSES[id]?.code||id).join(", ");
+    return `<div class="cc done core-applied-card" data-apcore="${escapeHtml(token.ap.id)}">
+      <div class="code">AP CREDIT</div><div class="ttl">${escapeHtml(token.ap.name)}</div>
+      <div class="meta">Rutgers equivalency: ${escapeHtml(codes)}</div></div>`;
+  }
+  const c=COURSES[token.courseId];
+  return `<div class="cc done core-applied-card" data-cid="${escapeHtml(token.courseId)}">
+    <div class="code">${escapeHtml(c?.code||token.courseId)}</div><div class="ttl">${escapeHtml(c?.fullTitle||c?.title||token.courseId)}</div>
+    <div class="meta">Applied to this Core goal</div></div>`;
+}
+function coreGroupHtml(gk,allocation){
+  const g=GROUPS[gk];
+  if(!g) return "";
+  const applied=allocation.byGroup[gk]||[];
+  const needed=coreGroupNeeded(g);
+  const ok=needed>0 && applied.length>=needed;
+  const selected=selectedRequirementCourses(gk);
+  const selectedHtml=selected.length?`<div class="choice-picked"><strong style="font-size:10px;">Courses you picked to consider</strong><div class="cgrid">${selected.map(id=>cardHtml(id)).join("")}</div></div>`:"";
+  const summary=applied.length
+    ? `${applied.length} of ${needed} course${needed===1?"":"s"} automatically applied. The app will reassign credit when that completes more Core requirements.`
+    : `No completed or scheduled course is applied yet. Browse the approved list at any time.`;
+  return `<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
+    <span class="gn">${groupDisplayName(g)}</span><span class="gm">${applied.length}/${needed} applied · click to expand</span>
+  </div><div class="gr-body" id="gb-${gk}"><div class="choice-summary">${summary}</div>
+    ${applied.length?`<div class="choice-picked"><strong style="font-size:10px;">Applied here</strong><div class="cgrid">${applied.map(coreAppliedCardHtml).join("")}</div></div>`:""}
+    ${selectedHtml}<div class="choice-actions"><button class="choice-btn" data-gpicker="${gk}">Browse approved courses</button>
+    ${selected.length?`<button class="choice-btn secondary" data-gclear="${gk}">Clear picked courses</button>`:""}</div></div></div>`;
+}
 function renderRequired(){
   useRequirementTree(ST.majorRequirementTree);
   const pb=document.getElementById("pb");
@@ -1229,33 +1402,19 @@ function renderCore(){
     return;
   }
   useRequirementTree(ST.coreRequirementTree);
-  let h=`<div class="leg">RBS requires a minimum of 27 Core credits. Every course shown is from Rutgers’ official New Brunswick Core list; select approved options the same way as electives. Click any course for details.</div>`;
-  // Core sections are headings only. Their individual requirements sit
-  // directly beneath them, except AH, which must stay grouped because its
-  // two selections have to cover two different learning goals.
-  const visibleCoreGroups=gk=>{
-    const g=GROUPS[gk];
-    if(!g) return [];
-    if(g.rule==="all" && !(g.members||[]).length) return (g.children||[]).flatMap(visibleCoreGroups);
-    return [gk];
-  };
+  const allocation=computeCoreAllocation();
+  ST.coreAllocation=allocation;
+  let h=`<div class="leg">RBS requires a minimum of 27 Core credits. Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed Core goals. One course is used once within each Core family, while Rutgers permits it to satisfy goals in different families. Click any course for details.</div>`;
   ROOT_GROUPS.forEach(gk=>{
     const g=GROUPS[gk];
     if(!g) return;
-    const members=(g.members||[]).filter(id=>!isCompleted(id));
-    const children=visibleCoreGroups(gk).filter(id=>id!==gk).map(groupHtml).join("");
-    if(g.rule==="all"){
-      h+=`<div class="sec-hdr">${groupDisplayName(g)}</div>`;
-      if(members.length) h+=`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`;
-      h+=children;
-    }else{
-      h+=groupHtml(gk);
-    }
+    h+=`<div class="sec-hdr">${groupDisplayName(g)}</div>`;
+    h+=coreRequirementGroups(gk).map(id=>coreGroupHtml(id,allocation)).join("");
   });
-  const done=Object.keys(COURSES).filter(id=>isCompleted(id));
-  if(done.length) h+=`<div class="sec-hdr">✓ Completed / AP-Waived</div><div class="cgrid">${done.map(id=>cardHtml(id)).join("")}</div>`;
+  if(allocation.tokens.length) h+=`<div class="sec-hdr">✓ Completed / AP Credit</div><div class="cgrid">${allocation.tokens.map(coreAppliedCardHtml).join("")}</div>`;
   pb.innerHTML=h;
   attachCardEvents(pb);
+  pb.querySelectorAll("[data-apcore]").forEach(card=>card.addEventListener("click",()=>document.getElementById("apBtn").click()));
   pb.querySelectorAll("[data-gtog]").forEach(d=>d.addEventListener("click",()=>
     document.getElementById("gb-"+d.dataset.gtog).classList.toggle("open")));
   pb.querySelectorAll("[data-gpicker]").forEach(b=>b.addEventListener("click",e=>{
@@ -1321,6 +1480,16 @@ function buildRequirementTree(requirements){
       const catalogTitle=cleanApiText(row.catalog_title);
       const sourceCredits=cleanApiText(row.source_credits);
       const note=cleanApiText(row.note);
+      const alternatives=[
+        ...(existing?.alternatives||[]),
+        ...(row.alternatives||[]).map(alt=>({
+          code:cleanApiText(alt.equivalent_course_code)||cleanApiText(alt.code),
+          title:cleanApiText(alt.catalog_title)||cleanApiText(alt.source_title),
+          credits:cleanApiText(alt.catalog_credits),
+          note:cleanApiText(alt.note),
+          sourceLabel:cleanApiText(alt.source_label),
+        })),
+      ];
       nextCourses[id]={
         ...existing,
         code:row.course_code,
@@ -1336,6 +1505,7 @@ function buildRequirementTree(requirements){
         restrictions:cleanApiText(row.section_restrictions)||existing?.restrictions||"",
         requirementNotes:[...new Set([...(existing?.requirementNotes||[]),note].filter(Boolean))],
         prereqs:existing?.prereqs||[],
+        alternatives:[...new Map(alternatives.filter(alt=>alt.code).map(alt=>[alt.code,alt])).values()],
       };
       group.members.push(id);
       courseRows.push({id,row});
@@ -1925,14 +2095,15 @@ const BUILDING_CAMPUS = {
   SC:"COLLEGE AVENUE", ABE:"COLLEGE AVENUE", ABW:"COLLEGE AVENUE", AB:"COLLEGE AVENUE",
   MU:"COLLEGE AVENUE", VH:"COLLEGE AVENUE", HH:"COLLEGE AVENUE", BH:"COLLEGE AVENUE",
   CA:"COLLEGE AVENUE", CI:"COLLEGE AVENUE", ED:"COLLEGE AVENUE", FH:"COLLEGE AVENUE",
-  MI:"COLLEGE AVENUE", ZIM:"COLLEGE AVENUE", RUL:"COLLEGE AVENUE",
+  MI:"COLLEGE AVENUE", ZIM:"COLLEGE AVENUE", RUL:"COLLEGE AVENUE", VD:"COLLEGE AVENUE",
   // Busch
   ARC:"BUSCH", BME:"BUSCH", BST:"BUSCH", CCB:"BUSCH", COR:"BUSCH", EN:"BUSCH",
-  FBO:"BUSCH", HLL:"BUSCH", PHY:"BUSCH", WL:"BUSCH", SERC:"BUSCH", LSB:"BUSCH", RWH:"BUSCH",
+  FBO:"BUSCH", HLL:"BUSCH", PH:"BUSCH", PHY:"BUSCH", SEC:"BUSCH", WL:"BUSCH", SERC:"BUSCH", LSB:"BUSCH", RWH:"BUSCH",
   // Cook/Douglass
   ARH:"COOK/DOUGLASS", BIO:"COOK/DOUGLASS", BL:"COOK/DOUGLASS", BT:"COOK/DOUGLASS",
-  CDL:"COOK/DOUGLASS", DAV:"COOK/DOUGLASS", HCK:"COOK/DOUGLASS", RAB:"COOK/DOUGLASS",
-  LOR:"COOK/DOUGLASS", FOR:"COOK/DOUGLASS", IFNH:"COOK/DOUGLASS",
+  CDL:"COOK/DOUGLASS", DAV:"COOK/DOUGLASS", FSW:"COOK/DOUGLASS", HCK:"COOK/DOUGLASS", RAB:"COOK/DOUGLASS",
+  LOR:"COOK/DOUGLASS", FOR:"COOK/DOUGLASS", IFNH:"COOK/DOUGLASS", FNH:"COOK/DOUGLASS",
+  HSB:"COOK/DOUGLASS", KLG:"COOK/DOUGLASS", TH:"COOK/DOUGLASS", WAL:"COOK/DOUGLASS",
   // Livingston
   BE:"LIVINGSTON", TIL:"LIVINGSTON", LSH:"LIVINGSTON", GVLL:"LIVINGSTON", BRR:"LIVINGSTON",
   // Downtown New Brunswick
@@ -1956,7 +2127,7 @@ function campusFor(m){
   if(!m) return "OTHER/UNKNOWN";
   if(/ONLINE/i.test(m.mode||"") || /ONLINE/i.test(m.meeting_mode||"")) return "ONLINE";
   const b = String(m.building||"").trim();
-  if(!b) return "ONLINE"; // no building + no room usually means an online/async meeting
+  if(!b) return "OTHER/UNKNOWN"; // do not label a missing location as online without an explicit mode
   const prefix = b.split(/[\s-]/)[0].toUpperCase();
   return BUILDING_CAMPUS[prefix] || "OTHER/UNKNOWN";
 }

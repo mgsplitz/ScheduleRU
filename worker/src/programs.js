@@ -927,7 +927,7 @@ async function getRequirementTree(env, programId) {
      ORDER BY CASE WHEN program_id = ? THEN 1 ELSE 0 END, sort_order, id`
   ).bind(...ownerIds, programId).all();
   const { results: courses } = await env.DB.prepare(
-    `SELECT rc.*, c.title as catalog_title, c.credits as catalog_credits,
+    `SELECT rc.*, g.program_id as owner_program_id, c.title as catalog_title, c.credits as catalog_credits,
             c.description as catalog_description, c.prereqs as catalog_prereqs,
             c.subject_notes as catalog_subject_notes,
             (
@@ -936,12 +936,29 @@ async function getRequirementTree(env, programId) {
               WHERE s.course_id = c.id AND NULLIF(TRIM(s.restrictions), '') IS NOT NULL
             ) as section_restrictions
      FROM requirement_courses rc
+     INNER JOIN requirement_groups g ON g.id = rc.group_id
      LEFT JOIN courses c ON c.school || ':' || c.subject_code || ':' || c.course_number = rc.course_code
      WHERE rc.group_id IN (SELECT id FROM requirement_groups WHERE program_id IN (${placeholders}))`
   ).bind(...ownerIds).all();
 
+  // Alternatives are scoped to the requirement-set/program that owns the
+  // course row. This lets Degree Navigator-only families be entered once as
+  // reviewed data and avoids a frontend exception for any particular course.
+  const { results: alternatives } = await env.DB.prepare(
+    `SELECT e.*, c.title as catalog_title, c.credits as catalog_credits
+     FROM requirement_course_equivalencies e
+     LEFT JOIN courses c ON c.school || ':' || c.subject_code || ':' || c.course_number = e.equivalent_course_code
+     WHERE e.program_id IN (${placeholders}) AND e.review_status = 'reviewed'`
+  ).bind(...ownerIds).all();
+  const alternativesByRequirement = {};
+  for (const alternative of alternatives) {
+    const key = `${alternative.program_id}::${alternative.requirement_course_code}`;
+    (alternativesByRequirement[key] ||= []).push(alternative);
+  }
+
   const byGroup = {};
   for (const c of courses) {
+    c.alternatives = alternativesByRequirement[`${c.owner_program_id}::${c.course_code}`] || [];
     (byGroup[c.group_id] ||= []).push(c);
   }
   const byId = {};
