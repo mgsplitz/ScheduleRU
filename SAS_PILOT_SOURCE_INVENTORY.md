@@ -52,13 +52,26 @@ This is the best first pilot because it tests three reusable concerns at once wi
 | Published overlap outcome | [PPE minor requirements](https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics) | A Political Science major may use the Political Science component toward both the major and PPE minor. This is a specific, source-backed overlap permission, not an assumption from SAS's general overlap policy. |
 | School-level bounds | [SAS degree requirements](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/degree-requirements) and [SAS major/minor restrictions](https://www.sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-restrictions) | Major/minor/credit/GPA baseline, conditional minor exceptions, and prohibition records that must remain separate from this permitted PPE overlap. |
 
-### Required implementation before import
+### Selector foundation completed in development
 
-Both source pages include honest rule types that a flat approved-course list cannot express, such as “any Political Science course at the 300/400 level,” “no more than one 100-level Philosophy course,” and a course category defined by the department. The next code slice is therefore a **reviewed course-selector rule** attached to a requirement group. It must:
+Both source pages include honest rule types that a flat approved-course list cannot express, such as “any Political Science course at the 300/400 level,” “no more than one 100-level Philosophy course,” and a course category defined by the department. The reviewed course-selector rule is attached to a requirement group and must:
 
 1. Match only source-backed attributes (school/campus, subject, course level, and a finite reviewed list where one is published).
 2. Apply a scheduled or completed course even when the student did not choose it through that group’s browse button.
 3. Keep source-defined maximums, grade/residency, and named category boundaries visible as separate rules instead of silently treating every departmental course as approved.
 4. Fail closed: an unrecognized selector or incomplete category source must show an advising/review notice, not mark a requirement complete.
 
-The pilot will stay hidden until this selector behavior, the minor-waiver rule, the named SAS restrictions, and one RBS-plus-SAS advising-only case have passing comparison tests.
+The selector foundation is deployed to development. It matches only source-backed finite code lists or New Brunswick-scoped subject-and-level ranges, applies scheduled or known completed courses without a group-button selection, and requires a source URL plus reviewed status. No SAS selector or program row has been added, so it changes no RBS student-facing result.
+
+### Still required before import
+
+The selector alone must not approximate the rest of the public pilot rules. Add reusable, source-backed support and comparison cases for these before exposing SAS:
+
+1. **Credit and level accounting:** Political Science requires 15 elective credits, with 12 at the 300/400 level, rather than simply five arbitrary elective courses.
+2. **Category approval:** the three Political Science in-depth areas must use the department's published approved categories/lists; a broad subject-level selector is not enough for an area whose public list is incomplete.
+3. **Caps and residency:** model the published maximums for lower-level, mini-course, internship/independent-study/thesis, and non-New-Brunswick credits without treating a catalog code as proof of eligibility.
+4. **PPE component constraints:** enforce the per-field course counts, Philosophy's 100-/300-level distribution, required Economics introductions, and the one-course-only treatment for cross-listed courses.
+5. **Grade and transfer facts:** keep C-or-better and the per-field New Brunswick residency limitation as reviewed conditions or advising checks until the student-record model can verify them.
+6. **Combination policy:** encode the published Political Science-to-PPE overlap permission, the SAS minor-waiver rule, named SAS restrictions, and one RBS-plus-SAS scenario that stays advisor-confirmation-only.
+
+The pilot will stay hidden until these rule types, the school profile, the policy rows, and comparison cases are reviewed and passing.
