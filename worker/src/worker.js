@@ -325,10 +325,33 @@ async function handleApi(request, env, ctx) {
     const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100);
     const offset = Number(url.searchParams.get("offset") || 0);
 
+    // Rutgers uses some official catalog abbreviations (for example,
+    // "INTRO COMPUTER SCI"). Search each meaningful word and its familiar
+    // expansion so students can still find it by typing the full name.
+    const searchAliases = {
+      intro: ["introduction"], introduction: ["intro"],
+      sci: ["science"], science: ["sci"],
+      comp: ["computer"], computer: ["comp"],
+      info: ["information"], information: ["info"],
+      math: ["mathematics"], mathematics: ["math"],
+      mgmt: ["management"], management: ["mgmt"],
+    };
+    const meaningfulTerms = q.toLowerCase().match(/[a-z0-9]+/g)?.filter((term) => !["and", "of", "the", "to", "for"].includes(term)) || [];
     let where = ` WHERE 1=1`;
     const binds = [];
     if (subject) { where += ` AND subject_code = ?`; binds.push(subject.padStart(3, "0")); }
-    if (q) { where += ` AND (title LIKE ? OR course_number LIKE ? OR id LIKE ?)`; binds.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+    if (q) {
+      const tokenClauses = meaningfulTerms.map((term) => {
+        const variants = [...new Set([term, ...(searchAliases[term] || [])])];
+        const fields = variants.flatMap(() => ["LOWER(title) LIKE ?", "LOWER(course_number) LIKE ?", "LOWER(subject_code) LIKE ?", "LOWER(id) LIKE ?"]);
+        for (const variant of variants) for (let i = 0; i < 4; i++) binds.push(`%${variant}%`);
+        return `(${fields.join(" OR ")})`;
+      });
+      // Preserve direct course-code searches (01:198:111) as one exact
+      // substring match while natural-language searches use every word.
+      where += ` AND (LOWER(id) LIKE ?${tokenClauses.length ? ` OR (${tokenClauses.join(" AND ")})` : ""})`;
+      binds.splice(subject ? 1 : 0, 0, `%${q.toLowerCase()}%`);
+    }
 
     const countRow = await env.DB.prepare(`SELECT COUNT(*) as n FROM courses${where}`).bind(...binds).first();
     const total = countRow ? countRow.n : 0;

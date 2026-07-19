@@ -65,10 +65,8 @@ const RBS_CORE_GROUPS = [
   ] },
   { key: "areas", name: "Areas of Inquiry (6 courses)", rule: "all", children: [
     { key: "ns", name: "Natural Sciences [NS]", rule: "min_courses", count: 2, tags: ["NS"] },
-    { key: "social-historical", name: "Social and Historical Analysis (2 courses)", rule: "all", children: [
-      { key: "hst", name: "Historical Analysis [HST]", rule: "min_courses", count: 1, tags: ["HST"] },
-      { key: "scl", name: "Social Analysis [SCL]", rule: "min_courses", count: 1, tags: ["SCL"] },
-    ] },
+    { key: "hst", name: "Historical Analysis [HST]", rule: "min_courses", count: 1, tags: ["HST"] },
+    { key: "scl", name: "Social Analysis [SCL]", rule: "min_courses", count: 1, tags: ["SCL"] },
     // The two Arts/Humanities courses must cover two distinct learning goals.
     // The frontend understands this explicit rule; the child groups supply
     // the goal membership used to check it.

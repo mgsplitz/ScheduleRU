@@ -139,6 +139,7 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   border:none;width:16px;height:16px;border-radius:3px;font-size:11px;
   line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .wish-card{min-height:65px;padding-right:27px;}
+.wish-card.done{background:var(--green);border-color:var(--green-l);}
 .wish-card .rx{position:absolute;right:4px;top:4px;background:none;border:none;cursor:pointer;
   color:var(--muted);font-size:13px;padding:2px 4px;}
 .wish-card .rx:hover{color:var(--scarlet);}
@@ -250,11 +251,11 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   display:none;align-items:flex-start;justify-content:center;z-index:50;padding-top:5vh;}
 .ov.open{display:flex;}
 .modal{background:var(--card);border-radius:5px;width:640px;max-width:94vw;
-  max-height:88vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.3);}
+  max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.3);}
 .mhdr{background:var(--scarlet);color:#fff;padding:12px 18px;
-  font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;}
+  font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .mhdr .xbtn{background:none;border:none;font-size:16px;cursor:pointer;color:#fff;}
-.mbody{padding:16px 20px;}
+.mbody{padding:16px 20px;overflow-y:auto;min-height:0;}
 .dtable{width:100%;border-collapse:collapse;font-size:12.5px;}
 .dtable tr:nth-child(even) td{background:#f9f7f0;}
 .dtable td{padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
@@ -360,7 +361,7 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .calendar-scroll{overflow-x:auto;padding-bottom:3px;}
 .builder-cal{display:grid;grid-template-columns:52px repeat(5,minmax(118px,1fr));
   grid-auto-rows:18px;border:1px solid var(--line);border-radius:6px;overflow:hidden;
-  min-width:670px;margin-top:6px;background:#fff;}
+  min-width:670px;margin-top:6px;background:repeating-linear-gradient(to bottom,#fff 0,#fff 17px,#f0eee8 17px,#f0eee8 18px);}
 .cal-daylabel{font-size:10px;font-weight:700;text-align:center;padding:5px 0;
   background:var(--paper);border-bottom:1px solid var(--line);border-left:1px solid #eee;}
 .cal-timelabel{font-size:9px;color:var(--muted);text-align:right;padding-right:6px;
@@ -1229,11 +1230,20 @@ function renderCore(){
   }
   useRequirementTree(ST.coreRequirementTree);
   let h=`<div class="leg">RBS requires a minimum of 27 Core credits. Every course shown is from Rutgers’ official New Brunswick Core list; select approved options the same way as electives. Click any course for details.</div>`;
+  // Core sections are headings only. Their individual requirements sit
+  // directly beneath them, except AH, which must stay grouped because its
+  // two selections have to cover two different learning goals.
+  const visibleCoreGroups=gk=>{
+    const g=GROUPS[gk];
+    if(!g) return [];
+    if(g.rule==="all" && !(g.members||[]).length) return (g.children||[]).flatMap(visibleCoreGroups);
+    return [gk];
+  };
   ROOT_GROUPS.forEach(gk=>{
     const g=GROUPS[gk];
     if(!g) return;
     const members=(g.members||[]).filter(id=>!isCompleted(id));
-    const children=(g.children||[]).map(groupHtml).join("");
+    const children=visibleCoreGroups(gk).filter(id=>id!==gk).map(groupHtml).join("");
     if(g.rule==="all"){
       h+=`<div class="sec-hdr">${groupDisplayName(g)}</div>`;
       if(members.length) h+=`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`;
@@ -1640,11 +1650,14 @@ function cleanApiText(raw){
     .trim();
 }
 
-// A section's meeting times, collapsed to one readable line per meeting
-// ("Fri 10:20AM - 1:20PM · LIV BRR-5113", or "Online" when there's no room).
+// A section's meeting times, collapsed to one readable line per meeting.
+// Rutgers stores its class times in a compact twelve-hour format; the helper
+// converts that format into normal AM/PM wording for students.
 function fmtMeeting(m){
   const day = m.day_of_week || "";
-  const time = (m.start_time && m.end_time) ? `${m.start_time} - ${m.end_time}` : "";
+  const range=meetingTimeRange(m);
+  const time = range ? `${formatClock(range.start)} – ${formatClock(range.end)}` :
+    ((m.start_time && m.end_time) ? `${m.start_time} – ${m.end_time}` : "");
   const loc = [m.building, m.room].filter(Boolean).join(" ");
   const bits = [day, time].filter(Boolean).join(" ");
   if(!bits && !loc) return (m.mode||"").toUpperCase().includes("ONLINE") ? "Online" : "—";
@@ -1856,13 +1869,15 @@ function renderWishlist(){
       Use the <b>Courses</b> page and click + Wishlist to add electives here.</div>`;
     return;
   }
-  pb.innerHTML=`<div class="sec-hdr">Saved courses</div><div class="cgrid">${records.map(record=>`
-    <div class="cc wish-card" data-cid="${escapeHtml(record.code)}" draggable="true">
+  pb.innerHTML=`<div class="sec-hdr">Saved courses</div><div class="cgrid">${records.map(record=>{
+    const scheduled=Object.values(ST.schedule).some(entry=>entry.code===record.code);
+    return `
+    <div class="cc wish-card${scheduled?" done":""}" data-cid="${escapeHtml(record.code)}" draggable="true" title="${scheduled?"Already added to your semester plan":""}">
       <div class="code">${escapeHtml(record.code)}</div>
       <div class="ttl">${escapeHtml(record.fullTitle||record.title||record.code)}</div>
-      <div class="meta">${escapeHtml(record.credits||"?")} credits</div>
+      <div class="meta">${escapeHtml(record.credits||"?")} credits${scheduled?" · In your plan":""}</div>
       <button class="rx" data-wrem="${escapeHtml(record.key)}" title="Remove from wishlist">×</button>
-    </div>`).join("")}</div>`;
+    </div>`;}).join("")}</div>`;
   attachCardEvents(pb);
   pb.querySelectorAll("[data-wrem]").forEach(b=>b.addEventListener("click",e=>{
     e.stopPropagation();
@@ -1959,30 +1974,52 @@ function dayIndex(d){
     U:6,SU:6,SUN:6,SUNDAY:6};
   return M[String(d||"").toUpperCase().trim()];
 }
-// Returns time-of-day as a count of 30-min slots since 8:00am (may be
-// fractional if a meeting starts off the half-hour). Handles both
-// "10:20AM"-style and "1020"-military-style strings.
+function parseRutgersClock(value){
+  const match=String(value||"").trim().match(/^(\d{1,2})(?::?(\d{2}))?\s*([AP]M)?$/i);
+  if(!match) return null;
+  let hour=Number(match[1]), minute=Number(match[2]||0);
+  if(!Number.isInteger(hour)||!Number.isInteger(minute)||hour<1||hour>12||minute>59) return null;
+  const suffix=(match[3]||"").toUpperCase();
+  if(suffix){
+    if(suffix==="PM" && hour!==12) hour+=12;
+    if(suffix==="AM" && hour===12) hour=0;
+    return {minutes:hour*60+minute, explicit:true};
+  }
+  // The Rutgers section feed uses a compact 12-hour clock without AM/PM:
+  // 0830 is 8:30am, 0200 is 2:00pm, and 0745 is 7:45pm.
+  return {hour,minute,explicit:false};
+}
+function compactRutgersMinutes(clock){
+  if(clock.explicit) return clock.minutes;
+  if(clock.hour===12) return 12*60+clock.minute;
+  return (clock.hour>=8 ? clock.hour : clock.hour+12)*60+clock.minute;
+}
+function meetingTimeRange(meeting){
+  const startClock=parseRutgersClock(meeting?.start_time), endClock=parseRutgersClock(meeting?.end_time);
+  if(!startClock||!endClock) return null;
+  const start=compactRutgersMinutes(startClock);
+  let end=compactRutgersMinutes(endClock);
+  // A 7:45-8:40 evening meeting arrives as 0745-0840. The end has to move
+  // into the same afternoon/evening period when the raw clock wraps.
+  if(!endClock.explicit && end<=start) end+=12*60;
+  return end>start ? {start,end} : null;
+}
+function formatClock(minutes){
+  const normalized=((minutes%(24*60))+(24*60))%(24*60);
+  const hour=Math.floor(normalized/60), minute=normalized%60;
+  const displayHour=(hour%12)||12;
+  return `${displayHour}:${String(minute).padStart(2,"0")} ${hour>=12?"PM":"AM"}`;
+}
 function timeToSlot(t){
-  if(!t) return null;
-  let h,m;
-  const ampm = String(t).match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
-  if(ampm){
-    h=parseInt(ampm[1],10); m=parseInt(ampm[2],10);
-    const pm=/PM/i.test(ampm[3]);
-    if(pm&&h!==12) h+=12;
-    if(!pm&&h===12) h=0;
-  } else if(/^\d{3,4}$/.test(String(t))){
-    const s=String(t).padStart(4,"0"); h=parseInt(s.slice(0,2),10); m=parseInt(s.slice(2),10);
-  } else return null;
-  return ((h*60+m)-8*60)/30;
+  const clock=parseRutgersClock(t);
+  return clock ? (compactRutgersMinutes(clock)-8*60)/30 : null;
 }
 function meetingsConflict(mA,mB){
   const dA=dayIndex(mA.day_of_week), dB=dayIndex(mB.day_of_week);
   if(dA==null||dB==null||dA!==dB) return false;
-  const s1=timeToSlot(mA.start_time), e1=timeToSlot(mA.end_time);
-  const s2=timeToSlot(mB.start_time), e2=timeToSlot(mB.end_time);
-  if(s1==null||e1==null||s2==null||e2==null) return false;
-  return s1<e2 && s2<e1;
+  const a=meetingTimeRange(mA), b=meetingTimeRange(mB);
+  if(!a||!b) return false;
+  return a.start<b.end && b.start<a.end;
 }
 function comboConflicts(combo, sec){
   for(const c of combo) for(const m1 of c.meetings||[]) for(const m2 of sec.meetings||[])
@@ -2200,7 +2237,7 @@ function renderBuilderCalendar(){
   // meetings remain visible below instead of being silently dropped.
   const DAYS=["Mon","Tue","Wed","Thu","Fri"];
   let cells = DAYS.map((d,i)=>`<div class="cal-daylabel" style="grid-column:${i+2};grid-row:1;">${d}</div>`).join("");
-  for(let h=8; h<=20; h++){
+  for(let h=8; h<=22; h++){
     const slot=(h-8)*2;
     const label = h===12?"12pm":h>12?`${h-12}pm`:`${h}am`;
     cells += `<div class="cal-timelabel" style="grid-row:${slot+2};">${label}</div>`;
@@ -2213,25 +2250,26 @@ function renderBuilderCalendar(){
         outside.push(`${c.code} · ${fmtMeeting(m)}`);
         return;
       }
-      const s=timeToSlot(m.start_time), e=timeToSlot(m.end_time);
+      const range=meetingTimeRange(m);
+      const s=range ? (range.start-8*60)/30 : null, e=range ? (range.end-8*60)/30 : null;
       if(s==null||e==null||e<=s){
         outside.push(`${c.code} · ${fmtMeeting(m)}`);
         return;
       }
       const campus = campusFor(m);
       const col = CAMPUS_COLORS[campus] || CAMPUS_COLORS["OTHER/UNKNOWN"];
-      const closed = c.open_status===false;
+      const closed = c.open_status===false || c.open_status===0;
       const loc = [m.building,m.room].filter(Boolean).join(" ") || (campus==="ONLINE"?"Online":"");
       const gridStart=Math.max(0,Math.floor(s));
       const gridSpan=Math.max(1,Math.ceil(e)-gridStart);
-      const time=`${m.start_time||""}${m.end_time?`–${m.end_time}`:""}`;
+      const time=`${formatClock(range.start)} – ${formatClock(range.end)}`;
       cells += `<div class="cal-block${closed?" cal-block-closed":""}" style="grid-column:${day+2};grid-row:${gridStart+2} / span ${gridSpan};
         background:${col.fill};border-color:${col.border};">
         <b>${escapeHtml(c.code)}</b><span class="cal-course-title">${escapeHtml(c.title||c.code)}</span>
         <span class="cal-detail">${escapeHtml(time)}</span><span class="cal-detail">${escapeHtml(loc)}</span></div>`;
     });
   });
-  return `<div class="calendar-scroll"><div class="builder-cal" style="grid-template-rows:28px repeat(26,18px);">${cells}</div></div>
+  return `<div class="calendar-scroll"><div class="builder-cal" style="grid-template-rows:28px repeat(30,18px);">${cells}</div></div>
     ${outside.length?`<div class="cal-outside"><b>Weekend, online, or untimed meetings</b><br/>${escapeHtml(outside.join(" · "))}</div>`:""}`;
 }
 
