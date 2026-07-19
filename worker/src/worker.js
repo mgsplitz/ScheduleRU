@@ -446,6 +446,8 @@ async function handleApi(request, env, ctx) {
         "GET /api/programs/:id/requirements",
         "GET /api/requirements?programs=id1,id2",
         "GET /api/double-count-policies?school=",
+        "GET /api/program-selection-policies?home_school=",
+        "POST /api/program-selection-check               (body: {home_school, program_ids:[...]})",
         "POST /api/admin/programs/seed?secret=...            (body: {id,name,school_slug,program_slug,type,catalog_year} or an array)",
         "POST /api/admin/programs/discover?secret=...&school=&index_path=  (best-effort slug discovery)",
         "POST /api/admin/scrape-programs?secret=...[&program=id]",

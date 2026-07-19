@@ -29,6 +29,8 @@
  * depend on guessing exact class names, but there will be edge cases.
  */
 
+import { evaluateProgramSelection } from "./program-selection-policy.js";
+
 /* ============================================================
    CONFIG
    ============================================================ */
@@ -971,6 +973,29 @@ async function getRequirementTree(env, programId) {
   return roots;
 }
 
+async function getProgramSelectionPolicies(env, homeSchoolSlug) {
+  const [limitsResult, combinationsResult] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT * FROM program_selection_limits WHERE home_school_slug = ? ORDER BY program_type`
+    ).bind(homeSchoolSlug),
+    env.DB.prepare(
+      `SELECT * FROM program_combination_policies WHERE home_school_slug = ? ORDER BY policy_key`
+    ).bind(homeSchoolSlug),
+  ]);
+  return {
+    limits: limitsResult.results || [],
+    combination_policies: combinationsResult.results || [],
+  };
+}
+
+function isSafeHomeSchoolSlug(value) {
+  return typeof value === "string" && /^[a-z0-9-]{2,80}$/.test(value);
+}
+
+function isSafeProgramId(value) {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,119}$/.test(value);
+}
+
 /* ============================================================
    ROUTES
    ============================================================ */
@@ -1045,6 +1070,57 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     if (school) { where = " WHERE school_slug = ?"; binds.push(school); }
     const { results } = await env.DB.prepare(`SELECT * FROM double_count_policies${where}`).bind(...binds).all();
     return json({ policies: results });
+  }
+
+  // Program selection is governed by a student's home school, program type,
+  // and occasionally by a specific cross-school combination. This read route
+  // lets the UI show the currently reviewed limits without copying policy
+  // numbers into index.html.
+  if (path === "/api/program-selection-policies" && request.method === "GET") {
+    const homeSchoolSlug = url.searchParams.get("home_school") || "";
+    if (!isSafeHomeSchoolSlug(homeSchoolSlug)) {
+      return json({ error: "pass a valid ?home_school=..." }, 400);
+    }
+    return json({ home_school_slug: homeSchoolSlug, ...(await getProgramSelectionPolicies(env, homeSchoolSlug)) });
+  }
+
+  // Stateless validation before the browser saves a selection. It only reads
+  // reviewed program/policy data, so it is deliberately public and contains
+  // no student data or admin secret.
+  if (path === "/api/program-selection-check" && request.method === "POST") {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "body must be JSON" }, 400);
+    }
+    const homeSchoolSlug = body?.home_school;
+    const programIds = Array.isArray(body?.program_ids) ? body.program_ids : null;
+    if (!isSafeHomeSchoolSlug(homeSchoolSlug)) {
+      return json({ error: "body.home_school must be a valid school slug" }, 400);
+    }
+    if (!programIds || programIds.length > 20 || programIds.some((id) => !isSafeProgramId(id))) {
+      return json({ error: "body.program_ids must contain up to 20 valid program ids" }, 400);
+    }
+    const ids = [...new Set(programIds)];
+    let programs = [];
+    if (ids.length) {
+      const { results } = await env.DB.prepare(
+        `SELECT id, school_slug, type
+         FROM programs
+         WHERE review_status = 'reviewed' AND type NOT IN ('shared_requirement_set', 'core_curriculum')
+           AND id IN (${ids.map(() => "?").join(",")})`
+      ).bind(...ids).all();
+      programs = results || [];
+    }
+    const policyData = await getProgramSelectionPolicies(env, homeSchoolSlug);
+    return json(evaluateProgramSelection({
+      homeSchoolSlug,
+      selectedProgramIds: ids,
+      programs,
+      limits: policyData.limits,
+      combinationPolicies: policyData.combination_policies,
+    }));
   }
 
   // ---- Admin: everything below requires ?secret= ----

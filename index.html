@@ -247,6 +247,9 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .program-category:first-child{margin-top:0;}
 .program-category-title{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 4px;}
 .program-picker-note{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:9px;}
+.program-policy-feedback{font-size:11px;line-height:1.4;margin:0 0 10px;}
+.program-policy-feedback.warn{background:#fff5f7;border:1px solid #f3c9ce;border-radius:4px;color:#7a1d34;padding:8px;}
+.program-policy-feedback.info{background:#f5f8fb;border:1px solid #cdd8e7;border-radius:4px;color:#38516c;padding:8px;}
 .modal-footer{display:flex;justify-content:flex-end;gap:7px;margin-top:14px;}
 
 /* MODALS */
@@ -502,7 +505,8 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   <div class="modal" style="width:500px">
     <div class="mhdr">Choose programs of study <button class="xbtn" id="programClose">✕</button></div>
     <div class="mbody">
-      <div class="program-picker-note">Choose any reviewed RBS major, minor, concentration, track, or certificate. Shared requirements are shown once; the app flags known double-count policies and clearly marks policy coverage that still needs review.</div>
+      <div class="program-picker-note" id="programPickerNote">Choose reviewed programs of study. Shared requirements are shown once; the app checks reviewed selection and double-count policies before it saves your plan.</div>
+      <div class="program-policy-feedback" id="programPolicyFeedback" aria-live="polite"></div>
       <div id="programList"></div>
       <div class="modal-footer"><button class="choice-btn secondary" id="programCancel">Cancel</button><button class="choice-btn" id="programApply">Apply programs</button></div>
     </div>
@@ -586,6 +590,7 @@ const ST = {
   // headers itself) rather than needing a public relay.
   backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || defaultBackendUrl(),
   availablePrograms:[], activeProgram:null, selectedPrograms:[],
+  homeSchoolSlug:"rbsnb", programSelectionPolicies:{limits:[],combination_policies:[]},
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
@@ -617,6 +622,7 @@ function restorePlannerState(){
     ST.groupSelections=savedObject(saved.groupSelections);
     const year=Number(saved.year);
     if(Number.isInteger(year) && year>=1 && year<=4) ST.year=year;
+    if(typeof saved.homeSchoolSlug==="string" && /^[a-z0-9-]{2,80}$/.test(saved.homeSchoolSlug)) ST.homeSchoolSlug=saved.homeSchoolSlug;
     if(Array.isArray(saved.selectedPrograms)) ST.selectedPrograms=saved.selectedPrograms.filter(id=>typeof id==="string");
   }catch(e){
     // A malformed or outdated local value should never prevent the planner
@@ -629,7 +635,7 @@ function savePlannerState(){
     localStorage.setItem(PLANNER_STATE_KEY,JSON.stringify({
       version:1, savedAt:Date.now(), apOn:ST.apOn, completed:ST.completed,
       schedule:ST.schedule, wishlist:ST.wishlist, groupSelections:ST.groupSelections,
-      year:ST.year, selectedPrograms:ST.selectedPrograms,
+      year:ST.year, homeSchoolSlug:ST.homeSchoolSlug, selectedPrograms:ST.selectedPrograms,
     }));
   }catch(e){
     // Browsers can disable or limit local storage. Planning still works for
@@ -732,6 +738,27 @@ function selectedProgramRows(){
   const selected=new Set(ST.selectedPrograms);
   return (ST.availablePrograms||[]).filter(program=>selected.has(program.id));
 }
+function activeHomeSchoolLabel(){
+  if(ST.homeSchoolSlug==="rbsnb") return "RBS New Brunswick";
+  return ST.homeSchoolSlug||"your home school";
+}
+function selectionLimitSummary(){
+  const limits=ST.programSelectionPolicies?.limits||[];
+  if(!limits.length) return "No reviewed program-count limits are available yet for this home school.";
+  const phrases=limits.map(limit=>{
+    const count=Number(limit.max_selected);
+    return `up to ${count} ${programTypeLabel(limit.program_type).toLowerCase()}${count===1?"":"s"}`;
+  });
+  return `Reviewed ${activeHomeSchoolLabel()} selection limits: ${phrases.join(", ")}.`;
+}
+function showProgramPolicyFeedback(check){
+  const node=document.getElementById("programPolicyFeedback");
+  if(!node) return;
+  const issues=[...(check?.errors||[]),...(check?.warnings||[])];
+  if(!issues.length){ node.className="program-policy-feedback"; node.textContent=""; return; }
+  node.className=`program-policy-feedback ${check?.errors?.length?"warn":"info"}`;
+  node.innerHTML=issues.map(issue=>`<div>${escapeHtml(issue.message||issue.note||"This selection needs review.")}</div>`).join("");
+}
 function updateProgramTitle(){
   const names=selectedProgramRows().map(program=>program.name);
   document.getElementById("topProgramTitle").textContent=names.length?`${names.join(" + ")} Degree Navigator`:"Degree Navigator";
@@ -743,6 +770,9 @@ function closeProgramPicker(){
 }
 function openProgramPicker(){
   ST.programDraft=[...ST.selectedPrograms];
+  delete ST.programDraftWarningSignature;
+  document.getElementById("programPickerNote").textContent=`Choose reviewed programs of study. ${selectionLimitSummary()} Shared requirements are shown once, and the app checks reviewed policies before saving your plan.`;
+  showProgramPolicyFeedback(null);
   const list=document.getElementById("programList");
   const categories=PROGRAM_TYPE_SECTIONS.map(section=>({
     ...section,
@@ -764,6 +794,7 @@ function openProgramPicker(){
       draft.delete(id);
     }
     ST.programDraft=[...draft];
+    delete ST.programDraftWarningSignature;
   }));
   document.getElementById("programOv").classList.add("open");
 }
@@ -773,6 +804,28 @@ document.getElementById("programCancel").addEventListener("click", closeProgramP
 document.getElementById("programApply").addEventListener("click", async()=>{
   const ids=(ST.programDraft||[]);
   if(!ids.length){ alert("Choose at least one program."); return; }
+  let selectionCheck;
+  try{
+    selectionCheck=await backendFetch("/api/program-selection-check",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({home_school:ST.homeSchoolSlug,program_ids:ids}),
+    });
+  }catch(err){
+    showProgramPolicyFeedback({errors:[{message:"Program policy checks could not be loaded. Your selection was not changed; please try again."}]});
+    return;
+  }
+  if(!selectionCheck.allowed){
+    showProgramPolicyFeedback(selectionCheck);
+    return;
+  }
+  const warningSignature=JSON.stringify((selectionCheck.warnings||[]).map(issue=>issue.code).sort());
+  if(selectionCheck.warnings?.length && ST.programDraftWarningSignature!==warningSignature){
+    ST.programDraftWarningSignature=warningSignature;
+    showProgramPolicyFeedback(selectionCheck);
+    return;
+  }
+  showProgramPolicyFeedback(selectionCheck);
   ST.selectedPrograms=ids;
   closeProgramPicker();
   ST.requirementsLoading=true;
@@ -1546,9 +1599,9 @@ function saveBackendUrl(u){
   try{ localStorage.setItem(BACKEND_URL_STORAGE_KEY, ST.backendUrl); }catch(e){}
 }
 
-async function backendFetch(path){
+async function backendFetch(path,options={}){
   if(!ST.backendUrl) throw new Error("No backend URL set.");
-  const res = await fetch(ST.backendUrl + path);
+  const res = await fetch(ST.backendUrl + path,options);
   const text = await res.text();
   if(!res.ok) throw new Error(`HTTP ${res.status} — ${text.slice(0,150)}`);
   try{ return JSON.parse(text); }
@@ -1803,8 +1856,12 @@ async function loadAvailablePrograms(){
   // Fetch every reviewed RBS item. Filtering is deliberately client-side so
   // majors, minors, concentrations/tracks, and certificates all remain
   // available as soon as reviewed data is added.
-  const data=await backendFetch("/api/programs?school=rbsnb");
+  const [data,policyData]=await Promise.all([
+    backendFetch(`/api/programs?school=${encodeURIComponent(ST.homeSchoolSlug)}`),
+    backendFetch(`/api/program-selection-policies?home_school=${encodeURIComponent(ST.homeSchoolSlug)}`),
+  ]);
   ST.availablePrograms=(data.programs||[]).filter(p=>["major","minor","concentration","certificate"].includes(p.type));
+  ST.programSelectionPolicies=policyData||{limits:[],combination_policies:[]};
   return ST.availablePrograms;
 }
 async function loadRequirements(programId){
