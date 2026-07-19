@@ -82,10 +82,12 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .dz.over{background:#fff6e6;outline:2px dashed var(--gold);}
 .sc-card{background:var(--paper);border:1px solid var(--line);
   border-left:4px solid var(--scarlet);border-radius:4px;
-  padding:7px 9px;margin-bottom:6px;display:flex;align-items:center;
-  justify-content:space-between;cursor:grab;font-size:12px;}
-.sc-card .sn{font-weight:700;}
-.sc-card .sct{font-family:var(--fmono);font-size:10px;color:var(--muted);}
+  padding:7px 9px;margin-bottom:6px;display:flex;align-items:flex-start;
+  justify-content:space-between;gap:8px;cursor:grab;font-size:12px;}
+.sc-card-main{min-width:0;}
+.sc-card .sn{font-family:var(--fmono);font-size:10px;font-weight:700;color:var(--scarlet);}
+.sc-card .stitle{font-weight:700;line-height:1.25;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sc-card .sct{font-family:var(--fmono);font-size:10px;color:var(--muted);display:block;margin-top:2px;}
 .sc-card .rx{background:none;border:none;cursor:pointer;color:var(--muted);
   font-size:13px;padding:2px 4px;}
 .sc-card .rx:hover{color:var(--scarlet);}
@@ -136,6 +138,10 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .plus-btn{position:absolute;top:4px;right:4px;background:var(--scarlet);color:#fff;
   border:none;width:16px;height:16px;border-radius:3px;font-size:11px;
   line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.wish-card{min-height:65px;padding-right:27px;}
+.wish-card .rx{position:absolute;right:4px;top:4px;background:none;border:none;cursor:pointer;
+  color:var(--muted);font-size:13px;padding:2px 4px;}
+.wish-card .rx:hover{color:var(--scarlet);}
 
 /* GROUP ROWS */
 .gr-row{border:1px solid var(--line);border-radius:5px;margin-bottom:6px;overflow:hidden;}
@@ -351,15 +357,21 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   border:none;border-radius:5px;padding:9px 22px;font-size:12.5px;font-weight:700;cursor:pointer;}
 .builder-confirm:hover:not(:disabled){background:var(--scarlet-d);}
 .builder-confirm:disabled{background:var(--grayt);cursor:default;}
-.builder-cal{display:grid;grid-template-columns:46px repeat(7,1fr);
-  grid-auto-rows:14px;border:1px solid var(--line);border-radius:6px;overflow:hidden;
-  margin-top:6px;background:#fff;}
-.cal-daylabel{font-size:9.5px;font-weight:700;text-align:center;padding:5px 0;
+.calendar-scroll{overflow-x:auto;padding-bottom:3px;}
+.builder-cal{display:grid;grid-template-columns:52px repeat(5,minmax(118px,1fr));
+  grid-auto-rows:18px;border:1px solid var(--line);border-radius:6px;overflow:hidden;
+  min-width:670px;margin-top:6px;background:#fff;}
+.cal-daylabel{font-size:10px;font-weight:700;text-align:center;padding:5px 0;
   background:var(--paper);border-bottom:1px solid var(--line);border-left:1px solid #eee;}
-.cal-timelabel{font-size:8.5px;color:var(--muted);text-align:right;padding-right:5px;
-  border-top:1px solid #f2f0ea;}
-.cal-block{border-radius:3px;border:1.5px solid;padding:2px 3px;font-size:8.5px;
-  line-height:1.25;overflow:hidden;margin:0 1px;}
+.cal-timelabel{font-size:9px;color:var(--muted);text-align:right;padding-right:6px;
+  border-top:1px solid #f2f0ea;transform:translateY(-6px);}
+.cal-block{border-radius:2px;border:1.5px solid;padding:3px 4px;font-size:9px;
+  line-height:1.2;overflow:hidden;margin:0 2px;position:relative;z-index:2;}
+.cal-block b{font-size:9.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cal-block .cal-course-title{font-weight:700;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cal-block .cal-detail{font-size:8.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cal-outside{font-size:10px;color:var(--muted);background:#f9f7f0;border:1px solid var(--line);
+  border-radius:4px;padding:7px 9px;margin-top:7px;line-height:1.45;}
 .cal-block-closed{border-style:dashed !important;}
 
 /* CAMPUS COLOR LEGEND (schedule builder calendar) */
@@ -435,6 +447,7 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
     <button class="panel-expand" id="expandBtn" title="Expand panel">⟵</button>
     <div class="tabs">
       <button class="tab-btn active" data-tab="required">Required</button>
+      <button class="tab-btn" data-tab="core">Core</button>
       <button class="tab-btn" data-tab="wishlist">Wishlist</button>
     </div>
     <div class="pb" id="pb"></div>
@@ -555,8 +568,9 @@ const ST = {
   // headers itself) rather than needing a public relay.
   backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem("bait_backend_url")) || "https://rutgers-course-sync.housselllaura.workers.dev",
   availablePrograms:[], activeProgram:null, selectedPrograms:[],
-  requirementTrees:{}, doubleCountPolicies:[], doubleCountRules:[], doubleCount:null,
+  requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
+  coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
   backendSubject:"", backendSearch:"", backendPage:1,
   backendCourses:[], backendTotal:0, backendLoading:false, backendError:"",
   backendSubjects:[], backendStatus:null,
@@ -610,6 +624,15 @@ function groupFulfilled(gk){
   const members = g.members || [];
   const done = members.filter(id=>isCompleted(id)).length;
   if(g.rule==="all") return members.every(id=>isCompleted(id)) && (g.children||[]).every(groupFulfilled);
+  if(g.rule==="distinct"){
+    const selected=new Set([
+      ...selectedRequirementCourses(g.id),
+      ...members.filter(id=>isCompleted(id)),
+    ]);
+    const distinct=(g.children||[]).map(id=>GROUPS[id]).filter(Boolean)
+      .filter(child=>(child.members||[]).some(id=>selected.has(id))).length;
+    return selected.size>=g.count && distinct>=g.count;
+  }
   return g.rule==="min" ? done >= g.count : done <= g.count;
 }
 
@@ -725,14 +748,15 @@ function courseCodesFromText(text){
   return [...new Set((String(text||"").match(/\b\d{2}:\d{3}:\d{3}\b/g)||[]))];
 }
 function planningPrerequisiteCodes(course){
-  const fromChecked=(course.prereqs||[]).map(id=>COURSES[id]?.code).filter(Boolean);
+  const fromChecked=(Array.isArray(course.prereqs)?course.prereqs:[]).map(id=>COURSES[id]?.code).filter(Boolean);
+  const fromCatalog=courseCodesFromText(course.catalogPrereqs||(!Array.isArray(course.prereqs)?course.prereqs:"")||"");
   const fromRequirementNotes=(course.requirementNotes||[])
     .filter(note=>/^pre-?reqs?:/i.test(String(note).trim()))
     .flatMap(courseCodesFromText);
-  return [...new Set([...fromChecked,...fromRequirementNotes])];
+  return [...new Set([...fromChecked,...fromCatalog,...fromRequirementNotes])];
 }
 function courseByCode(code){
-  return Object.values(COURSES).find(course=>course.code===code);
+  return Object.values(COURSES).find(course=>course.code===code) || wishlistRecords().find(course=>course.code===code);
 }
 function compactRestriction(course, standing){
   if(standing) return standing.label;
@@ -741,7 +765,7 @@ function compactRestriction(course, standing){
   return text ? "See official catalog details" : "No special enrollment restriction listed";
 }
 function openCourseDetails(id){
-  const c = COURSES[id];
+  const c = courseRecordFromId(id);
   if(!c) return;
   document.getElementById("prTitle").textContent = "Course details";
   const body = document.getElementById("prBody");
@@ -751,15 +775,17 @@ function openCourseDetails(id){
     return `<div class="detail-chip">${escapeHtml(prerequisite?.fullTitle||prerequisite?.title||code)}<code>${escapeHtml(code)}</code></div>`;
   }).join("");
   const requirementNotes=(c.requirementNotes||[]).join("; ");
+  const requirementId=COURSES[id] ? id : Object.keys(COURSES).find(key=>COURSES[key].code===c.code);
   const standing=standingRequirement(c);
-  const status=courseAvailable(id)
+  const available=!requirementId || courseAvailable(requirementId);
+  const status=available
     ? (c.prereqs?.length ? "Available based on the simple prerequisite rules the app can verify." : "No simple prerequisite rule is blocking this course in the app.")
     : (!prereqsMet(id) ? "Not yet available based on the simple prerequisite rules the app can verify." : `Not yet available in the ${YL[ST.year]||"selected"} plan year because ${standing?.label?.toLowerCase()||"of an enrollment restriction"}.`);
   body.innerHTML=`
     <div class="detail-overview">
       <h2>${escapeHtml(c.fullTitle||c.title)}</h2>
       <div class="detail-code">${escapeHtml(c.code)} · ${escapeHtml(c.credits||"?")} credits</div>
-      <div class="detail-status${courseAvailable(id)?" ready":""}">${escapeHtml(status)}</div>
+    <div class="detail-status${available?" ready":""}">${escapeHtml(status)}</div>
     </div>
     <div class="detail-section"><h3>${standing?"When you can take it":"Enrollment"}</h3><p>${escapeHtml(compactRestriction(c,standing))}</p></div>
     ${prerequisiteChips?`<div class="detail-section"><h3>Plan these first</h3><div class="detail-chips">${prerequisiteChips}</div>${c.catalogPrereqs?`<p class="src-note">The official catalog includes alternative prerequisite paths; use the details below when your situation differs.</p>`:""}</div>`:""}
@@ -807,7 +833,9 @@ function renderRequirementPicker(){
   const constraints=(g.children||[]).map(id=>GROUPS[id]).filter(isConstraintGroup);
   const search=String(document.getElementById("pickerSearch")?.value||"").trim().toLowerCase();
   document.getElementById("pickerIntro").textContent=
-    `Choose up to ${limit} approved ${limit===1?"course":"courses"} for this requirement.${constraints.length?` Your choices must also satisfy: ${constraints.map(child=>`${groupDisplayName(child)} (${groupRuleLabel(child)})`).join("; ")}.`:""} After those choices are filled, additional courses from this list can be saved to your wishlist.`;
+    g.rule==="distinct"
+      ? `Choose ${limit} approved courses that cover ${g.count} distinct Arts and Humanities learning goals. After those choices are filled, additional courses from this list can be saved to your wishlist.`
+      : `Choose up to ${limit} approved ${limit===1?"course":"courses"} for this requirement.${constraints.length?` Your choices must also satisfy: ${constraints.map(child=>`${groupDisplayName(child)} (${groupRuleLabel(child)})`).join("; ")}.`:""} After those choices are filled, additional courses from this list can be saved to your wishlist.`;
   const ids=(g.members||[]).filter(id=>{
     const c=COURSES[id];
     return c && (!search || `${c.code} ${c.title} ${c.fullTitle||""}`.toLowerCase().includes(search));
@@ -842,7 +870,7 @@ function renderRequirementPicker(){
       }
       ST.groupSelections[g.id]=proposed;
     }else{
-      ST.wishlist[id]=true;
+      addToWishlist(id);
     }
     renderAll();
     renderRequirementPicker();
@@ -850,6 +878,68 @@ function renderRequirementPicker(){
 }
 document.getElementById("pickerClose").addEventListener("click", closeRequirementPicker);
 document.getElementById("pickerSearch").addEventListener("input", renderRequirementPicker);
+
+/* ============================================================
+   COURSE RECORDS — one shape for requirements, catalog, wishlist and plan
+   ============================================================ */
+function catalogCourseCode(c){
+  return c?.code || [c?.school,c?.subject_code,c?.course_number].filter(Boolean).join(":");
+}
+function requirementCourseRecord(id){
+  const c=COURSES[id];
+  if(!c) return null;
+  return {
+    id, code:c.code, title:c.title||c.fullTitle||c.code, fullTitle:c.fullTitle||c.title||c.code,
+    credits:c.credits??"", description:c.description||"", catalogPrereqs:c.catalogPrereqs||"",
+    subjectNotes:c.subjectNotes||"", restrictions:c.restrictions||"", requirementNotes:c.requirementNotes||[],
+    prereqs:Array.isArray(c.prereqs)?c.prereqs:[], requirementId:id,
+  };
+}
+function backendCourseRecord(c){
+  if(!c) return null;
+  const code=catalogCourseCode(c);
+  if(!code) return null;
+  return {
+    id:c.id||code, code, title:cleanApiText(c.title)||code, fullTitle:cleanApiText(c.title)||code,
+    credits:c.credits??"", description:cleanApiText(c.description), catalogPrereqs:cleanApiText(c.prereqs),
+    subjectNotes:cleanApiText(c.subject_notes), restrictions:cleanApiText(c.restrictions), requirementNotes:[], prereqs:[],
+  };
+}
+function courseRecordFromId(ref){
+  const id=String(ref||"");
+  if(COURSES[id]) return requirementCourseRecord(id);
+  const wishlist=ST.wishlist[id];
+  if(wishlist && typeof wishlist==="object") return wishlist;
+  const scheduled=ST.schedule[id];
+  if(scheduled?.course) return scheduled.course;
+  const byCode=Object.values(COURSES).find(c=>c.code===id);
+  if(byCode){
+    const requirementId=Object.keys(COURSES).find(key=>COURSES[key]===byCode);
+    return requirementCourseRecord(requirementId);
+  }
+  const catalog=(ST.backendCourses||[]).find(c=>c.id===id || catalogCourseCode(c)===id);
+  if(catalog) return backendCourseRecord(catalog);
+  // Older in-memory wishlist entries were saved as { courseCode: true }.
+  // Preserve the code even when their original catalog page is no longer open.
+  return /^\d{2}:\d{3}:\d{3}$/.test(id)
+    ? {id,code:id,title:id,fullTitle:id,credits:"",description:"",catalogPrereqs:"",subjectNotes:"",restrictions:"",requirementNotes:[],prereqs:[]}
+    : null;
+}
+function addToWishlist(ref, explicitRecord=null){
+  const record=explicitRecord||courseRecordFromId(ref);
+  if(!record?.code) return;
+  // The public course code is the stable identity shared by Rutgers' catalog,
+  // a degree requirement and a scheduled section. Storing the full record here
+  // prevents title/credit data from disappearing during drag-and-drop.
+  ST.wishlist[record.code]={...record,id:record.id||record.code,code:record.code};
+}
+function wishlistRecords(){
+  const seen=new Set();
+  return Object.entries(ST.wishlist).map(([key,value])=>{
+    const record=value&&typeof value==="object" ? value : courseRecordFromId(key);
+    return record?.code ? {...record,key} : null;
+  }).filter(record=>record&&!seen.has(record.code)&&seen.add(record.code));
+}
 
 /* ============================================================
    SCHEDULE
@@ -875,7 +965,11 @@ function renderSchedule(){
       zone.innerHTML = codes.map(code=>{
         const e=ST.schedule[code]; total+=parseFloat(e.credits)||0;
         return `<div class="sc-card" draggable="true" data-id="${code}">
-          <span class="sn">${escapeHtml(e.code)}${e.locked?' <span class="sched-locked">SET</span>':''}<span class="sct"> ${e.credits||"?"}cr${e.section_number?` · Sec ${escapeHtml(e.section_number)}`:''}</span></span>
+          <div class="sc-card-main">
+            <div class="sn">${escapeHtml(e.code)}${e.locked?' <span class="sched-locked">SET</span>':''}</div>
+            <div class="stitle" title="${escapeHtml(e.fullTitle||e.title||e.code)}">${escapeHtml(e.fullTitle||e.title||e.code)}</div>
+            <span class="sct">${e.credits||"?"} cr${e.section_number?` · Sec ${escapeHtml(e.section_number)}`:''}</span>
+          </div>
           <button class="rx" data-rem="${escapeHtml(code)}">✕</button></div>`;
       }).join("");
     }
@@ -883,6 +977,10 @@ function renderSchedule(){
   });
   document.querySelectorAll("[data-rem]").forEach(b=>
     b.addEventListener("click",e=>{delete ST.schedule[e.target.dataset.rem];renderAll();}));
+  document.querySelectorAll(".sc-card[data-id]").forEach(card=>card.addEventListener("click",e=>{
+    if(e.target.closest("[data-rem]")) return;
+    openCourseDetails(card.dataset.id);
+  }));
   setupDropZones();
   const total = Object.values(ST.schedule).reduce((s,e)=>s+(parseFloat(e.credits)||0),0);
   document.getElementById("pill").textContent = `${total} / 120 credits planned`;
@@ -903,12 +1001,14 @@ function setupDropZones(){
       e.preventDefault();z.classList.remove("over");
       const cid=e.dataTransfer.getData("cid");
       if(!cid) return;
-      let code, title, credits;
+      const record=courseRecordFromId(cid);
+      if(!record) return;
+      let code, title, fullTitle, credits;
       if(COURSES[cid]){
         if(COURSES[cid].type!=="gen"&&!courseAvailable(cid)) return;
-        code=COURSES[cid].code; title=COURSES[cid].title; credits=COURSES[cid].credits;
+        code=record.code; title=record.title; fullTitle=record.fullTitle; credits=record.credits;
       } else {
-        code=cid; title=cid; credits="";
+        code=record.code; title=record.title; fullTitle=record.fullTitle; credits=record.credits;
       }
       if(lockedElsewhere(code, ST.year, z.dataset.sem)){
         alert(`${code} is already scheduled (with a chosen section) for a different semester. Remove it there first.`);
@@ -917,7 +1017,8 @@ function setupDropZones(){
       const prev = ST.schedule[code];
       ST.schedule[code] = {
         year:ST.year, sem:z.dataset.sem, code,
-        title: prev?.title || title, credits: prev?.credits ?? credits,
+        title: prev?.title || title, fullTitle: prev?.fullTitle || fullTitle || title, credits: prev?.credits ?? credits,
+        course: prev?.course || record,
         sectionId: prev?.sectionId, index_number: prev?.index_number,
         section_number: prev?.section_number, meetings: prev?.meetings,
         locked: prev?.locked || false,
@@ -933,6 +1034,7 @@ function setupDropZones(){
 document.querySelectorAll(".tab-btn").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".tab-btn").forEach(x=>x.classList.remove("active"));
   b.classList.add("active"); ST.tab=b.dataset.tab; renderPanel();
+  if(ST.tab==="core" && !ST.coreRequirementTree && !ST.coreLoading) loadCoreCurriculum();
 }));
 
 /* ============================================================
@@ -964,7 +1066,7 @@ function attachCardEvents(el){
     ST.completed[id]=!ST.completed[id]; renderAll();
   }));
   el.querySelectorAll("[data-plus]").forEach(d=>d.addEventListener("click",e=>{
-    e.stopPropagation(); ST.wishlist[d.dataset.plus]=true; renderAll();
+    e.stopPropagation(); addToWishlist(d.dataset.plus); renderAll();
   }));
 }
 
@@ -974,6 +1076,7 @@ function attachCardEvents(el){
 function groupRuleLabel(g){
   if(g.rule==="min") return `choose at least ${g.count}`;
   if(g.rule==="max") return `choose up to ${g.count}`;
+  if(g.rule==="distinct") return `choose ${g.count} across distinct goals`;
   return "all required";
 }
 function groupDisplayName(g){
@@ -995,7 +1098,7 @@ function selectionLimit(g){
 }
 function isConstraintGroup(g){
   const parent=GROUPS[g?.parentId];
-  if(!parent || !g?.members?.length || !parent.members?.length) return false;
+  if(!parent || parent.rule==="distinct" || !g?.members?.length || !parent.members?.length) return false;
   const parentMembers=new Set(parent.members);
   return g.members.every(id=>parentMembers.has(id));
 }
@@ -1011,6 +1114,13 @@ function constraintSelectionCount(g){
 function parentSelectionConstraintViolation(parent, proposed){
   const limit=selectionLimit(parent);
   const planned=new Set(proposed);
+  if(parent.rule==="distinct" && proposed.length===limit){
+    const distinct=(parent.children||[]).map(id=>GROUPS[id]).filter(Boolean)
+      .filter(child=>(child.members||[]).some(id=>planned.has(id))).length;
+    if(distinct<parent.count){
+      return `${groupDisplayName(parent)} needs ${parent.count} courses that cover ${parent.count} distinct Arts and Humanities goals.`;
+    }
+  }
   for(const childId of parent.children||[]){
     const child=GROUPS[childId];
     if(!isConstraintGroup(child)) continue;
@@ -1053,7 +1163,7 @@ function groupHtml(gk){
   if(!g) return "";
   const ok=groupFulfilled(gk);
   const members=(g.members||[]).filter(id=>!isCompleted(id));
-  const children=(g.children||[]).map(groupHtml).join("");
+  const children=(g.rule==="distinct" ? [] : (g.children||[])).map(groupHtml).join("");
   const body=isConstraintGroup(g) ? constraintSummaryHtml(g) : (isPickerGroup(g) ? pickerSummaryHtml(gk) : (members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>` : ""));
   return `<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
     <span class="gn">${groupDisplayName(g)}</span>
@@ -1061,6 +1171,7 @@ function groupHtml(gk){
   </div><div class="gr-body" id="gb-${gk}">${body}${children}</div></div>`;
 }
 function renderRequired(){
+  useRequirementTree(ST.majorRequirementTree);
   const pb=document.getElementById("pb");
   if(ST.requirementsLoading){
     pb.innerHTML=`<div class="empty" style="margin-top:30px;">Loading requirements from Rutgers…</div>`;
@@ -1098,6 +1209,52 @@ function renderRequired(){
     e.stopPropagation(); delete ST.groupSelections[b.dataset.gclear]; renderPanel();
   }));
 }
+
+/* ============================================================
+   TAB 2: RBS CORE CURRICULUM
+   ============================================================ */
+function renderCore(){
+  const pb=document.getElementById("pb");
+  if(ST.coreLoading){
+    pb.innerHTML=`<div class="empty" style="margin-top:30px;">Loading the reviewed RBS Core Curriculum…</div>`;
+    return;
+  }
+  if(ST.coreError){
+    pb.innerHTML=`<div class="api-status err">Could not load the Core Curriculum: ${escapeHtml(ST.coreError)}</div>`;
+    return;
+  }
+  if(!ST.coreRequirementTree){
+    pb.innerHTML=`<div class="empty" style="margin-top:30px;">The reviewed RBS Core Curriculum is not available yet.</div>`;
+    return;
+  }
+  useRequirementTree(ST.coreRequirementTree);
+  let h=`<div class="leg">RBS requires a minimum of 27 Core credits. Every course shown is from Rutgers’ official New Brunswick Core list; select approved options the same way as electives. Click any course for details.</div>`;
+  ROOT_GROUPS.forEach(gk=>{
+    const g=GROUPS[gk];
+    if(!g) return;
+    const members=(g.members||[]).filter(id=>!isCompleted(id));
+    const children=(g.children||[]).map(groupHtml).join("");
+    if(g.rule==="all"){
+      h+=`<div class="sec-hdr">${groupDisplayName(g)}</div>`;
+      if(members.length) h+=`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`;
+      h+=children;
+    }else{
+      h+=groupHtml(gk);
+    }
+  });
+  const done=Object.keys(COURSES).filter(id=>isCompleted(id));
+  if(done.length) h+=`<div class="sec-hdr">✓ Completed / AP-Waived</div><div class="cgrid">${done.map(id=>cardHtml(id)).join("")}</div>`;
+  pb.innerHTML=h;
+  attachCardEvents(pb);
+  pb.querySelectorAll("[data-gtog]").forEach(d=>d.addEventListener("click",()=>
+    document.getElementById("gb-"+d.dataset.gtog).classList.toggle("open")));
+  pb.querySelectorAll("[data-gpicker]").forEach(b=>b.addEventListener("click",e=>{
+    e.stopPropagation(); openRequirementPicker(b.dataset.gpicker);
+  }));
+  pb.querySelectorAll("[data-gclear]").forEach(b=>b.addEventListener("click",e=>{
+    e.stopPropagation(); delete ST.groupSelections[b.dataset.gclear]; renderPanel();
+  }));
+}
 /* ============================================================
    PAGE 2: COURSES — live data from the Cloudflare Worker + D1
    backend (worker.js / schema.sql). No curated/offline fallback
@@ -1123,7 +1280,7 @@ async function backendFetch(path){
 function requirementCourseId(code){
   return String(code||"").replace(/[^0-9A-Za-z]/g, "");
 }
-function prerequisiteIds(row, courseId){
+function prerequisiteIds(row, courseId, availableCourses=COURSES){
   // The catalog prerequisite field contains nested AND/OR alternatives. It
   // is not safe to flatten that grammar into a list of mandatory courses.
   // Use only a simple scraper note with no alternatives; ambiguous rules are
@@ -1131,14 +1288,14 @@ function prerequisiteIds(row, courseId){
   const text=String(row.note||"").trim();
   if(!/^pre-reqs?:/i.test(text) || /;|\bor\b/i.test(text)) return [];
   const codes = text.match(/\b\d{2}:\d{3}:\d{3}\b/g)||[];
-  return [...new Set(codes.map(requirementCourseId))].filter(id=>id && id!==courseId && COURSES[id]);
+  return [...new Set(codes.map(requirementCourseId))].filter(id=>id && id!==courseId && availableCourses[id]);
 }
-function loadRequirementTree(requirements){
+function buildRequirementTree(requirements){
   const nextCourses={};
   const nextGroups={};
   const rootIds=[];
   const courseRows=[];
-  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : "all";
+  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : rule==="min_distinct_children" ? "distinct" : "all";
 
   function addGroup(raw, parentId=null){
     const group={
@@ -1178,13 +1335,15 @@ function loadRequirementTree(requirements){
   }
 
   for(const root of requirements||[]) rootIds.push(addGroup(root));
-  COURSES=nextCourses;
   for(const {id,row} of courseRows){
-    COURSES[id].prereqs=[...new Set([...(COURSES[id].prereqs||[]),...prerequisiteIds(row,id)])];
+    nextCourses[id].prereqs=[...new Set([...(nextCourses[id].prereqs||[]),...prerequisiteIds(row,id,nextCourses)])];
   }
-  GROUPS=nextGroups;
-  ROOT_GROUPS=rootIds;
-  ST.groupSelections={};
+  return {courses:nextCourses, groups:nextGroups, roots:rootIds};
+}
+function useRequirementTree(tree){
+  COURSES=tree?.courses||{};
+  GROUPS=tree?.groups||{};
+  ROOT_GROUPS=tree?.roots||[];
 }
 
 /* ============================================================
@@ -1213,6 +1372,63 @@ function sharedRootGroups(requirementTrees, programIds){
     }
   }
   return [...found.values()].filter(entry=>entry.programs.size>1);
+}
+function rootCourseCodes(root){
+  return (root?.courses||[]).map(course=>course?.course_code).filter(Boolean);
+}
+function sharedCoreBaselines(referenceTrees){
+  const candidates=new Map();
+  for(const roots of Object.values(referenceTrees||{})){
+    for(const root of roots||[]){
+      const key=normalizedRequirementName(root?.name);
+      const codes=rootCourseCodes(root);
+      if(!key || root?.rule!=="all" || (root?.children||[]).length || codes.length<4 || !/(business|foundational|common|core)/i.test(root?.name||"")) continue;
+      const rows=candidates.get(key)||[];
+      rows.push(root);
+      candidates.set(key,rows);
+    }
+  }
+  const baselines=new Map();
+  for(const [key,roots] of candidates){
+    if(roots.length<2) continue;
+    const shared=roots.slice(1).reduce((codes,root)=>{
+      const available=new Set(rootCourseCodes(root));
+      return codes.filter(code=>available.has(code));
+    },rootCourseCodes(roots[0]));
+    if(shared.length>=4) baselines.set(key,{template:roots[0], codes:new Set(shared)});
+  }
+  return baselines;
+}
+function normalizedCoreRequirementTrees(requirementTrees, programIds){
+  const baselines=sharedCoreBaselines(Object.keys(ST.referenceRequirementTrees||{}).length?ST.referenceRequirementTrees:requirementTrees);
+  if(!baselines.size) return requirementTrees;
+  const out={};
+  for(const programId of programIds){
+    const roots=requirementTrees[programId]||[];
+    out[programId]=roots.flatMap(root=>{
+      const baseline=baselines.get(normalizedRequirementName(root?.name));
+      const rootCodes=rootCourseCodes(root);
+      if(!baseline || root?.rule!=="all" || (root?.children||[]).length || !rootCodes.length) return [root];
+      const byCode=new Map((root.courses||[]).map(course=>[course.course_code,course]));
+      const sharedCourses=[...baseline.codes].map(code=>byCode.get(code)||baseline.template.courses?.find(course=>course.course_code===code)).filter(Boolean);
+      const sharedRoot={...root, id:`${root.id}-shared-base`, courses:sharedCourses};
+      const residualCourses=(root.courses||[]).filter(course=>{
+        if(baseline.codes.has(course.course_code)) return false;
+        // If a school lists an Accounting-only course in both the business
+        // core and its Required Accounting section, show it once only.
+        return !roots.some(other=>other!==root && rootCourseCodes(other).includes(course.course_code));
+      });
+      if(!residualCourses.length) return [sharedRoot];
+      const program=ST.availablePrograms.find(item=>item.id===programId);
+      return [sharedRoot,{
+        ...root,
+        id:`${root.id}-program-additions`,
+        name:`${program?.name||"Program"}-specific additions to ${root.name}`,
+        courses:residualCourses,
+      }];
+    });
+  }
+  return out;
 }
 function requirementsForDisplay(requirementTrees, programIds){
   const seen=new Set();
@@ -1307,14 +1523,42 @@ async function loadSelectedRequirements(programIds){
   const returned=data.requirements||{};
   const visibleIds=ids.filter(id=>Array.isArray(returned[id]));
   if(!visibleIds.length) throw new Error("None of the selected programs has reviewed requirements yet.");
+  const normalized=normalizedCoreRequirementTrees(returned,visibleIds);
   ST.selectedPrograms=visibleIds;
-  ST.requirementTrees=returned;
+  ST.requirementTrees=normalized;
   ST.doubleCountPolicies=policies.policies||[];
   ST.doubleCountRules=data.double_count_rules||[];
-  loadRequirementTree(requirementsForDisplay(returned,visibleIds));
-  ST.doubleCount=computeDoubleCountOverlaps(returned,visibleIds);
+  ST.majorRequirementTree=buildRequirementTree(requirementsForDisplay(normalized,visibleIds));
+  if(ST.tab!=="core") useRequirementTree(ST.majorRequirementTree);
+  ST.doubleCount=computeDoubleCountOverlaps(normalized,visibleIds);
   ST.activeProgram=visibleIds.length===1 ? (ST.availablePrograms||[]).find(program=>program.id===visibleIds[0])||null : null;
-  return {requirements:returned,policies:ST.doubleCountPolicies};
+  return {requirements:normalized,policies:ST.doubleCountPolicies};
+}
+async function loadSchoolReferenceRequirementTrees(programs){
+  const ids=(programs||[]).map(program=>program.id).filter(Boolean);
+  if(ids.length<2) return {};
+  const data=await backendFetch(`/api/requirements?programs=${ids.map(encodeURIComponent).join(",")}`);
+  ST.referenceRequirementTrees=data.requirements||{};
+  return ST.referenceRequirementTrees;
+}
+async function loadCoreCurriculum(){
+  ST.coreLoading=true;
+  ST.coreError="";
+  renderPanel();
+  try{
+    const data=await backendFetch("/api/core-curricula?school=rbsnb");
+    const curriculum=(data.curricula||[])[0];
+    if(!curriculum) throw new Error("No reviewed RBS Core Curriculum is available yet.");
+    const detail=await backendFetch(`/api/programs/${encodeURIComponent(curriculum.id)}/requirements`);
+    ST.coreCurricula=data.curricula||[];
+    ST.activeCoreCurriculum=curriculum;
+    ST.coreRequirementTree=buildRequirementTree(detail.requirements||[]);
+  }catch(err){
+    ST.coreError=err.message||"Unknown error";
+  }finally{
+    ST.coreLoading=false;
+    if(ST.tab==="core") renderPanel();
+  }
 }
 async function loadInitialRequirements(){
   ST.requirementsLoading=true;
@@ -1322,6 +1566,10 @@ async function loadInitialRequirements(){
   renderPanel();
   try{
     const programs=await loadAvailablePrograms();
+    // This one read lets the UI derive the common Business Core from the
+    // reviewed school data, including when a program's own table contains
+    // additional major-only rows. It is not a hard-coded course list.
+    try{ await loadSchoolReferenceRequirementTrees(programs); }catch(e){ ST.referenceRequirementTrees={}; }
     const initial=programs.find(p=>p.id==="rbsnb-bait")||programs[0];
     if(!initial) throw new Error("No reviewed RBS major is available yet.");
     ST.selectedPrograms=[initial.id];
@@ -1426,7 +1674,7 @@ async function toggleCourseExpand(id){
 
 function courseRowHtml(c){
   const code = `${c.school}:${c.subject_code}:${c.course_number}`;
-  const inW = !!ST.wishlist[code];
+  const inW = !!ST.wishlist[code] || wishlistRecords().some(item=>item.code===code);
   const isOpen = ST.expandedIds.has(c.id);
   const openCt = c.open_count ?? 0, totalCt = c.section_count ?? 0;
 
@@ -1588,7 +1836,7 @@ function attachCoursesPageControls(){
   }));
   document.querySelectorAll("[data-wadd]").forEach(b=>b.addEventListener("click", e=>{
     e.stopPropagation();
-    ST.wishlist[e.target.dataset.wadd]=true;
+    addToWishlist(e.target.dataset.wadd);
     renderCoursesPage();
   }));
 }
@@ -1601,29 +1849,20 @@ if(ST.backendUrl){ loadBackendMeta(); loadBackendCourses(); }
    ============================================================ */
 function renderWishlist(){
   const pb=document.getElementById("pb");
-  const ids=Object.keys(ST.wishlist);
-  // wishlist includes both local degree-requirement COURSES and backend course codes
-  const localIds=ids.filter(id=>COURSES[id]);
-  const otherIds=ids.filter(id=>!COURSES[id]);
+  const records=wishlistRecords();
 
-  if(!ids.length){
+  if(!records.length){
     pb.innerHTML=`<div class="empty" style="margin-top:30px;">No wishlist courses yet.<br/>
       Use the <b>Courses</b> page and click + Wishlist to add electives here.</div>`;
     return;
   }
-  let h="";
-  if(localIds.length){
-    h+=`<div class="sec-hdr">Saved Courses</div><div class="cgrid">${localIds.map(id=>cardHtml(id,{plus:false})).join("")}</div>`;
-  }
-  if(otherIds.length){
-    h+=`<div class="sec-hdr">From Course Catalog</div>`;
-    h+=otherIds.map(code=>`<div data-cid="${code}" draggable="true" style="display:flex;align-items:center;justify-content:space-between;
-      padding:6px 8px;border:1px solid var(--line);border-radius:4px;margin-bottom:5px;font-size:12px;cursor:grab;">
-      <code style="font-size:10.5px;color:var(--scarlet)">${code}</code>
-      <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px"
-        data-wrem="${code}">✕</button></div>`).join("");
-  }
-  pb.innerHTML=h;
+  pb.innerHTML=`<div class="sec-hdr">Saved courses</div><div class="cgrid">${records.map(record=>`
+    <div class="cc wish-card" data-cid="${escapeHtml(record.code)}" draggable="true">
+      <div class="code">${escapeHtml(record.code)}</div>
+      <div class="ttl">${escapeHtml(record.fullTitle||record.title||record.code)}</div>
+      <div class="meta">${escapeHtml(record.credits||"?")} credits</div>
+      <button class="rx" data-wrem="${escapeHtml(record.key)}" title="Remove from wishlist">×</button>
+    </div>`).join("")}</div>`;
   attachCardEvents(pb);
   pb.querySelectorAll("[data-wrem]").forEach(b=>b.addEventListener("click",e=>{
     e.stopPropagation();
@@ -1636,6 +1875,7 @@ function renderWishlist(){
    ============================================================ */
 function renderPanel(){
   if(ST.tab==="required") renderRequired();
+  else if(ST.tab==="core") renderCore();
   else renderWishlist();
 }
 function renderMain(){
@@ -1840,16 +2080,16 @@ async function hydratePoolEntry(entry, preselectIndex){
 
 async function addToBuilderPool(cid){
   if(!ST.builder || !cid) return;
-  let code, title, credits;
-  if(COURSES[cid]){ code=COURSES[cid].code; title=COURSES[cid].title; credits=COURSES[cid].credits; }
-  else { code=cid; }
+  const record=courseRecordFromId(cid);
+  if(!record) return;
+  const {code,title,fullTitle,credits}=record;
   if(ST.builder.pool.some(p=>p.code===code)) return;
   if(lockedElsewhere(code, ST.builder.year, ST.builder.sem)){
     const e=ST.schedule[code];
     alert(`${code} is already scheduled for ${YL[e.year]} ${e.sem}. Remove it there first.`);
     return;
   }
-  const entry={code, title, credits, sections:[], checked:new Set(), loading:true, enabled:true, collapsed:false};
+  const entry={code, title, fullTitle:fullTitle||title, credits, course:record, sections:[], checked:new Set(), loading:true, enabled:true, collapsed:false};
   ST.builder.pool.push(entry);
   renderBuilder();
   await hydratePoolEntry(entry);
@@ -1861,7 +2101,7 @@ async function addToBuilderPool(cid){
 // instead of leaving the builder empty and out of sync with the plan.
 async function seedBuilderPoolFromSchedule(e){
   if(!ST.builder || ST.builder.pool.some(p=>p.code===e.code)) return;
-  const entry={code:e.code, title:e.title, credits:e.credits, sections:[], checked:new Set(), loading:true, enabled:true, collapsed:false};
+  const entry={code:e.code, title:e.title, fullTitle:e.fullTitle||e.title, credits:e.credits, course:e.course, sections:[], checked:new Set(), loading:true, enabled:true, collapsed:false};
   ST.builder.pool.push(entry);
   renderBuilder();
   // If this course was already locked with a specific section (e.g. set via
@@ -1912,7 +2152,8 @@ function confirmBuilderSchedule(){
   const {year, sem} = ST.builder;
   combo.forEach(c=>{
     ST.schedule[c.code] = {
-      year, sem, code:c.code, title:c.title, credits:c.credits,
+      year, sem, code:c.code, title:c.title, fullTitle:c.fullTitle||c.title, credits:c.credits,
+      course:c.course||courseRecordFromId(c.code),
       sectionId:c.id, index_number:c.index_number, section_number:c.section_number,
       meetings:c.meetings||[], locked:true,
     };
@@ -1955,29 +2196,43 @@ function poolCourseHtml(p){
 
 function renderBuilderCalendar(){
   const combo = (ST.builder.permutations||[])[ST.builder.permIndex] || [];
-  const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  // Match the familiar Rutgers WebReg work-week view. Weekend and untimed
+  // meetings remain visible below instead of being silently dropped.
+  const DAYS=["Mon","Tue","Wed","Thu","Fri"];
   let cells = DAYS.map((d,i)=>`<div class="cal-daylabel" style="grid-column:${i+2};grid-row:1;">${d}</div>`).join("");
-  for(let h=8; h<=22; h++){
+  for(let h=8; h<=20; h++){
     const slot=(h-8)*2;
     const label = h===12?"12pm":h>12?`${h-12}pm`:`${h}am`;
     cells += `<div class="cal-timelabel" style="grid-row:${slot+2};">${label}</div>`;
   }
+  const outside=[];
   combo.forEach(c=>{
     (c.meetings||[]).forEach(m=>{
       const day=dayIndex(m.day_of_week);
-      if(day==null) return;
+      if(day==null || day>4){
+        outside.push(`${c.code} · ${fmtMeeting(m)}`);
+        return;
+      }
       const s=timeToSlot(m.start_time), e=timeToSlot(m.end_time);
-      if(s==null||e==null||e<=s) return;
+      if(s==null||e==null||e<=s){
+        outside.push(`${c.code} · ${fmtMeeting(m)}`);
+        return;
+      }
       const campus = campusFor(m);
       const col = CAMPUS_COLORS[campus] || CAMPUS_COLORS["OTHER/UNKNOWN"];
       const closed = c.open_status===false;
       const loc = [m.building,m.room].filter(Boolean).join(" ") || (campus==="ONLINE"?"Online":"");
-      cells += `<div class="cal-block${closed?" cal-block-closed":""}" style="grid-column:${day+2};grid-row:${Math.round(s)+2} / span ${Math.max(1,Math.round(e-s))};
+      const gridStart=Math.max(0,Math.floor(s));
+      const gridSpan=Math.max(1,Math.ceil(e)-gridStart);
+      const time=`${m.start_time||""}${m.end_time?`–${m.end_time}`:""}`;
+      cells += `<div class="cal-block${closed?" cal-block-closed":""}" style="grid-column:${day+2};grid-row:${gridStart+2} / span ${gridSpan};
         background:${col.fill};border-color:${col.border};">
-        <b>${escapeHtml(c.code)}</b><br/>${escapeHtml(loc)}</div>`;
+        <b>${escapeHtml(c.code)}</b><span class="cal-course-title">${escapeHtml(c.title||c.code)}</span>
+        <span class="cal-detail">${escapeHtml(time)}</span><span class="cal-detail">${escapeHtml(loc)}</span></div>`;
     });
   });
-  return `<div class="builder-cal" style="grid-template-rows:24px repeat(30,14px);">${cells}</div>`;
+  return `<div class="calendar-scroll"><div class="builder-cal" style="grid-template-rows:28px repeat(26,18px);">${cells}</div></div>
+    ${outside.length?`<div class="cal-outside"><b>Weekend, online, or untimed meetings</b><br/>${escapeHtml(outside.join(" · "))}</div>`:""}`;
 }
 
 function renderBuilder(){
