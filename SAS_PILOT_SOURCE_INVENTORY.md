@@ -23,7 +23,7 @@
 3. **Program degree metadata:** SAS has BA/BS distinctions for some programs. The program data needs a degree-type field or a reviewed program-variant structure before a BA and BS path can be shown as separate, trustworthy choices.
 4. **Combination policies:** encode specific prohibited pairs and permitted overlap outcomes in reviewed data. The SAS general overlap statement is not a substitute for program-level restrictions.
 5. **Cross-school status:** a cross-school request must remain “needs advisor confirmation” unless an official, combination-specific policy supports a stronger result.
-6. **Core module review:** compare the published SAS Core course-goal rules and catalog year with the existing Rutgers-New Brunswick Core data before attaching a shared module to SAS.
+6. **Core module review:** the existing reviewed Core is now stored as the canonical `rutgers-nb-core-curriculum` module and attached to RBS through reviewed data. Compare the published SAS Core course-goal rules and catalog year with that module before attaching it to SAS; no SAS attachment exists yet.
 
 ## Evidence required before the SAS pilot is visible
 

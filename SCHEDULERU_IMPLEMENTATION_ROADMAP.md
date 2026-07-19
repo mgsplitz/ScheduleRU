@@ -277,6 +277,8 @@ Work:
 4. Record SAS residency, double-count, and major/minor policy rules with sources.
 5. Add SAS to the Programs school selector only after the pilot's acceptance checks pass.
 
+Progress note (development, 2026-07-19): item 1 is implemented as the reviewed `rutgers-nb-core-curriculum` module and is attached to RBS through reviewed school-to-module data. SAS is deliberately **not** attached or visible yet; its catalog-year compatibility and its own program/policy pilot still need review.
+
 #### Engineering pilot
 
 Work:

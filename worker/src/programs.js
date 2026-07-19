@@ -56,12 +56,14 @@ const FETCH_HEADERS = {
 // the SAS Undergraduate site. This is deliberately a source URL plus a
 // parser, not a hard-coded list of courses: the current catalog can change
 // which courses carry each Core code, and a refresh should pick that up.
-const RBS_CORE_SOURCE_URL = "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core?id=106&layout=blog&view=category";
-const RBS_CORE_PROGRAM_ID = "rbsnb-core-curriculum";
+// The module is not RBS-owned: reviewed schools link to it through
+// school_curriculum_modules.
+const RUTGERS_NB_CORE_SOURCE_URL = "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core?id=106&layout=blog&view=category";
+const RUTGERS_NB_CORE_PROGRAM_ID = "rutgers-nb-core-curriculum";
 
 // Rules are stable curricular structure. Course memberships are obtained at
 // scrape time from the official New Brunswick Core list above.
-const RBS_CORE_GROUPS = [
+const RUTGERS_NB_CORE_GROUPS = [
   { key: "contemporary", name: "Contemporary Challenges (2 courses)", rule: "all", children: [
     { key: "ccd", name: "Diversities and Social Inequalities [CCD]", rule: "min_courses", count: 1, tags: ["CCD"] },
     { key: "cco", name: "Our Common Future [CCO]", rule: "min_courses", count: 1, tags: ["CCO"] },
@@ -181,7 +183,7 @@ async function runD1Batches(env, statements, chunkSize = 100) {
 }
 
 async function scrapeCoreCurriculum(env, program) {
-  const source = program.source_url || RBS_CORE_SOURCE_URL;
+  const source = program.source_url || RUTGERS_NB_CORE_SOURCE_URL;
   const continuation = source.includes("?") ? `${source}&start=5` : `${source}?start=5`;
   let pages;
   try {
@@ -212,7 +214,7 @@ async function scrapeCoreCurriculum(env, program) {
     return { ok: false, error: "no Core course rows parsed" };
   }
 
-  const flatGroups = flattenCoreGroups(RBS_CORE_GROUPS);
+  const flatGroups = flattenCoreGroups(RUTGERS_NB_CORE_GROUPS);
   const statements = [
     env.DB.prepare(`DELETE FROM requirement_courses WHERE group_id IN (SELECT id FROM requirement_groups WHERE program_id = ? AND auto_generated = 1)`).bind(program.id),
     env.DB.prepare(`DELETE FROM requirement_groups WHERE program_id = ? AND auto_generated = 1`).bind(program.id),
@@ -1120,9 +1122,18 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
 
   if (path === "/api/core-curricula" && request.method === "GET") {
     const school = url.searchParams.get("school");
-    let where = " WHERE review_status = 'reviewed' AND type = 'core_curriculum'", binds = [];
-    if (school) { where += " AND school_slug = ?"; binds.push(school); }
-    const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();
+    let where = `WHERE link.review_status = 'reviewed'
+                   AND curriculum.review_status = 'reviewed'
+                   AND curriculum.type = 'core_curriculum'`, binds = [];
+    if (school) { where += " AND link.school_slug = ?"; binds.push(school); }
+    const { results } = await env.DB.prepare(
+      `SELECT curriculum.*, link.school_slug AS attached_school_slug,
+              link.module_type, link.source_url AS attachment_source_url
+       FROM school_curriculum_modules link
+       INNER JOIN programs curriculum ON curriculum.id = link.curriculum_program_id
+       ${where}
+       ORDER BY link.sort_order, curriculum.name`
+    ).bind(...binds).all();
     return json({ curricula: results });
   }
 
@@ -1336,7 +1347,7 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     // uses the public New Brunswick Core list and remains unreviewed until a
     // human explicitly marks the parsed result reviewed.
     if (path === "/api/admin/scrape-core-curriculum" && request.method === "POST") {
-      const programId = url.searchParams.get("program") || RBS_CORE_PROGRAM_ID;
+      const programId = url.searchParams.get("program") || RUTGERS_NB_CORE_PROGRAM_ID;
       const p = await env.DB.prepare(`SELECT * FROM programs WHERE id = ? AND type = 'core_curriculum'`).bind(programId).first();
       if (!p) return json({ error: "unknown Core Curriculum id" }, 404);
       const result = await scrapeCoreCurriculum(env, p);
