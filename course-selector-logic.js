@@ -40,6 +40,18 @@
     return Number.isInteger(number) && number >= 0 && number <= 999 ? number : null;
   }
 
+  function minimumCredits(value) {
+    if (value === undefined) return 0;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 && number <= 99 ? number : null;
+  }
+
+  function courseCredits(course) {
+    if (!course || typeof course !== "object") return null;
+    const credits = Number(course.credits);
+    return Number.isFinite(credits) && credits >= 0 ? credits : null;
+  }
+
   function normalizeSelector(input) {
     if (!input || typeof input !== "object" || Array.isArray(input) || Number(input.version) !== 1) return null;
     const kind = text(input.kind);
@@ -57,10 +69,11 @@
       const subject_codes = unique(input.subject_codes, (code) => /^\d{3}$/.test(code));
       const course_number_min = input.course_number_min === undefined ? 0 : positiveCourseNumber(input.course_number_min);
       const course_number_max = input.course_number_max === undefined ? 999 : positiveCourseNumber(input.course_number_max);
-      if (!school_codes.length || !subject_codes.length || course_number_min === null || course_number_max === null || course_number_min > course_number_max) return null;
+      const minimum_credits = minimumCredits(input.minimum_credits);
+      if (!school_codes.length || !subject_codes.length || course_number_min === null || course_number_max === null || minimum_credits === null || course_number_min > course_number_max) return null;
       return {
         version: 1, kind, label, school_codes, subject_codes,
-        course_number_min, course_number_max, exclude_course_codes,
+        course_number_min, course_number_max, minimum_credits, exclude_course_codes,
       };
     }
 
@@ -72,6 +85,7 @@
     const parsed = parseCourseCode(course);
     if (!selector || !parsed || selector.exclude_course_codes.includes(parsed.code)) return false;
     if (selector.kind === "course_codes") return selector.include_course_codes.includes(parsed.code);
+    if (selector.minimum_credits > 0 && (courseCredits(course) === null || courseCredits(course) < selector.minimum_credits)) return false;
     return selector.school_codes.includes(parsed.school_code)
       && selector.subject_codes.includes(parsed.subject_code)
       && parsed.course_number >= selector.course_number_min
@@ -90,7 +104,8 @@
     const level = selector.course_number_min === 0 && selector.course_number_max === 999
       ? ""
       : `${selector.course_number_min}-${selector.course_number_max} level `;
-    return `Any reviewed ${level}course in subject ${selector.subject_codes.join(", ")}`;
+    const credit = selector.minimum_credits > 0 ? ` worth at least ${selector.minimum_credits} credits` : "";
+    return `Any reviewed ${level}course in subject ${selector.subject_codes.join(", ")}${credit}`;
   }
 
   // Used only to decide whether a nested requirement acts as a constraint on
@@ -106,6 +121,7 @@
         && child.subject_codes.every((code) => parent.subject_codes.includes(code))
         && child.course_number_min >= parent.course_number_min
         && child.course_number_max <= parent.course_number_max
+        && child.minimum_credits >= parent.minimum_credits
         && !child.exclude_course_codes.length;
     }
     return false;
