@@ -1,6 +1,6 @@
 # SAS pilot source inventory
 
-**Status:** Discovery and modeling only. No SAS school, program, requirement, or policy is available in ScheduleRU from this document.
+**Status:** Discovery and modeling only. No SAS school, program, requirement, or policy is publicly available in ScheduleRU from this document.
 
 **Purpose:** Define the evidence and data-model work required before the School of Arts and Sciences (SAS) appears in the Programs modal. This prevents RBS rules from being silently reused for SAS.
 
@@ -48,7 +48,7 @@ This is the best first pilot because it tests three reusable concerns at once wi
 | Item | Official evidence | What the future model must represent |
 | --- | --- | --- |
 | Political Science major | [Political Science major page](https://polisci.rutgers.edu/academics/undergraduate/major-in-political-science) and [SAS program profile](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/political-science) | Official code 790, B.A. path, 13 courses/39 credits, declaration condition, the named foundation/research/seminar requirements, thematic 300/400-level areas, elective limits, and C-or-better rule. |
-| Philosophy, Politics, and Economics minor | [PPE minor requirements](https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics) and [SAS program profile](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/1746-philosophy-politics-and-economics-ppe) | Official code 792, 27 credits across philosophy, political science, and economics; the course-list and level constraints; Rutgers-New Brunswick residency limits; and C-or-better rule. |
+| Philosophy, Politics, and Economics minor | [PPE minor requirements](https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics) and [SAS program profile](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/philosophy-politics-and-economics-ppe) | Official code 792, 27 credits across philosophy, political science, and economics; the course-list and level constraints; Rutgers-New Brunswick residency limits; and C-or-better rule. |
 | Published overlap outcome | [PPE minor requirements](https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics) | A Political Science major may use the Political Science component toward both the major and PPE minor. This is a specific, source-backed overlap permission, not an assumption from SAS's general overlap policy. |
 | School-level bounds | [SAS degree requirements](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/degree-requirements) and [SAS major/minor restrictions](https://www.sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-restrictions) | Major/minor/credit/GPA baseline, conditional minor exceptions, and prohibition records that must remain separate from this permitted PPE overlap. |
 
@@ -75,3 +75,15 @@ The selector alone must not approximate the rest of the public pilot rules. Add 
 6. **Combination policy:** encode the published Political Science-to-PPE overlap permission, the SAS minor-waiver rule, named SAS restrictions, and one RBS-plus-SAS scenario that stays advisor-confirmation-only.
 
 The pilot will stay hidden until these rule types, the school profile, the policy rows, and comparison cases are reviewed and passing.
+
+### Non-public PPE source draft boundary
+
+The PPE minor is recorded only as an unreviewed development draft behind the requirement-evidence gate. The two current official sources are the [department requirements page](https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics) and the [SAS program profile](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/philosophy-politics-and-economics-ppe). Current department page; no catalog-year boundary stated.
+
+The finite course lists from the department page may support source transcription, but the source records belong only to the unreviewed draft and every requirement-evidence row remains unreviewed. The draft has these unresolved blockers:
+
+1. `01:730:105/106` is slash notation. It is not transcribed because the source does not state whether it means one course, two courses, or a choice.
+2. The Philosophy component permits other courses on a case-by-case basis, so the published finite list is incomplete for automatic completion.
+3. Courses that are cross-listed may be used to satisfy only one requirement, but the source provides no course map for enforcing that restriction.
+4. All minor courses require a grade of C or better; this remains unresolved in the draft.
+5. Only one course in each field can come from transfer credit, AP credit, study abroad, or another Rutgers campus, which the source describes as three credits outside Rutgers University-New Brunswick per field.
