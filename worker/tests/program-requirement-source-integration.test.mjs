@@ -16,3 +16,11 @@ test("the Worker can register and bulk-import source drafts without publishing r
   assert.match(worker, /review_status = 'catalog_listed'/);
   assert.doesNotMatch(worker, /UPDATE programs SET[\s\S]{0,160}review_status = 'reviewed'/);
 });
+
+test("school source imports queue a bounded batch of not-yet-snapshotted sources", async () => {
+  const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
+
+  assert.match(worker, /last_imported_at IS NULL/);
+  assert.match(worker, /ORDER BY id\s+LIMIT \?/);
+  assert.match(worker, /batchLimit/);
+});

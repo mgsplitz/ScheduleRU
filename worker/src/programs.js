@@ -514,15 +514,29 @@ async function importRequirementSource(env, sourceId) {
   }
 }
 
-async function importRequirementSourcesForSchool(env, schoolSlug) {
+function requirementSourceImportBatchLimit(value) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isSafeInteger(parsed)) return 20;
+  return Math.min(Math.max(parsed, 1), 25);
+}
+
+async function pendingRequirementSourceIds(env, schoolSlug, batchLimit) {
   if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
   const { results } = await env.DB.prepare(
     `SELECT id FROM program_requirement_import_sources
-     WHERE school_slug = ? AND enabled = 1
-     ORDER BY id`
-  ).bind(schoolSlug).all();
+     WHERE school_slug = ?
+       AND enabled = 1
+       AND last_imported_at IS NULL
+       AND last_error IS NULL
+     ORDER BY id
+     LIMIT ?`
+  ).bind(schoolSlug, batchLimit).all();
+  return results || [];
+}
+
+async function importRequirementSourceBatch(env, sources) {
   const imported = [];
-  for (const source of results || []) {
+  for (const source of sources) {
     imported.push(await importRequirementSource(env, source.id));
     // Keep bulk source imports polite to Rutgers and within Worker limits.
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -1855,8 +1869,13 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       try {
         const registration = await registerRequirementSourcesForSchool(env, school);
         if (!registration.registered) return json({ error: "no active catalog sources found for this school" }, 404);
-        ctx.waitUntil(importRequirementSourcesForSchool(env, school));
-        return json({ ok: true, mode: "background", school, sources: registration.registered, note: "Draft source snapshots only; no program was automatically marked reviewed." });
+        const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
+        const sources = await pendingRequirementSourceIds(env, school, batchLimit);
+        if (!sources.length) {
+          return json({ ok: true, mode: "complete", school, sources: registration.registered, queued: 0, note: "All eligible sources have draft snapshots; no program was automatically marked reviewed." });
+        }
+        ctx.waitUntil(importRequirementSourceBatch(env, sources));
+        return json({ ok: true, mode: "background", school, sources: registration.registered, queued: sources.length, note: "Draft source snapshots only; no program was automatically marked reviewed." });
       } catch (err) {
         return json({ error: err.message }, 400);
       }
