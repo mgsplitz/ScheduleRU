@@ -630,7 +630,7 @@ function activeCoreLabel(){
 }
 
 const ST = {
-  apOn:{}, completed:{}, schedule:{}, wishlist:{}, groupSelections:{}, creditLedger:{}, courseEligibilityByCode:{},
+  apOn:{}, completed:{}, schedule:{}, wishlist:{}, groupSelections:{}, creditLedger:{}, courseEligibilityByCode:{}, courseEligibilityFetched:{},
   year:1, tab:"required", panelFull:false,
   page:"nav", // top-level page: "nav" (Degree Navigator) | "courses" (Courses)
   // Backend (Cloudflare Worker + D1) integration — see worker.js/schema.sql.
@@ -1163,7 +1163,8 @@ function directPrerequisiteCodes(course){
 }
 function prerequisitePlanForCourse(course){
   const parsed=globalThis.ScheduleRUEligibilityLogic.parseCatalogPrerequisitePaths(course?.catalogPrereqs||"");
-  const reviewedPaths=globalThis.ScheduleRUEligibilityLogic.prerequisitePathsFromConditions(course?.eligibility?.conditions||[]);
+  const eligibility=course?.eligibility||ST.courseEligibilityByCode?.[course?.code]||null;
+  const reviewedPaths=globalThis.ScheduleRUEligibilityLogic.prerequisitePathsFromConditions(eligibility?.conditions||[]);
   const direct=directPrerequisiteCodes(course);
   const references=new Map((parsed.references||[]).map(reference=>[reference.course_code,reference]));
   [...direct,...reviewedPaths.flat()].forEach(code=>{
@@ -1237,6 +1238,11 @@ function openCourseDetails(id){
   if(!c) return;
   document.getElementById("prTitle").textContent = "Course details";
   const body = document.getElementById("prBody");
+  if(c.code&&!ST.courseEligibilityFetched[c.code]){
+    void loadCourseEligibilityForCodes([c.code]).then(loaded=>{
+      if(loaded) openCourseDetails(id);
+    });
+  }
   const requirementNotes=(c.requirementNotes||[]).join("; ");
   const standing=standingRequirement(c);
   const approvedAlternatives=(c.alternatives||[]).filter(alt=>alt.code||alt.equivalent_course_code);
@@ -1491,7 +1497,7 @@ function setupDropZones(){
   document.querySelectorAll(".dz").forEach(z=>{
     z.ondragover=e=>{e.preventDefault();z.classList.add("over");};
     z.ondragleave=()=>z.classList.remove("over");
-    z.ondrop=e=>{
+    z.ondrop=async e=>{
       e.preventDefault();z.classList.remove("over");
       const cid=e.dataTransfer.getData("cid");
       if(!cid) return;
@@ -1508,6 +1514,7 @@ function setupDropZones(){
         alert(`${code} is already scheduled (with a chosen section) for a different semester. Remove it there first.`);
         return;
       }
+      await loadCourseEligibilityForCodes([record.code]);
       const prerequisiteEligibility=prerequisiteEligibilityForTerm(record,{year:ST.year,sem});
       if(prerequisiteEligibility.status==="blocked"){
         alert(`${code} cannot be placed in ${sem} of ${YL[ST.year]}: ${prerequisiteBlockerLabel(prerequisiteEligibility)}.`);
@@ -2005,13 +2012,18 @@ async function backendFetch(path,options={}){
 }
 
 async function loadCourseEligibilityForCodes(codes){
-  const unique=[...new Set((codes||[]).filter(code=>/^\d{2}:\d{3}:\d{3}$/.test(code)))].slice(0,25);
+  const unique=[...new Set((codes||[]).filter(code=>/^\d{2}:\d{3}:\d{3}$/.test(code)))]
+    .filter(code=>!ST.courseEligibilityFetched[code])
+    .slice(0,25);
   if(!unique.length) return;
   try{
     const response=await backendFetch("/api/course-eligibility?codes="+encodeURIComponent(unique.join(",")));
+    unique.forEach(code=>{ST.courseEligibilityFetched[code]=true;});
     Object.assign(ST.courseEligibilityByCode,response.eligibility||{});
+    return true;
   }catch(_){
     // Missing or unavailable reviewed data remains a neutral needs-review state.
+    return false;
   }
 }
 

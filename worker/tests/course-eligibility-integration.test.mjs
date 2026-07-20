@@ -28,6 +28,9 @@ test("the browser migrates v1 state and evaluates the selected target term", asy
   assert.match(frontend, /function plannedScheduleCreditEntries\(/);
   assert.match(frontend, /function courseEligibilityForTerm\(/);
   assert.match(frontend, /function loadCourseEligibilityForCodes\(/);
+  assert.match(frontend, /courseEligibilityFetched:\{\}/);
+  assert.match(frontend, /await loadCourseEligibilityForCodes\(\[record\.code\]\)/);
+  assert.match(frontend, /const eligibility=course\?\.eligibility\|\|ST\.courseEligibilityByCode\?\.\[course\?\.code\]\|\|null/);
   assert.match(frontend, /function reviewedEligibilityForCourse\(/);
   assert.match(frontend, /function courseEligibilityNotice\(/);
   assert.match(frontend, /Planning eligibility/);
