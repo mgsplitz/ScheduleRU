@@ -14,6 +14,10 @@ test("eligibility facts are source-backed and review-gated", () => {
   assert.match(worker, /path === "\/api\/course-eligibility"/);
 });
 
+test("course eligibility lookups stay within D1's 100-variable query limit", () => {
+  assert.match(worker, /const COURSE_ELIGIBILITY_BATCH_SIZE = 100;/);
+});
+
 test("the browser migrates v1 state and evaluates the selected target term", async () => {
   const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
   assert.match(frontend, /<script src="eligibility-logic\.js"><\/script>/);

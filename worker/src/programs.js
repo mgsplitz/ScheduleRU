@@ -994,7 +994,9 @@ function groupAppliesToSelection(groupId, conditionsByGroup, selectedProgramIds)
 }
 
 const COURSE_ELIGIBILITY_CODE = /^\d{2}:\d{3}:\d{3}$/;
-const COURSE_ELIGIBILITY_BATCH_SIZE = 200;
+// D1 accepts at most 100 bind variables per statement. The Core curriculum
+// contains more course rows than that, so lookup batches must not exceed it.
+const COURSE_ELIGIBILITY_BATCH_SIZE = 100;
 
 function reviewedCourseCodes(values) {
   return [...new Set((values || [])
