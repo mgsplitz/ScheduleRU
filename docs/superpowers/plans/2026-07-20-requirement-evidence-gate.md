@@ -24,7 +24,7 @@
 - `worker/src/requirement-evidence.js`: pure validation for the evidence manifest returned from D1.
 - `worker/src/programs.js`: fetches evidence for opt-in programs and rejects incomplete programs from public routes.
 - `worker/tests/requirement-evidence.test.mjs`: unit coverage for legacy, complete, missing, stale, and malformed evidence records.
-- `worker/tests/program-requirement-evidence-integration.test.mjs`: asserts that all three public program paths use the evidence gate.
+- `worker/tests/program-requirement-evidence-integration.test.mjs`: asserts that public listing, requirement loading, and selection checking use the evidence gate.
 - `worker/schema/seed_sas_ppe_draft.sql`: unreviewed, development-only source transcription for PPE; it is deliberately not a public import.
 - `worker/tests/sas-ppe-draft.test.mjs`: protects the SAS boundary and records the two unresolved PPE conditions.
 - `SAS_PILOT_SOURCE_INVENTORY.md`: updates the current-source-only PPE evidence and explicit blocking facts.
@@ -111,7 +111,7 @@ git commit -m "feat: add reviewed requirement evidence gate"
 
 **Files:**
 
-- Modify: `worker/src/programs.js: getRequirementTree and /api/programs routes`
+- Modify: `worker/src/programs.js: public program-listing, requirement-loading, and selection-check routes`
 - Create: `worker/tests/program-requirement-evidence-integration.test.mjs`
 
 **Interfaces:**
@@ -126,7 +126,8 @@ test("public program listing, requirement loading, and selection reject incomple
   assert.match(worker, /programHasCompleteRequirementEvidence/);
   assert.match(worker, /path === "\\/api\\/programs"/);
   assert.match(worker, /path\.startsWith\("\\/api\\/programs\\/"\)/);
-  assert.match(worker, /path === "\\/api\\/program-selection\\/compare"/);
+  assert.match(worker, /path === "\\/api\\/requirements"/);
+  assert.match(worker, /path === "\\/api\\/program-selection-check"/);
 });
 ```
 
@@ -150,7 +151,7 @@ async function programHasCompleteRequirementEvidence(env, program) {
 }
 ```
 
-Use this helper to filter `/api/programs`, return 404 from a direct requirement request, and omit an incomplete program from selection/comparison evaluation. Preserve the existing reviewed-status checks; evidence is an additional gate, never a replacement.
+Use this helper to filter `/api/programs`, return 404 from `/api/programs/:id/requirements`, omit an incomplete program from `/api/requirements`, and reject it through `/api/program-selection-check`. Preserve the existing reviewed-status checks; evidence is an additional gate, never a replacement.
 
 - [ ] **Step 4: Run focused and full tests**
 
