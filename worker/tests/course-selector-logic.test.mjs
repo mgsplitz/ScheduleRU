@@ -32,6 +32,21 @@ test("a subject-and-level selector keeps its reviewed campus and numeric range",
   assert.equal(selectors.matchesSelector("01:198:300", selector), false);
 });
 
+test("a reviewed selector excludes source-disallowed courses inside its range", () => {
+  const selector = {
+    version: 1,
+    kind: "subject_level",
+    school_codes: ["01"],
+    subject_codes: ["640"],
+    course_number_min: 300,
+    course_number_max: 499,
+    exclude_course_codes: ["01:640:491", "01:640:492"],
+  };
+  assert.equal(selectors.matchesSelector("01:640:490", selector), true);
+  assert.equal(selectors.matchesSelector("01:640:491", selector), false);
+  assert.equal(selectors.matchesSelector("01:640:492", selector), false);
+});
+
 test("unknown or malformed selectors fail closed", () => {
   assert.equal(selectors.matchesSelector("01:790:300", { version: 1, kind: "department" }), false);
   assert.equal(selectors.matchesSelector("01:790:300", {
