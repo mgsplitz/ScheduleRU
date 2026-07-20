@@ -29,4 +29,5 @@ test("reviewed credit-count group rules survive normalization and render course 
   assert.match(frontend, /rule===\"max_credits\" \? \"max_credits\"/);
   assert.match(frontend, /groupProgress\(g\)/);
   assert.match(frontend, /courses.*credits applied/);
+  assert.match(frontend, /g\.rule!==\"all\"&&!isCreditRule\(g\)/);
 });

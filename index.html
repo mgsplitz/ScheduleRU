@@ -1508,7 +1508,7 @@ function groupDisplayName(g){
 }
 const PICKER_THRESHOLD=6;
 function isPickerGroup(g){
-  return !!g && g.rule!=="all" && (g.members||[]).length>PICKER_THRESHOLD;
+  return !!g && g.rule!=="all"&&!isCreditRule(g) && (g.members||[]).length>PICKER_THRESHOLD;
 }
 function selectedRequirementCourses(gk){
   const valid=new Set(GROUPS[gk]?.members||[]);
