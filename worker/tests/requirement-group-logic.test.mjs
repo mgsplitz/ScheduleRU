@@ -104,6 +104,18 @@ test("a nested maximum constraint continues to block an over-limit selection", (
   assert.equal(evaluate(groups, ["scm-a", "outside-a", "outside-b"])("electives"), false);
 });
 
+test("a one-of-sequences requirement accepts one complete approved sequence but not a mixed partial path", () => {
+  const groups = {
+    science: { id: "science", rule: "one_of", members: [], children: ["physics", "chemistry"] },
+    physics: { id: "physics", parentId: "science", rule: "all", members: ["203", "204", "205", "206"], children: [] },
+    chemistry: { id: "chemistry", parentId: "science", rule: "all", members: ["159", "160", "171"], children: [] },
+  };
+
+  assert.equal(evaluate(groups, ["203", "204", "205", "206"])("science"), true);
+  assert.equal(evaluate(groups, ["203", "204", "205", "159", "160"])("science"), false);
+  assert.equal(evaluate(groups, ["159", "160", "171"])("science"), true);
+});
+
 test("an exclusive allocation family assigns one completed course to only one group with a stable tie-breaker", () => {
   const groups = {
     beta: { id: "beta", rule: "all", members: ["shared"], children: [], allocation: { allocation_family: "cross-listed", max_uses: 1 } },

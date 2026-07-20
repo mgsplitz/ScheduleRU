@@ -58,6 +58,13 @@
         && (g.children || []).every((childId) => groupFulfilled(childId, groups, options));
     }
 
+    // A reviewed parent with this rule describes mutually exclusive complete
+    // paths (for example, one approved laboratory-science sequence). Its
+    // children own each path; combining partial children must not satisfy it.
+    if (g.rule === "one_of") {
+      return (g.children || []).some((childId) => groupFulfilled(childId, groups, options));
+    }
+
     if (g.rule === "distinct") {
       const applied = new Set([
         ...selected(g.id),

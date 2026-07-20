@@ -1594,6 +1594,7 @@ function attachCardEvents(el){
    TAB 1: REQUIRED
    ============================================================ */
 function groupRuleLabel(g){
+  if(g.rule==="one_of") return "complete one approved sequence";
   if(g.rule==="min") return `choose at least ${g.count}`;
   if(g.rule==="max") return `choose up to ${g.count}`;
   if(g.rule==="min_credits") return `complete at least ${g.count} credits`;
@@ -1612,7 +1613,7 @@ function groupDisplayName(g){
 }
 const PICKER_THRESHOLD=6;
 function isPickerGroup(g){
-  return !!g && g.rule!=="all"&&!isCreditRule(g) && (g.members||[]).length>PICKER_THRESHOLD;
+  return !!g && g.rule!=="all"&&g.rule!=="one_of"&&!isCreditRule(g) && (g.members||[]).length>PICKER_THRESHOLD;
 }
 function selectedRequirementCourses(gk){
   const valid=new Set(GROUPS[gk]?.members||[]);
@@ -2045,7 +2046,7 @@ function buildRequirementTree(requirements){
   const nextGroups={};
   const rootIds=[];
   const courseRows=[];
-  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : rule==="min_credits" ? "min_credits" : rule==="max_credits" ? "max_credits" : rule==="min_distinct_children" ? "distinct" : "all";
+  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : rule==="min_credits" ? "min_credits" : rule==="max_credits" ? "max_credits" : rule==="min_distinct_children" ? "distinct" : rule==="one_of" ? "one_of" : "all";
 
   function addGroup(raw, parentId=null){
     const group={
