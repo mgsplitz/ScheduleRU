@@ -93,6 +93,30 @@ test("a reviewed co-requisite permits a matching same-term course", () => {
   assert.equal(result.status, "eligible_now");
 });
 
+test("one AP award satisfies every official course equivalent without double-counting credit", () => {
+  const calculusOne = {
+    condition_type: "prerequisite_course",
+    condition_value_json: JSON.stringify({ any_of_course_codes: ["01:640:151"] }),
+    review_status: "reviewed",
+  };
+  const calculusTwo = {
+    condition_type: "prerequisite_course",
+    condition_value_json: JSON.stringify({ any_of_course_codes: ["01:640:152"] }),
+    review_status: "reviewed",
+  };
+  const result = logic.evaluateEligibility({
+    targetTerm: { year: 2, sem: "fall" }, mode: "current", review,
+    conditions: [calculusOne, calculusTwo],
+    confirmedEntries: [{
+      id: "ap:calc-bc", source: "ap", credits: 8, course_code: "01:640:151",
+      equivalent_course_codes: ["01:640:151", "01:640:152"],
+    }],
+    scheduledEntries: [],
+  });
+  assert.equal(result.status, "eligible_now");
+  assert.equal(result.creditTotals.confirmed, 8);
+});
+
 test("wishlist-shaped records do not add credit", () => {
   const result = logic.evaluateEligibility({
     targetTerm: { year: 2, sem: "fall" }, mode: "current", review, conditions: [creditGate],

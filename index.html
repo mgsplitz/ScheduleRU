@@ -643,7 +643,7 @@ const ST = {
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
-  backendSubject:"", backendSearch:"", backendPage:1,
+  backendSubject:"", backendSearch:"", backendPage:1, backendSelectorGroupId:null,
   backendCourses:[], backendTotal:0, backendLoading:false, backendError:"",
   backendSubjects:[], backendStatus:null,
   expandedIds: new Set(),   // course ids currently expanded on the Courses page
@@ -719,7 +719,7 @@ function confirmedAcademicCreditEntries(){
   const entries=[];
   AP.filter(ap=>ST.apOn[ap.id]).forEach(ap=>entries.push({
     id:"ap:"+ap.id, source:"ap", credits:creditNumber(ap.credits),
-    course_code:courseCodesFromText(ap.equiv)[0]||"",
+    course_code:courseCodesFromText(ap.equiv)[0]||"", equivalent_course_codes:courseCodesFromText(ap.equiv),
   }));
   Object.entries(ST.completed||{}).forEach(([id,taken])=>{
     if(!taken) return;
@@ -730,6 +730,10 @@ function confirmedAcademicCreditEntries(){
   });
   Object.values(ST.creditLedger||{}).forEach(entry=>entries.push(entry));
   return globalThis.ScheduleRUEligibilityLogic.confirmedCreditEntries(entries);
+}
+function confirmedAcademicCourseCodes(){
+  const logic=globalThis.ScheduleRUEligibilityLogic;
+  return [...new Set(confirmedAcademicCreditEntries().flatMap(entry=>logic.entryCourseCodes(entry)))];
 }
 function plannedScheduleCreditEntries(){
   return Object.values(ST.schedule||{}).map(entry=>({
@@ -764,6 +768,12 @@ function courseEligibilityNotice(course,term){
   return result.status==="eligible_now" ? "" : plannerEligibilityLabel(result);
 }
 
+function apFulfillsRequirementCourse(ap,id,course){
+  if((ap?.fulfills||[]).includes(id)) return true;
+  const acceptedIds=new Set([id,requirementCourseId(course?.code)]);
+  (course?.alternatives||[]).forEach(alt=>acceptedIds.add(requirementCourseId(alt?.code||alt?.equivalent_course_code)));
+  return courseCodesFromText(ap?.equiv).some(code=>acceptedIds.has(requirementCourseId(code)));
+}
 function isCompleted(id){
   if(ST.completed[id]) return true;
   const c = COURSES[id];
@@ -776,9 +786,10 @@ function isCompleted(id){
     const altId=requirementCourseId(code);
     return !!ST.completed[altId] || Object.values(ST.schedule).some(e=>e.code===code);
   })) return true;
-  // check if any checked AP credit fulfills this course
-  const aps = AP_FULFILLS[id] || [];
-  return aps.some(apId => ST.apOn[apId]);
+  // AP awards can carry more than one official course equivalency. The
+  // legacy fulfills map covers Core-specific ids; the course-code comparison
+  // makes every official equivalency available to reviewed programs too.
+  return AP.some(ap=>ST.apOn[ap.id]&&apFulfillsRequirementCourse(ap,id,c));
 }
 function standingRequirement(c){
   const text=[c?.restrictions,...(c?.requirementNotes||[])].join(" ").toLowerCase();
@@ -865,6 +876,7 @@ function requirementAllocationKey(){
       GROUPS[id]?.count,GROUPS[id]?.children,GROUPS[id]?.parentId,GROUPS[id]?.courseSelectors,
     ]),
     Object.keys(ST.completed||{}).filter(id=>ST.completed[id]).sort(),
+    Object.keys(ST.apOn||{}).filter(id=>ST.apOn[id]).sort(),
     Object.values(ST.schedule||{}).map(entry=>entry?.code).filter(Boolean).sort(),
     Object.keys(ST.groupSelections||{}).sort().map(id=>[id,ST.groupSelections[id]]),
   ]);
@@ -897,19 +909,24 @@ function selectorGuidanceHtml(g){
   const descriptions=selectors.map(selector=>engine.selectorDescription(selector));
   const corrected=selectors.length===raw.length;
   const rule=descriptions.length ? descriptions.join("; ") : "this reviewed course rule";
-  return `<div class="choice-summary">Scheduled and completed courses matching ${escapeHtml(rule)} apply here automatically. Add matching courses from the Courses page; this requirement does not use a static course list.${corrected?"":" A reviewed course rule needs correction before it can be applied."}</div>`;
+  const action=corrected
+    ? `<div class="choice-actions"><button class="choice-btn" data-gbrowse="${escapeHtml(g.id)}">Browse matching courses</button></div>`
+    : "";
+  return `<div class="choice-summary">Scheduled and completed courses matching ${escapeHtml(rule)} apply here automatically. Browse the matching catalog, add a course to your wishlist, then place it in your plan.${corrected?"":" A reviewed course rule needs correction before it can be applied."}</div>${action}`;
 }
 
 /* ============================================================
    TOP-LEVEL PAGE SWITCH (Degree Navigator / Courses)
    ============================================================ */
-document.querySelectorAll(".pagenav-btn").forEach(b=>b.addEventListener("click", ()=>{
-  document.querySelectorAll(".pagenav-btn").forEach(x=>x.classList.remove("active"));
-  b.classList.add("active");
-  ST.page = b.dataset.page;
-  document.getElementById("page-nav").style.display = ST.page==="nav" ? "" : "none";
-  document.getElementById("page-courses").style.display = ST.page==="courses" ? "" : "none";
+function setTopLevelPage(page){
+  ST.page=page==="courses"?"courses":"nav";
+  document.querySelectorAll(".pagenav-btn").forEach(button=>button.classList.toggle("active",button.dataset.page===ST.page));
+  document.getElementById("page-nav").style.display=ST.page==="nav" ? "" : "none";
+  document.getElementById("page-courses").style.display=ST.page==="courses" ? "" : "none";
   if(ST.page==="courses") renderCoursesPage();
+}
+document.querySelectorAll(".pagenav-btn").forEach(b=>b.addEventListener("click", ()=>{
+  setTopLevelPage(b.dataset.page);
 }));
 
 /* ============================================================
@@ -1180,7 +1197,7 @@ function prerequisiteEligibilityForTerm(course,term){
   const result=globalThis.ScheduleRUEligibilityLogic.evaluatePrerequisitePaths({
     targetTerm:term,
     paths:plan.paths,
-    confirmedCourseCodes:confirmedAcademicCreditEntries().map(entry=>entry.course_code),
+    confirmedCourseCodes:confirmedAcademicCourseCodes(),
     scheduledEntries:plannedScheduleCreditEntries(),
   });
   return {...result,plan};
@@ -1945,6 +1962,9 @@ function renderRequired(){
   pb.querySelectorAll("[data-gpicker]").forEach(b=>b.addEventListener("click",e=>{
     e.stopPropagation(); openRequirementPicker(b.dataset.gpicker);
   }));
+  pb.querySelectorAll("[data-gbrowse]").forEach(b=>b.addEventListener("click",e=>{
+    e.stopPropagation(); openSelectorCourseBrowser(b.dataset.gbrowse);
+  }));
   pb.querySelectorAll("[data-gclear]").forEach(b=>b.addEventListener("click",e=>{
     e.stopPropagation(); delete ST.groupSelections[b.dataset.gclear]; renderPanel();
   }));
@@ -2010,6 +2030,29 @@ async function backendFetch(path,options={}){
   if(!res.ok) throw new Error(`HTTP ${res.status} — ${text.slice(0,150)}`);
   try{ return JSON.parse(text); }
   catch(e){ throw new Error(`Response wasn't JSON: ${text.slice(0,150)}`); }
+}
+
+function activeCatalogSelectorContext(){
+  const group=GROUPS[ST.backendSelectorGroupId];
+  const selectors=reviewedGroupSelectors(group);
+  return group&&selectors.length ? {group,selectors} : null;
+}
+function openSelectorCourseBrowser(gk){
+  const group=GROUPS[gk];
+  if(!group||!reviewedGroupSelectors(group).length) return;
+  ST.backendSelectorGroupId=gk;
+  ST.backendSearch="";
+  ST.backendSubject="";
+  ST.backendPage=1;
+  ST.expandedIds.clear();
+  setTopLevelPage("courses");
+  loadBackendCourses();
+}
+function clearCatalogSelectorBrowser(){
+  ST.backendSelectorGroupId=null;
+  ST.backendPage=1;
+  ST.expandedIds.clear();
+  loadBackendCourses();
 }
 
 async function loadCourseEligibilityForCodes(codes){
@@ -2435,6 +2478,8 @@ async function loadBackendCourses(){
       search: ST.backendSearch||"", subject: ST.backendSubject||"",
       limit: String(PAGE_SIZE), offset: String((ST.backendPage-1)*PAGE_SIZE),
     });
+    const selectorContext=activeCatalogSelectorContext();
+    if(selectorContext) params.set("selector",JSON.stringify(selectorContext.selectors));
     const d = await backendFetch("/api/courses?"+params.toString());
     ST.backendCourses = d.courses||[];
     await loadCourseEligibilityForCodes(ST.backendCourses.map(catalogCourseCode));
@@ -2572,6 +2617,7 @@ function courseRowHtml(c){
 function renderCoursesPage(){
   const root = document.getElementById("coursesRoot");
   if(!root) return;
+  const selectorContext=activeCatalogSelectorContext();
 
   // Connection bar is always visible so the backend URL can be seen/changed
   // at any time, not just on first connect. The "Open" link hits the raw
@@ -2612,6 +2658,12 @@ function renderCoursesPage(){
   const subjOpts = `<option value="">All subjects</option>` + (ST.backendSubjects||[]).map(s=>
     `<option value="${s.code}"${ST.backendSubject===s.code?" selected":""}>${escapeHtml(s.description||s.code)} (${s.code})</option>`
   ).join("");
+  const selectorDescription=selectorContext
+    ? selectorContext.selectors.map(selector=>globalThis.ScheduleRUCourseSelectorLogic.selectorDescription(selector)).join("; ")
+    : "";
+  const displayedCourses=selectorContext
+    ? ST.backendCourses.filter(course=>globalThis.ScheduleRUCourseSelectorLogic.matchesAnySelector(backendCourseRecord(course),selectorContext.selectors))
+    : ST.backendCourses;
 
   let statusLine = "";
   if(ST.backendStatus){
@@ -2624,10 +2676,10 @@ function renderCoursesPage(){
     bodyHtml = `<div class="loading">Loading courses…</div>`;
   } else if(ST.backendError){
     bodyHtml = `<div class="api-status err">${escapeHtml(ST.backendError)}</div>`;
-  } else if(ST.backendCourses.length){
+  } else if(displayedCourses.length){
     const pages = Math.max(1, Math.ceil(ST.backendTotal / PAGE_SIZE));
     bodyHtml = `
-      <div class="course-list">${ST.backendCourses.map(courseRowHtml).join("")}</div>
+      <div class="course-list">${displayedCourses.map(courseRowHtml).join("")}</div>
       <div class="pager">
         <button id="cpPrev" ${ST.backendPage<=1?"disabled":""}>← Prev</button>
         <span class="pg-info">Page ${ST.backendPage} of ${pages} (${ST.backendTotal.toLocaleString()} courses)</span>
@@ -2640,9 +2692,10 @@ function renderCoursesPage(){
   root.innerHTML = `
     <div class="cp-header"><h1>Course Catalog</h1><div class="cp-sub">${statusLine}</div></div>
     ${connectionBar}
+    ${selectorContext?`<div class="choice-summary">Showing only courses that count toward <b>${escapeHtml(groupDisplayName(selectorContext.group))}</b>: ${escapeHtml(selectorDescription)}. Add one to your wishlist, then place it in your plan to apply it automatically.</div>`:""}
     <div class="cp-controls">
       <input id="cpSearch" placeholder="Search by title or course code…" value="${escapeHtml(ST.backendSearch)}"/>
-      <select id="cpSubject">${subjOpts}</select>
+      ${selectorContext?`<button class="choice-btn secondary" id="cpClearSelector">Clear requirement filter</button>`:`<select id="cpSubject">${subjOpts}</select>`}
     </div>
     ${bodyHtml}`;
 
@@ -2668,6 +2721,7 @@ function attachCoursesPageControls(){
   if(subjEl) subjEl.addEventListener("change", e=>{
     ST.backendSubject=e.target.value; ST.backendPage=1; loadBackendCourses();
   });
+  document.getElementById("cpClearSelector")?.addEventListener("click", clearCatalogSelectorBrowser);
 
   document.getElementById("cpPrev")?.addEventListener("click", ()=>{ ST.backendPage--; loadBackendCourses(); });
   document.getElementById("cpNext")?.addEventListener("click", ()=>{ ST.backendPage++; loadBackendCourses(); });

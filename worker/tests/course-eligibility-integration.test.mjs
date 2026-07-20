@@ -25,6 +25,8 @@ test("the browser migrates v1 state and evaluates the selected target term", asy
   assert.match(frontend, /\[1,PLANNER_STATE_VERSION\]\.includes\(saved\.version\)/);
   assert.match(frontend, /ST\.creditLedger\s*=\s*savedObject\(saved\.creditLedger\)/);
   assert.match(frontend, /function confirmedAcademicCreditEntries\(/);
+  assert.match(frontend, /equivalent_course_codes:courseCodesFromText\(ap\.equiv\)/);
+  assert.match(frontend, /function apFulfillsRequirementCourse\(/);
   assert.match(frontend, /function plannedScheduleCreditEntries\(/);
   assert.match(frontend, /function courseEligibilityForTerm\(/);
   assert.match(frontend, /function loadCourseEligibilityForCodes\(/);

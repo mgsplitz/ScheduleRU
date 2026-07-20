@@ -58,6 +58,87 @@ function json(data, status = 200) {
   });
 }
 
+const COURSE_CODE_PATTERN = /^\d{2}:\d{3}:\d{3}$/;
+
+// The browser sends only selector shapes that came from a reviewed program
+// rule. Validate them again here so catalog filtering stays fail-closed and
+// can never turn query parameters into SQL syntax.
+function parseCourseSelectorFilter(rawValue) {
+  let raw;
+  try {
+    raw = JSON.parse(rawValue);
+  } catch (_) {
+    return null;
+  }
+  const values = Array.isArray(raw) ? raw : [raw];
+  if (!values.length || values.length > 12) return null;
+  const unique = (items, pattern, limit) => [...new Set((Array.isArray(items) ? items : [])
+    .map((item) => String(item || "").trim())
+    .filter((item) => pattern.test(item)))].slice(0, limit);
+  const selectors = [];
+  for (const value of values) {
+    if (!value || typeof value !== "object" || Array.isArray(value) || Number(value.version) !== 1) return null;
+    const exclude_course_codes = unique(value.exclude_course_codes, COURSE_CODE_PATTERN, 32);
+    if (value.kind === "course_codes") {
+      const include_course_codes = unique(value.include_course_codes, COURSE_CODE_PATTERN, 32);
+      if (!include_course_codes.length) return null;
+      selectors.push({ kind: "course_codes", include_course_codes, exclude_course_codes });
+      continue;
+    }
+    if (value.kind === "subject_level") {
+      const school_codes = unique(value.school_codes, /^\d{2}$/, 8);
+      const subject_codes = unique(value.subject_codes, /^\d{3}$/, 12);
+      const course_number_min = value.course_number_min === undefined ? 0 : Number(value.course_number_min);
+      const course_number_max = value.course_number_max === undefined ? 999 : Number(value.course_number_max);
+      const minimum_credits = value.minimum_credits === undefined ? 0 : Number(value.minimum_credits);
+      if (!school_codes.length || !subject_codes.length
+        || !Number.isInteger(course_number_min) || !Number.isInteger(course_number_max)
+        || course_number_min < 0 || course_number_max > 999 || course_number_min > course_number_max
+        || !Number.isFinite(minimum_credits) || minimum_credits < 0 || minimum_credits > 99) return null;
+      selectors.push({
+        kind: "subject_level", school_codes, subject_codes,
+        course_number_min, course_number_max, minimum_credits, exclude_course_codes,
+      });
+      continue;
+    }
+    return null;
+  }
+  return selectors;
+}
+
+function selectorWhereClause(selectors) {
+  const catalogCode = "c.school || ':' || c.subject_code || ':' || c.course_number";
+  const binds = [];
+  const placeholders = (values) => values.map(() => "?").join(",");
+  const clauses = selectors.map((selector) => {
+    if (selector.kind === "course_codes") {
+      const parts = [`${catalogCode} IN (${placeholders(selector.include_course_codes)})`];
+      binds.push(...selector.include_course_codes);
+      if (selector.exclude_course_codes.length) {
+        parts.push(`${catalogCode} NOT IN (${placeholders(selector.exclude_course_codes)})`);
+        binds.push(...selector.exclude_course_codes);
+      }
+      return `(${parts.join(" AND ")})`;
+    }
+    const parts = [
+      `c.school IN (${placeholders(selector.school_codes)})`,
+      `c.subject_code IN (${placeholders(selector.subject_codes)})`,
+      "CAST(c.course_number AS INTEGER) BETWEEN ? AND ?",
+    ];
+    binds.push(...selector.school_codes, ...selector.subject_codes, selector.course_number_min, selector.course_number_max);
+    if (selector.minimum_credits > 0) {
+      parts.push("CAST(c.credits AS REAL) >= ?");
+      binds.push(selector.minimum_credits);
+    }
+    if (selector.exclude_course_codes.length) {
+      parts.push(`${catalogCode} NOT IN (${placeholders(selector.exclude_course_codes)})`);
+      binds.push(...selector.exclude_course_codes);
+    }
+    return `(${parts.join(" AND ")})`;
+  });
+  return { sql: `(${clauses.join(" OR ")})`, binds };
+}
+
 /* ============================================================
    FETCH FROM RUTGERS (source of truth — always full & fresh)
    ============================================================ */
@@ -322,6 +403,7 @@ async function handleApi(request, env, ctx) {
   if (path === "/api/courses") {
     const q = (url.searchParams.get("search") || "").trim();
     const subject = (url.searchParams.get("subject") || "").trim();
+    const selectorValue = url.searchParams.get("selector");
     const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100);
     const offset = Number(url.searchParams.get("offset") || 0);
 
@@ -352,8 +434,15 @@ async function handleApi(request, env, ctx) {
       where += ` AND (LOWER(id) LIKE ?${tokenClauses.length ? ` OR (${tokenClauses.join(" AND ")})` : ""})`;
       binds.splice(subject ? 1 : 0, 0, `%${q.toLowerCase()}%`);
     }
+    if (selectorValue !== null) {
+      const selectors = parseCourseSelectorFilter(selectorValue);
+      if (!selectors) return json({ error: "invalid course selector" }, 400);
+      const selector = selectorWhereClause(selectors);
+      where += ` AND ${selector.sql}`;
+      binds.push(...selector.binds);
+    }
 
-    const countRow = await env.DB.prepare(`SELECT COUNT(*) as n FROM courses${where}`).bind(...binds).first();
+    const countRow = await env.DB.prepare(`SELECT COUNT(*) as n FROM courses c${where}`).bind(...binds).first();
     const total = countRow ? countRow.n : 0;
 
     const sql = `SELECT c.*,

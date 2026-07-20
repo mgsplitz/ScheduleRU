@@ -65,7 +65,19 @@
       ...entry,
       credits: Number(entry.credits),
       course_code: String(entry.course_code || ""),
+      equivalent_course_codes: entryCourseCodes(entry),
     }));
+  }
+
+  function entryCourseCodes(entry) {
+    return [...new Set([
+      entry?.course_code,
+      ...(Array.isArray(entry?.equivalent_course_codes) ? entry.equivalent_course_codes : []),
+    ].map((code) => String(code || "")).filter((code) => COURSE_CODE.test(code)))];
+  }
+
+  function entryMatchesCourseCode(entry, courseCode) {
+    return entryCourseCodes(entry).includes(String(courseCode || ""));
   }
 
   function plannedCreditEntriesBefore(targetTerm, entries) {
@@ -290,11 +302,11 @@
         const sameTerm = (Array.isArray(input.scheduledEntries) ? input.scheduledEntries : [])
           .filter((entry) => termOrdinal(entry) === target);
         const match = evidence.concat(sameTerm)
-          .find((entry) => condition.any_of_course_codes.includes(entry.course_code));
+          .find((entry) => condition.any_of_course_codes.some((code) => entryMatchesCourseCode(entry, code)));
         if (!match) missing.push(condition);
         else satisfied.push(condition);
       } else {
-        const match = evidence.find((entry) => condition.any_of_course_codes.includes(entry.course_code));
+        const match = evidence.find((entry) => condition.any_of_course_codes.some((code) => entryMatchesCourseCode(entry, code)));
         if (!match) missing.push(condition);
         else {
           satisfied.push(condition);
@@ -317,6 +329,8 @@
     normalizeReview,
     normalizeCondition,
     confirmedCreditEntries,
+    entryCourseCodes,
+    entryMatchesCourseCode,
     plannedCreditEntriesBefore,
     catalogCourseReferences,
     parseCatalogPrerequisitePaths,

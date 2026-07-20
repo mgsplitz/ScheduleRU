@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const schema = await readFile(new URL("../schema/schema_requirement_course_selectors.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
+const catalogWorker = await readFile(new URL("../src/worker.js", import.meta.url), "utf8");
 const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
 
 test("reviewed selector rows are stored with an audited source and returned with their group", () => {
@@ -21,6 +22,18 @@ test("the browser loads selector matching and uses schedule/completed records fo
   assert.match(frontend, /plannedOrCompletedCourseRecords\(\)/);
   assert.match(frontend, /appliedCourseIds:groupAppliedCourseIds/);
   assert.match(frontend, /courseSelectors:Array\.isArray\(raw\.course_selectors\)/);
+});
+
+test("selector-backed requirements can open the catalog with their reviewed filter", () => {
+  assert.match(frontend, /function openSelectorCourseBrowser\(gk\)/);
+  assert.match(frontend, /data-gbrowse=/);
+  assert.match(frontend, /params\.set\("selector",JSON\.stringify\(selectorContext\.selectors\)\)/);
+});
+
+test("the catalog applies selector filters on the server before it paginates", () => {
+  assert.match(catalogWorker, /function parseCourseSelectorFilter\(/);
+  assert.match(catalogWorker, /url\.searchParams\.get\("selector"\)/);
+  assert.match(catalogWorker, /course_number AS INTEGER/);
 });
 
 test("reviewed credit-count group rules survive normalization and render course and credit progress", () => {
