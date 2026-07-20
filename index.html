@@ -2396,6 +2396,14 @@ async function loadAvailablePrograms(){
   ST.availablePrograms=(data.programs||[])
     .filter(p=>["major","minor","concentration","certificate"].includes(p.type))
     .filter(programIsAvailableForHomeSchool);
+  const catalogReplacements=new Map(ST.availablePrograms
+    .filter(program=>typeof program.catalog_program_id==="string"&&program.catalog_program_id)
+    .map(program=>[program.catalog_program_id,program.id]));
+  const migratedSelections=[...new Set(ST.selectedPrograms.map(id=>catalogReplacements.get(id)||id))];
+  if(migratedSelections.some((id,index)=>id!==ST.selectedPrograms[index])||migratedSelections.length!==ST.selectedPrograms.length){
+    ST.selectedPrograms=migratedSelections;
+    savePlannerState();
+  }
   ST.programSelectionPolicies=policyData||{limits:[],combination_policies:[]};
   return ST.availablePrograms;
 }
