@@ -77,6 +77,11 @@ export function publishedCatalogPrograms(catalogPrograms = [], reviewedPrograms 
     seenReviewedIds.add(reviewed.id);
     return {
       ...reviewed,
+      // Preserve the catalog identity that this reviewed row replaces.  The
+      // browser uses it to upgrade a saved catalog-only selection on the
+      // next refresh, so students do not have to remove and re-add a program
+      // simply because its audited path has become available.
+      catalog_program_id: catalog.id,
       coverage_status: "reviewed",
       requirements_available: true,
       requirements_notice: null,
