@@ -30,6 +30,7 @@
  */
 
 import { evaluateProgramSelection, publicEligibilityRule } from "./program-selection-policy.js";
+import { requirementEvidenceComplete } from "./requirement-evidence.js";
 import { publicSchoolProfile } from "./school-profiles.js";
 
 /* ============================================================
@@ -1031,6 +1032,33 @@ async function getReviewedCourseEligibility(env, rawCodes) {
   return output;
 }
 
+async function programHasCompleteRequirementEvidence(env, program) {
+  if (Number(program?.requirement_evidence_required) !== 1) return true;
+  const [groupsResult, coursesResult, evidenceResult] = await env.DB.batch([
+    env.DB.prepare(
+      "SELECT id FROM requirement_groups WHERE program_id = ?"
+    ).bind(program.id),
+    env.DB.prepare(
+      `SELECT rc.group_id, rc.course_code
+       FROM requirement_courses rc
+       INNER JOIN requirement_groups g ON g.id = rc.group_id
+       WHERE g.program_id = ?`
+    ).bind(program.id),
+    env.DB.prepare(
+      `SELECT entity_key, entity_type, group_id, course_code, source_url,
+              source_title, source_catalog_year, accessed_at, reviewer_note, review_status
+       FROM program_requirement_evidence
+       WHERE program_id = ?`
+    ).bind(program.id),
+  ]);
+  return requirementEvidenceComplete({
+    required: true,
+    groups: groupsResult.results || [],
+    courses: coursesResult.results || [],
+    evidence: evidenceResult.results || [],
+  });
+}
+
 async function getRequirementTree(env, programId, selectedProgramIds = [programId]) {
   // A major can inherit one or more reusable requirement sets. For example,
   // every RBS-New Brunswick major links to the single RBS Foundational Core
@@ -1217,11 +1245,15 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     if (school) { where += " AND school_slug = ?"; binds.push(school); }
     if (type) { where += " AND type = ?"; binds.push(type); }
     const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();
-    const eligibilityRules = await getProgramEligibilityRules(env, (results || []).map((program) => program.id));
+    const programs = [];
+    for (const program of results || []) {
+      if (await programHasCompleteRequirementEvidence(env, program)) programs.push(program);
+    }
+    const eligibilityRules = await getProgramEligibilityRules(env, programs.map((program) => program.id));
     const rulesByProgram = {};
     for (const rule of eligibilityRules) (rulesByProgram[rule.program_id] ||= []).push(rule);
     return json({
-      programs: (results || []).map((program) => ({
+      programs: programs.map((program) => ({
         ...program,
         eligibility_rules: rulesByProgram[program.id] || [],
       })),
@@ -1252,7 +1284,9 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     const program = await env.DB.prepare(
       `SELECT * FROM programs WHERE id = ? AND review_status = 'reviewed'`
     ).bind(programId).first();
-    if (!program) return json({ error: "not found" }, 404);
+    if (!program || !(await programHasCompleteRequirementEvidence(env, program))) {
+      return json({ error: "not found" }, 404);
+    }
     const [tree, eligibilityRules] = await Promise.all([
       getRequirementTree(env, programId),
       getProgramEligibilityRules(env, [programId]),
@@ -1265,10 +1299,15 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     if (!ids.length) return json({ error: "pass ?programs=id1,id2" }, 400);
     const out = {};
     const { results: reviewedPrograms } = await env.DB.prepare(
-      `SELECT id FROM programs WHERE review_status = 'reviewed' AND id IN (${ids.map(() => "?").join(",")})`
+      `SELECT id, requirement_evidence_required
+       FROM programs
+       WHERE review_status = 'reviewed' AND id IN (${ids.map(() => "?").join(",")})`
     ).bind(...ids).all();
-    const reviewedIds = new Set(reviewedPrograms.map((program) => program.id));
-    const visibleIds = ids.filter((id) => reviewedIds.has(id));
+    const visibleProgramIds = new Set();
+    for (const program of reviewedPrograms || []) {
+      if (await programHasCompleteRequirementEvidence(env, program)) visibleProgramIds.add(program.id);
+    }
+    const visibleIds = ids.filter((id) => visibleProgramIds.has(id));
 
     // Silently omit unknown or unreviewed ids, keeping the response useful
     // for any reviewed programs requested alongside them.
@@ -1352,12 +1391,14 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     let programs = [];
     if (ids.length) {
       const { results } = await env.DB.prepare(
-        `SELECT id, school_slug, type
+        `SELECT id, school_slug, type, requirement_evidence_required
          FROM programs
          WHERE review_status = 'reviewed' AND type NOT IN ('shared_requirement_set', 'core_curriculum')
            AND id IN (${ids.map(() => "?").join(",")})`
       ).bind(...ids).all();
-      programs = results || [];
+      for (const program of results || []) {
+        if (await programHasCompleteRequirementEvidence(env, program)) programs.push(program);
+      }
     }
     const [policyData, eligibilityRules] = await Promise.all([
       getProgramSelectionPolicies(env, homeSchoolSlug),
