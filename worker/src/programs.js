@@ -32,7 +32,7 @@
 import { evaluateProgramSelection, publicEligibilityRule } from "./program-selection-policy.js";
 import { requirementEvidenceComplete } from "./requirement-evidence.js";
 import { publicSchoolProfile } from "./school-profiles.js";
-import { SAS_CATALOG_PROGRAMS } from "./sas-catalog-manifest.js";
+import { importProgramDirectory } from "./program-directory-import.js";
 
 function normalizedCatalogText(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -42,7 +42,7 @@ function normalizedDegreeType(value) {
   return String(value || "").toUpperCase().replace(/[^A-Z]/g, "");
 }
 
-function reviewedProgramMatchesSasCatalog(reviewed, catalog) {
+function reviewedProgramMatchesCatalog(reviewed, catalog) {
   if (!reviewed || !catalog || reviewed.type !== catalog.type) return false;
   if (reviewed.id === catalog.id) return true;
   const catalogDegree = normalizedDegreeType(catalog.degree_type);
@@ -55,18 +55,25 @@ function reviewedProgramMatchesSasCatalog(reviewed, catalog) {
     || normalizedCatalogText(reviewed.name) === normalizedCatalogText(catalog.name);
 }
 
-function reviewedProgramForSasCatalog(catalog, reviewedPrograms) {
-  return (reviewedPrograms || []).find((reviewed) => reviewedProgramMatchesSasCatalog(reviewed, catalog)) || null;
+function reviewedProgramForCatalog(catalog, reviewedPrograms) {
+  return (reviewedPrograms || []).find((reviewed) => reviewedProgramMatchesCatalog(reviewed, catalog)) || null;
 }
 
 // An official catalog listing is sufficient to let a student identify a
 // program they intend to pursue; it is never sufficient to present a degree
 // audit. Reviewed records replace their catalog counterpart when available.
-export function publishedSasCatalogPrograms(reviewedPrograms = []) {
+export function publishedCatalogPrograms(catalogPrograms = [], reviewedPrograms = []) {
   const seenReviewedIds = new Set();
-  const programs = SAS_CATALOG_PROGRAMS.map((catalog) => {
-    const reviewed = reviewedProgramForSasCatalog(catalog, reviewedPrograms);
-    if (!reviewed) return catalog;
+  const programs = (catalogPrograms || []).map((catalog) => {
+    const reviewed = reviewedProgramForCatalog(catalog, reviewedPrograms);
+    if (!reviewed) {
+      return {
+        ...catalog,
+        coverage_status: "catalog_listed",
+        requirements_available: false,
+        requirements_notice: "Catalog-listed program: its program-specific requirements are still being reviewed. Use the official program source and advising to confirm degree progress.",
+      };
+    }
     seenReviewedIds.add(reviewed.id);
     return {
       ...reviewed,
@@ -89,10 +96,6 @@ export function publishedSasCatalogPrograms(reviewedPrograms = []) {
   return programs.sort((a, b) => a.name.localeCompare(b.name)
     || a.type.localeCompare(b.type)
     || String(a.degree_type || "").localeCompare(String(b.degree_type || "")));
-}
-
-function sasCatalogProgramById(programId) {
-  return SAS_CATALOG_PROGRAMS.find((program) => program.id === programId) || null;
 }
 
 /* ============================================================
@@ -242,6 +245,104 @@ function coreGroupCourseRows(group, courses) {
 async function runD1Batches(env, statements, chunkSize = 100) {
   for (let i = 0; i < statements.length; i += chunkSize) {
     await env.DB.batch(statements.slice(i, i + chunkSize));
+  }
+}
+
+function isSafeCatalogSourceId(value) {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{2,119}$/.test(value);
+}
+
+function isSupportedCatalogDirectorySource(source) {
+  return source
+    && source.adapter === "html_program_directory_v1"
+    && typeof source.directory_url === "string"
+    && typeof source.profile_path === "string";
+}
+
+async function saveCatalogDirectoryEntries(env, source, entries) {
+  const now = Date.now();
+  const statements = entries.map((entry) => env.DB.prepare(
+    `INSERT INTO programs (
+       id, name, school_slug, program_slug, type, catalog_year, degree_type,
+       program_family_id, source_url, review_status, last_scraped_at,
+       catalog_source_id, catalog_listed_at, catalog_active
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+     ON CONFLICT(id) DO UPDATE SET
+       name = excluded.name,
+       school_slug = excluded.school_slug,
+       program_slug = excluded.program_slug,
+       type = excluded.type,
+       catalog_year = excluded.catalog_year,
+       degree_type = excluded.degree_type,
+       program_family_id = excluded.program_family_id,
+       source_url = excluded.source_url,
+       review_status = excluded.review_status,
+       last_scraped_at = excluded.last_scraped_at,
+       catalog_source_id = excluded.catalog_source_id,
+       catalog_listed_at = excluded.catalog_listed_at,
+       catalog_active = 1
+     WHERE programs.review_status = 'catalog_listed'`
+  ).bind(
+    entry.id, entry.name, entry.school_slug, entry.program_slug, entry.type,
+    entry.catalog_year, entry.degree_type, entry.program_family_id, entry.source_url,
+    entry.review_status, now, source.id, now,
+  ));
+  await runD1Batches(env, statements);
+  // Only after every current entry was safely stored do we retire programs
+  // missing from the latest official directory. A failed partial import never
+  // hides previously published programs.
+  await env.DB.prepare(
+    `UPDATE programs
+     SET catalog_active = 0
+     WHERE catalog_source_id = ?
+       AND review_status = 'catalog_listed'
+       AND catalog_listed_at < ?`
+  ).bind(source.id, now).run();
+  await env.DB.prepare(
+    `UPDATE program_catalog_sources
+     SET last_imported_at = ?, last_error = NULL
+     WHERE id = ?`
+  ).bind(now, source.id).run();
+}
+
+async function importCatalogDirectorySource(env, sourceId) {
+  if (!isSafeCatalogSourceId(sourceId)) throw new Error("invalid catalog source id");
+  const source = await env.DB.prepare(
+    `SELECT id, school_slug, directory_url, profile_path, catalog_year,
+            source_title, adapter
+     FROM program_catalog_sources
+     WHERE id = ? AND enabled = 1`
+  ).bind(sourceId).first();
+  if (!source) throw new Error("unknown or disabled catalog source");
+  if (!isSupportedCatalogDirectorySource(source)) throw new Error("unsupported catalog directory adapter");
+
+  let rawHtml = "";
+  try {
+    const result = await importProgramDirectory({
+      source,
+      fetchHtml: async (directoryUrl) => {
+        const response = await fetch(directoryUrl, { headers: FETCH_HEADERS });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        rawHtml = await response.text();
+        return rawHtml;
+      },
+      saveEntries: (entries) => saveCatalogDirectoryEntries(env, source, entries),
+    });
+    await logScrape(
+      env,
+      `catalog:${source.id}`,
+      "ok",
+      { groupsWritten: 0, coursesWritten: result.programs_imported, notesWritten: 0 },
+      `imported ${result.programs_imported} catalog-listed programs from ${source.directory_url}`,
+      rawHtml.slice(0, 1500),
+    );
+    return { ok: true, source_id: source.id, ...result };
+  } catch (err) {
+    await env.DB.prepare(
+      `UPDATE program_catalog_sources SET last_error = ? WHERE id = ?`
+    ).bind(String(err?.message || err), source.id).run();
+    await logScrape(env, `catalog:${source.id}`, "error", null, `catalog directory import failed: ${err.message}`, rawHtml.slice(0, 1500));
+    return { ok: false, source_id: source.id, error: err.message };
   }
 }
 
@@ -1258,15 +1359,20 @@ async function getProgramSelectionPolicies(env, homeSchoolSlug) {
 async function getProgramEligibilityRules(env, programIds) {
   const ids = [...new Set((Array.isArray(programIds) ? programIds : []).filter(isSafeProgramId))];
   if (!ids.length) return [];
-  const { results } = await env.DB.prepare(
-    `SELECT rule_key, program_id, condition_type, condition_value_json,
-            decision, note, source_url
-     FROM program_eligibility_rules
-     WHERE review_status = 'reviewed'
-       AND program_id IN (${ids.map(() => "?").join(",")})
-     ORDER BY program_id, rule_key`
-  ).bind(...ids).all();
-  return (results || []).map(publicEligibilityRule);
+  const rows = [];
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    const batch = ids.slice(offset, offset + 100);
+    const { results } = await env.DB.prepare(
+      `SELECT rule_key, program_id, condition_type, condition_value_json,
+              decision, note, source_url
+       FROM program_eligibility_rules
+       WHERE review_status = 'reviewed'
+         AND program_id IN (${batch.map(() => "?").join(",")})
+       ORDER BY program_id, rule_key`
+    ).bind(...batch).all();
+    rows.push(...(results || []));
+  }
+  return rows.map(publicEligibilityRule);
 }
 
 function isSafeHomeSchoolSlug(value) {
@@ -1300,25 +1406,25 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     const school = url.searchParams.get("school");
     const type = url.searchParams.get("type");
     // Shared sets and school-level Core curricula have their own public
-    // routes; neither is a student-selectable major/minor program. SAS also
-    // exposes an official catalog coverage tier: it is selectable but never
-    // supplies a requirement tree until a separate review is complete.
-    let where = " WHERE review_status = 'reviewed' AND type NOT IN ('shared_requirement_set', 'core_curriculum')", binds = [];
+    // routes. A catalog-listed program is selectable, but its empty
+    // requirement tree is never presented as an audited degree result.
+    let where = ` WHERE type NOT IN ('shared_requirement_set', 'core_curriculum')
+                  AND (review_status = 'reviewed'
+                    OR (review_status = 'catalog_listed' AND catalog_active = 1))`, binds = [];
     if (school) { where += " AND school_slug = ?"; binds.push(school); }
     if (type) { where += " AND type = ?"; binds.push(type); }
     const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();
     const reviewedPrograms = [];
+    const catalogPrograms = [];
     for (const program of results || []) {
-      if (await programHasCompleteRequirementEvidence(env, program)) reviewedPrograms.push(program);
+      if (program.review_status === "catalog_listed") {
+        catalogPrograms.push(program);
+      } else if (await programHasCompleteRequirementEvidence(env, program)) {
+        reviewedPrograms.push(program);
+      }
     }
-    let programs = reviewedPrograms;
-    if (!school || school === "sasnb") {
-      const reviewedSasPrograms = reviewedPrograms.filter((program) => program.school_slug === "sasnb");
-      const nonSasPrograms = school ? [] : reviewedPrograms.filter((program) => program.school_slug !== "sasnb");
-      programs = [...nonSasPrograms, ...publishedSasCatalogPrograms(reviewedSasPrograms)];
-    }
-    if (type) programs = programs.filter((program) => program.type === type);
-    const eligibilityRules = await getProgramEligibilityRules(env, programs.map((program) => program.id));
+    const programs = publishedCatalogPrograms(catalogPrograms, reviewedPrograms);
+    const eligibilityRules = await getProgramEligibilityRules(env, reviewedPrograms.map((program) => program.id));
     const rulesByProgram = {};
     for (const rule of eligibilityRules) (rulesByProgram[rule.program_id] ||= []).push(rule);
     return json({
@@ -1349,15 +1455,21 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
   if (path.match(/^\/api\/programs\/[^/]+\/requirements$/) && request.method === "GET") {
     const programId = decodeURIComponent(path.split("/")[3]);
     const program = await env.DB.prepare(
-      `SELECT * FROM programs WHERE id = ? AND review_status = 'reviewed'`
+      `SELECT * FROM programs
+       WHERE id = ?
+         AND (review_status = 'reviewed'
+           OR (review_status = 'catalog_listed' AND catalog_active = 1))`
     ).bind(programId).first();
-    if (!program || !(await programHasCompleteRequirementEvidence(env, program))) {
-      const catalogProgram = sasCatalogProgramById(programId);
-      if (catalogProgram) {
-        return json({ program: catalogProgram, requirements: [], eligibility_rules: [], catalog_listed: true });
-      }
-      return json({ error: "not found" }, 404);
+    if (!program) return json({ error: "not found" }, 404);
+    if (program.review_status === "catalog_listed") {
+      return json({
+        program: publishedCatalogPrograms([program], [])[0],
+        requirements: [],
+        eligibility_rules: [],
+        catalog_listed: true,
+      });
     }
+    if (!(await programHasCompleteRequirementEvidence(env, program))) return json({ error: "not found" }, 404);
     const [tree, eligibilityRules] = await Promise.all([
       getRequirementTree(env, programId),
       getProgramEligibilityRules(env, [programId]),
@@ -1367,19 +1479,26 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
 
   if (path === "/api/requirements" && request.method === "GET") {
     const ids = (url.searchParams.get("programs") || "").split(",").map((s) => s.trim()).filter(Boolean);
-    if (!ids.length) return json({ error: "pass ?programs=id1,id2" }, 400);
+    if (!ids.length || ids.length > 25) return json({ error: "pass 1-25 valid program ids in ?programs=id1,id2" }, 400);
     const out = {};
-    const { results: reviewedPrograms } = await env.DB.prepare(
-      `SELECT id, requirement_evidence_required
+    const { results: publicPrograms } = await env.DB.prepare(
+      `SELECT id, requirement_evidence_required, review_status, catalog_active
        FROM programs
-       WHERE review_status = 'reviewed' AND id IN (${ids.map(() => "?").join(",")})`
+       WHERE id IN (${ids.map(() => "?").join(",")})
+         AND (review_status = 'reviewed'
+           OR (review_status = 'catalog_listed' AND catalog_active = 1))`
     ).bind(...ids).all();
     const visibleProgramIds = new Set();
-    for (const program of reviewedPrograms || []) {
-      if (await programHasCompleteRequirementEvidence(env, program)) visibleProgramIds.add(program.id);
+    const catalogListedProgramIds = new Set();
+    for (const program of publicPrograms || []) {
+      if (program.review_status === "catalog_listed") {
+        catalogListedProgramIds.add(program.id);
+      } else if (await programHasCompleteRequirementEvidence(env, program)) {
+        visibleProgramIds.add(program.id);
+      }
     }
     const visibleIds = ids.filter((id) => visibleProgramIds.has(id));
-    const catalogListedIds = ids.filter((id) => !visibleProgramIds.has(id) && !!sasCatalogProgramById(id));
+    const catalogListedIds = ids.filter((id) => catalogListedProgramIds.has(id));
 
     // Catalog-listed programs are intentionally represented by an empty tree.
     // The client keeps their selection and shows the source-backed coverage
@@ -1450,8 +1569,8 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
   }
 
   // Stateless validation before the browser saves a selection. It reads
-  // reviewed policy data plus the official SAS catalog-coverage manifest, so
-  // it remains public and contains no student data or admin secret.
+  // reviewed policy data plus catalog-listed program records from D1, so it
+  // remains public and contains no student data or admin secret.
   if (path === "/api/program-selection-check" && request.method === "POST") {
     let body;
     try {
@@ -1472,38 +1591,23 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     if (ids.length) {
       const { results } = await env.DB.prepare(
         `SELECT id, name, school_slug, program_slug, type, degree_type,
-                program_family_id, requirement_evidence_required
+                program_family_id, requirement_evidence_required, review_status,
+                catalog_active
          FROM programs
-         WHERE review_status = 'reviewed' AND type NOT IN ('shared_requirement_set', 'core_curriculum')
+         WHERE type NOT IN ('shared_requirement_set', 'core_curriculum')
+           AND (review_status = 'reviewed'
+             OR (review_status = 'catalog_listed' AND catalog_active = 1))
            AND id IN (${ids.map(() => "?").join(",")})`
       ).bind(...ids).all();
       for (const program of results || []) {
-        if (await programHasCompleteRequirementEvidence(env, program)) programs.push(program);
-      }
-
-      // Resolve any selected catalog ids through the same published SAS view
-      // used by /api/programs. That preserves known program-family policies
-      // when one sibling already has a reviewed requirement tree.
-      if (ids.some((id) => !!sasCatalogProgramById(id))) {
-        const { results: reviewedSasRows } = await env.DB.prepare(
-          `SELECT id, name, school_slug, program_slug, type, degree_type,
-                  program_family_id, requirement_evidence_required, source_url
-           FROM programs
-           WHERE review_status = 'reviewed' AND school_slug = 'sasnb'
-             AND type NOT IN ('shared_requirement_set', 'core_curriculum')`
-        ).all();
-        const completeSasPrograms = [];
-        for (const program of reviewedSasRows || []) {
-          if (await programHasCompleteRequirementEvidence(env, program)) completeSasPrograms.push(program);
+        if (program.review_status === "catalog_listed" || await programHasCompleteRequirementEvidence(env, program)) {
+          programs.push(program);
         }
-        const byId = new Map(programs.map((program) => [program.id, program]));
-        for (const program of publishedSasCatalogPrograms(completeSasPrograms)) byId.set(program.id, program);
-        programs = ids.map((id) => byId.get(id)).filter(Boolean);
       }
     }
     const [policyData, eligibilityRules] = await Promise.all([
       getProgramSelectionPolicies(env, homeSchoolSlug),
-      getProgramEligibilityRules(env, programs.map((program) => program.id)),
+      getProgramEligibilityRules(env, programs.filter((program) => program.review_status === "reviewed").map((program) => program.id)),
     ]);
     return json(evaluateProgramSelection({
       homeSchoolSlug,
@@ -1516,8 +1620,15 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
   }
 
   // ---- Admin: everything below requires ?secret= ----
-  if (path.startsWith("/api/admin/") && (path.startsWith("/api/admin/programs") || path.startsWith("/api/admin/scrape") || path.startsWith("/api/admin/review") || path.startsWith("/api/admin/requirement"))) {
+  if (path.startsWith("/api/admin/") && (path.startsWith("/api/admin/programs") || path.startsWith("/api/admin/program-catalog") || path.startsWith("/api/admin/scrape") || path.startsWith("/api/admin/review") || path.startsWith("/api/admin/requirement"))) {
     if (!checkAdmin(url)) return json({ error: "bad secret" }, 403);
+
+    if (path === "/api/admin/program-catalog/import" && request.method === "POST") {
+      const sourceId = url.searchParams.get("source") || "";
+      if (!sourceId) return json({ error: "pass ?source=the-catalog-source-id" }, 400);
+      const result = await importCatalogDirectorySource(env, sourceId);
+      return json(result, result.ok ? 200 : 502);
+    }
 
     // Seed a program by hand — the reliable path, always works regardless
     // of whether index-page discovery finds anything for that school.
