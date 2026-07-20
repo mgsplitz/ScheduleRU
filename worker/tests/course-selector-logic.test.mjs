@@ -75,3 +75,18 @@ test("selector subset checks prove only safe nested relationships", () => {
   assert.equal(selectors.selectorIsSubset({ ...child, minimum_credits: 3 }, creditBoundedParent), true);
   assert.equal(selectors.selectorIsSubset({ version: 1, kind: "course_codes", include_course_codes: ["29:790:300"] }, parent), false);
 });
+
+test("selector subset checks retain shared parent exclusions", () => {
+  const parent = {
+    version: 1, kind: "subject_level", school_codes: ["01"], subject_codes: ["920"],
+    course_number_min: 100, course_number_max: 499,
+    exclude_course_codes: ["01:920:101", "01:920:215"],
+  };
+  const child = {
+    version: 1, kind: "subject_level", school_codes: ["01"], subject_codes: ["920"],
+    course_number_min: 300, course_number_max: 499,
+    exclude_course_codes: ["01:920:101", "01:920:215"],
+  };
+  assert.equal(selectors.selectorIsSubset(child, parent), true);
+  assert.equal(selectors.selectorIsSubset({ ...child, exclude_course_codes: [] }, parent), false);
+});

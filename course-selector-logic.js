@@ -114,7 +114,7 @@
   function selectorIsSubset(rawChild, rawParent) {
     const child = normalizeSelector(rawChild);
     const parent = normalizeSelector(rawParent);
-    if (!child || !parent || parent.exclude_course_codes.length) return false;
+    if (!child || !parent) return false;
     if (child.kind === "course_codes") return child.include_course_codes.every((code) => matchesSelector(code, parent));
     if (child.kind === "subject_level" && parent.kind === "subject_level") {
       return child.school_codes.every((code) => parent.school_codes.includes(code))
@@ -122,7 +122,7 @@
         && child.course_number_min >= parent.course_number_min
         && child.course_number_max <= parent.course_number_max
         && child.minimum_credits >= parent.minimum_credits
-        && !child.exclude_course_codes.length;
+        && parent.exclude_course_codes.every((code) => child.exclude_course_codes.includes(code));
     }
     return false;
   }
