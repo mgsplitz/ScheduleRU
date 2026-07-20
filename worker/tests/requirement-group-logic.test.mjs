@@ -3,7 +3,7 @@ import test from "node:test";
 
 await import("../../requirement-group-logic.js");
 
-const { groupFulfilled, groupProgress } = globalThis.ScheduleRURequirementLogic;
+const { groupFulfilled, groupProgress, allocateRequirementCourses } = globalThis.ScheduleRURequirementLogic;
 
 function evaluate(groups, completed, appliedByGroup = {}, creditsByCourse = {}) {
   const taken = new Set(completed);
@@ -102,4 +102,49 @@ test("a nested maximum constraint continues to block an over-limit selection", (
   };
   assert.equal(evaluate(groups, ["scm-a", "outside-a"])("electives"), true);
   assert.equal(evaluate(groups, ["scm-a", "outside-a", "outside-b"])("electives"), false);
+});
+
+test("an exclusive allocation family assigns one completed course to only one group with a stable tie-breaker", () => {
+  const groups = {
+    beta: { id: "beta", rule: "all", members: ["shared"], children: [], allocation: { allocation_family: "cross-listed", max_uses: 1 } },
+    alpha: { id: "alpha", rule: "all", members: ["shared"], children: [], allocation: { allocation_family: "cross-listed", max_uses: 1 } },
+  };
+
+  const allocation = allocateRequirementCourses(groups, {
+    isCompleted: (courseId) => courseId === "shared",
+  });
+
+  assert.deepEqual(allocation.appliedByGroup, { alpha: ["shared"], beta: [] });
+});
+
+test("exclusive allocation reallocates a shared course to maximize completed requirements", () => {
+  const groups = {
+    alpha: { id: "alpha", rule: "min", count: 1, members: ["fallback", "shared"], children: [], allocation: { allocation_family: "cross-listed", max_uses: 1 } },
+    beta: { id: "beta", rule: "min", count: 1, members: ["shared"], children: [], allocation: { allocation_family: "cross-listed", max_uses: 1 } },
+  };
+
+  const allocation = allocateRequirementCourses(groups, {
+    isCompleted: (courseId) => ["fallback", "shared"].includes(courseId),
+  });
+
+  assert.deepEqual(allocation.appliedByGroup, { alpha: ["fallback"], beta: ["shared"] });
+  assert.equal(allocation.completedRequirements, 2);
+});
+
+test("exclusive allocation optimizes connected families together when a required parent depends on both", () => {
+  const groups = {
+    "a-required": { id: "a-required", rule: "all", members: ["shared"], children: ["z-child"], allocation: { allocation_family: "first-family", max_uses: 1 } },
+    "b-optional": { id: "b-optional", rule: "min", count: 1, members: ["shared"], children: [], allocation: { allocation_family: "first-family", max_uses: 1 } },
+    "z-child": { id: "z-child", rule: "min", count: 1, members: ["child-course"], children: [], allocation: { allocation_family: "second-family", max_uses: 1 } },
+  };
+
+  const allocation = allocateRequirementCourses(groups, {
+    isCompleted: (courseId) => ["shared", "child-course"].includes(courseId),
+  });
+
+  assert.deepEqual(allocation.appliedByGroup, {
+    "a-required": ["shared"],
+    "b-optional": [],
+    "z-child": ["child-course"],
+  });
 });

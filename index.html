@@ -848,7 +848,7 @@ function registerSelectorCourseRecord(record){
   };
   return id;
 }
-function groupAppliedCourseIds(g){
+function baseGroupAppliedCourseIds(g){
   const explicit=(g?.members||[]).filter(id=>isCompleted(id));
   const selectors=reviewedGroupSelectors(g);
   const engine=globalThis.ScheduleRUCourseSelectorLogic;
@@ -858,6 +858,38 @@ function groupAppliedCourseIds(g){
     .map(registerSelectorCourseRecord)
     .filter(Boolean);
   return [...new Set([...explicit,...selectorMatches])];
+}
+let requirementAllocationCache={key:"",value:null};
+function requirementAllocationKey(){
+  return JSON.stringify([
+    Object.keys(GROUPS).sort().map(id=>[
+      id,GROUPS[id]?.allocation,GROUPS[id]?.members,GROUPS[id]?.rule,
+      GROUPS[id]?.count,GROUPS[id]?.children,GROUPS[id]?.parentId,GROUPS[id]?.courseSelectors,
+    ]),
+    Object.keys(ST.completed||{}).filter(id=>ST.completed[id]).sort(),
+    Object.values(ST.schedule||{}).map(entry=>entry?.code).filter(Boolean).sort(),
+    Object.keys(ST.groupSelections||{}).sort().map(id=>[id,ST.groupSelections[id]]),
+  ]);
+}
+function requirementAllocation(){
+  const engine=globalThis.ScheduleRURequirementLogic;
+  if(!engine?.allocateRequirementCourses) return null;
+  const key=requirementAllocationKey();
+  if(requirementAllocationCache.key===key) return requirementAllocationCache.value;
+  const value=engine.allocateRequirementCourses(GROUPS,{
+    isCompleted,
+    selectedRequirementCourses,
+    isConstraintGroup,
+    appliedCourseIds:baseGroupAppliedCourseIds,
+    courseCredits:id=>creditNumber(COURSES[id]?.credits),
+  });
+  requirementAllocationCache={key,value};
+  return value;
+}
+function groupAppliedCourseIds(g){
+  if(!g?.allocation) return baseGroupAppliedCourseIds(g);
+  const allocated=requirementAllocation()?.appliedByGroup?.[g.id];
+  return Array.isArray(allocated) ? allocated : baseGroupAppliedCourseIds(g);
 }
 function selectorGuidanceHtml(g){
   const raw=Array.isArray(g?.courseSelectors)?g.courseSelectors:[];
@@ -1581,6 +1613,16 @@ function constraintSummaryHtml(g){
   const requirement=g.rule==="min" ? `at least ${g.count}` : `up to ${g.count}`;
   return `<div class="choice-summary">${selected} selected or completed · ${requirement} required. Choose these through the approved list above.</div>`;
 }
+function allocationSummaryHtml(g){
+  const allocation=g?.allocation;
+  if(!allocation) return "";
+  const applied=groupAppliedCourseIds(g);
+  const maxUses=Number(allocation.max_uses);
+  const selected=applied.length
+    ? `${applied.length} completed course${applied.length===1?" is":"s are"} allocated to this group.`
+    : "No completed course is allocated to this group.";
+  return `<div class="choice-summary">${selected} This reviewed ${escapeHtml(allocation.allocation_family)} allocation permits each course to count in up to ${maxUses} group${maxUses===1?"":"s"}; other eligible choices remain visible.</div>`;
+}
 function pickerSummaryHtml(gk){
   const g=GROUPS[gk];
   const selected=selectedRequirementCourses(gk);
@@ -1614,6 +1656,7 @@ function groupHtml(gk){
     : (isPickerGroup(g)
       ? pickerSummaryHtml(gk)
       : `${appliedHtml}${members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`:""}`);
+  body=`${allocationSummaryHtml(g)}${body}`;
   body=isConstraintGroup(g)||isPickerGroup(g) ? body : `${selectorGuidanceHtml(g)}${body}`;
   const selectorCount=reviewedGroupSelectors(g).length;
   const appliedProgress=groupProgress(g);
@@ -1933,6 +1976,7 @@ function buildRequirementTree(requirements){
       parentId, members:[], children:[], sourceProgramId:raw.program_id,
       display_family:cleanApiText(raw.display_family),
       display_priority:Number(raw.display_priority)||0,
+      allocation:raw.allocation,
       courseSelectors:Array.isArray(raw.course_selectors)?raw.course_selectors:[],
     };
     nextGroups[group.id]=group;

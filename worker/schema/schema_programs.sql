@@ -53,8 +53,8 @@ CREATE INDEX IF NOT EXISTS idx_reqgroups_parent ON requirement_groups(parent_gro
 CREATE TABLE IF NOT EXISTS requirement_group_conditions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   group_id TEXT NOT NULL REFERENCES requirement_groups(id),
-  condition_type TEXT NOT NULL,     -- selected_program_must_include_one_of | selected_program_must_not_include_any
-  condition_value_json TEXT NOT NULL,
+  condition_type TEXT NOT NULL,     -- selected_program_must_include_one_of | selected_program_must_not_include_any | allocation_family | max_uses
+  condition_value_json TEXT NOT NULL, -- allocation JSON: {"allocation_family":"reviewed-family"} + {"max_uses":1}
   note TEXT,
   source_url TEXT,
   review_status TEXT DEFAULT 'unreviewed',

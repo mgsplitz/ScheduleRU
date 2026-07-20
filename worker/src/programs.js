@@ -679,7 +679,7 @@ function parseBizTable(tableHtml, precedingHeading = "") {
   return section.courseItems.length || section.orGroups.length ? section : null;
 }
 
-export { parseBizTable, groupAppliesToSelection };
+export { parseBizTable, groupAppliesToSelection, allocationForConditions };
 
 function isLegacyBizCurriculum(section) {
   // The app currently represents the active catalog path for a program.
@@ -936,9 +936,47 @@ function conditionProgramIds(condition) {
   }
 }
 
+function allocationForConditions(conditions) {
+  let family = null;
+  let maxUses = null;
+  let hasAllocationCondition = false;
+  for (const condition of conditions || []) {
+    if (condition?.condition_type !== "allocation_family" && condition?.condition_type !== "max_uses") continue;
+    hasAllocationCondition = true;
+    let value;
+    try {
+      value = JSON.parse(condition.condition_value_json || "{}");
+    } catch {
+      return null;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    if (condition.condition_type === "allocation_family") {
+      const candidate = typeof value.allocation_family === "string" ? value.allocation_family.trim() : "";
+      if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(candidate) || (family && family !== candidate)) return null;
+      family = candidate;
+      continue;
+    }
+    const candidate = Number(value.max_uses);
+    if (!Number.isInteger(candidate) || candidate < 1 || (maxUses !== null && maxUses !== candidate)) return null;
+    maxUses = candidate;
+  }
+  return hasAllocationCondition && family && maxUses !== null
+    ? { allocation_family: family, max_uses: maxUses }
+    : null;
+}
+
 function groupAppliesToSelection(groupId, conditionsByGroup, selectedProgramIds) {
   const selected = new Set((selectedProgramIds || []).filter(isSafeProgramId));
-  for (const condition of conditionsByGroup[groupId] || []) {
+  const conditions = conditionsByGroup[groupId] || [];
+  const hasAllocationCondition = conditions.some((condition) =>
+    condition?.condition_type === "allocation_family" || condition?.condition_type === "max_uses"
+  );
+  // A partial or malformed reviewed allocation must not silently lift a
+  // no-double-count rule. It remains invisible until the reviewed data has a
+  // complete family and positive usage cap.
+  if (hasAllocationCondition && !allocationForConditions(conditions)) return false;
+  for (const condition of conditions) {
+    if (condition.condition_type === "allocation_family" || condition.condition_type === "max_uses") continue;
     const expected = conditionProgramIds(condition);
     if (condition.condition_type === "selected_program_must_include_one_of") {
       if (![...expected].some((id) => selected.has(id))) return false;
@@ -1081,9 +1119,26 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
     c.eligibility = eligibilityByCode[c.course_code] || null;
     (byGroup[c.group_id] ||= []).push(c);
   }
+  const allocationsByGroup = Object.fromEntries(visibleGroups.map((group) => [
+    group.id,
+    allocationForConditions(conditionsByGroup[group.id]),
+  ]));
+  const familyMaxUses = new Map();
+  for (const allocation of Object.values(allocationsByGroup)) {
+    if (!allocation) continue;
+    const current = familyMaxUses.get(allocation.allocation_family);
+    familyMaxUses.set(allocation.allocation_family, current === undefined
+      ? allocation.max_uses
+      : Math.min(current, allocation.max_uses));
+  }
   const byId = {};
   for (const g of visibleGroups) byId[g.id] = {
-    ...g, courses: byGroup[g.id] || [], course_selectors: selectorsByGroup[g.id] || [], children: [],
+    ...g,
+    allocation: allocationsByGroup[g.id] && {
+      ...allocationsByGroup[g.id],
+      max_uses: familyMaxUses.get(allocationsByGroup[g.id].allocation_family),
+    },
+    courses: byGroup[g.id] || [], course_selectors: selectorsByGroup[g.id] || [], children: [],
   };
   const roots = [];
   for (const g of visibleGroups) {

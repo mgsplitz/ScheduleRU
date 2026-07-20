@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { groupAppliesToSelection, parseBizTable } from "../src/programs.js";
+import { allocationForConditions, groupAppliesToSelection, parseBizTable } from "../src/programs.js";
 
 test("a Business Core cross-reference is retained as source prose, not a duplicate major requirement", () => {
   const section = parseBizTable(`
@@ -43,4 +43,22 @@ test("a reviewed requirement path follows the selected major rather than a front
   assert.equal(groupAppliesToSelection("otherPath", conditions, ["rbsnb-finance", "rbsnb-real-estate-concentration"]), false);
   assert.equal(groupAppliesToSelection("financePath", conditions, ["rbsnb-marketing", "rbsnb-real-estate-concentration"]), false);
   assert.equal(groupAppliesToSelection("otherPath", conditions, ["rbsnb-marketing", "rbsnb-real-estate-concentration"]), true);
+});
+
+test("reviewed allocation conditions expose a valid family and cap without changing group visibility", () => {
+  const conditions = [{
+    condition_type: "allocation_family",
+    condition_value_json: '{"allocation_family":"cross-listed-elective"}',
+  }, {
+    condition_type: "max_uses",
+    condition_value_json: '{"max_uses":1}',
+  }];
+
+  assert.deepEqual(allocationForConditions(conditions), {
+    allocation_family: "cross-listed-elective",
+    max_uses: 1,
+  });
+  assert.equal(groupAppliesToSelection("elective", { elective: conditions }, []), true);
+  assert.equal(allocationForConditions([conditions[0]]), null);
+  assert.equal(groupAppliesToSelection("elective", { elective: [conditions[0]] }, []), false);
 });
