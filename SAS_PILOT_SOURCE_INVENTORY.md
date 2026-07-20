@@ -52,6 +52,10 @@ This is the best first pilot because it tests three reusable concerns at once wi
 | Published overlap outcome | [PPE minor requirements](https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics) | A Political Science major may use the Political Science component toward both the major and PPE minor. This is a specific, source-backed overlap permission, not an assumption from SAS's general overlap policy. |
 | School-level bounds | [SAS degree requirements](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/degree-requirements) and [SAS major/minor restrictions](https://www.sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-restrictions) | Major/minor/credit/GPA baseline, conditional minor exceptions, and prohibition records that must remain separate from this permitted PPE overlap. |
 
+### Political Science area-map check
+
+The current [Political Science Focus Areas page](https://polisci.rutgers.edu/academics/undergraduate/course-descriptions/focus-areas) is useful supporting evidence, but it is not yet a complete source for automatic major-area evaluation. It exposes the relevant area labels and tags some courses, while other listed courses have no main-area tag. Do not fill those gaps from titles, course levels, or older catalogs. Political Science remains hidden until Rutgers publishes or confirms a complete current course-to-area map.
+
 ### Selector foundation completed in development
 
 Both source pages include honest rule types that a flat approved-course list cannot express, such as “any Political Science course at the 300/400 level,” “no more than one 100-level Philosophy course,” and a course category defined by the department. The reviewed course-selector rule is attached to a requirement group and must:
