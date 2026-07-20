@@ -8,6 +8,7 @@ import { evaluateProgramSelection, publicEligibilityRule } from "../src/program-
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, "../fixtures/program-selection-comparison-cases.json");
 const fixture = JSON.parse(await readFile(fixturePath, "utf8"));
+const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
 
 for (const comparisonCase of fixture.cases) {
   test(comparisonCase.id, () => {
@@ -23,6 +24,10 @@ for (const comparisonCase of fixture.cases) {
     assert.deepEqual(result.errors.map((issue) => issue.code).sort(), [...comparisonCase.expected.error_codes].sort());
   });
 }
+
+test("selection validation loads a program family for reviewed same-family policies", () => {
+  assert.match(worker, /SELECT id,\s+school_slug,\s+type,\s+program_family_id,\s+requirement_evidence_required/);
+});
 
 test("unknown program ids are rejected instead of being silently dropped", () => {
   const result = evaluateProgramSelection({
@@ -77,6 +82,50 @@ test("a named major exclusion blocks a BAIT student from the Business Analytics 
   });
   assert.equal(result.allowed, false);
   assert.deepEqual(result.errors.map((issue) => issue.code), ["eligibility:rbsnb-business-analytics-concentration-no-bait"]);
+});
+
+test("a same-program-family policy blocks only the matching SAS major and minor", () => {
+  const policy = {
+    policy_key: "sasnb-no-major-minor-same-program-family",
+    home_school_slug: "sasnb",
+    program_a_school_slug: "sasnb",
+    program_a_type: "major",
+    program_b_school_slug: "sasnb",
+    program_b_type: "minor",
+    same_program_family: 1,
+    decision: "blocked",
+    note: "SAS students may not select a major and minor from the same academic program.",
+    source_url: "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-restrictions",
+  };
+  const economicsMajor = {
+    id: "sasnb-economics-major", school_slug: "sasnb", type: "major", program_family_id: "sasnb-economics-220",
+  };
+  const economicsMinor = {
+    id: "sasnb-economics-minor", school_slug: "sasnb", type: "minor", program_family_id: "sasnb-economics-220",
+  };
+  const historyMinor = {
+    id: "sasnb-history-minor", school_slug: "sasnb", type: "minor", program_family_id: "sasnb-history-510",
+  };
+
+  const blocked = evaluateProgramSelection({
+    homeSchoolSlug: "sasnb",
+    selectedProgramIds: [economicsMajor.id, economicsMinor.id],
+    programs: [economicsMajor, economicsMinor, historyMinor],
+    limits: [], combinationPolicies: [policy], eligibilityRules: [],
+  });
+  assert.equal(blocked.allowed, false);
+  assert.deepEqual(blocked.errors.map((issue) => issue.code), [
+    "combination:sasnb-no-major-minor-same-program-family",
+  ]);
+
+  const allowed = evaluateProgramSelection({
+    homeSchoolSlug: "sasnb",
+    selectedProgramIds: [economicsMajor.id, historyMinor.id],
+    programs: [economicsMajor, economicsMinor, historyMinor],
+    limits: [], combinationPolicies: [policy], eligibilityRules: [],
+  });
+  assert.equal(allowed.allowed, true);
+  assert.deepEqual(allowed.errors, []);
 });
 
 test("a Leadership and Management major cannot add the Leadership Skills concentration", () => {

@@ -349,15 +349,27 @@ INSERT INTO program_combination_policies (
   policy_key, home_school_slug,
   program_a_id, program_a_school_slug, program_a_type,
   program_b_id, program_b_school_slug, program_b_type,
+  same_program_family,
   decision, note, source_url, verified_at
 ) VALUES (
   'sasnb-economics-major-no-quantitative-economics-minor',
   'sasnb',
   'sasnb-economics-major', NULL, NULL,
   'sasnb-quantitative-economics-minor', NULL, NULL,
+  0,
   'blocked',
   'Economics (220) majors may not minor in Quantitative Economics (221).',
   'https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/economics',
+  strftime('%s','now') * 1000
+), (
+  'sasnb-no-major-minor-same-program-family',
+  'sasnb',
+  NULL, 'sasnb', 'major',
+  NULL, 'sasnb', 'minor',
+  1,
+  'blocked',
+  'SAS students may not select a major and minor from the same academic program.',
+  'https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-restrictions',
   strftime('%s','now') * 1000
 )
 ON CONFLICT(policy_key) DO UPDATE SET
@@ -368,6 +380,7 @@ ON CONFLICT(policy_key) DO UPDATE SET
   program_b_id=excluded.program_b_id,
   program_b_school_slug=excluded.program_b_school_slug,
   program_b_type=excluded.program_b_type,
+  same_program_family=excluded.same_program_family,
   decision=excluded.decision,
   note=excluded.note,
   source_url=excluded.source_url,

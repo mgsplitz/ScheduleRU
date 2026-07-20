@@ -5,6 +5,7 @@ import test from "node:test";
 import { evaluateProgramSelection } from "../src/program-selection-policy.js";
 
 const seedUrl = new URL("../schema/review_sas_economics_batch_1.sql", import.meta.url);
+const traditionalMinorSeedUrl = new URL("../schema/review_sas_economics_batch_2.sql", import.meta.url);
 
 test("the first public SAS batch contains reviewed Economics paths with evidence", async () => {
   assert.equal(
@@ -84,4 +85,23 @@ test("the published Economics major and Quantitative Economics minor pairing is 
   assert.deepEqual(result.errors.map((issue) => issue.code), [
     "combination:sasnb-economics-major-no-quantitative-economics-minor",
   ]);
+});
+
+test("the traditional Economics minor is a reviewed selector-backed SAS program", async () => {
+  assert.equal(
+    existsSync(traditionalMinorSeedUrl),
+    true,
+    "traditional Economics minor seed must exist before it can be released"
+  );
+
+  const seed = await readFile(traditionalMinorSeedUrl, "utf8");
+  assert.match(seed, /'sasnb-economics-minor'/);
+  assert.match(seed, /'220'/);
+  assert.match(seed, /'sasnb-economics-220'/);
+  assert.match(seed, /'01:220:212'/);
+  assert.match(seed, /"course_number_min":300/);
+  assert.match(seed, /"course_number_max":499/);
+  assert.match(seed, /requirement_course_selectors/);
+  assert.match(seed, /program_requirement_evidence/);
+  assert.doesNotMatch(seed, /'14:540:343'/);
 });

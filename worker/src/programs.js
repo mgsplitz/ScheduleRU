@@ -1391,7 +1391,7 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     let programs = [];
     if (ids.length) {
       const { results } = await env.DB.prepare(
-        `SELECT id, school_slug, type, requirement_evidence_required
+        `SELECT id, school_slug, type, program_family_id, requirement_evidence_required
          FROM programs
          WHERE review_status = 'reviewed' AND type NOT IN ('shared_requirement_set', 'core_curriculum')
            AND id IN (${ids.map(() => "?").join(",")})`

@@ -44,7 +44,15 @@ function policySideMatches(program, policy, side) {
 function matchingPolicyPair(programs, policy) {
   const left = programs.filter((program) => policySideMatches(program, policy, "a"));
   const right = programs.filter((program) => policySideMatches(program, policy, "b"));
-  return left.some((a) => right.some((b) => a.id !== b.id));
+  const sameFamilyOnly = Number(policy?.same_program_family) === 1;
+  return left.some((a) => right.some((b) => {
+    if (a.id === b.id) return false;
+    if (!sameFamilyOnly) return true;
+    // A missing reviewed family must not silently bypass a school policy that
+    // depends on the family. New reviewed SAS programs always provide one.
+    if (!nonEmptyText(a.program_family_id) || !nonEmptyText(b.program_family_id)) return true;
+    return a.program_family_id === b.program_family_id;
+  }));
 }
 
 function policyMessage(policy) {
