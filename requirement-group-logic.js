@@ -218,7 +218,8 @@
 
     function allocationUpperBound(candidateIndex) {
       const potential = Object.fromEntries(Object.entries(working).map(([groupId, values]) => [groupId, [...values]]));
-      for (const candidate of candidates.slice(candidateIndex)) {
+      const remainingCandidates = candidates.slice(candidateIndex);
+      for (const candidate of remainingCandidates) {
         for (const groupId of candidate.groupIds) {
           if (!potential[groupId].includes(candidate.courseId)) potential[groupId].push(candidate.courseId);
         }
@@ -235,6 +236,40 @@
         bound.completed += 1;
         if (group.rule === "all") bound.required += 1;
       }
+
+      // The duplicated potential above deliberately ignores exclusive-use
+      // capacity. Tighten the safe upper bound for independent counted
+      // groups by treating each remaining course's max_uses as a shared pool.
+      // This is a relaxation (it ignores which group a course belongs to), so
+      // it can only overestimate what a real allocation can complete.
+      const countedGroups = scoredGroups.filter((group) => group.rule === "min"
+        && !(group.children || []).length
+        && Object.prototype.hasOwnProperty.call(working, group.id));
+      const fixedCount = countedGroups.filter((group) => working[group.id].length >= group.count).length;
+      const needs = countedGroups
+        .filter((group) => working[group.id].length < group.count)
+        .map((group) => ({
+          group,
+          needed: group.count - working[group.id].length,
+          available: remainingCandidates.filter((candidate) => candidate.groupIds.includes(group.id)).length,
+        }))
+        .filter((entry) => entry.available >= entry.needed)
+        .sort((left, right) => left.needed - right.needed || String(left.group.id).localeCompare(String(right.group.id)));
+      let capacity = remainingCandidates.reduce((total, candidate) => total + candidate.maxUses, 0);
+      let capacityCompleted = fixedCount;
+      for (const entry of needs) {
+        if (entry.needed > capacity) continue;
+        capacity -= entry.needed;
+        capacityCompleted += 1;
+      }
+      const duplicatedCount = countedGroups.filter((group) => groupFulfilled(group.id, groups, {
+        ...options,
+        isCompleted: completed,
+        allocatedCourseIds: (candidate) => Object.prototype.hasOwnProperty.call(potential, candidate?.id)
+          ? potential[candidate.id]
+          : undefined,
+      })).length;
+      bound.completed -= Math.max(0, duplicatedCount - capacityCompleted);
       return bound;
     }
 

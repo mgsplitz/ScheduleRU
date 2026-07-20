@@ -163,3 +163,19 @@ test("exclusive allocation prunes an impossible incomplete family with its stabl
   assert.deepEqual(allocation.appliedByGroup, { alpha: [...sharedCourses].sort(), beta: [] });
   assert.equal(allocation.completedRequirements, 0);
 });
+
+test("exclusive allocation prunes individually feasible groups that exceed shared capacity", () => {
+  const sharedCourses = Array.from({ length: 20 }, (_, index) => `shared-${index}`);
+  const groups = {
+    alpha: { id: "alpha", rule: "min", count: 11, members: sharedCourses, children: [], allocation: { allocation_family: "large-family", max_uses: 1 } },
+    beta: { id: "beta", rule: "min", count: 11, members: sharedCourses, children: [], allocation: { allocation_family: "large-family", max_uses: 1 } },
+  };
+
+  const allocation = allocateRequirementCourses(groups, {
+    isCompleted: (courseId) => sharedCourses.includes(courseId),
+  });
+
+  assert.equal(allocation.completedRequirements, 1);
+  assert.equal(allocation.appliedByGroup.alpha.length, 20);
+  assert.deepEqual(allocation.appliedByGroup.beta, []);
+});
