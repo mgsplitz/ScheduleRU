@@ -7,8 +7,8 @@
 CREATE TABLE IF NOT EXISTS requirement_group_conditions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   group_id TEXT NOT NULL REFERENCES requirement_groups(id),
-  condition_type TEXT NOT NULL,
-  condition_value_json TEXT NOT NULL,
+  condition_type TEXT NOT NULL, -- includes allocation_family and max_uses for reviewed exclusive-use families
+  condition_value_json TEXT NOT NULL, -- {"allocation_family":"reviewed-family"} + {"max_uses":1}
   note TEXT,
   source_url TEXT,
   review_status TEXT DEFAULT 'unreviewed',

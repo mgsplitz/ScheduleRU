@@ -441,6 +441,7 @@ async function handleApi(request, env, ctx) {
         "POST /api/admin/sync-now?secret=...            (writes one cursor chunk)",
         "POST /api/admin/sync-now?secret=...&full=true  (background full resync)",
         "--- programs / degree requirements ---",
+        "GET /api/schools",
         "GET /api/programs?school=&type=",
         "GET /api/core-curricula?school=",
         "GET /api/programs/:id/requirements",

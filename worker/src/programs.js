@@ -29,7 +29,8 @@
  * depend on guessing exact class names, but there will be edge cases.
  */
 
-import { evaluateProgramSelection } from "./program-selection-policy.js";
+import { evaluateProgramSelection, publicEligibilityRule } from "./program-selection-policy.js";
+import { publicSchoolProfile } from "./school-profiles.js";
 
 /* ============================================================
    CONFIG
@@ -55,12 +56,14 @@ const FETCH_HEADERS = {
 // the SAS Undergraduate site. This is deliberately a source URL plus a
 // parser, not a hard-coded list of courses: the current catalog can change
 // which courses carry each Core code, and a refresh should pick that up.
-const RBS_CORE_SOURCE_URL = "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core?id=106&layout=blog&view=category";
-const RBS_CORE_PROGRAM_ID = "rbsnb-core-curriculum";
+// The module is not RBS-owned: reviewed schools link to it through
+// school_curriculum_modules.
+const RUTGERS_NB_CORE_SOURCE_URL = "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core?id=106&layout=blog&view=category";
+const RUTGERS_NB_CORE_PROGRAM_ID = "rutgers-nb-core-curriculum";
 
 // Rules are stable curricular structure. Course memberships are obtained at
 // scrape time from the official New Brunswick Core list above.
-const RBS_CORE_GROUPS = [
+const RUTGERS_NB_CORE_GROUPS = [
   { key: "contemporary", name: "Contemporary Challenges (2 courses)", rule: "all", children: [
     { key: "ccd", name: "Diversities and Social Inequalities [CCD]", rule: "min_courses", count: 1, tags: ["CCD"] },
     { key: "cco", name: "Our Common Future [CCO]", rule: "min_courses", count: 1, tags: ["CCO"] },
@@ -180,7 +183,7 @@ async function runD1Batches(env, statements, chunkSize = 100) {
 }
 
 async function scrapeCoreCurriculum(env, program) {
-  const source = program.source_url || RBS_CORE_SOURCE_URL;
+  const source = program.source_url || RUTGERS_NB_CORE_SOURCE_URL;
   const continuation = source.includes("?") ? `${source}&start=5` : `${source}?start=5`;
   let pages;
   try {
@@ -211,7 +214,7 @@ async function scrapeCoreCurriculum(env, program) {
     return { ok: false, error: "no Core course rows parsed" };
   }
 
-  const flatGroups = flattenCoreGroups(RBS_CORE_GROUPS);
+  const flatGroups = flattenCoreGroups(RUTGERS_NB_CORE_GROUPS);
   const statements = [
     env.DB.prepare(`DELETE FROM requirement_courses WHERE group_id IN (SELECT id FROM requirement_groups WHERE program_id = ? AND auto_generated = 1)`).bind(program.id),
     env.DB.prepare(`DELETE FROM requirement_groups WHERE program_id = ? AND auto_generated = 1`).bind(program.id),
@@ -676,7 +679,7 @@ function parseBizTable(tableHtml, precedingHeading = "") {
   return section.courseItems.length || section.orGroups.length ? section : null;
 }
 
-export { parseBizTable, groupAppliesToSelection };
+export { parseBizTable, groupAppliesToSelection, allocationForConditions };
 
 function isLegacyBizCurriculum(section) {
   // The app currently represents the active catalog path for a program.
@@ -933,9 +936,47 @@ function conditionProgramIds(condition) {
   }
 }
 
+function allocationForConditions(conditions) {
+  let family = null;
+  let maxUses = null;
+  let hasAllocationCondition = false;
+  for (const condition of conditions || []) {
+    if (condition?.condition_type !== "allocation_family" && condition?.condition_type !== "max_uses") continue;
+    hasAllocationCondition = true;
+    let value;
+    try {
+      value = JSON.parse(condition.condition_value_json || "{}");
+    } catch {
+      return null;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    if (condition.condition_type === "allocation_family") {
+      const candidate = typeof value.allocation_family === "string" ? value.allocation_family.trim() : "";
+      if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(candidate) || (family && family !== candidate)) return null;
+      family = candidate;
+      continue;
+    }
+    const candidate = Number(value.max_uses);
+    if (!Number.isInteger(candidate) || candidate < 1 || (maxUses !== null && maxUses !== candidate)) return null;
+    maxUses = candidate;
+  }
+  return hasAllocationCondition && family && maxUses !== null
+    ? { allocation_family: family, max_uses: maxUses }
+    : null;
+}
+
 function groupAppliesToSelection(groupId, conditionsByGroup, selectedProgramIds) {
   const selected = new Set((selectedProgramIds || []).filter(isSafeProgramId));
-  for (const condition of conditionsByGroup[groupId] || []) {
+  const conditions = conditionsByGroup[groupId] || [];
+  const hasAllocationCondition = conditions.some((condition) =>
+    condition?.condition_type === "allocation_family" || condition?.condition_type === "max_uses"
+  );
+  // A partial or malformed reviewed allocation must not silently lift a
+  // no-double-count rule. It remains invisible until the reviewed data has a
+  // complete family and positive usage cap.
+  if (hasAllocationCondition && !allocationForConditions(conditions)) return false;
+  for (const condition of conditions) {
+    if (condition.condition_type === "allocation_family" || condition.condition_type === "max_uses") continue;
     const expected = conditionProgramIds(condition);
     if (condition.condition_type === "selected_program_must_include_one_of") {
       if (![...expected].some((id) => selected.has(id))) return false;
@@ -950,6 +991,44 @@ function groupAppliesToSelection(groupId, conditionsByGroup, selectedProgramIds)
     return false;
   }
   return true;
+}
+
+const COURSE_ELIGIBILITY_CODE = /^\d{2}:\d{3}:\d{3}$/;
+// D1 accepts at most 100 bind variables per statement. The Core curriculum
+// contains more course rows than that, so lookup batches must not exceed it.
+const COURSE_ELIGIBILITY_BATCH_SIZE = 100;
+
+function reviewedCourseCodes(values) {
+  return [...new Set((values || [])
+    .map((value) => String(value || "").trim())
+    .filter((code) => COURSE_ELIGIBILITY_CODE.test(code)))];
+}
+
+async function getReviewedCourseEligibility(env, rawCodes) {
+  const codes = reviewedCourseCodes(rawCodes);
+  const output = {};
+  for (let offset = 0; offset < codes.length; offset += COURSE_ELIGIBILITY_BATCH_SIZE) {
+    const batch = codes.slice(offset, offset + COURSE_ELIGIBILITY_BATCH_SIZE);
+    const placeholders = batch.map(() => "?").join(",");
+    const [reviews, conditions] = await env.DB.batch([
+      env.DB.prepare(
+        `SELECT course_code, review_status, no_known_conditions, source_url, source_label, source_date
+         FROM course_eligibility_reviews
+         WHERE review_status = 'reviewed' AND course_code IN (${placeholders})`
+      ).bind(...batch),
+      env.DB.prepare(
+        `SELECT course_code, condition_key, condition_type, condition_value_json, review_status, source_url, source_label, source_date
+         FROM course_eligibility_conditions
+         WHERE review_status = 'reviewed' AND course_code IN (${placeholders})
+         ORDER BY course_code, condition_key`
+      ).bind(...batch),
+    ]);
+    for (const review of reviews.results || []) output[review.course_code] = { review, conditions: [] };
+    for (const condition of conditions.results || []) {
+      if (output[condition.course_code]) output[condition.course_code].conditions.push(condition);
+    }
+  }
+  return output;
 }
 
 async function getRequirementTree(env, programId, selectedProgramIds = [programId]) {
@@ -994,6 +1073,17 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
     return true;
   });
   const visibleGroupIds = visibleGroups.map((group) => group.id);
+  const selectorsByGroup = {};
+  if (visibleGroupIds.length) {
+    const { results: selectors } = await env.DB.prepare(
+      `SELECT group_id, selector_key, selector_json, source_url, source_label
+       FROM requirement_course_selectors
+       WHERE review_status = 'reviewed'
+         AND group_id IN (${visibleGroupIds.map(() => "?").join(",")})
+       ORDER BY group_id, selector_key`
+    ).bind(...visibleGroupIds).all();
+    for (const selector of selectors || []) (selectorsByGroup[selector.group_id] ||= []).push(selector);
+  }
   const { results: courses } = visibleGroupIds.length ? await env.DB.prepare(
     `SELECT rc.*, g.program_id as owner_program_id, c.title as catalog_title, c.credits as catalog_credits,
             c.description as catalog_description, c.prereqs as catalog_prereqs,
@@ -1008,6 +1098,7 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
      LEFT JOIN courses c ON c.school || ':' || c.subject_code || ':' || c.course_number = rc.course_code
      WHERE rc.group_id IN (${visibleGroupIds.map(() => "?").join(",")})`
   ).bind(...visibleGroupIds).all() : { results: [] };
+  const eligibilityByCode = await getReviewedCourseEligibility(env, courses.map((course) => course.course_code));
 
   // Alternatives are scoped to the requirement-set/program that owns the
   // course row. This lets Degree Navigator-only families be entered once as
@@ -1027,10 +1118,30 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
   const byGroup = {};
   for (const c of courses) {
     c.alternatives = alternativesByRequirement[`${c.owner_program_id}::${c.course_code}`] || [];
+    c.eligibility = eligibilityByCode[c.course_code] || null;
     (byGroup[c.group_id] ||= []).push(c);
   }
+  const allocationsByGroup = Object.fromEntries(visibleGroups.map((group) => [
+    group.id,
+    allocationForConditions(conditionsByGroup[group.id]),
+  ]));
+  const familyMaxUses = new Map();
+  for (const allocation of Object.values(allocationsByGroup)) {
+    if (!allocation) continue;
+    const current = familyMaxUses.get(allocation.allocation_family);
+    familyMaxUses.set(allocation.allocation_family, current === undefined
+      ? allocation.max_uses
+      : Math.min(current, allocation.max_uses));
+  }
   const byId = {};
-  for (const g of visibleGroups) byId[g.id] = { ...g, courses: byGroup[g.id] || [], children: [] };
+  for (const g of visibleGroups) byId[g.id] = {
+    ...g,
+    allocation: allocationsByGroup[g.id] && {
+      ...allocationsByGroup[g.id],
+      max_uses: familyMaxUses.get(allocationsByGroup[g.id].allocation_family),
+    },
+    courses: byGroup[g.id] || [], course_selectors: selectorsByGroup[g.id] || [], children: [],
+  };
   const roots = [];
   for (const g of visibleGroups) {
     if (g.parent_group_id && byId[g.parent_group_id]) byId[g.parent_group_id].children.push(byId[g.id]);
@@ -1065,7 +1176,7 @@ async function getProgramEligibilityRules(env, programIds) {
        AND program_id IN (${ids.map(() => "?").join(",")})
      ORDER BY program_id, rule_key`
   ).bind(...ids).all();
-  return results || [];
+  return (results || []).map(publicEligibilityRule);
 }
 
 function isSafeHomeSchoolSlug(value) {
@@ -1081,6 +1192,20 @@ function isSafeProgramId(value) {
    ============================================================ */
 export async function handleProgramsApi(request, env, ctx, path, url, json, checkAdmin) {
   // ---- Public reads ----
+  // School profiles are the reviewed, data-backed source of Programs-modal
+  // wording and context. An unreviewed row is intentionally invisible here:
+  // adding a name alone must never make a school appear supported.
+  if (path === "/api/schools" && request.method === "GET") {
+    const { results } = await env.DB.prepare(
+      `SELECT slug, institution_slug, campus_slug, name, short_name,
+              catalog_year, configuration_json, source_url, source_title
+       FROM school_profiles
+       WHERE review_status = 'reviewed'
+       ORDER BY sort_order, name`
+    ).all();
+    return json({ schools: (results || []).map(publicSchoolProfile).filter((school) => school.slug) });
+  }
+
   if (path === "/api/programs" && request.method === "GET") {
     const school = url.searchParams.get("school");
     const type = url.searchParams.get("type");
@@ -1105,9 +1230,18 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
 
   if (path === "/api/core-curricula" && request.method === "GET") {
     const school = url.searchParams.get("school");
-    let where = " WHERE review_status = 'reviewed' AND type = 'core_curriculum'", binds = [];
-    if (school) { where += " AND school_slug = ?"; binds.push(school); }
-    const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();
+    let where = `WHERE link.review_status = 'reviewed'
+                   AND curriculum.review_status = 'reviewed'
+                   AND curriculum.type = 'core_curriculum'`, binds = [];
+    if (school) { where += " AND link.school_slug = ?"; binds.push(school); }
+    const { results } = await env.DB.prepare(
+      `SELECT curriculum.*, link.school_slug AS attached_school_slug,
+              link.module_type, link.source_url AS attachment_source_url
+       FROM school_curriculum_modules link
+       INNER JOIN programs curriculum ON curriculum.id = link.curriculum_program_id
+       ${where}
+       ORDER BY link.sort_order, curriculum.name`
+    ).bind(...binds).all();
     return json({ curricula: results });
   }
 
@@ -1161,6 +1295,14 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     }
     const eligibilityRules = await getProgramEligibilityRules(env, visibleIds);
     return json({ requirements: out, double_count_rules: doubleCounts, double_count_exceptions: doubleCountExceptions, eligibility_rules: eligibilityRules });
+  }
+
+  if (path === "/api/course-eligibility" && request.method === "GET") {
+    const codes = reviewedCourseCodes((url.searchParams.get("codes") || "").split(","));
+    if (!codes.length || codes.length > 25) {
+      return json({ error: "pass up to 25 valid course codes in ?codes=" }, 400);
+    }
+    return json({ eligibility: await getReviewedCourseEligibility(env, codes) });
   }
 
   // School-scoped double-count caps (e.g. "RBS majors may share at most 1
@@ -1242,11 +1384,19 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       const items = Array.isArray(body) ? body : [body];
       const stmts = items.map((p) =>
         env.DB.prepare(
-          `INSERT INTO programs (id, name, school_slug, program_slug, type, catalog_year, source_url)
-           VALUES (?,?,?,?,?,?,?)
+          `INSERT INTO programs (
+             id, name, school_slug, program_slug, type, catalog_year,
+             academic_program_code, degree_type, program_family_id, source_url
+           ) VALUES (?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(id) DO UPDATE SET name=excluded.name, school_slug=excluded.school_slug,
-             program_slug=excluded.program_slug, type=excluded.type, catalog_year=excluded.catalog_year`
-        ).bind(p.id, p.name, p.school_slug, p.program_slug, p.type, p.catalog_year || null, p.source_url || null)
+             program_slug=excluded.program_slug, type=excluded.type, catalog_year=excluded.catalog_year,
+             academic_program_code=excluded.academic_program_code, degree_type=excluded.degree_type,
+             program_family_id=excluded.program_family_id, source_url=excluded.source_url`
+        ).bind(
+          p.id, p.name, p.school_slug, p.program_slug, p.type, p.catalog_year || null,
+          p.academic_program_code || null, p.degree_type || null, p.program_family_id || null,
+          p.source_url || null
+        )
       );
       await env.DB.batch(stmts);
       return json({ ok: true, seeded: items.length });
@@ -1321,7 +1471,7 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     // uses the public New Brunswick Core list and remains unreviewed until a
     // human explicitly marks the parsed result reviewed.
     if (path === "/api/admin/scrape-core-curriculum" && request.method === "POST") {
-      const programId = url.searchParams.get("program") || RBS_CORE_PROGRAM_ID;
+      const programId = url.searchParams.get("program") || RUTGERS_NB_CORE_PROGRAM_ID;
       const p = await env.DB.prepare(`SELECT * FROM programs WHERE id = ? AND type = 'core_curriculum'`).bind(programId).first();
       if (!p) return json({ error: "unknown Core Curriculum id" }, 404);
       const result = await scrapeCoreCurriculum(env, p);

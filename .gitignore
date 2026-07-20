@@ -1,3 +1,5 @@
 # Local admin credentials and temporary deployment output
 worker/admin-secret.txt
 .pages-preview/
+.worktrees/
+.superpowers/

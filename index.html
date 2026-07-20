@@ -247,6 +247,10 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .program-category:first-child{margin-top:0;}
 .program-category-title{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 4px;}
 .program-picker-note{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:9px;}
+.program-school-field{display:block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 7px;}
+.program-school-field select{display:block;width:100%;margin-top:4px;border:1px solid var(--line);border-radius:4px;padding:7px 8px;background:#fff;font:600 12px var(--ff);color:var(--black);}
+.program-school-field select:disabled{color:var(--muted);background:#f9f7f0;cursor:default;}
+.program-school-help{font-size:10.5px;color:var(--muted);line-height:1.4;margin:-2px 0 10px;}
 .program-policy-feedback{font-size:11px;line-height:1.4;margin:0 0 10px;}
 .program-policy-feedback.warn{background:#fff5f7;border:1px solid #f3c9ce;border-radius:4px;color:#7a1d34;padding:8px;}
 .program-policy-feedback.info{background:#f5f8fb;border:1px solid #cdd8e7;border-radius:4px;color:#38516c;padding:8px;}
@@ -506,6 +510,10 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
     <div class="mhdr">Choose programs of study <button class="xbtn" id="programClose">✕</button></div>
     <div class="mbody">
       <div class="program-picker-note" id="programPickerNote">Choose reviewed programs of study. Shared requirements are shown once; the app checks reviewed selection and double-count policies before it saves your plan.</div>
+      <label class="program-school-field" for="programSchoolSelect">Your Rutgers school
+        <select id="programSchoolSelect" aria-describedby="programSchoolHelp"></select>
+      </label>
+      <div class="program-school-help" id="programSchoolHelp"></div>
       <div class="program-policy-feedback" id="programPolicyFeedback" aria-live="polite"></div>
       <div id="programList"></div>
       <div class="modal-footer"><button class="choice-btn secondary" id="programCancel">Cancel</button><button class="choice-btn" id="programApply">Apply programs</button></div>
@@ -514,6 +522,8 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 </div>
 
 <script src="requirement-group-logic.js"></script>
+<script src="course-selector-logic.js"></script>
+<script src="eligibility-logic.js"></script>
 <script>
 /* ============================================================
    DATA — scraped from official Rutgers pages June 2026!
@@ -582,27 +592,29 @@ function defaultBackendUrl(){
    STATE
    ============================================================ */
 // A home school owns the catalog rules that apply to a student's plan. The
-// current reviewed data set is RBS New Brunswick; a future school adds one
-// entry here and reviewed API data instead of changing the planner flow.
-const DEFAULT_HOME_SCHOOL_SLUG="rbsnb";
-const SCHOOL_CONTEXTS={
-  rbsnb:{
-    label:"RBS New Brunswick",
-    defaultProgramId:"rbsnb-bait",
-    advisingLabel:"RBS advising",
-    sharedRequirementReferenceTypes:["major"],
-    coreFallbackLabel:"RBS Core Curriculum",
-    coreIntro:"RBS requires a minimum of 27 Core credits. Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed Core goals. One course is used once within each Core family, while Rutgers permits it to satisfy goals in different families. Click any course for details.",
-  },
+// reviewed school profiles come from the Worker, so future schools can define
+// their own labels and curriculum context without a separate frontend page.
+const FALLBACK_SCHOOL_CONTEXT={
+  label:"your home school",
+  shortName:"your home school",
+  defaultProgramId:null,
+  advisingLabel:"your school advising office",
+  sharedRequirementReferenceTypes:["major"],
+  coreFallbackLabel:"Core Curriculum",
+  coreIntro:"Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed curriculum goals. Click any course for details.",
+  programTypeSections:[],
 };
+function schoolProfileBySlug(slug){
+  return (ST.availableSchools||[]).find(school=>school.slug===slug)||null;
+}
 function activeSchoolContext(){
-  return SCHOOL_CONTEXTS[ST.homeSchoolSlug]||{
-    label:ST.homeSchoolSlug||"your home school",
-    defaultProgramId:null,
-    advisingLabel:"your school advising office",
-    sharedRequirementReferenceTypes:["major"],
-    coreFallbackLabel:"Core Curriculum",
-    coreIntro:"Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed curriculum goals. Click any course for details.",
+  const school=schoolProfileBySlug(ST.homeSchoolSlug);
+  if(!school) return FALLBACK_SCHOOL_CONTEXT;
+  return {
+    ...FALLBACK_SCHOOL_CONTEXT,
+    ...(school.context||{}),
+    label:school.short_name||school.name||FALLBACK_SCHOOL_CONTEXT.label,
+    shortName:school.short_name||school.name||FALLBACK_SCHOOL_CONTEXT.shortName,
   };
 }
 function activeCoreLabel(){
@@ -610,7 +622,7 @@ function activeCoreLabel(){
 }
 
 const ST = {
-  apOn:{}, completed:{}, schedule:{}, wishlist:{}, groupSelections:{},
+  apOn:{}, completed:{}, schedule:{}, wishlist:{}, groupSelections:{}, creditLedger:{}, courseEligibilityByCode:{},
   year:1, tab:"required", panelFull:false,
   page:"nav", // top-level page: "nav" (Degree Navigator) | "courses" (Courses)
   // Backend (Cloudflare Worker + D1) integration — see worker.js/schema.sql.
@@ -618,8 +630,8 @@ const ST = {
   // so this is a plain same-origin-friendly fetch (the worker sends CORS
   // headers itself) rather than needing a public relay.
   backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || defaultBackendUrl(),
-  availablePrograms:[], activeProgram:null, selectedPrograms:[],
-  homeSchoolSlug:DEFAULT_HOME_SCHOOL_SLUG, programSelectionPolicies:{limits:[],combination_policies:[]},
+  availableSchools:[], availablePrograms:[], activeProgram:null, selectedPrograms:[],
+  homeSchoolSlug:"", programSelectionPolicies:{limits:[],combination_policies:[]},
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
@@ -636,6 +648,7 @@ const ST = {
 // same site address. Catalog and requirement data stay on the Worker, so the
 // saved payload remains small and can be re-evaluated against updated rules.
 const PLANNER_STATE_KEY="scheduleru_planner_state_v1";
+const PLANNER_STATE_VERSION=2;
 function savedObject(value){
   return value && typeof value==="object" && !Array.isArray(value) ? value : {};
 }
@@ -643,12 +656,13 @@ function restorePlannerState(){
   try{
     if(typeof localStorage==="undefined") return;
     const saved=JSON.parse(localStorage.getItem(PLANNER_STATE_KEY)||"null");
-    if(!saved || saved.version!==1) return;
+    if(!saved || ![1,PLANNER_STATE_VERSION].includes(saved.version)) return;
     ST.apOn=savedObject(saved.apOn);
     ST.completed=savedObject(saved.completed);
     ST.schedule=savedObject(saved.schedule);
     ST.wishlist=savedObject(saved.wishlist);
     ST.groupSelections=savedObject(saved.groupSelections);
+    ST.creditLedger=savedObject(saved.creditLedger);
     const year=Number(saved.year);
     if(Number.isInteger(year) && year>=1 && year<=4) ST.year=year;
     if(typeof saved.homeSchoolSlug==="string" && /^[a-z0-9-]{2,80}$/.test(saved.homeSchoolSlug)) ST.homeSchoolSlug=saved.homeSchoolSlug;
@@ -662,8 +676,9 @@ function savePlannerState(){
   try{
     if(typeof localStorage==="undefined") return;
     localStorage.setItem(PLANNER_STATE_KEY,JSON.stringify({
-      version:1, savedAt:Date.now(), apOn:ST.apOn, completed:ST.completed,
+      version:PLANNER_STATE_VERSION, savedAt:Date.now(), apOn:ST.apOn, completed:ST.completed,
       schedule:ST.schedule, wishlist:ST.wishlist, groupSelections:ST.groupSelections,
+      creditLedger:ST.creditLedger,
       year:ST.year, homeSchoolSlug:ST.homeSchoolSlug, selectedPrograms:ST.selectedPrograms,
     }));
   }catch(e){
@@ -686,6 +701,60 @@ AP.forEach(a => a.fulfills.forEach(cid => {
   if(!AP_FULFILLS[cid]) AP_FULFILLS[cid] = [];
   AP_FULFILLS[cid].push(a.id);
 }));
+
+function creditNumber(value){
+  const match=String(value??"").match(/\d+(?:\.\d+)?/);
+  const number=Number(match?.[0]);
+  return Number.isFinite(number)&&number>=0?number:0;
+}
+function confirmedAcademicCreditEntries(){
+  const entries=[];
+  AP.filter(ap=>ST.apOn[ap.id]).forEach(ap=>entries.push({
+    id:"ap:"+ap.id, source:"ap", credits:creditNumber(ap.credits),
+    course_code:courseCodesFromText(ap.equiv)[0]||"",
+  }));
+  Object.entries(ST.completed||{}).forEach(([id,taken])=>{
+    if(!taken) return;
+    const course=courseRecordFromId(id);
+    if(course) entries.push({
+      id:"completed:"+id, source:"rutgers_completed", credits:creditNumber(course.credits), course_code:course.code,
+    });
+  });
+  Object.values(ST.creditLedger||{}).forEach(entry=>entries.push(entry));
+  return globalThis.ScheduleRUEligibilityLogic.confirmedCreditEntries(entries);
+}
+function plannedScheduleCreditEntries(){
+  return Object.values(ST.schedule||{}).map(entry=>({
+    id:"scheduled:"+entry.code, course_code:entry.code, credits:creditNumber(entry.credits),
+    year:Number(entry.year), sem:entry.sem,
+  }));
+}
+function courseEligibilityForTerm(course,term){
+  const payload=course?.eligibility||ST.courseEligibilityByCode?.[course?.code]||null;
+  return globalThis.ScheduleRUEligibilityLogic.evaluateEligibility({
+    targetTerm:term, mode:"plan", review:payload?.review, conditions:payload?.conditions||[],
+    confirmedEntries:confirmedAcademicCreditEntries(), scheduledEntries:plannedScheduleCreditEntries(),
+  });
+}
+function plannerEligibilityLabel(result){
+  if(result.status==="eligible_now") return "Eligible based on completed credit and reviewed rules";
+  if(result.status==="planned_assumption") return "Works in this plan if earlier planned courses are completed";
+  const missing=result.missing?.[0];
+  if(missing?.type==="minimum_prior_credits") return "Requires "+missing.minimum_credits+" previously completed credits";
+  if(missing?.type==="minimum_plan_year") return "Available starting in plan year "+missing.minimum_year;
+  if(missing?.type==="corequisite_course") return "A reviewed co-requisite must be scheduled in the same term";
+  if(missing?.type==="prerequisite_course") return "A reviewed prerequisite must be completed first";
+  return "Eligibility needs review; verify with Rutgers before registration";
+}
+function reviewedEligibilityForCourse(course){
+  const payload=course?.eligibility||ST.courseEligibilityByCode?.[course?.code]||null;
+  return payload?.review?.review_status==="reviewed" ? payload : null;
+}
+function courseEligibilityNotice(course,term){
+  if(!reviewedEligibilityForCourse(course)) return "";
+  const result=courseEligibilityForTerm(course,term);
+  return result.status==="eligible_now" ? "" : plannerEligibilityLabel(result);
+}
 
 function isCompleted(id){
   if(ST.completed[id]) return true;
@@ -725,7 +794,112 @@ function groupFulfilled(gk){
     isCompleted,
     selectedRequirementCourses,
     isConstraintGroup,
+    appliedCourseIds:groupAppliedCourseIds,
+    courseCredits:id=>creditNumber(COURSES[id]?.credits),
   });
+}
+function groupProgress(g){
+  return ScheduleRURequirementLogic.groupProgress(g,isCompleted,{
+    appliedCourseIds:groupAppliedCourseIds,
+    courseCredits:id=>creditNumber(COURSES[id]?.credits),
+  });
+}
+function reviewedGroupSelectors(g){
+  const engine=globalThis.ScheduleRUCourseSelectorLogic;
+  if(!engine) return [];
+  return (Array.isArray(g?.courseSelectors)?g.courseSelectors:[]).map(row=>{
+    try{
+      const raw=typeof row?.selector_json==="string" ? JSON.parse(row.selector_json) : row?.selector_json;
+      return engine.normalizeSelector(raw);
+    }catch(_){ return null; }
+  }).filter(Boolean);
+}
+function plannedOrCompletedCourseRecords(){
+  const records=new Map();
+  const add=record=>{
+    const code=String(record?.code||"").trim();
+    if(/^\d{2}:\d{3}:\d{3}$/.test(code)) records.set(code,{...record,code});
+  };
+  Object.values(ST.schedule||{}).forEach(entry=>add(entry?.course||entry));
+  Object.entries(ST.completed||{}).forEach(([id,taken])=>{
+    if(!taken) return;
+    add(courseRecordFromId(id));
+    const catalog=(ST.backendCourses||[]).find(row=>requirementCourseId(catalogCourseCode(row))===id);
+    if(catalog) add(backendCourseRecord(catalog));
+  });
+  return [...records.values()];
+}
+function registerSelectorCourseRecord(record){
+  const code=String(record?.code||"").trim();
+  const id=requirementCourseId(code);
+  if(!id) return null;
+  const existing=COURSES[id]||{};
+  const title=cleanApiText(record?.fullTitle)||cleanApiText(record?.title)||existing.fullTitle||existing.title||code;
+  COURSES[id]={
+    ...existing, code, title, fullTitle:title,
+    credits:record?.credits??existing.credits??"",
+    description:cleanApiText(record?.description)||existing.description||"",
+    catalogPrereqs:cleanApiText(record?.catalogPrereqs)||existing.catalogPrereqs||"",
+    subjectNotes:cleanApiText(record?.subjectNotes)||existing.subjectNotes||"",
+    restrictions:cleanApiText(record?.restrictions)||existing.restrictions||"",
+    requirementNotes:Array.isArray(existing.requirementNotes)?existing.requirementNotes:[],
+    prereqs:Array.isArray(existing.prereqs)?existing.prereqs:[],
+    alternatives:Array.isArray(existing.alternatives)?existing.alternatives:[],
+  };
+  return id;
+}
+function baseGroupAppliedCourseIds(g){
+  const explicit=(g?.members||[]).filter(id=>isCompleted(id));
+  const selectors=reviewedGroupSelectors(g);
+  const engine=globalThis.ScheduleRUCourseSelectorLogic;
+  if(!selectors.length||!engine) return explicit;
+  const selectorMatches=plannedOrCompletedCourseRecords()
+    .filter(record=>engine.matchesAnySelector(record,selectors))
+    .map(registerSelectorCourseRecord)
+    .filter(Boolean);
+  return [...new Set([...explicit,...selectorMatches])];
+}
+let requirementAllocationCache={key:"",value:null};
+function requirementAllocationKey(){
+  return JSON.stringify([
+    Object.keys(GROUPS).sort().map(id=>[
+      id,GROUPS[id]?.allocation,GROUPS[id]?.members,GROUPS[id]?.rule,
+      GROUPS[id]?.count,GROUPS[id]?.children,GROUPS[id]?.parentId,GROUPS[id]?.courseSelectors,
+    ]),
+    Object.keys(ST.completed||{}).filter(id=>ST.completed[id]).sort(),
+    Object.values(ST.schedule||{}).map(entry=>entry?.code).filter(Boolean).sort(),
+    Object.keys(ST.groupSelections||{}).sort().map(id=>[id,ST.groupSelections[id]]),
+  ]);
+}
+function requirementAllocation(){
+  const engine=globalThis.ScheduleRURequirementLogic;
+  if(!engine?.allocateRequirementCourses) return null;
+  const key=requirementAllocationKey();
+  if(requirementAllocationCache.key===key) return requirementAllocationCache.value;
+  const value=engine.allocateRequirementCourses(GROUPS,{
+    isCompleted,
+    selectedRequirementCourses,
+    isConstraintGroup,
+    appliedCourseIds:baseGroupAppliedCourseIds,
+    courseCredits:id=>creditNumber(COURSES[id]?.credits),
+  });
+  requirementAllocationCache={key,value};
+  return value;
+}
+function groupAppliedCourseIds(g){
+  if(!g?.allocation) return baseGroupAppliedCourseIds(g);
+  const allocated=requirementAllocation()?.appliedByGroup?.[g.id];
+  return Array.isArray(allocated) ? allocated : baseGroupAppliedCourseIds(g);
+}
+function selectorGuidanceHtml(g){
+  const raw=Array.isArray(g?.courseSelectors)?g.courseSelectors:[];
+  if(!raw.length) return "";
+  const engine=globalThis.ScheduleRUCourseSelectorLogic;
+  const selectors=reviewedGroupSelectors(g);
+  const descriptions=selectors.map(selector=>engine.selectorDescription(selector));
+  const corrected=selectors.length===raw.length;
+  const rule=descriptions.length ? descriptions.join("; ") : "this reviewed course rule";
+  return `<div class="choice-summary">Scheduled and completed courses matching ${escapeHtml(rule)} apply here automatically. Add matching courses from the Courses page; this requirement does not use a static course list.${corrected?"":" A reviewed course rule needs correction before it can be applied."}</div>`;
 }
 
 /* ============================================================
@@ -743,14 +917,27 @@ document.querySelectorAll(".pagenav-btn").forEach(b=>b.addEventListener("click",
 /* ============================================================
    PROGRAM SELECTION (reviewed programs of study)
    ============================================================ */
-const PROGRAM_TYPE_SECTIONS=[
+const DEFAULT_PROGRAM_TYPE_SECTIONS=[
   {type:"major",label:"Majors",singular:"Major"},
   {type:"minor",label:"Minors",singular:"Minor"},
   {type:"concentration",label:"Concentrations and tracks",singular:"Concentration or track"},
   {type:"certificate",label:"Certificates",singular:"Certificate"},
 ];
+function programTypeSections(){
+  const configured=activeSchoolContext().programTypeSections;
+  if(!Array.isArray(configured)) return DEFAULT_PROGRAM_TYPE_SECTIONS;
+  const byType=new Map(configured.filter(section=>section&&typeof section.type==="string").map(section=>[section.type,section]));
+  return DEFAULT_PROGRAM_TYPE_SECTIONS.map(fallback=>{
+    const section=byType.get(fallback.type)||{};
+    return {
+      type:fallback.type,
+      label:typeof section.label==="string"&&section.label.trim()?section.label.trim():fallback.label,
+      singular:typeof section.singular==="string"&&section.singular.trim()?section.singular.trim():fallback.singular,
+    };
+  });
+}
 function programTypeLabel(type){
-  const section=PROGRAM_TYPE_SECTIONS.find(item=>item.type===type);
+  const section=programTypeSections().find(item=>item.type===type);
   return section?.singular||"Program";
 }
 function eligibilityRuleValues(rule){
@@ -797,6 +984,51 @@ function updateProgramTitle(){
   document.getElementById("topProgramTitle").textContent=names.length?`${names.join(" + ")} Degree Navigator`:"Degree Navigator";
   document.getElementById("topProgramMeta").textContent=names.join(" + ")||activeHomeSchoolLabel();
 }
+function renderProgramSchoolSelector(){
+  const select=document.getElementById("programSchoolSelect");
+  const help=document.getElementById("programSchoolHelp");
+  const schools=ST.availableSchools||[];
+  select.innerHTML=schools.map(school=>`<option value="${escapeHtml(school.slug)}">${escapeHtml(school.name||school.short_name||school.slug)}</option>`).join("");
+  select.value=ST.homeSchoolSlug;
+  select.disabled=schools.length<2;
+  help.textContent=schools.length<2
+    ? "More Rutgers schools will appear here only after their curriculum and policy data are reviewed."
+    : "Changing your home school re-evaluates your program requirements. Your planned courses stay in your browser.";
+  select.onchange=()=>changeHomeSchool(select.value);
+}
+async function changeHomeSchool(nextSchoolSlug){
+  const next=schoolProfileBySlug(nextSchoolSlug);
+  if(!next || next.slug===ST.homeSchoolSlug) return;
+  const prior=ST.homeSchoolSlug;
+  const priorName=activeHomeSchoolLabel();
+  if(ST.selectedPrograms.length && !confirm(`Change your home school from ${priorName} to ${next.name||next.short_name||next.slug}? Your planned courses stay saved, but program selections and requirement choices will be re-evaluated.`)){
+    const select=document.getElementById("programSchoolSelect");
+    if(select) select.value=prior;
+    return;
+  }
+  ST.homeSchoolSlug=next.slug;
+  ST.selectedPrograms=[];
+  ST.groupSelections={};
+  ST.requirementTrees={};
+  ST.referenceRequirementTrees={};
+  ST.majorRequirementTree=null;
+  ST.activeProgram=null;
+  ST.doubleCount=null;
+  savePlannerState();
+  ST.requirementsLoading=true;
+  ST.requirementsError="";
+  renderPanel();
+  renderProgramSchoolSelector();
+  try{
+    await loadInitialRequirements({reloadSchools:false});
+  }catch(err){
+    ST.requirementsError=err.message||"Could not load the selected school.";
+  }finally{
+    ST.requirementsLoading=false;
+    renderPanel();
+    openProgramPicker();
+  }
+}
 function closeProgramPicker(){
   document.getElementById("programOv").classList.remove("open");
   delete ST.programDraft;
@@ -805,9 +1037,10 @@ function openProgramPicker(){
   ST.programDraft=[...ST.selectedPrograms];
   delete ST.programDraftWarningSignature;
   document.getElementById("programPickerNote").textContent=`Choose reviewed programs of study. ${selectionLimitSummary()} Shared requirements are shown once, and the app checks reviewed policies before saving your plan.`;
+  renderProgramSchoolSelector();
   showProgramPolicyFeedback(null);
   const list=document.getElementById("programList");
-  const categories=PROGRAM_TYPE_SECTIONS.map(section=>({
+  const categories=programTypeSections().map(section=>({
     ...section,
     programs:(ST.availablePrograms||[]).filter(program=>program.type===section.type),
   })).filter(section=>section.programs.length);
@@ -818,6 +1051,12 @@ function openProgramPicker(){
       <span><strong>${escapeHtml(program.name)}</strong><small>${escapeHtml(programTypeLabel(program.type))} · ${escapeHtml(program.catalog_year||"Catalog year not listed")}</small></span>
     </label>`).join("")}
   </section>`).join("") || `<div class="api-status">No reviewed programs are available yet for ${escapeHtml(activeHomeSchoolLabel())}.</div>`;
+  for(const option of list.querySelectorAll("[data-program-choice]")){
+    const degreeType=cleanApiText((ST.availablePrograms||[]).find(program=>program.id===option.dataset.programChoice)?.degree_type);
+    if(!degreeType) continue;
+    const metadata=option.closest(".program-option")?.querySelector("small");
+    if(metadata) metadata.textContent=`${metadata.textContent} | ${degreeType}`;
+  }
   list.querySelectorAll("[data-program-choice]").forEach(input=>input.addEventListener("change",()=>{
     const id=input.dataset.programChoice;
     const draft=new Set(ST.programDraft||[]);
@@ -957,6 +1196,11 @@ function openCourseDetails(id){
     const label=alt.title ? `${alt.title} (${code})` : code;
     return `<div class="detail-chip">${escapeHtml(label)}<code>${escapeHtml(code)}</code></div>`;
   }).join("");
+  const scheduledEntry=ST.schedule[c.code];
+  const detailsTerm=scheduledEntry
+    ? {year:Number(scheduledEntry.year),sem:scheduledEntry.sem}
+    : {year:ST.year,sem:"fall"};
+  const eligibilityNotice=courseEligibilityNotice(c,detailsTerm);
   const status=completedAlternative
     ? `This requirement is already fulfilled by ${completedAlternative.title||completedAlternative.code||completedAlternative.equivalent_course_code}.`
     : available
@@ -969,6 +1213,7 @@ function openCourseDetails(id){
     <div class="detail-status${(available||completedAlternative)?" ready":""}">${escapeHtml(status)}</div>
     </div>
     <div class="detail-section"><h3>${standing?"When you can take it":"Enrollment"}</h3><p>${escapeHtml(compactRestriction(c,standing))}</p></div>
+    ${eligibilityNotice?`<div class="detail-section"><h3>Planning eligibility</h3><p>${escapeHtml(eligibilityNotice)}</p></div>`:""}
     ${alternativeDetails?`<div class="detail-section"><h3>Also accepted for this requirement</h3><div class="detail-chips">${alternativeDetails}</div><p class="src-note">This reviewed equivalency comes from the degree-audit rule recorded for this requirement.</p></div>`:""}
     ${prerequisiteChips?`<div class="detail-section"><h3>Plan these first</h3><div class="detail-chips">${prerequisiteChips}</div>${c.catalogPrereqs?`<p class="src-note">The official catalog includes alternative prerequisite paths; use the details below when your situation differs.</p>`:""}</div>`:""}
     ${c.description?`<div class="detail-section"><h3>About this course</h3><p>${escapeHtml(cleanApiText(c.description))}</p></div>`:""}
@@ -1011,7 +1256,7 @@ function renderRequirementPicker(){
   const g=GROUPS[ST.pickerGroupId];
   if(!g) return;
   const selected=selectedRequirementCourses(g.id);
-  const applied=(g.members||[]).filter(id=>isCompleted(id));
+  const applied=groupAppliedCourseIds(g);
   const limit=selectionLimit(g);
   const constraints=(g.children||[]).map(id=>GROUPS[id]).filter(isConstraintGroup);
   const search=String(document.getElementById("pickerSearch")?.value||"").trim().toLowerCase();
@@ -1043,7 +1288,7 @@ function renderRequirementPicker(){
   list.querySelectorAll("[data-pchoose]").forEach(b=>b.addEventListener("click",()=>{
     const id=b.dataset.pchoose;
     const current=selectedRequirementCourses(g.id);
-    const currentlyApplied=(g.members||[]).filter(memberId=>isCompleted(memberId));
+    const currentlyApplied=groupAppliedCourseIds(g);
     if(currentlyApplied.includes(id)){
       return;
     }else if(current.includes(id)){
@@ -1080,6 +1325,7 @@ function requirementCourseRecord(id){
     credits:c.credits??"", description:c.description||"", catalogPrereqs:c.catalogPrereqs||"",
     subjectNotes:c.subjectNotes||"", restrictions:c.restrictions||"", requirementNotes:c.requirementNotes||[],
     prereqs:Array.isArray(c.prereqs)?c.prereqs:[], alternatives:Array.isArray(c.alternatives)?c.alternatives:[], requirementId:id,
+    eligibility:c.eligibility||null,
   };
 }
 function backendCourseRecord(c){
@@ -1090,6 +1336,7 @@ function backendCourseRecord(c){
     id:c.id||code, code, title:cleanApiText(c.title)||code, fullTitle:cleanApiText(c.title)||code,
     credits:c.credits??"", description:cleanApiText(c.description), catalogPrereqs:cleanApiText(c.prereqs),
     subjectNotes:cleanApiText(c.subject_notes), restrictions:cleanApiText(c.restrictions), requirementNotes:[], prereqs:[],
+    eligibility:ST.courseEligibilityByCode[code]||null,
   };
 }
 function courseRecordFromId(ref){
@@ -1152,10 +1399,12 @@ function renderSchedule(){
     else {
       zone.innerHTML = codes.map(code=>{
         const e=ST.schedule[code]; total+=parseFloat(e.credits)||0;
+        const eligibilityNote=courseEligibilityNotice(e.course||courseRecordFromId(e.code),{year:e.year,sem:e.sem});
         return `<div class="sc-card" draggable="true" data-id="${code}">
           <div class="sc-card-main">
             <div class="sn">${escapeHtml(e.code)}${e.locked?' <span class="sched-locked">SET</span>':''}</div>
             <div class="stitle" title="${escapeHtml(e.fullTitle||e.title||e.code)}">${escapeHtml(e.fullTitle||e.title||e.code)}</div>
+            ${eligibilityNote?`<span class="sct">${escapeHtml(eligibilityNote)}</span>`:""}
             <span class="sct">${escapeHtml(courseCreditsLabel(e.credits,true))}${e.section_number?` · Sec ${escapeHtml(e.section_number)}`:''}</span>
           </div>
           <button class="rx" data-rem="${escapeHtml(code)}">✕</button></div>`;
@@ -1191,6 +1440,7 @@ function setupDropZones(){
       if(!cid) return;
       const record=courseRecordFromId(cid);
       if(!record) return;
+      const sem=z.dataset.sem;
       let code, title, fullTitle, credits;
       if(COURSES[cid]){
         if(COURSES[cid].type!=="gen"&&!courseAvailable(cid)) return;
@@ -1198,18 +1448,24 @@ function setupDropZones(){
       } else {
         code=record.code; title=record.title; fullTitle=record.fullTitle; credits=record.credits;
       }
-      if(lockedElsewhere(code, ST.year, z.dataset.sem)){
+      if(lockedElsewhere(code, ST.year, sem)){
         alert(`${code} is already scheduled (with a chosen section) for a different semester. Remove it there first.`);
+        return;
+      }
+      const eligibility=courseEligibilityForTerm(record,{year:ST.year,sem});
+      if(eligibility.status==="blocked"){
+        alert(code+" cannot be placed in "+sem+" of "+YL[ST.year]+": "+plannerEligibilityLabel(eligibility)+".");
         return;
       }
       const prev = ST.schedule[code];
       ST.schedule[code] = {
-        year:ST.year, sem:z.dataset.sem, code,
+        year:ST.year, sem, code,
         title: prev?.title || title, fullTitle: prev?.fullTitle || fullTitle || title, credits: prev?.credits ?? credits,
         course: prev?.course || record,
         sectionId: prev?.sectionId, index_number: prev?.index_number,
         section_number: prev?.section_number, meetings: prev?.meetings,
         locked: prev?.locked || false,
+        eligibilityStatus:eligibility.status, eligibilityAssumptions:eligibility.assumptions,
       };
       renderAll();
     };
@@ -1268,8 +1524,13 @@ function attachCardEvents(el){
 function groupRuleLabel(g){
   if(g.rule==="min") return `choose at least ${g.count}`;
   if(g.rule==="max") return `choose up to ${g.count}`;
+  if(g.rule==="min_credits") return `complete at least ${g.count} credits`;
+  if(g.rule==="max_credits") return `apply up to ${g.count} credits`;
   if(g.rule==="distinct") return `choose ${g.count} across distinct goals`;
   return "all required";
+}
+function isCreditRule(g){
+  return g?.rule==="min_credits"||g?.rule==="max_credits";
 }
 function groupDisplayName(g){
   if(/^choose 1$/i.test(g.name||"") && (g.members||[]).length){
@@ -1279,7 +1540,7 @@ function groupDisplayName(g){
 }
 const PICKER_THRESHOLD=6;
 function isPickerGroup(g){
-  return !!g && g.rule!=="all" && (g.members||[]).length>PICKER_THRESHOLD;
+  return !!g && g.rule!=="all"&&!isCreditRule(g) && (g.members||[]).length>PICKER_THRESHOLD;
 }
 function selectedRequirementCourses(gk){
   const valid=new Set(GROUPS[gk]?.members||[]);
@@ -1293,23 +1554,30 @@ function selectionLimit(g){
 }
 function isConstraintGroup(g){
   const parent=GROUPS[g?.parentId];
-  if(!parent || parent.rule==="distinct" || !g?.members?.length || !parent.members?.length) return false;
-  const parentMembers=new Set(parent.members);
-  return g.members.every(id=>parentMembers.has(id));
+  if(!parent || parent.rule==="distinct") return false;
+  if(g?.members?.length && parent.members?.length){
+    const parentMembers=new Set(parent.members);
+    return g.members.every(id=>parentMembers.has(id));
+  }
+  const engine=globalThis.ScheduleRUCourseSelectorLogic;
+  const childSelectors=reviewedGroupSelectors(g);
+  const parentSelectors=reviewedGroupSelectors(parent);
+  return !!engine && childSelectors.length>0 && parentSelectors.length>0
+    && childSelectors.every(child=>parentSelectors.some(parentSelector=>engine.selectorIsSubset(child,parentSelector)));
 }
 function constraintSelectionCount(g){
   const parent=GROUPS[g?.parentId];
   if(!parent) return 0;
   const plannedOrCompleted=new Set([
     ...selectedRequirementCourses(parent.id),
-    ...(parent.members||[]).filter(id=>isCompleted(id)),
+    ...groupAppliedCourseIds(parent),
   ]);
-  return (g.members||[]).filter(id=>plannedOrCompleted.has(id)).length;
+  return groupAppliedCourseIds(g).filter(id=>plannedOrCompleted.has(id)).length;
 }
 function parentSelectionConstraintViolation(parent, proposed){
   const limit=selectionLimit(parent);
-  const planned=new Set(proposed);
-  if(parent.rule==="distinct" && proposed.length===limit){
+  const planned=new Set([...proposed,...groupAppliedCourseIds(parent)]);
+  if(parent.rule==="distinct" && planned.size===limit){
     const distinct=(parent.children||[]).map(id=>GROUPS[id]).filter(Boolean)
       .filter(child=>(child.members||[]).some(id=>planned.has(id))).length;
     if(distinct<parent.count){
@@ -1319,12 +1587,12 @@ function parentSelectionConstraintViolation(parent, proposed){
   for(const childId of parent.children||[]){
     const child=GROUPS[childId];
     if(!isConstraintGroup(child)) continue;
-    const chosen=(child.members||[]).filter(id=>planned.has(id)).length;
+    const chosen=groupAppliedCourseIds(child).filter(id=>planned.has(id)).length;
     if(child.rule==="max" && chosen>child.count){
       return `${groupDisplayName(child)} allows at most ${child.count} course${child.count===1?"":"s"}.`;
     }
     if(child.rule==="min"){
-      const remainingSlots=limit-proposed.length;
+      const remainingSlots=limit-planned.size;
       if(chosen+remainingSlots<child.count){
         return `Keep enough room for ${groupDisplayName(child)}: at least ${child.count} course${child.count===1?"":"s"} are required.`;
       }
@@ -1336,14 +1604,29 @@ function parentSelectionConstraintViolation(parent, proposed){
   return "";
 }
 function constraintSummaryHtml(g){
+  if(isCreditRule(g)){
+    const progress=groupProgress(g);
+    const requirement=g.rule==="min_credits" ? `at least ${g.count}` : `up to ${g.count}`;
+    return `<div class="choice-summary">${progress.courses} courses / ${progress.credits} credits applied · ${requirement} credits required. Matching scheduled and completed courses apply automatically.</div>`;
+  }
   const selected=constraintSelectionCount(g);
   const requirement=g.rule==="min" ? `at least ${g.count}` : `up to ${g.count}`;
   return `<div class="choice-summary">${selected} selected or completed · ${requirement} required. Choose these through the approved list above.</div>`;
 }
+function allocationSummaryHtml(g){
+  const allocation=g?.allocation;
+  if(!allocation) return "";
+  const applied=groupAppliedCourseIds(g);
+  const maxUses=Number(allocation.max_uses);
+  const selected=applied.length
+    ? `${applied.length} completed course${applied.length===1?" is":"s are"} allocated to this group.`
+    : "No completed course is allocated to this group.";
+  return `<div class="choice-summary">${selected} This reviewed ${escapeHtml(allocation.allocation_family)} allocation permits each course to count in up to ${maxUses} group${maxUses===1?"":"s"}; other eligible choices remain visible.</div>`;
+}
 function pickerSummaryHtml(gk){
   const g=GROUPS[gk];
   const selected=selectedRequirementCourses(gk);
-  const applied=(g.members||[]).filter(id=>isCompleted(id));
+  const applied=groupAppliedCourseIds(g);
   const limit=selectionLimit(g);
   const noun=limit===1?"course":"courses";
   const selectionText=applied.length
@@ -1362,20 +1645,29 @@ function groupHtml(gk){
   const g=GROUPS[gk];
   if(!g) return "";
   const ok=groupFulfilled(gk);
-  const applied=(g.members||[]).filter(id=>isCompleted(id));
-  const members=(g.members||[]).filter(id=>!isCompleted(id));
+  const applied=groupAppliedCourseIds(g);
+  const members=(g.members||[]).filter(id=>!applied.includes(id));
   const children=(g.children||[]).map(groupHtml).join("");
   const appliedHtml=applied.length
     ? `<div class="choice-picked"><strong style="font-size:10px;">Applied here</strong><div class="cgrid">${applied.map(id=>cardHtml(id)).join("")}</div></div>`
     : "";
-  const body=isConstraintGroup(g)
+  let body=isConstraintGroup(g)
     ? `${constraintSummaryHtml(g)}${appliedHtml}`
     : (isPickerGroup(g)
       ? pickerSummaryHtml(gk)
       : `${appliedHtml}${members.length?`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`:""}`);
-  const progress=g.members?.length
+  body=`${allocationSummaryHtml(g)}${body}`;
+  body=isConstraintGroup(g)||isPickerGroup(g) ? body : `${selectorGuidanceHtml(g)}${body}`;
+  const selectorCount=reviewedGroupSelectors(g).length;
+  const appliedProgress=groupProgress(g);
+  const creditProgress=isCreditRule(g)
+    ? ` · ${appliedProgress.courses} courses / ${appliedProgress.credits}/${g.count} credits applied`
+    : "";
+  const selectorProgress=selectorCount ? ` · ${applied.length}/${Math.max(1,Number(g.count)||1)} applied` : "";
+  const explicitProgress=g.members?.length
     ? ` · ${applied.length}/${g.rule==="all"?g.members.length:Math.min(Number(g.count)||1,g.members.length)} applied`
     : "";
+  const progress=creditProgress || selectorCount ? (creditProgress||selectorProgress) : explicitProgress;
   return `<div class="gr-row"><div class="gr-hdr${ok?" ok":""}" data-gtog="${gk}">
     <span class="gn">${groupDisplayName(g)}</span>
     <span class="gm">${groupRuleLabel(g)}${progress} · click to expand</span>
@@ -1559,11 +1851,12 @@ function renderRequired(){
   ROOT_GROUPS.forEach(gk=>{
     const g=GROUPS[gk];
     if(!g) return;
-    const applied=(g.members||[]).filter(id=>isCompleted(id));
-    const members=(g.members||[]).filter(id=>!isCompleted(id));
+    const applied=groupAppliedCourseIds(g);
+    const members=(g.members||[]).filter(id=>!applied.includes(id));
     const children=(g.children||[]).map(groupHtml).join("");
     if(g.rule==="all"){
       h+=`<div class="sec-hdr">${groupDisplayName(g)}</div>`;
+      h+=selectorGuidanceHtml(g);
       if(applied.length) h+=`<div class="choice-picked"><strong style="font-size:10px;">Applied here</strong><div class="cgrid">${applied.map(id=>cardHtml(id)).join("")}</div></div>`;
       if(members.length) h+=`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`;
       h+=children;
@@ -1646,6 +1939,17 @@ async function backendFetch(path,options={}){
   catch(e){ throw new Error(`Response wasn't JSON: ${text.slice(0,150)}`); }
 }
 
+async function loadCourseEligibilityForCodes(codes){
+  const unique=[...new Set((codes||[]).filter(code=>/^\d{2}:\d{3}:\d{3}$/.test(code)))].slice(0,25);
+  if(!unique.length) return;
+  try{
+    const response=await backendFetch("/api/course-eligibility?codes="+encodeURIComponent(unique.join(",")));
+    Object.assign(ST.courseEligibilityByCode,response.eligibility||{});
+  }catch(_){
+    // Missing or unavailable reviewed data remains a neutral needs-review state.
+  }
+}
+
 function requirementCourseId(code){
   return String(code||"").replace(/[^0-9A-Za-z]/g, "");
 }
@@ -1664,7 +1968,7 @@ function buildRequirementTree(requirements){
   const nextGroups={};
   const rootIds=[];
   const courseRows=[];
-  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : rule==="min_distinct_children" ? "distinct" : "all";
+  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : rule==="min_credits" ? "min_credits" : rule==="max_credits" ? "max_credits" : rule==="min_distinct_children" ? "distinct" : "all";
 
   function addGroup(raw, parentId=null){
     const group={
@@ -1672,6 +1976,8 @@ function buildRequirementTree(requirements){
       parentId, members:[], children:[], sourceProgramId:raw.program_id,
       display_family:cleanApiText(raw.display_family),
       display_priority:Number(raw.display_priority)||0,
+      allocation:raw.allocation,
+      courseSelectors:Array.isArray(raw.course_selectors)?raw.course_selectors:[],
     };
     nextGroups[group.id]=group;
     for(const row of raw.courses||[]){
@@ -1707,6 +2013,7 @@ function buildRequirementTree(requirements){
         restrictions:cleanApiText(row.section_restrictions)||existing?.restrictions||"",
         requirementNotes:[...new Set([...(existing?.requirementNotes||[]),note].filter(Boolean))],
         prereqs:existing?.prereqs||[],
+        eligibility:row.eligibility||existing?.eligibility||null,
         alternatives:[...new Map(alternatives.filter(alt=>alt.code).map(alt=>[alt.code,alt])).values()],
       };
       group.members.push(id);
@@ -1736,12 +2043,21 @@ function collectRawCourseCodes(group, into=new Set()){
   for(const child of group?.children||[]) collectRawCourseCodes(child,into);
   return into;
 }
+function collectRawSelectorSignatures(group, into=[]){
+  for(const selector of group?.course_selectors||[]){
+    const raw=typeof selector?.selector_json==="string" ? selector.selector_json : JSON.stringify(selector?.selector_json||{});
+    if(raw) into.push(raw);
+  }
+  for(const child of group?.children||[]) collectRawSelectorSignatures(child,into);
+  return into;
+}
 function normalizedRequirementName(name){
   return String(name||"").replace(/\s+/g," ").trim().toLowerCase();
 }
 function rootRequirementSignature(root){
   const codes=[...collectRawCourseCodes(root)].sort();
-  return JSON.stringify([normalizedRequirementName(root?.name),root?.rule||"",root?.count??null,codes]);
+  const selectors=collectRawSelectorSignatures(root).sort();
+  return JSON.stringify([normalizedRequirementName(root?.name),root?.rule||"",root?.count??null,codes,selectors]);
 }
 function sharedRootGroups(requirementTrees, programIds){
   return ScheduleRURequirementLogic.sharedRequirementGroups(
@@ -1851,9 +2167,9 @@ function programEligibilityBannerHtml(){
   const programsById=Object.fromEntries((ST.availablePrograms||[]).map(program=>[program.id,program]));
   const facts=rules.map(rule=>{
     const name=programsById[rule.program_id]?.name||"Selected program";
-    return `<li><strong>${escapeHtml(name)}:</strong> ${escapeHtml(rule.note||"Formal eligibility condition; confirm with advising.")}</li>`;
+    return `<li><strong>${escapeHtml(name)}:</strong> ${escapeHtml(rule.advisory_message||rule.note||"Confirm this reviewed program policy with advising.")}</li>`;
   }).join("");
-  return `<div class="dc-banner warn"><b>Formal program conditions</b><ul style="margin:5px 0 0;padding-left:18px;">${facts}</ul><span>These are planning notes from reviewed program sources. ScheduleRU does not verify grades, GPA, formal applications, or advisor approvals.</span></div>`;
+  return `<div class="dc-banner warn"><b>Planning notices</b><ul style="margin:5px 0 0;padding-left:18px;">${facts}</ul><span>Planning notices from reviewed program sources. ScheduleRU does not verify grades, residency, transfer credit, formal applications, or school approvals.</span></div>`;
 }
 function overlapProgramPairsHtml(overlaps,programsById){
   const byPrograms=new Map();
@@ -1932,6 +2248,19 @@ async function loadAvailablePrograms(){
   ST.programSelectionPolicies=policyData||{limits:[],combination_policies:[]};
   return ST.availablePrograms;
 }
+async function loadAvailableSchools(){
+  const data=await backendFetch("/api/schools");
+  const schools=Array.isArray(data.schools)?data.schools.filter(school=>school&&typeof school.slug==="string"&&school.slug):[];
+  if(!schools.length) throw new Error("No reviewed Rutgers school profiles are available yet.");
+  ST.availableSchools=schools;
+  if(!schoolProfileBySlug(ST.homeSchoolSlug)){
+    ST.homeSchoolSlug=schools[0].slug;
+    ST.selectedPrograms=[];
+    ST.groupSelections={};
+    savePlannerState();
+  }
+  return ST.availableSchools;
+}
 async function loadRequirements(programId){
   return loadSelectedRequirements([programId]);
 }
@@ -1984,11 +2313,12 @@ async function loadCoreCurriculum(){
     if(ST.tab==="core") renderPanel();
   }
 }
-async function loadInitialRequirements(){
+async function loadInitialRequirements({reloadSchools=true}={}){
   ST.requirementsLoading=true;
   ST.requirementsError="";
   renderPanel();
   try{
+    if(reloadSchools) await loadAvailableSchools();
     const programs=await loadAvailablePrograms();
     // This one read lets the UI derive a shared requirement baseline from the
     // reviewed school data, including when a program's own table contains
@@ -2028,6 +2358,7 @@ async function loadBackendCourses(){
     });
     const d = await backendFetch("/api/courses?"+params.toString());
     ST.backendCourses = d.courses||[];
+    await loadCourseEligibilityForCodes(ST.backendCourses.map(catalogCourseCode));
     ST.backendTotal = d.total ?? ST.backendCourses.length;
   }catch(err){
     ST.backendError = `Couldn't reach backend: ${err.message}`;

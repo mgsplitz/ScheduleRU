@@ -9,6 +9,13 @@
 
 const REJECTING_DECISIONS = new Set(["blocked", "requires_transfer"]);
 const ELIGIBILITY_BLOCKING_DECISIONS = new Set(["blocked"]);
+const ADVISORY_CONDITION_TYPES = new Set([
+  "minimum_course_grade",
+  "nb_residency_limit",
+  "requires_school_approval",
+  "transfer_limit",
+]);
+const ADVISORY_DECISIONS = new Set(["requires_approval", "information"]);
 
 function nonEmptyText(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -59,6 +66,90 @@ function stringList(value) {
   return Array.isArray(value) ? value.filter(nonEmptyText).map((item) => item.trim()) : [];
 }
 
+function nonNegativeNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function pluralCredits(value) {
+  return value === 1 ? "credit" : "credits";
+}
+
+export function hasUsableSourceUrl(value) {
+  if (!nonEmptyText(value)) return false;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+export function isAdvisoryEligibilityCondition(conditionType) {
+  return ADVISORY_CONDITION_TYPES.has(conditionType);
+}
+
+export function isAdvisoryEligibilityDecision(decision) {
+  return ADVISORY_DECISIONS.has(decision);
+}
+
+/**
+ * Creates concise, action-oriented wording for policy facts that ScheduleRU
+ * cannot evaluate from a planned-course selection. It deliberately returns
+ * null for malformed values so callers can fail safely rather than inventing
+ * a conclusion from incomplete reviewed data.
+ */
+export function advisoryMessageForEligibilityRule(rule) {
+  if (!isAdvisoryEligibilityCondition(rule?.condition_type)) return null;
+  const value = parseConditionValue(rule);
+  if (value === null || Array.isArray(value) || typeof value !== "object") return null;
+
+  switch (rule.condition_type) {
+    case "minimum_course_grade": {
+      const courseCode = nonEmptyText(value.course_code) ? value.course_code.trim() : null;
+      const minimumGrade = nonEmptyText(value.minimum_grade) ? value.minimum_grade.trim() : null;
+      return courseCode && minimumGrade
+        ? `Confirm that you earned ${minimumGrade} or better in ${courseCode} before relying on this plan.`
+        : null;
+    }
+    case "nb_residency_limit": {
+      const maximum = nonNegativeNumber(value.maximum_outside_nb_credits);
+      return maximum === null
+        ? null
+        : `Confirm that no more than ${maximum} ${pluralCredits(maximum)} for this program were completed outside Rutgers–New Brunswick before relying on this plan.`;
+    }
+    case "requires_school_approval": {
+      const school = nonEmptyText(value.school) ? value.school.trim() : null;
+      const action = nonEmptyText(value.action) ? value.action.trim() : null;
+      return school && action
+        ? `Ask ${school} for approval to ${action} before relying on this plan.`
+        : null;
+    }
+    case "transfer_limit": {
+      const maximum = nonNegativeNumber(value.maximum_transfer_credits);
+      return maximum === null
+        ? null
+        : `Confirm that no more than ${maximum} transfer ${pluralCredits(maximum)} apply to this program before relying on this plan.`;
+    }
+    default:
+      return null;
+  }
+}
+
+export function publicEligibilityRule(rule) {
+  const advisoryCondition = isAdvisoryEligibilityCondition(rule?.condition_type);
+  const advisory = advisoryCondition
+    && isAdvisoryEligibilityDecision(rule?.decision)
+    && hasUsableSourceUrl(rule?.source_url);
+  const advisoryMessage = advisory ? advisoryMessageForEligibilityRule(rule) : null;
+  return {
+    ...rule,
+    advisory,
+    advisory_message: advisoryMessage || (advisoryCondition
+      ? "A reviewed program policy needs data correction before this planning notice can be shown."
+      : null),
+  };
+}
+
 function eligibilityFailure(rule, homeSchoolSlug, selectedProgramIds) {
   const value = parseConditionValue(rule);
   if (value === null) return { failed: true, dataError: true };
@@ -78,18 +169,26 @@ function eligibilityFailure(rule, homeSchoolSlug, selectedProgramIds) {
     // them instead of pretending browser state proves eligibility.
     case "minimum_total_credits":
     case "minimum_gpa":
-    case "minimum_course_grade":
     case "course_completion_or_placement":
     case "application_required":
     case "advisor_confirmation":
       return { failed: true, needsAdvising: true };
+    case "minimum_course_grade":
+    case "nb_residency_limit":
+    case "requires_school_approval":
+    case "transfer_limit":
+      return advisoryMessageForEligibilityRule(rule)
+        ? { failed: true, needsAdvising: true, advisory: true }
+        : { failed: true, dataError: true };
     default:
       return { failed: true, dataError: true };
   }
 }
 
 function eligibilityMessage(rule, failure) {
+  if (failure.advisoryDataError) return "A reviewed advisory policy needs data correction before this selection can be confirmed.";
   if (failure.dataError) return "A reviewed program eligibility rule needs data correction before this selection can be confirmed.";
+  if (failure.advisory) return advisoryMessageForEligibilityRule(rule);
   return rule.note || "This program has a formal eligibility condition to confirm with advising.";
 }
 
@@ -174,6 +273,13 @@ export function evaluateProgramSelection({
   for (const rule of matchingEligibilityRules) {
     const failure = eligibilityFailure(rule, homeSchoolSlug, selectedIds);
     if (!failure.failed) continue;
+    // Advisory conditions are not determinate from a course plan. A reviewed
+    // row that marks one as blocking is a data/configuration error, not proof
+    // that the student failed the policy.
+    const advisoryDataError = failure.advisory && (
+      !isAdvisoryEligibilityDecision(rule.decision) || !hasUsableSourceUrl(rule.source_url)
+    );
+    const issueFailure = advisoryDataError ? { ...failure, dataError: true, advisoryDataError } : failure;
     const issue = {
       code: `eligibility:${rule.rule_key}`,
       kind: "eligibility",
@@ -182,9 +288,10 @@ export function evaluateProgramSelection({
       condition_type: rule.condition_type,
       note: rule.note || null,
       source_url: rule.source_url || null,
-      message: eligibilityMessage(rule, failure),
+      advisory: Boolean(issueFailure.advisory && !issueFailure.dataError),
+      message: eligibilityMessage(rule, issueFailure),
     };
-    if (ELIGIBILITY_BLOCKING_DECISIONS.has(rule.decision) || failure.dataError) errors.push(issue);
+    if (ELIGIBILITY_BLOCKING_DECISIONS.has(rule.decision) || issueFailure.dataError) errors.push(issue);
     else warnings.push(issue);
   }
 

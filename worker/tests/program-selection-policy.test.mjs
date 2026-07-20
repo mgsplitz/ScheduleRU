@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { evaluateProgramSelection } from "../src/program-selection-policy.js";
+import { evaluateProgramSelection, publicEligibilityRule } from "../src/program-selection-policy.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, "../fixtures/program-selection-comparison-cases.json");
@@ -117,8 +117,167 @@ test("a grade condition remains a transparent advising warning, not a fake autom
       condition_value_json: '{"course_code":"33:390:300","minimum_grade":"B"}',
       decision: "requires_approval",
       note: "A B or better in Financial Management is required to declare.",
+      source_url: "https://example.edu/finance",
     }],
   });
   assert.equal(result.allowed, true);
   assert.deepEqual(result.warnings.map((issue) => issue.code), ["eligibility:rbsnb-finance-concentration-grade"]);
+});
+
+test("structured academic policy advisories remain selectable and tell the student what to confirm", () => {
+  const result = evaluateProgramSelection({
+    homeSchoolSlug: "rbsnb",
+    selectedProgramIds: ["rbsnb-finance"],
+    programs: fixture.programs,
+    limits: [],
+    combinationPolicies: [],
+    eligibilityRules: [
+      {
+        rule_key: "example-minimum-grade",
+        program_id: "rbsnb-finance",
+        condition_type: "minimum_course_grade",
+        condition_value_json: '{"course_code":"01:790:101","minimum_grade":"C+"}',
+        decision: "requires_approval",
+        note: "A source-backed minimum grade applies.",
+        source_url: "https://example.edu/minimum-grade",
+      },
+      {
+        rule_key: "example-nb-residency",
+        program_id: "rbsnb-finance",
+        condition_type: "nb_residency_limit",
+        condition_value_json: '{"maximum_outside_nb_credits":6}',
+        decision: "requires_approval",
+        note: "A source-backed residency limit applies.",
+        source_url: "https://example.edu/nb-residency",
+      },
+      {
+        rule_key: "example-school-approval",
+        program_id: "rbsnb-finance",
+        condition_type: "requires_school_approval",
+        condition_value_json: '{"school":"SAS","action":"add this program"}',
+        decision: "requires_approval",
+        note: "A source-backed approval condition applies.",
+        source_url: "https://example.edu/school-approval",
+      },
+      {
+        rule_key: "example-transfer-limit",
+        program_id: "rbsnb-finance",
+        condition_type: "transfer_limit",
+        condition_value_json: '{"maximum_transfer_credits":2}',
+        decision: "requires_approval",
+        note: "A source-backed transfer limit applies.",
+        source_url: "https://example.edu/transfer-limit",
+      },
+    ],
+  });
+
+  assert.equal(result.allowed, true);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.warnings.map((issue) => issue.code), [
+    "eligibility:example-minimum-grade",
+    "eligibility:example-nb-residency",
+    "eligibility:example-school-approval",
+    "eligibility:example-transfer-limit",
+  ]);
+  assert.deepEqual(result.warnings.map((issue) => issue.message), [
+    "Confirm that you earned C+ or better in 01:790:101 before relying on this plan.",
+    "Confirm that no more than 6 credits for this program were completed outside Rutgers–New Brunswick before relying on this plan.",
+    "Ask SAS for approval to add this program before relying on this plan.",
+    "Confirm that no more than 2 transfer credits apply to this program before relying on this plan.",
+  ]);
+  assert.ok(result.warnings.every((issue) => issue.advisory === true));
+  assert.ok(result.warnings.every((issue) => !/audit/i.test(issue.message)));
+});
+
+test("a reviewed advisory marked as blocking fails closed as a data correction", () => {
+  const result = evaluateProgramSelection({
+    homeSchoolSlug: "rbsnb",
+    selectedProgramIds: ["rbsnb-finance"],
+    programs: fixture.programs,
+    limits: [],
+    combinationPolicies: [],
+    eligibilityRules: [{
+      rule_key: "example-blocking-grade-advisory",
+      program_id: "rbsnb-finance",
+      condition_type: "minimum_course_grade",
+      condition_value_json: '{"course_code":"01:790:101","minimum_grade":"C+"}',
+      decision: "blocked",
+      note: "A source-backed minimum grade applies.",
+      source_url: "https://example.edu/minimum-grade",
+    }],
+  });
+
+  assert.equal(result.allowed, false);
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.errors.map((issue) => issue.message), [
+    "A reviewed advisory policy needs data correction before this selection can be confirmed.",
+  ]);
+});
+
+test("public advisory data marked as blocking is shown only as a data correction", () => {
+  const rule = publicEligibilityRule({
+    rule_key: "example-blocking-grade-advisory",
+    program_id: "rbsnb-finance",
+    condition_type: "minimum_course_grade",
+    condition_value_json: '{"course_code":"01:790:101","minimum_grade":"C+"}',
+    decision: "blocked",
+    note: "A source-backed minimum grade applies.",
+    source_url: "https://example.edu/minimum-grade",
+  });
+
+  assert.equal(rule.advisory, false);
+  assert.equal(
+    rule.advisory_message,
+    "A reviewed program policy needs data correction before this planning notice can be shown."
+  );
+});
+
+test("an incomplete structured advisory fails closed instead of inventing a zero-credit limit", () => {
+  const result = evaluateProgramSelection({
+    homeSchoolSlug: "rbsnb",
+    selectedProgramIds: ["rbsnb-finance"],
+    programs: fixture.programs,
+    limits: [],
+    combinationPolicies: [],
+    eligibilityRules: [{
+      rule_key: "example-empty-transfer-limit",
+      program_id: "rbsnb-finance",
+      condition_type: "transfer_limit",
+      condition_value_json: '{"maximum_transfer_credits":""}',
+      decision: "requires_approval",
+      note: "A source-backed transfer limit applies.",
+      source_url: "https://example.edu/transfer-limit",
+    }],
+  });
+
+  assert.equal(result.allowed, false);
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.errors.map((issue) => issue.message), [
+    "A reviewed program eligibility rule needs data correction before this selection can be confirmed.",
+  ]);
+});
+
+test("a structured advisory without usable source provenance fails closed", () => {
+  const result = evaluateProgramSelection({
+    homeSchoolSlug: "rbsnb",
+    selectedProgramIds: ["rbsnb-finance"],
+    programs: fixture.programs,
+    limits: [],
+    combinationPolicies: [],
+    eligibilityRules: [{
+      rule_key: "example-unsourced-transfer-limit",
+      program_id: "rbsnb-finance",
+      condition_type: "transfer_limit",
+      condition_value_json: '{"maximum_transfer_credits":2}',
+      decision: "requires_approval",
+      note: "A transfer limit applies.",
+      source_url: "",
+    }],
+  });
+
+  assert.equal(result.allowed, false);
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.errors.map((issue) => issue.message), [
+    "A reviewed advisory policy needs data correction before this selection can be confirmed.",
+  ]);
 });
