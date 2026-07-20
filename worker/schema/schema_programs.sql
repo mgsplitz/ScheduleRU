@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS requirement_groups (
   name TEXT,                        -- e.g. "Business Core", "Law/Ethics (choose 1)"
   display_family TEXT,              -- optional shared display family, e.g. 'rbsnb-business-core'
   display_priority INTEGER DEFAULT 0, -- higher reviewed variant replaces lower variants in one family
-  rule TEXT NOT NULL,               -- 'all' | 'min_courses' | 'max_courses' | 'min_credits'
+  rule TEXT NOT NULL,               -- 'all' | 'one_of' | 'min_courses' | 'max_courses' | 'min_credits'
   count INTEGER,                    -- N for min/max_courses, credit count for min_credits
   sort_order INTEGER DEFAULT 0,
   auto_generated INTEGER DEFAULT 1  -- 1 = came from the scraper, 0 = you hand-added it
