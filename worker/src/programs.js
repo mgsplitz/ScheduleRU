@@ -259,7 +259,19 @@ function isSupportedCatalogDirectorySource(source) {
     && typeof source.profile_path === "string";
 }
 
-async function saveCatalogDirectoryEntries(env, source, entries) {
+function ownerLabelsForCatalogSource(value) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((label) => typeof label === "string" && label.trim()).slice(0, 30)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveCatalogDirectoryEntries(env, source, entries, importToken) {
   const now = Date.now();
   const statements = entries.map((entry) => env.DB.prepare(
     `INSERT INTO programs (
@@ -300,21 +312,53 @@ async function saveCatalogDirectoryEntries(env, source, entries) {
   ).bind(source.id, now).run();
   await env.DB.prepare(
     `UPDATE program_catalog_sources
-     SET last_imported_at = ?, last_error = NULL
-     WHERE id = ?`
-  ).bind(now, source.id).run();
+     SET last_imported_at = ?, last_error = NULL,
+         import_token = NULL, import_started_at = NULL
+     WHERE id = ? AND import_token = ?`
+  ).bind(now, source.id, importToken).run();
 }
 
 async function importCatalogDirectorySource(env, sourceId) {
   if (!isSafeCatalogSourceId(sourceId)) throw new Error("invalid catalog source id");
   const source = await env.DB.prepare(
     `SELECT id, school_slug, directory_url, profile_path, catalog_year,
-            source_title, adapter
+            source_title, adapter, owner_labels_json
      FROM program_catalog_sources
      WHERE id = ? AND enabled = 1`
   ).bind(sourceId).first();
   if (!source) throw new Error("unknown or disabled catalog source");
   if (!isSupportedCatalogDirectorySource(source)) throw new Error("unsupported catalog directory adapter");
+
+  const { results: overrideRows } = await env.DB.prepare(
+    `SELECT program_slug, type, program_id
+     FROM program_catalog_identity_overrides
+     WHERE catalog_source_id = ?`
+  ).bind(source.id).all();
+  source.owner_labels = ownerLabelsForCatalogSource(source.owner_labels_json);
+  source.program_id_overrides = Object.fromEntries(
+    overrideRows
+      .filter((row) => isSafeCatalogSourceId(row.program_slug)
+        && (row.type === "major" || row.type === "minor")
+        && isSafeCatalogSourceId(row.program_id))
+      .map((row) => [`${row.program_slug}:${row.type}`, row.program_id]),
+  );
+
+  const startedAt = Date.now();
+  const importToken = crypto.randomUUID();
+  const lease = await env.DB.prepare(
+    `UPDATE program_catalog_sources
+     SET import_token = ?, import_started_at = ?
+     WHERE id = ?
+       AND (import_token IS NULL OR import_started_at < ?)`
+  ).bind(importToken, startedAt, source.id, startedAt - (10 * 60 * 1000)).run();
+  if ((lease.meta?.changes || 0) !== 1) {
+    return {
+      ok: false,
+      source_id: source.id,
+      error: "a catalog import for this source is already running",
+      status: 409,
+    };
+  }
 
   let rawHtml = "";
   try {
@@ -326,7 +370,7 @@ async function importCatalogDirectorySource(env, sourceId) {
         rawHtml = await response.text();
         return rawHtml;
       },
-      saveEntries: (entries) => saveCatalogDirectoryEntries(env, source, entries),
+      saveEntries: (entries) => saveCatalogDirectoryEntries(env, source, entries, importToken),
     });
     await logScrape(
       env,
@@ -339,8 +383,10 @@ async function importCatalogDirectorySource(env, sourceId) {
     return { ok: true, source_id: source.id, ...result };
   } catch (err) {
     await env.DB.prepare(
-      `UPDATE program_catalog_sources SET last_error = ? WHERE id = ?`
-    ).bind(String(err?.message || err), source.id).run();
+      `UPDATE program_catalog_sources
+       SET last_error = ?, import_token = NULL, import_started_at = NULL
+       WHERE id = ? AND import_token = ?`
+    ).bind(String(err?.message || err), source.id, importToken).run();
     await logScrape(env, `catalog:${source.id}`, "error", null, `catalog directory import failed: ${err.message}`, rawHtml.slice(0, 1500));
     return { ok: false, source_id: source.id, error: err.message };
   }
@@ -1627,7 +1673,7 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       const sourceId = url.searchParams.get("source") || "";
       if (!sourceId) return json({ error: "pass ?source=the-catalog-source-id" }, 400);
       const result = await importCatalogDirectorySource(env, sourceId);
-      return json(result, result.ok ? 200 : 502);
+      return json(result, result.ok ? 200 : (result.status || 502));
     }
 
     // Seed a program by hand — the reliable path, always works regardless
@@ -1664,22 +1710,23 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       return json(result);
     }
 
-    // Scrape one program (?program=id) or every program that hasn't been
-    // scraped yet / is due for a refresh (no query param).
-    // Scrape one program from the OLD Coursedog catalog source (prose-heavy,
-    // no reliable elective lists — see the big comment above
-    // scrapeProgramFromBizSite). Kept for Business Core / required-course
-    // sections, which that source does parse fine.
+    // Scrape one non-RBS program (?program=id) or every eligible program
+    // (no query param) from Coursedog. RBS is deliberately excluded: its
+    // Coursedog pages have unreliable copied prose and incomplete electives.
+    // Use /api/admin/scrape-programs-biz for the supported RBS majors instead.
     if (path === "/api/admin/scrape-programs" && request.method === "POST") {
       const singleId = url.searchParams.get("program");
       let targets;
       if (singleId) {
         const p = await env.DB.prepare(`SELECT * FROM programs WHERE id = ?`).bind(singleId).first();
         if (!p) return json({ error: "unknown program id" }, 404);
+        if (p.school_slug === "rbsnb") {
+          return json({ error: "Coursedog is not an approved RBS requirements source; use /api/admin/scrape-programs-biz for a supported RBS major." }, 400);
+        }
         targets = [p];
       } else {
         const { results } = await env.DB.prepare(`SELECT * FROM programs`).all();
-        targets = results;
+        targets = results.filter((program) => program.school_slug !== "rbsnb");
       }
       const run = async () => {
         const results = [];

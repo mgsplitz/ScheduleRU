@@ -53,6 +53,28 @@ function profileSlug(url, profilePath) {
   return /^[a-z0-9-]+$/i.test(remainder) ? remainder.toLowerCase() : null;
 }
 
+function normalizedOwnerLabel(value) {
+  return textFromHtml(value).toLowerCase().replace(/\s+/g, "");
+}
+
+function allowedOwnerLabels(source) {
+  if (!Array.isArray(source.owner_labels)) return [];
+  return source.owner_labels
+    .map(normalizedOwnerLabel)
+    .filter(Boolean);
+}
+
+function ownerLabelFromRow(row) {
+  const match = String(row || "").match(
+    /<td\b[^>]*\bdata-title\s*=\s*(?:"School"|'School')[^>]*>([\s\S]*?)<\/td>/i,
+  );
+  return match ? textFromHtml(match[1]) : "";
+}
+
+function safeProgramId(value) {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{2,119}$/.test(value);
+}
+
 function validSource(source) {
   return source
     && typeof source.id === "string"
@@ -69,42 +91,57 @@ export function parseProgramDirectory(html, source) {
   const profilePath = source.profile_path.startsWith("/") ? source.profile_path : `/${source.profile_path}`;
   const entries = [];
   const seen = new Set();
-  const anchorRe = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
-  let match;
-  while ((match = anchorRe.exec(String(html || "")))) {
-    const [, attributes, body] = match;
-    const href = attributeValue(attributes, "href");
-    if (!href) continue;
-    let sourceUrl;
-    try {
-      sourceUrl = new URL(decodeHtml(href), source.directory_url);
-    } catch {
+  const permittedOwners = allowedOwnerLabels(source);
+  const rowBlocks = [...String(html || "").matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)]
+    .map((match) => match[0]);
+  // Some future official directories will not use a table. In that case, the
+  // source has no owner column to filter, so continue to support the generic
+  // anchor-only layout.
+  const containers = rowBlocks.length ? rowBlocks : [String(html || "")];
+  for (const container of containers) {
+    if (permittedOwners.length && !permittedOwners.includes(normalizedOwnerLabel(ownerLabelFromRow(container)))) {
       continue;
     }
-    const programSlug = profileSlug(sourceUrl, profilePath);
-    if (!programSlug) continue;
-    const label = textFromHtml(attributeValue(attributes, "title") || body);
-    const name = displayName(label);
-    const types = programTypes(label);
-    if (!name || !types.length) continue;
-    const degree = degreeType(label);
-    for (const type of types) {
-      const id = `catalog-${source.school_slug}-${programSlug}-${type}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      entries.push({
-        id,
-        name,
-        school_slug: source.school_slug,
-        program_slug: programSlug,
-        type,
-        catalog_year: source.catalog_year || null,
-        degree_type: degree,
-        program_family_id: `${source.school_slug}-${programSlug}`,
-        source_url: sourceUrl.href,
-        review_status: "catalog_listed",
-        catalog_source_id: source.id,
-      });
+    const anchorRe = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+    let match;
+    while ((match = anchorRe.exec(container))) {
+      const [, attributes, body] = match;
+      const href = attributeValue(attributes, "href");
+      if (!href) continue;
+      let sourceUrl;
+      try {
+        sourceUrl = new URL(decodeHtml(href), source.directory_url);
+      } catch {
+        continue;
+      }
+      const programSlug = profileSlug(sourceUrl, profilePath);
+      if (!programSlug) continue;
+      const label = textFromHtml(attributeValue(attributes, "title") || body);
+      const name = displayName(label);
+      const types = programTypes(label);
+      if (!name || !types.length) continue;
+      const degree = degreeType(label);
+      for (const type of types) {
+        const override = source.program_id_overrides?.[`${programSlug}:${type}`];
+        const id = safeProgramId(override)
+          ? override
+          : `${source.school_slug}-catalog-${programSlug}-${type}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        entries.push({
+          id,
+          name,
+          school_slug: source.school_slug,
+          program_slug: programSlug,
+          type,
+          catalog_year: source.catalog_year || null,
+          degree_type: degree,
+          program_family_id: `${source.school_slug}-catalog-${programSlug}`,
+          source_url: sourceUrl.href,
+          review_status: "catalog_listed",
+          catalog_source_id: source.id,
+        });
+      }
     }
   }
   return entries;
