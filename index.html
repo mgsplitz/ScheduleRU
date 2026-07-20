@@ -2167,9 +2167,9 @@ function programEligibilityBannerHtml(){
   const programsById=Object.fromEntries((ST.availablePrograms||[]).map(program=>[program.id,program]));
   const facts=rules.map(rule=>{
     const name=programsById[rule.program_id]?.name||"Selected program";
-    return `<li><strong>${escapeHtml(name)}:</strong> ${escapeHtml(rule.note||"Formal eligibility condition; confirm with advising.")}</li>`;
+    return `<li><strong>${escapeHtml(name)}:</strong> ${escapeHtml(rule.advisory_message||rule.note||"Confirm this reviewed program policy with advising.")}</li>`;
   }).join("");
-  return `<div class="dc-banner warn"><b>Formal program conditions</b><ul style="margin:5px 0 0;padding-left:18px;">${facts}</ul><span>These are planning notes from reviewed program sources. ScheduleRU does not verify grades, GPA, formal applications, or advisor approvals.</span></div>`;
+  return `<div class="dc-banner warn"><b>Planning notices</b><ul style="margin:5px 0 0;padding-left:18px;">${facts}</ul><span>Planning notices from reviewed program sources. ScheduleRU does not verify grades, residency, transfer credit, formal applications, or school approvals.</span></div>`;
 }
 function overlapProgramPairsHtml(overlaps,programsById){
   const byPrograms=new Map();

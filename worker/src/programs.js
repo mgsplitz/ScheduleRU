@@ -29,7 +29,7 @@
  * depend on guessing exact class names, but there will be edge cases.
  */
 
-import { evaluateProgramSelection } from "./program-selection-policy.js";
+import { evaluateProgramSelection, publicEligibilityRule } from "./program-selection-policy.js";
 import { publicSchoolProfile } from "./school-profiles.js";
 
 /* ============================================================
@@ -1176,7 +1176,7 @@ async function getProgramEligibilityRules(env, programIds) {
        AND program_id IN (${ids.map(() => "?").join(",")})
      ORDER BY program_id, rule_key`
   ).bind(...ids).all();
-  return results || [];
+  return (results || []).map(publicEligibilityRule);
 }
 
 function isSafeHomeSchoolSlug(value) {

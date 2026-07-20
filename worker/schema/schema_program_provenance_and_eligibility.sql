@@ -36,6 +36,13 @@ CREATE INDEX IF NOT EXISTS idx_program_sources_program ON program_sources(progra
 --   minimum_total_credits
 --   minimum_gpa
 --   minimum_course_grade
+--     {"course_code":"01:790:101","minimum_grade":"C+"}
+--   nb_residency_limit
+--     {"maximum_outside_nb_credits":6}
+--   requires_school_approval
+--     {"school":"SAS","action":"add this program"}
+--   transfer_limit
+--     {"maximum_transfer_credits":2}
 --   course_completion_or_placement
 --   application_required
 --   advisor_confirmation
@@ -43,6 +50,10 @@ CREATE INDEX IF NOT EXISTS idx_program_sources_program ON program_sources(progra
 -- `blocked` is enforced when the app can evaluate the condition from the
 -- selected programs/home school. `requires_approval` and `information` are
 -- visible planning facts, not a claim that the app can verify grades or GPA.
+-- The four structured advisory conditions above cannot be used to reach a
+-- declaration decision from a course plan, so reviewed rows must use an
+-- `requires_approval` or `information` decision and source-backed values.
+-- Malformed rows fail closed.
 CREATE TABLE IF NOT EXISTS program_eligibility_rules (
   rule_key TEXT PRIMARY KEY,
   program_id TEXT NOT NULL REFERENCES programs(id),
