@@ -26,7 +26,7 @@ for (const comparisonCase of fixture.cases) {
 }
 
 test("selection validation loads a program family for reviewed same-family policies", () => {
-  assert.match(worker, /SELECT id,\s+school_slug,\s+type,\s+program_family_id,\s+requirement_evidence_required/);
+  assert.match(worker, /SELECT id,\s+name,\s+school_slug,\s+program_slug,\s+type,\s+degree_type,\s+program_family_id,\s+requirement_evidence_required/);
 });
 
 test("unknown program ids are rejected instead of being silently dropped", () => {

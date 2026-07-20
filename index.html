@@ -522,6 +522,7 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
         <select id="programSchoolSelect" aria-describedby="programSchoolHelp"></select>
       </label>
       <div class="program-school-help" id="programSchoolHelp"></div>
+      <input class="picker-search" id="programSearch" placeholder="Search majors and minors" />
       <div class="program-policy-feedback" id="programPolicyFeedback" aria-live="polite"></div>
       <div id="programList"></div>
       <div class="modal-footer"><button class="choice-btn secondary" id="programCancel">Cancel</button><button class="choice-btn" id="programApply">Apply programs</button></div>
@@ -640,7 +641,7 @@ const ST = {
   backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || defaultBackendUrl(),
   availableSchools:[], availablePrograms:[], activeProgram:null, selectedPrograms:[],
   homeSchoolSlug:"", programSelectionPolicies:{limits:[],combination_policies:[]},
-  requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
+  requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, catalogListedProgramIds:[], doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
   backendSubject:"", backendSearch:"", backendPage:1, backendSelectorGroupId:null,
@@ -930,7 +931,7 @@ document.querySelectorAll(".pagenav-btn").forEach(b=>b.addEventListener("click",
 }));
 
 /* ============================================================
-   PROGRAM SELECTION (reviewed programs of study)
+   PROGRAM SELECTION
    ============================================================ */
 const DEFAULT_PROGRAM_TYPE_SECTIONS=[
   {type:"major",label:"Majors",singular:"Major"},
@@ -986,6 +987,15 @@ function selectionLimitSummary(){
   });
   return `Reviewed ${activeHomeSchoolLabel()} selection limits: ${phrases.join(", ")}.`;
 }
+function programCoverageLabel(program){
+  return program?.requirements_available===false || program?.coverage_status==="catalog_listed"
+    ? "Catalog-listed · requirements under review"
+    : "Reviewed requirements";
+}
+function programMatchesSearch(program, query){
+  const haystack=[program?.name,program?.degree_type,program?.type,program?.academic_program_code].join(" ").toLowerCase();
+  return !query || haystack.includes(query);
+}
 function showProgramPolicyFeedback(check){
   const node=document.getElementById("programPolicyFeedback");
   if(!node) return;
@@ -1026,6 +1036,7 @@ async function changeHomeSchool(nextSchoolSlug){
   ST.groupSelections={};
   ST.requirementTrees={};
   ST.referenceRequirementTrees={};
+  ST.catalogListedProgramIds=[];
   ST.majorRequirementTree=null;
   ST.activeProgram=null;
   ST.doubleCount=null;
@@ -1050,22 +1061,34 @@ function closeProgramPicker(){
 }
 function openProgramPicker(){
   ST.programDraft=[...ST.selectedPrograms];
+  ST.programSearch="";
   delete ST.programDraftWarningSignature;
-  document.getElementById("programPickerNote").textContent=`Choose reviewed programs of study. ${selectionLimitSummary()} Shared requirements are shown once, and the app checks reviewed policies before saving your plan.`;
+  document.getElementById("programPickerNote").textContent=`Catalog-listed programs are selectable so you can record your SAS path now. Only reviewed programs show a requirement tree. ${selectionLimitSummary()} The app checks reviewed policies before saving your plan.`;
   renderProgramSchoolSelector();
   showProgramPolicyFeedback(null);
+  const search=document.getElementById("programSearch");
+  search.value="";
+  search.oninput=()=>{
+    ST.programSearch=search.value.trim().toLowerCase();
+    renderProgramPickerList();
+  };
+  renderProgramPickerList();
+  document.getElementById("programOv").classList.add("open");
+}
+function renderProgramPickerList(){
   const list=document.getElementById("programList");
+  const query=ST.programSearch||"";
   const categories=programTypeSections().map(section=>({
     ...section,
-    programs:(ST.availablePrograms||[]).filter(program=>program.type===section.type),
+    programs:(ST.availablePrograms||[]).filter(program=>program.type===section.type&&programMatchesSearch(program,query)),
   })).filter(section=>section.programs.length);
   list.innerHTML=categories.map(section=>`<section class="program-category">
     <h3 class="program-category-title">${escapeHtml(section.label)}</h3>
     ${section.programs.map(program=>`<label class="program-option">
       <input type="checkbox" data-program-choice="${escapeHtml(program.id)}" ${ST.programDraft.includes(program.id)?"checked":""}/>
-      <span><strong>${escapeHtml(program.name)}</strong><small>${escapeHtml(programTypeLabel(program.type))} · ${escapeHtml(program.catalog_year||"Catalog year not listed")}</small></span>
+      <span><strong>${escapeHtml(program.name)}</strong><small>${escapeHtml(programTypeLabel(program.type))} · ${escapeHtml(programCoverageLabel(program))}</small></span>
     </label>`).join("")}
-  </section>`).join("") || `<div class="api-status">No reviewed programs are available yet for ${escapeHtml(activeHomeSchoolLabel())}.</div>`;
+  </section>`).join("") || `<div class="api-status">No programs match that search for ${escapeHtml(activeHomeSchoolLabel())}.</div>`;
   for(const option of list.querySelectorAll("[data-program-choice]")){
     const degreeType=cleanApiText((ST.availablePrograms||[]).find(program=>program.id===option.dataset.programChoice)?.degree_type);
     if(!degreeType) continue;
@@ -1083,7 +1106,6 @@ function openProgramPicker(){
     ST.programDraft=[...draft];
     delete ST.programDraftWarningSignature;
   }));
-  document.getElementById("programOv").classList.add("open");
 }
 document.getElementById("programBtn").addEventListener("click", openProgramPicker);
 document.getElementById("programClose").addEventListener("click", closeProgramPicker);
@@ -1937,7 +1959,7 @@ function renderRequired(){
     pb.innerHTML=`<div class="api-status err">Could not load degree requirements: ${escapeHtml(ST.requirementsError)}</div>`;
     return;
   }
-  let h=`<div class="leg">Gray = not yet unlocked. Green = completed or AP-waived. Click any course card for full details; click ○ to mark a course taken/waived.</div>${programEligibilityBannerHtml()}${doubleCountBannerHtml()}`;
+  let h=`<div class="leg">Gray = not yet unlocked. Green = completed or AP-waived. Click any course card for full details; click ○ to mark a course taken/waived.</div>${catalogListedProgramsBannerHtml()}${programEligibilityBannerHtml()}${doubleCountBannerHtml()}`;
   ROOT_GROUPS.forEach(gk=>{
     const g=GROUPS[gk];
     if(!g) return;
@@ -1954,7 +1976,7 @@ function renderRequired(){
       h+=groupHtml(gk);
     }
   });
-  if(!ROOT_GROUPS.length) h+=`<div class="empty" style="margin-top:30px;">No reviewed requirements are available yet.</div>`;
+  if(!ROOT_GROUPS.length) h+=`<div class="empty" style="margin-top:30px;">No reviewed requirements are available for the selected catalog-listed program yet.</div>`;
   pb.innerHTML=h;
   attachCardEvents(pb);
   pb.querySelectorAll("[data-gtog]").forEach(d=>d.addEventListener("click",()=>
@@ -1968,6 +1990,13 @@ function renderRequired(){
   pb.querySelectorAll("[data-gclear]").forEach(b=>b.addEventListener("click",e=>{
     e.stopPropagation(); delete ST.groupSelections[b.dataset.gclear]; renderPanel();
   }));
+}
+
+function catalogListedProgramsBannerHtml(){
+  const listed=selectedProgramRows().filter(program=>program?.requirements_available===false||program?.coverage_status==="catalog_listed");
+  if(!listed.length) return "";
+  const names=listed.map(program=>program.name).join(", ");
+  return `<div class="dc-banner warn"><b>Requirements under review</b><div>${escapeHtml(names)} ${listed.length===1?"is":"are"} selectable from the official SAS catalog, but ScheduleRU is not yet showing a program-specific requirement audit. Use the linked catalog entry and SAS advising to confirm progress while we import the rules.</div></div>`;
 }
 
 /* ============================================================
@@ -2357,9 +2386,9 @@ function doubleCountBannerHtml(){
 }
 
 async function loadAvailablePrograms(){
-  // Fetch every reviewed item for the active home school. Filtering is deliberately client-side so
-  // majors, minors, concentrations/tracks, and certificates all remain
-  // available as soon as reviewed data is added.
+  // The API combines reviewed requirement trees with the official SAS catalog
+  // coverage tier. Filtering stays client-side so all supported program types
+  // remain visible as soon as source-backed data is available.
   const [data,policyData]=await Promise.all([
     backendFetch(`/api/programs?school=${encodeURIComponent(ST.homeSchoolSlug)}`),
     backendFetch(`/api/program-selection-policies?home_school=${encodeURIComponent(ST.homeSchoolSlug)}`),
@@ -2395,9 +2424,10 @@ async function loadSelectedRequirements(programIds){
   ]);
   const returned=data.requirements||{};
   const visibleIds=ids.filter(id=>Array.isArray(returned[id]));
-  if(!visibleIds.length) throw new Error("None of the selected programs has reviewed requirements yet.");
+  if(!visibleIds.length) throw new Error("None of the selected programs is available from the current catalog.");
   const normalized=normalizedCoreRequirementTrees(returned,visibleIds);
   ST.selectedPrograms=visibleIds;
+  ST.catalogListedProgramIds=data.catalog_listed_program_ids||[];
   ST.requirementTrees=normalized;
   ST.doubleCountPolicies=policies.policies||[];
   ST.doubleCountRules=data.double_count_rules||[];
@@ -2449,10 +2479,13 @@ async function loadInitialRequirements({reloadSchools=true}={}){
     // this prevents a future minor or certificate from accidentally becoming
     // part of a shared major-level baseline.
     const referenceTypes=activeSchoolContext().sharedRequirementReferenceTypes||[];
-    try{ await loadSchoolReferenceRequirementTrees(programs.filter(program=>referenceTypes.includes(program.type))); }catch(e){ ST.referenceRequirementTrees={}; }
+    try{ await loadSchoolReferenceRequirementTrees(programs.filter(program=>program.requirements_available!==false&&referenceTypes.includes(program.type))); }catch(e){ ST.referenceRequirementTrees={}; }
     const restored=ST.selectedPrograms.filter(id=>programs.some(program=>program.id===id));
-    const initial=programs.find(p=>p.id===activeSchoolContext().defaultProgramId)||programs.find(p=>p.type==="major")||programs[0];
-    if(!initial) throw new Error(`No reviewed programs are available yet for ${activeHomeSchoolLabel()}.`);
+    const reviewedPrograms=programs.filter(program=>program.requirements_available!==false);
+    const initial=programs.find(p=>p.id===activeSchoolContext().defaultProgramId&&p.requirements_available!==false)
+      ||reviewedPrograms.find(p=>p.type==="major")||reviewedPrograms[0]
+      ||programs.find(p=>p.type==="major")||programs[0];
+    if(!initial) throw new Error(`No catalog-listed programs are available yet for ${activeHomeSchoolLabel()}.`);
     ST.selectedPrograms=restored.length ? restored : [initial.id];
     await loadSelectedRequirements(ST.selectedPrograms);
     updateProgramTitle();
