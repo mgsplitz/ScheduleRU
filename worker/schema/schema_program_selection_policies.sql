@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS program_combination_policies (
   program_b_id TEXT,
   program_b_school_slug TEXT,
   program_b_type TEXT,
+  same_program_family INTEGER NOT NULL DEFAULT 0
+    CHECK (same_program_family IN (0, 1)),
 
   -- "blocked" means the app must not save the selection. "requires_transfer"
   -- is also blocked for the current home school. "requires_approval" remains
