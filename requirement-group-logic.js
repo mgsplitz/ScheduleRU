@@ -137,6 +137,15 @@
     });
   }
 
+  function hasNonMonotonicAllocationRule(groupId, groups, seen = new Set()) {
+    if (!groupId || seen.has(groupId)) return false;
+    seen.add(groupId);
+    const group = groups?.[groupId];
+    if (!group) return false;
+    if (group.rule === "max" || group.rule === "max_credits") return true;
+    return (group.children || []).some((childId) => hasNonMonotonicAllocationRule(childId, groups, seen));
+  }
+
   // Allocation is opt-in reviewed data. A family limits how many times a
   // completed course can be applied among the groups in that family, without
   // changing how the same course is treated by groups outside the family.
@@ -184,14 +193,18 @@
     const maximumRequired = scoredGroups.filter((group) => group.rule === "all").length;
     const maximumCompleted = scoredGroups.length;
 
-    function scoreCurrent() {
-      const score = allocationScore(groups, {
+    function scoreForAllocation(allocatedCourseIds) {
+      return allocationScore(groups, {
         ...options,
         isCompleted: completed,
-        allocatedCourseIds: (group) => Object.prototype.hasOwnProperty.call(working, group?.id)
-          ? working[group.id]
+        allocatedCourseIds: (group) => Object.prototype.hasOwnProperty.call(allocatedCourseIds, group?.id)
+          ? allocatedCourseIds[group.id]
           : undefined,
       });
+    }
+
+    function scoreCurrent() {
+      const score = scoreForAllocation(working);
       const signature = candidates.map((candidate) => {
         const selected = Object.entries(working)
           .filter(([, courseList]) => courseList.includes(candidate.courseId))
@@ -203,7 +216,33 @@
       return { ...score, signature };
     }
 
+    function allocationUpperBound(candidateIndex) {
+      const potential = Object.fromEntries(Object.entries(working).map(([groupId, values]) => [groupId, [...values]]));
+      for (const candidate of candidates.slice(candidateIndex)) {
+        for (const groupId of candidate.groupIds) {
+          if (!potential[groupId].includes(candidate.courseId)) potential[groupId].push(candidate.courseId);
+        }
+      }
+      const bound = scoreForAllocation(potential);
+      for (const group of scoredGroups) {
+        if (!hasNonMonotonicAllocationRule(group.id, groups) || groupFulfilled(group.id, groups, {
+          ...options,
+          isCompleted: completed,
+          allocatedCourseIds: (candidate) => Object.prototype.hasOwnProperty.call(potential, candidate?.id)
+            ? potential[candidate.id]
+            : undefined,
+        })) continue;
+        bound.completed += 1;
+        if (group.rule === "all") bound.required += 1;
+      }
+      return bound;
+    }
+
     function visit(candidateIndex) {
+      if (best) {
+        const bound = allocationUpperBound(candidateIndex);
+        if (bound.required < best.required || (bound.required === best.required && bound.completed <= best.completed)) return false;
+      }
       if (candidateIndex === candidates.length) {
         const candidate = scoreCurrent();
         if (compareAllocationResults(candidate, best) < 0) {

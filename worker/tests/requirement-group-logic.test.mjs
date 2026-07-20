@@ -148,3 +148,18 @@ test("exclusive allocation optimizes connected families together when a required
     "z-child": ["child-course"],
   });
 });
+
+test("exclusive allocation prunes an impossible incomplete family with its stable result intact", () => {
+  const sharedCourses = Array.from({ length: 20 }, (_, index) => `shared-${index}`);
+  const groups = {
+    alpha: { id: "alpha", rule: "min", count: 21, members: sharedCourses, children: [], allocation: { allocation_family: "large-family", max_uses: 1 } },
+    beta: { id: "beta", rule: "min", count: 21, members: sharedCourses, children: [], allocation: { allocation_family: "large-family", max_uses: 1 } },
+  };
+
+  const allocation = allocateRequirementCourses(groups, {
+    isCompleted: (courseId) => sharedCourses.includes(courseId),
+  });
+
+  assert.deepEqual(allocation.appliedByGroup, { alpha: [...sharedCourses].sort(), beta: [] });
+  assert.equal(allocation.completedRequirements, 0);
+});
