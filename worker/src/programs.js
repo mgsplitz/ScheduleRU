@@ -33,6 +33,7 @@ import { evaluateProgramSelection, publicEligibilityRule } from "./program-selec
 import { requirementEvidenceComplete } from "./requirement-evidence.js";
 import { publicSchoolProfile } from "./school-profiles.js";
 import { importProgramDirectory } from "./program-directory-import.js";
+import { importProgramRequirementSource } from "./program-requirement-import.js";
 
 function normalizedCatalogText(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -395,6 +396,138 @@ async function importCatalogDirectorySource(env, sourceId) {
     await logScrape(env, `catalog:${source.id}`, "error", null, `catalog directory import failed: ${err.message}`, rawHtml.slice(0, 1500));
     return { ok: false, source_id: source.id, error: err.message };
   }
+}
+
+/* ============================================================
+   OFFICIAL REQUIREMENT-SOURCE SNAPSHOTS
+
+   The program directory is the authority for menu identities. These sources
+   are a separate, generic draft pipeline: they preserve each catalog path's
+   official profile page in D1 so source adapters can evolve without adding a
+   hand-written requirements file for every program. A snapshot is never an
+   audit and never changes a program's review status.
+   ============================================================ */
+
+function requirementSourceIdForProgram(programId) {
+  return `requirements-${programId}`;
+}
+
+function isSupportedRequirementImportSource(source) {
+  return source
+    && source.adapter === "html_requirement_source_v1"
+    && typeof source.source_url === "string"
+    && /^https:\/\//i.test(source.source_url);
+}
+
+async function registerRequirementSourcesForSchool(env, schoolSlug) {
+  if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
+  const { results } = await env.DB.prepare(
+    `SELECT id, name, school_slug, source_url
+     FROM programs
+     WHERE school_slug = ?
+       AND review_status = 'catalog_listed'
+       AND catalog_active = 1
+       AND source_url LIKE 'https://%'
+     ORDER BY id`
+  ).bind(schoolSlug).all();
+  const programs = (results || []).filter((program) => isSafeProgramId(program.id));
+  await runD1Batches(env, programs.map((program) => env.DB.prepare(
+    `INSERT INTO program_requirement_import_sources (
+       id, program_id, school_slug, source_url, source_title, adapter, enabled
+     ) VALUES (?,?,?,?,?,'html_requirement_source_v1',1)
+     ON CONFLICT(program_id, source_url) DO UPDATE SET
+       school_slug = excluded.school_slug,
+       source_title = excluded.source_title,
+       enabled = 1`
+  ).bind(
+    requirementSourceIdForProgram(program.id),
+    program.id,
+    program.school_slug,
+    program.source_url,
+    `${program.name} official program profile`,
+  )));
+  return { registered: programs.length };
+}
+
+async function saveProgramRequirementSnapshot(env, snapshot) {
+  const now = Date.now();
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO program_requirement_source_snapshots (
+       source_id, program_id, source_url, source_title, content_hash,
+       content_text, parsed_json, fetched_at
+     ) VALUES (?,?,?,?,?,?,?,?)`
+  ).bind(
+    snapshot.source_id,
+    snapshot.program_id,
+    snapshot.source_url,
+    snapshot.source_title,
+    snapshot.content_hash,
+    snapshot.content_text,
+    snapshot.parsed_json,
+    now,
+  ).run();
+  const changed = (inserted.meta?.changes || 0) === 1;
+  await env.DB.prepare(
+    `UPDATE program_requirement_import_sources
+     SET last_imported_at = ?, last_content_hash = ?, last_error = NULL
+     WHERE id = ?`
+  ).bind(now, snapshot.content_hash, snapshot.source_id).run();
+  return { changed };
+}
+
+async function importRequirementSource(env, sourceId) {
+  if (!isSafeCatalogSourceId(sourceId)) throw new Error("invalid requirement source id");
+  const source = await env.DB.prepare(
+    `SELECT id, program_id, school_slug, source_url, source_title, adapter
+     FROM program_requirement_import_sources
+     WHERE id = ? AND enabled = 1`
+  ).bind(sourceId).first();
+  if (!source) throw new Error("unknown or disabled requirement source");
+  if (!isSupportedRequirementImportSource(source)) throw new Error("unsupported requirement source adapter");
+  let rawHtml = "";
+  try {
+    const result = await importProgramRequirementSource({
+      source,
+      fetchHtml: async (sourceUrl) => {
+        const response = await fetch(sourceUrl, { headers: FETCH_HEADERS });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        rawHtml = await response.text();
+        return rawHtml;
+      },
+      saveSnapshot: (snapshot) => saveProgramRequirementSnapshot(env, snapshot),
+    });
+    await logScrape(
+      env,
+      `requirements:${source.id}`,
+      "ok",
+      { groupsWritten: 0, coursesWritten: result.courses_found, notesWritten: result.headings_found },
+      `${result.changed ? "saved" : "reused"} draft snapshot from ${source.source_url}; no review status changed`,
+      rawHtml.slice(0, 1500),
+    );
+    return { ok: true, ...result };
+  } catch (err) {
+    await env.DB.prepare(
+      `UPDATE program_requirement_import_sources SET last_error = ? WHERE id = ?`
+    ).bind(String(err?.message || err), source.id).run();
+    await logScrape(env, `requirements:${source.id}`, "error", null, `requirements-source import failed: ${err.message}`, rawHtml.slice(0, 1500));
+    return { ok: false, source_id: source.id, program_id: source.program_id, error: err.message };
+  }
+}
+
+async function importRequirementSourcesForSchool(env, schoolSlug) {
+  if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
+  const { results } = await env.DB.prepare(
+    `SELECT id FROM program_requirement_import_sources
+     WHERE school_slug = ? AND enabled = 1
+     ORDER BY id`
+  ).bind(schoolSlug).all();
+  const imported = [];
+  for (const source of results || []) {
+    imported.push(await importRequirementSource(env, source.id));
+    // Keep bulk source imports polite to Rutgers and within Worker limits.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return imported;
 }
 
 async function scrapeCoreCurriculum(env, program) {
@@ -1679,6 +1812,54 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       if (!sourceId) return json({ error: "pass ?source=the-catalog-source-id" }, 400);
       const result = await importCatalogDirectorySource(env, sourceId);
       return json(result, result.ok ? 200 : (result.status || 502));
+    }
+
+    // Register the current catalog-listed paths as generic requirement-source
+    // imports. This stores source metadata in D1, not a static program list
+    // in the application, and it does not change any program's coverage tier.
+    if (path === "/api/admin/requirement-sources/register" && request.method === "POST") {
+      const school = url.searchParams.get("school") || "";
+      try {
+        return json({ ok: true, school, ...(await registerRequirementSourcesForSchool(env, school)) });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
+    }
+
+    if (path === "/api/admin/requirement-sources" && request.method === "GET") {
+      const school = url.searchParams.get("school") || "";
+      if (!isSafeHomeSchoolSlug(school)) return json({ error: "pass a valid ?school=..." }, 400);
+      const { results } = await env.DB.prepare(
+        `SELECT source.id, source.program_id, source.source_url, source.source_title,
+                source.adapter, source.enabled, source.last_imported_at,
+                source.last_content_hash, source.last_error,
+                (SELECT COUNT(*) FROM program_requirement_source_snapshots snapshot
+                 WHERE snapshot.source_id = source.id) AS snapshot_count
+         FROM program_requirement_import_sources source
+         WHERE source.school_slug = ?
+         ORDER BY source.program_id`
+      ).bind(school).all();
+      return json({ school, sources: results || [] });
+    }
+
+    // One source runs synchronously for a fast inspection. School batches
+    // run in the background and only create/reuse draft snapshots; the
+    // public catalog remains selectable throughout and nothing is published.
+    if (path === "/api/admin/requirement-sources/import" && request.method === "POST") {
+      const sourceId = url.searchParams.get("source") || "";
+      const school = url.searchParams.get("school") || "";
+      if (sourceId) {
+        const result = await importRequirementSource(env, sourceId);
+        return json(result, result.ok ? 200 : 502);
+      }
+      try {
+        const registration = await registerRequirementSourcesForSchool(env, school);
+        if (!registration.registered) return json({ error: "no active catalog sources found for this school" }, 404);
+        ctx.waitUntil(importRequirementSourcesForSchool(env, school));
+        return json({ ok: true, mode: "background", school, sources: registration.registered, note: "Draft source snapshots only; no program was automatically marked reviewed." });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
     }
 
     // Seed a program by hand — the reliable path, always works regardless
