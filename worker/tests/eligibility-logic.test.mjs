@@ -132,3 +132,69 @@ test("a reviewed plan-year condition blocks courses before the required year", (
   assert.equal(early.status, "blocked");
   assert.equal(junior.status, "eligible_now");
 });
+
+test("catalog prerequisite paths preserve OR alternatives instead of flattening them", () => {
+  const parsed = logic.parseCatalogPrerequisitePaths(
+    "(33:010:272 INTRODUCTION TO FINANCIAL ACCOUNTING and 01:220:103 INTRODUCTION TO MACROECONOMICS and 01:960:285 INTRODUCTORY STATISTICS FOR BUSINESS) OR (33:010:272 INTRODUCTION TO FINANCIAL ACCOUNTING and 01:220:103 INTRODUCTION TO MACROECONOMICS and 01:960:211 STATISTICS I)"
+  );
+  assert.equal(parsed.reviewable, true);
+  assert.deepEqual(parsed.paths, [
+    ["33:010:272", "01:220:103", "01:960:285"],
+    ["33:010:272", "01:220:103", "01:960:211"],
+  ]);
+});
+
+test("catalog prerequisite eligibility requires courses in an earlier term, not merely somewhere in the plan", () => {
+  const paths = [["01:220:320"]];
+  const sameTerm = logic.evaluatePrerequisitePaths({
+    targetTerm: { year: 2, sem: "fall" },
+    paths,
+    confirmedCourseCodes: [],
+    scheduledEntries: [{ course_code: "01:220:320", year: 2, sem: "fall" }],
+  });
+  const earlierTerm = logic.evaluatePrerequisitePaths({
+    targetTerm: { year: 2, sem: "spring" },
+    paths,
+    confirmedCourseCodes: [],
+    scheduledEntries: [{ course_code: "01:220:320", year: 2, sem: "fall" }],
+  });
+  const laterTerm = logic.evaluatePrerequisitePaths({
+    targetTerm: { year: 1, sem: "fall" },
+    paths,
+    confirmedCourseCodes: [],
+    scheduledEntries: [{ course_code: "01:220:320", year: 2, sem: "fall" }],
+  });
+  assert.equal(sameTerm.status, "blocked");
+  assert.equal(sameTerm.recommendedPath.missing[0].reason, "same_term");
+  assert.equal(earlierTerm.status, "planned_assumption");
+  assert.equal(laterTerm.status, "blocked");
+  assert.equal(laterTerm.recommendedPath.missing[0].reason, "later_term");
+});
+
+test("unsupported catalog wording is displayed as references but is not incorrectly enforced", () => {
+  const parsed = logic.parseCatalogPrerequisitePaths(
+    "Any Course EQUAL or GREATER Than: (01:640:111 PRECALCULUS PART I)"
+  );
+  assert.equal(parsed.reviewable, false);
+  assert.deepEqual(parsed.paths, []);
+  assert.deepEqual(parsed.references, [{ course_code: "01:640:111", title: "PRECALCULUS PART I" }]);
+});
+
+test("reviewed prerequisite groups become complete alternative paths", () => {
+  const paths = logic.prerequisitePathsFromConditions([
+    {
+      condition_type: "prerequisite_course",
+      condition_value_json: JSON.stringify({ any_of_course_codes: ["01:960:211", "01:960:285"] }),
+      review_status: "reviewed",
+    },
+    {
+      condition_type: "prerequisite_course",
+      condition_value_json: JSON.stringify({ any_of_course_codes: ["01:220:320"] }),
+      review_status: "reviewed",
+    },
+  ]);
+  assert.deepEqual(paths, [
+    ["01:960:211", "01:220:320"],
+    ["01:960:285", "01:220:320"],
+  ]);
+});

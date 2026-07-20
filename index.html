@@ -289,6 +289,14 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .detail-chips{display:flex;flex-wrap:wrap;gap:6px;}
 .detail-chip{background:#f9f7f0;border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:11px;line-height:1.3;}
 .detail-chip code{font-family:var(--fmono);font-size:9.5px;color:var(--scarlet);display:block;margin-top:2px;}
+.detail-chip.met{background:#edf8ed;border-color:#94cd94;}
+.detail-chip.met code{color:#287a28;}
+.detail-chip.same-term,.detail-chip.later-term{background:#fff4f4;border-color:#e7aaaa;}
+.detail-chip.same-term code,.detail-chip.later-term code{color:#b32424;}
+.prereq-path{border-left:3px solid var(--line);padding-left:8px;margin:8px 0;}
+.prereq-path.met{border-left-color:#53a653;}
+.prereq-path.blocked{border-left-color:var(--scarlet);}
+.prereq-path-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:5px;}
 .detail-advanced{border-top:1px solid var(--line);margin-top:14px;padding-top:10px;}
 .detail-advanced summary{font-size:11px;font-weight:700;color:var(--scarlet);cursor:pointer;user-select:none;}
 .detail-advanced-body{padding:10px 0 0;font-size:11px;line-height:1.45;color:var(--black);}
@@ -772,22 +780,12 @@ function isCompleted(id){
   const aps = AP_FULFILLS[id] || [];
   return aps.some(apId => ST.apOn[apId]);
 }
-function prereqsMet(id){
-  const c = COURSES[id];
-  if(!c || !c.prereqs.length) return true;
-  return c.prereqs.every(p => isCompleted(p));
-}
 function standingRequirement(c){
   const text=[c?.restrictions,...(c?.requirementNotes||[])].join(" ").toLowerCase();
   if(/seniors?\s+(year|standing|status|only)|4th\s+year/.test(text)) return {year:4,label:"Senior (4th-year) standing required"};
   if(/juniors?\s*(\/|or|and|-)?\s*seniors?|juniors?\s+(year|standing|status)|3rd\s+year/.test(text)) return {year:3,label:"Junior (3rd-year) standing required"};
   if(/all\s+except\s+(?:1st|first)[ -]?year|not\s+open\s+to\s+(?:1st|first)[ -]?year|except\s+(?:1st|first)[ -]?year/.test(text)) return {year:2,label:"Not open to first-year students"};
   return null;
-}
-function courseAvailable(id){
-  const c=COURSES[id];
-  const standing=standingRequirement(c);
-  return prereqsMet(id) && (!standing || ST.year>=standing.year);
 }
 function groupFulfilled(gk){
   return ScheduleRURequirementLogic.groupFulfilled(gk,GROUPS,{
@@ -1155,16 +1153,78 @@ function courseCreditsLabel(credits, abbreviated=false){
   if(!value) return "Credits not listed";
   return abbreviated?`${value} cr`:`${value} credits`;
 }
-function planningPrerequisiteCodes(course){
-  const fromChecked=(Array.isArray(course.prereqs)?course.prereqs:[]).map(id=>COURSES[id]?.code).filter(Boolean);
-  const fromCatalog=courseCodesFromText(course.catalogPrereqs||(!Array.isArray(course.prereqs)?course.prereqs:"")||"");
-  const fromRequirementNotes=(course.requirementNotes||[])
-    .filter(note=>/^pre-?reqs?:/i.test(String(note).trim()))
-    .flatMap(courseCodesFromText);
-  return [...new Set([...fromChecked,...fromCatalog,...fromRequirementNotes])];
-}
 function courseByCode(code){
   return Object.values(COURSES).find(course=>course.code===code) || wishlistRecords().find(course=>course.code===code);
+}
+function directPrerequisiteCodes(course){
+  return [...new Set((Array.isArray(course?.prereqs)?course.prereqs:[])
+    .map(id=>COURSES[id]?.code)
+    .filter(code=>/^\d{2}:\d{3}:\d{3}$/.test(code)))];
+}
+function prerequisitePlanForCourse(course){
+  const parsed=globalThis.ScheduleRUEligibilityLogic.parseCatalogPrerequisitePaths(course?.catalogPrereqs||"");
+  const reviewedPaths=globalThis.ScheduleRUEligibilityLogic.prerequisitePathsFromConditions(course?.eligibility?.conditions||[]);
+  const direct=directPrerequisiteCodes(course);
+  const references=new Map((parsed.references||[]).map(reference=>[reference.course_code,reference]));
+  [...direct,...reviewedPaths.flat()].forEach(code=>{
+    const known=courseByCode(code);
+    if(!references.has(code)) references.set(code,{course_code:code,title:known?.fullTitle||known?.title||""});
+  });
+  if(reviewedPaths.length) return {reviewable:true,paths:reviewedPaths,references:[...references.values()],source:"reviewed_conditions"};
+  if(direct.length) return {reviewable:true,paths:[direct],references:[...references.values()],source:"reviewed_simple"};
+  return {...parsed,references:[...references.values()],source:parsed.reviewable?"catalog":"catalog_unreviewed"};
+}
+function prerequisiteEligibilityForTerm(course,term){
+  const plan=prerequisitePlanForCourse(course);
+  const result=globalThis.ScheduleRUEligibilityLogic.evaluatePrerequisitePaths({
+    targetTerm:term,
+    paths:plan.paths,
+    confirmedCourseCodes:confirmedAcademicCreditEntries().map(entry=>entry.course_code),
+    scheduledEntries:plannedScheduleCreditEntries(),
+  });
+  return {...result,plan};
+}
+function prerequisiteDisplayName(code,plan){
+  const known=courseByCode(code);
+  const reference=(plan.references||[]).find(item=>item.course_code===code);
+  return known?.fullTitle||known?.title||reference?.title||code;
+}
+function prerequisiteBlockerLabel(result){
+  const missing=result?.recommendedPath?.missing||[];
+  if(!missing.length) return "A prerequisite must be completed before this semester";
+  const names=missing.map(item=>prerequisiteDisplayName(item.course_code,result.plan));
+  const same=missing.some(item=>item.reason==="same_term");
+  const later=missing.some(item=>item.reason==="later_term");
+  const prefix=result.plan?.paths?.length>1?"Choose a prerequisite path and complete ":"Complete ";
+  const timing=same?" in an earlier semester (not the same semester)":later?" before moving this course earlier":" before this semester";
+  return prefix+names.join(", ")+timing;
+}
+function prerequisiteChipHtml(code,pathResult,plan){
+  const state=pathResult?.courseStates?.find(item=>item.course_code===code)?.state||"unknown";
+  const className=state==="completed"||state==="planned_earlier"?" met":state==="same_term"?" same-term":state==="later_term"?" later-term":"";
+  const stateLabel=state==="completed"?"Completed":state==="planned_earlier"?"Planned earlier":state==="same_term"?"Same semester — not eligible":state==="later_term"?"Planned later — not eligible":"Not yet planned";
+  return `<div class="detail-chip${className}" title="${escapeHtml(stateLabel)}">${escapeHtml(prerequisiteDisplayName(code,plan))}<code>${escapeHtml(code)}</code></div>`;
+}
+function prerequisiteDetailsHtml(result){
+  const plan=result.plan;
+  if(plan.paths?.length){
+    const paths=plan.paths.map((path,index)=>{
+      const pathResult=result.paths?.[index];
+      const className=pathResult?.missing?.length?" blocked":" met";
+      const label=plan.paths.length>1?`Path ${index+1} — complete every course in this path`:"Complete before this course";
+      return `<div class="prereq-path${className}"><div class="prereq-path-label">${escapeHtml(label)}</div><div class="detail-chips">${path.map(code=>prerequisiteChipHtml(code,pathResult,plan)).join("")}</div></div>`;
+    }).join("");
+    const sourceNote=plan.source==="catalog"
+      ? "These paths are read from the official catalog."
+      : plan.source==="reviewed_conditions"
+      ? "These paths come from a reviewed Rutgers prerequisite record."
+      : "";
+    return `<div class="detail-section"><h3>${plan.paths.length>1?"Prerequisite paths":"Plan this first"}</h3>${paths}${sourceNote?`<p class="src-note">${sourceNote} A green course is completed or scheduled in an earlier semester.</p>`:""}</div>`;
+  }
+  if(plan.references?.length){
+    return `<div class="detail-section"><h3>Official prerequisite references</h3><div class="detail-chips">${plan.references.map(reference=>prerequisiteChipHtml(reference.course_code,null,plan)).join("")}</div><p class="src-note">Rutgers lists additional wording or alternatives that the app cannot safely turn into an automatic rule. Verify the official catalog before registration.</p></div>`;
+  }
+  return "";
 }
 function compactRestriction(course, standing){
   if(standing) return standing.label;
@@ -1177,15 +1237,8 @@ function openCourseDetails(id){
   if(!c) return;
   document.getElementById("prTitle").textContent = "Course details";
   const body = document.getElementById("prBody");
-  const prerequisiteCodes=planningPrerequisiteCodes(c);
-  const prerequisiteChips=prerequisiteCodes.map(code=>{
-    const prerequisite=courseByCode(code);
-    return `<div class="detail-chip">${escapeHtml(prerequisite?.fullTitle||prerequisite?.title||code)}<code>${escapeHtml(code)}</code></div>`;
-  }).join("");
   const requirementNotes=(c.requirementNotes||[]).join("; ");
-  const requirementId=COURSES[id] ? id : Object.keys(COURSES).find(key=>COURSES[key].code===c.code);
   const standing=standingRequirement(c);
-  const available=!requirementId || courseAvailable(requirementId);
   const approvedAlternatives=(c.alternatives||[]).filter(alt=>alt.code||alt.equivalent_course_code);
   const completedAlternative=approvedAlternatives.find(alt=>{
     const code=alt.code||alt.equivalent_course_code;
@@ -1200,12 +1253,16 @@ function openCourseDetails(id){
   const detailsTerm=scheduledEntry
     ? {year:Number(scheduledEntry.year),sem:scheduledEntry.sem}
     : {year:ST.year,sem:"fall"};
+  const prerequisiteEligibility=prerequisiteEligibilityForTerm(c,detailsTerm);
+  const available=prerequisiteEligibility.status!=="blocked" && (!standing || detailsTerm.year>=standing.year);
   const eligibilityNotice=courseEligibilityNotice(c,detailsTerm);
   const status=completedAlternative
     ? `This requirement is already fulfilled by ${completedAlternative.title||completedAlternative.code||completedAlternative.equivalent_course_code}.`
+    : prerequisiteEligibility.status==="blocked"
+    ? `Not yet available: ${prerequisiteBlockerLabel(prerequisiteEligibility)}.`
     : available
-    ? (c.prereqs?.length ? "Available based on the simple prerequisite rules the app can verify." : "No simple prerequisite rule is blocking this course in the app.")
-    : (!prereqsMet(id) ? "Not yet available based on the simple prerequisite rules the app can verify." : `Not yet available in the ${YL[ST.year]||"selected"} plan year because ${standing?.label?.toLowerCase()||"of an enrollment restriction"}.`);
+    ? (prerequisiteEligibility.plan.paths?.length ? "Available based on prerequisite courses completed or planned in earlier semesters." : "No verified prerequisite rule is blocking this course in the app.")
+    : `Not yet available in the ${YL[detailsTerm.year]||"selected"} plan year because ${standing?.label?.toLowerCase()||"of an enrollment restriction"}.`;
   body.innerHTML=`
     <div class="detail-overview">
       <h2>${escapeHtml(c.fullTitle||c.title)}</h2>
@@ -1215,7 +1272,7 @@ function openCourseDetails(id){
     <div class="detail-section"><h3>${standing?"When you can take it":"Enrollment"}</h3><p>${escapeHtml(compactRestriction(c,standing))}</p></div>
     ${eligibilityNotice?`<div class="detail-section"><h3>Planning eligibility</h3><p>${escapeHtml(eligibilityNotice)}</p></div>`:""}
     ${alternativeDetails?`<div class="detail-section"><h3>Also accepted for this requirement</h3><div class="detail-chips">${alternativeDetails}</div><p class="src-note">This reviewed equivalency comes from the degree-audit rule recorded for this requirement.</p></div>`:""}
-    ${prerequisiteChips?`<div class="detail-section"><h3>Plan these first</h3><div class="detail-chips">${prerequisiteChips}</div>${c.catalogPrereqs?`<p class="src-note">The official catalog includes alternative prerequisite paths; use the details below when your situation differs.</p>`:""}</div>`:""}
+    ${prerequisiteDetailsHtml(prerequisiteEligibility)}
     ${c.description?`<div class="detail-section"><h3>About this course</h3><p>${escapeHtml(cleanApiText(c.description))}</p></div>`:""}
     ${(c.catalogPrereqs||c.subjectNotes||requirementNotes||c.restrictions)?`<details class="detail-advanced"><summary>Official catalog details</summary><div class="detail-advanced-body">
       ${c.catalogPrereqs?`<p><b>Official prerequisite wording</b><br/>${escapeHtml(cleanApiText(c.catalogPrereqs))}</p>`:""}
@@ -1443,13 +1500,17 @@ function setupDropZones(){
       const sem=z.dataset.sem;
       let code, title, fullTitle, credits;
       if(COURSES[cid]){
-        if(COURSES[cid].type!=="gen"&&!courseAvailable(cid)) return;
         code=record.code; title=record.title; fullTitle=record.fullTitle; credits=record.credits;
       } else {
         code=record.code; title=record.title; fullTitle=record.fullTitle; credits=record.credits;
       }
       if(lockedElsewhere(code, ST.year, sem)){
         alert(`${code} is already scheduled (with a chosen section) for a different semester. Remove it there first.`);
+        return;
+      }
+      const prerequisiteEligibility=prerequisiteEligibilityForTerm(record,{year:ST.year,sem});
+      if(prerequisiteEligibility.status==="blocked"){
+        alert(`${code} cannot be placed in ${sem} of ${YL[ST.year]}: ${prerequisiteBlockerLabel(prerequisiteEligibility)}.`);
         return;
       }
       const eligibility=courseEligibilityForTerm(record,{year:ST.year,sem});
@@ -1488,7 +1549,11 @@ function cardHtml(id, opts={}){
   const c=COURSES[id];
   if(!c) return "";
   const done=isCompleted(id);
-  const ok=courseAvailable(id);
+  const record=requirementCourseRecord(id);
+  const fallEligibility=prerequisiteEligibilityForTerm(record,{year:ST.year,sem:"fall"});
+  const springEligibility=prerequisiteEligibilityForTerm(record,{year:ST.year,sem:"spring"});
+  const standing=standingRequirement(c);
+  const ok=(fallEligibility.status!=="blocked" || springEligibility.status!=="blocked") && (!standing || ST.year>=standing.year);
   const gray=!done&&!ok;
   const alternative=(c.alternatives||[]).find(alt=>{
     const code=alt.code||alt.course_code||"";
@@ -1500,7 +1565,7 @@ function cardHtml(id, opts={}){
     <div class="code">${c.code}</div>
     <div class="ttl">${c.title}</div>
     <div class="meta">${c.credits} cr</div>
-    ${alternative?`<div class="restr">Satisfied by ${escapeHtml(alternative.code||alternative.course_code||"approved alternative")}</div>`:standingRequirement(c)?`<div class="restr">${standingRequirement(c).label}</div>`:c.restrictions?`<div class="restr">${c.restrictions}</div>`:""}
+    ${alternative?`<div class="restr">Satisfied by ${escapeHtml(alternative.code||alternative.course_code||"approved alternative")}</div>`:standing?`<div class="restr">${standing.label}</div>`:c.restrictions?`<div class="restr">${c.restrictions}</div>`:""}
   </div>`;
 }
 
@@ -2001,11 +2066,12 @@ function buildRequirementTree(requirements){
       nextCourses[id]={
         ...existing,
         code:row.course_code,
-        // The official program page is the stable source for requirement
-        // titles. The term-specific catalog fills in richer information
-        // whenever the course is offered in the current term.
-        title:sourceTitle||catalogTitle||existing?.title||row.course_code,
-        fullTitle:sourceTitle||catalogTitle||existing?.fullTitle||row.course_code,
+        // Keep source metadata when a course is not offered this term, but
+        // prefer the live Rutgers catalog when it is available: it carries
+        // the current official course title (for example, Game Theory and
+        // Economics rather than a stale abbreviated requirement label).
+        title:catalogTitle||sourceTitle||existing?.title||row.course_code,
+        fullTitle:catalogTitle||sourceTitle||existing?.fullTitle||row.course_code,
         credits:sourceCredits||cleanApiText(row.catalog_credits)||existing?.credits||"",
         description:cleanApiText(row.catalog_description)||existing?.description||"",
         catalogPrereqs:cleanApiText(row.catalog_prereqs)||existing?.catalogPrereqs||"",
@@ -2480,7 +2546,7 @@ function courseRowHtml(c){
     <div class="course-row-hdr" data-toggle="${c.id}">
       <span class="cr-arrow${isOpen?" open":""}">▶</span>
       <span class="cr-code">${escapeHtml(code)}</span>
-      ${cleanApiText(c.prereqs) ? `<span class="prereq-hint" onclick="event.stopPropagation()">Prereqs listed</span>` : ""}
+      ${cleanApiText(c.prereqs) ? `<span class="prereq-hint" onclick="event.stopPropagation()">Prereqs listed<span class="tip">${escapeHtml(cleanApiText(c.prereqs))}</span></span>` : ""}
       <span class="cr-title">${escapeHtml(c.title)}<span class="sub"> ${escapeHtml(c.subject_description||"")}</span></span>
       <span class="cr-credits">${escapeHtml(courseCreditsLabel(c.credits,true))}</span>
       <span class="cr-sections" style="color:${openCt>0?'#3a8a3a':'var(--grayt)'}">${openCt}/${totalCt} open</span>
