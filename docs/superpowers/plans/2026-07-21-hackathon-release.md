@@ -91,10 +91,10 @@ test("accepting a preview replaces only the plan and clears the preview", () => 
 });
 ```
 
-- [ ] **Step 2: Run the focused test and confirm it fails because the module is absent**
+- [ ] **Step 2: Run the focused test and confirm it fails on the missing public API**
 
 Run: `node --test worker/tests/planner-state-logic.test.mjs`  
-Expected: FAIL with `ENOENT` for `planner-state-logic.js`.
+Expected: FAIL because `ScheduleRUPlannerStateLogic` does not yet expose the required functions. The test loader must convert a missing file/module into this explicit assertion failure rather than an uncaught loader error.
 
 - [ ] **Step 3: Implement the state module**
 
@@ -235,7 +235,7 @@ test("returns a partial plan instead of exceeding the hard credit cap", () => {
 - [ ] **Step 2: Run the test and confirm module absence**
 
 Run: `node --test worker/tests/four-year-planner-logic.test.mjs`  
-Expected: FAIL with `ENOENT`.
+Expected: FAIL because `ScheduleRUFourYearPlanner.generatePlan` is not yet available. The test loader must report an assertion failure rather than an uncaught loader error.
 
 - [ ] **Step 3: Implement deterministic normalized generation**
 
@@ -319,7 +319,7 @@ test("recommendations preserve original indices and never exceed three", () => {
 - [ ] **Step 2: Run the test and confirm module absence**
 
 Run: `node --test worker/tests/schedule-preference-logic.test.mjs`  
-Expected: FAIL with `ENOENT`.
+Expected: FAIL because `ScheduleRUPreferenceLogic.recommendSchedules` is not yet available. The test loader must report an assertion failure rather than an uncaught loader error.
 
 - [ ] **Step 3: Implement preference normalization and ranking**
 
@@ -409,7 +409,7 @@ test("uses Luna structured output without sending transcript data", async () => 
 - [ ] **Step 2: Run the test and confirm module absence**
 
 Run: `node --test worker/tests/schedule-assistant.test.mjs`  
-Expected: FAIL with module-not-found.
+Expected: FAIL on an explicit assertion that the request handler is not yet implemented; avoid treating an uncaught import error as the red test.
 
 - [ ] **Step 3: Implement the Responses API adapter**
 
