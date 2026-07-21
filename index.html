@@ -614,8 +614,9 @@ let ROOT_GROUPS = [];
 // the current browser and site address.
 const PRODUCTION_BACKEND_URL="https://rutgers-course-sync.housselllaura.workers.dev";
 const DEVELOPMENT_BACKEND_URL="https://rutgers-course-sync-dev.housselllaura.workers.dev";
-const CURRENT_HOST=(typeof location!=="undefined" && location.hostname)||"";
-const IS_DEVELOPMENT_SITE=CURRENT_HOST.endsWith(".scheduleru-9fb.pages.dev") && CURRENT_HOST!=="scheduleru-9fb.pages.dev";
+const CURRENT_HOST=((typeof location!=="undefined" && location.hostname)||"").toLowerCase();
+const LOCAL_DEVELOPMENT_HOSTS=["localhost","127.0.0.1","::1"];
+const IS_DEVELOPMENT_SITE=LOCAL_DEVELOPMENT_HOSTS.includes(CURRENT_HOST) || (CURRENT_HOST.endsWith(".scheduleru-9fb.pages.dev") && CURRENT_HOST!=="scheduleru-9fb.pages.dev");
 const BACKEND_URL_STORAGE_KEY=IS_DEVELOPMENT_SITE ? "scheduleru_dev_backend_url" : "bait_backend_url";
 function defaultBackendUrl(){
   return IS_DEVELOPMENT_SITE ? DEVELOPMENT_BACKEND_URL : PRODUCTION_BACKEND_URL;
