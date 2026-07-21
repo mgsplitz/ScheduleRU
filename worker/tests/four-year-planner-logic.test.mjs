@@ -52,6 +52,59 @@ test("reports a locked prerequisite violation after generation when no earlier p
   assert.ok(result.issues.some((issue) => issue.code === "locked_prerequisite_violation"));
 });
 
+test("uses 18 credits before a locked dependent rather than placing its prerequisite too late", () => {
+  const flexible = Array.from({ length: 5 }, (_, index) => ({ code: `01:198:${200 + index}`, credits: 3 }));
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    courses: [{ code: "01:198:111", credits: 3 }, { code: "01:198:112", credits: 3 }, ...flexible],
+    lockedPlacements: {
+      "01:198:112": { year: 1, sem: "spring", locked: true },
+      ...Object.fromEntries(flexible.map((course) => [course.code, { year: 1, sem: "fall", locked: true }])),
+    },
+    prerequisitePathsByCode: { "01:198:112": [["01:198:111"]] },
+    targetCredits: 16,
+    maxCredits: 18,
+  });
+
+  assert.equal(result.schedule["01:198:111"].sem, "fall");
+  assert.equal(result.termCredits["1:fall"], 18);
+  assert.equal(result.status, "complete");
+  assert.equal(result.issues.some((issue) => issue.code === "locked_prerequisite_violation"), false);
+});
+
+test("schedules a transitive prerequisite closure before its locked dependent deadline", () => {
+  const fallLocks = Array.from({ length: 5 }, (_, index) => ({ code: `01:198:${200 + index}`, credits: 3 }));
+  const springLocks = Array.from({ length: 5 }, (_, index) => ({ code: `01:198:${300 + index}`, credits: 3 }));
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }, { year: 2, sem: "fall" }],
+    courses: [
+      { code: "01:198:111", credits: 3 },
+      { code: "01:198:112", credits: 3 },
+      { code: "01:198:211", credits: 3 },
+      ...fallLocks,
+      ...springLocks,
+    ],
+    lockedPlacements: {
+      "01:198:211": { year: 2, sem: "fall", locked: true },
+      ...Object.fromEntries(fallLocks.map((course) => [course.code, { year: 1, sem: "fall", locked: true }])),
+      ...Object.fromEntries(springLocks.map((course) => [course.code, { year: 1, sem: "spring", locked: true }])),
+    },
+    prerequisitePathsByCode: {
+      "01:198:112": [["01:198:111"]],
+      "01:198:211": [["01:198:112"]],
+    },
+    targetCredits: 16,
+    maxCredits: 18,
+  });
+
+  assert.equal(result.schedule["01:198:111"]?.sem, "fall");
+  assert.equal(result.schedule["01:198:112"]?.sem, "spring");
+  assert.equal(result.termCredits["1:fall"], 18);
+  assert.equal(result.termCredits["1:spring"], 18);
+  assert.equal(result.status, "complete");
+  assert.equal(result.issues.some((issue) => issue.code === "locked_prerequisite_violation"), false);
+});
+
 test("uses a typed placeholder instead of inventing an unresolved Core course", () => {
   const result = planner().generatePlan({
     terms: [{ year: 1, sem: "fall" }],

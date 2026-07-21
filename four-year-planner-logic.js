@@ -150,6 +150,32 @@
     return latest;
   }
 
+  function prerequisiteDeadlinesForLockedCourses(normalized, schedule, pending) {
+    const lockedDeadlineByCode = new Map();
+    const placementDeadlineByCode = new Map();
+
+    function visit(code, lockedDeadline, placementDeadline, ancestors) {
+      if (normalized.completedCourseCodes.has(code) || ancestors.has(code)) return;
+      if (schedule[code]) return;
+      if (!pending.has(code)) return;
+
+      lockedDeadlineByCode.set(code, Math.min(lockedDeadlineByCode.get(code) ?? Infinity, lockedDeadline));
+      placementDeadlineByCode.set(code, Math.min(placementDeadlineByCode.get(code) ?? Infinity, placementDeadline));
+      const nextAncestors = new Set(ancestors);
+      nextAncestors.add(code);
+      prerequisitePathsFor(normalized, code).forEach((path) => {
+        path.forEach((prerequisite) => visit(prerequisite, lockedDeadline, placementDeadline - 1, nextAncestors));
+      });
+    }
+
+    Object.keys(schedule).filter((code) => schedule[code]?.locked).sort().forEach((code) => {
+      prerequisitePathsFor(normalized, code).forEach((path) => {
+        path.forEach((prerequisite) => visit(prerequisite, schedule[code].ordinal, schedule[code].ordinal, new Set([code])));
+      });
+    });
+    return { lockedDeadlineByCode, placementDeadlineByCode };
+  }
+
   function cyclicCourseCodes(codes, normalized) {
     const remaining = new Set(codes);
     const edges = new Map(codes.map((code) => [code, new Set()]));
@@ -223,32 +249,45 @@
       .filter((course) => !normalized.completedCourseCodes.has(course.code) && !schedule[course.code])
       .map((course) => [course.code, course]));
 
-    let placedInPass = true;
-    while (pending.size && placedInPass) {
-      placedInPass = false;
-      [...pending.keys()].sort().forEach((code) => {
-        if (!pending.has(code)) return;
-        const course = pending.get(code);
-        const choices = prerequisitePathsFor(normalized, code).flatMap((path) => {
-          const prerequisiteOrdinal = pathPlacementOrdinal(path, normalized.completedCourseCodes, schedule);
-          if (prerequisiteOrdinal === null) return [];
-          return normalized.terms
-            .filter((term) => term.ordinal > prerequisiteOrdinal && termCredits[termKey(term)] + course.credits <= normalized.maxCredits)
-            .map((term) => ({ term, prerequisiteOrdinal }));
+    const deadlines = prerequisiteDeadlinesForLockedCourses(normalized, schedule, pending);
+    function placePendingCourses(courseCodes) {
+      let placedInPass = true;
+      while (placedInPass) {
+        placedInPass = false;
+        courseCodes.forEach((code) => {
+          if (!pending.has(code)) return;
+          const course = pending.get(code);
+          const placementDeadline = deadlines.placementDeadlineByCode.get(code) ?? Infinity;
+          const choices = prerequisitePathsFor(normalized, code).flatMap((path) => {
+            const prerequisiteOrdinal = pathPlacementOrdinal(path, normalized.completedCourseCodes, schedule);
+            if (prerequisiteOrdinal === null) return [];
+            return normalized.terms
+              .filter((term) => term.ordinal > prerequisiteOrdinal
+                && term.ordinal < placementDeadline
+                && termCredits[termKey(term)] + course.credits <= normalized.maxCredits)
+              .map((term) => ({ term, prerequisiteOrdinal }));
+          });
+          const targetChoices = choices.filter(({ term }) => termCredits[termKey(term)] + course.credits <= normalized.targetCredits);
+          const preferredChoices = targetChoices.length ? targetChoices : choices;
+          preferredChoices.sort((left, right) => left.term.ordinal - right.term.ordinal
+            || termCredits[termKey(left.term)] - termCredits[termKey(right.term)]);
+          const choice = preferredChoices[0];
+          if (!choice) return;
+          const term = choice.term;
+          schedule[code] = { code, credits: course.credits, year: term.year, sem: term.sem, ordinal: term.ordinal, locked: false };
+          termCredits[termKey(term)] += course.credits;
+          pending.delete(code);
+          placedInPass = true;
         });
-        const targetChoices = choices.filter(({ term }) => termCredits[termKey(term)] + course.credits <= normalized.targetCredits);
-        const preferredChoices = targetChoices.length ? targetChoices : choices;
-        preferredChoices.sort((left, right) => left.term.ordinal - right.term.ordinal
-          || termCredits[termKey(left.term)] - termCredits[termKey(right.term)]);
-        const choice = preferredChoices[0];
-        if (!choice) return;
-        const term = choice.term;
-        schedule[code] = { code, credits: course.credits, year: term.year, sem: term.sem, ordinal: term.ordinal, locked: false };
-        termCredits[termKey(term)] += course.credits;
-        pending.delete(code);
-        placedInPass = true;
-      });
+      }
     }
+
+    const lockedPrerequisiteCourses = [...deadlines.lockedDeadlineByCode.keys()].sort((left, right) =>
+      deadlines.placementDeadlineByCode.get(left) - deadlines.placementDeadlineByCode.get(right)
+      || deadlines.lockedDeadlineByCode.get(left) - deadlines.lockedDeadlineByCode.get(right)
+      || left.localeCompare(right));
+    placePendingCourses(lockedPrerequisiteCourses);
+    placePendingCourses([...pending.keys()].filter((code) => !deadlines.lockedDeadlineByCode.has(code)).sort());
 
     Object.keys(normalized.lockedPlacements).filter((code) => schedule[code]?.locked).sort().forEach((code) => {
       const paths = prerequisitePathsFor(normalized, code);
