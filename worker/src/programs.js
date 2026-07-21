@@ -33,7 +33,10 @@ import { evaluateProgramSelection, publicEligibilityRule } from "./program-selec
 import { requirementEvidenceComplete } from "./requirement-evidence.js";
 import { publicSchoolProfile } from "./school-profiles.js";
 import { importProgramDirectory } from "./program-directory-import.js";
-import { importProgramRequirementSource } from "./program-requirement-import.js";
+import {
+  discoverProfileRequirementPage,
+  importProgramRequirementSource,
+} from "./program-requirement-import.js";
 
 function normalizedCatalogText(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -412,6 +415,10 @@ function requirementSourceIdForProgram(programId) {
   return `requirements-${programId}`;
 }
 
+function requirementDetailSourceIdForProgram(programId) {
+  return `detail-${programId}`;
+}
+
 function isSupportedRequirementImportSource(source) {
   return source
     && source.adapter === "html_requirement_source_v1"
@@ -425,6 +432,7 @@ async function registerRequirementSourcesForSchool(env, schoolSlug) {
     `SELECT id, name, school_slug, source_url
      FROM programs
      WHERE school_slug = ?
+       AND type = 'major'
        AND review_status = 'catalog_listed'
        AND catalog_active = 1
        AND source_url LIKE 'https://%'
@@ -433,11 +441,12 @@ async function registerRequirementSourcesForSchool(env, schoolSlug) {
   const programs = (results || []).filter((program) => isSafeProgramId(program.id));
   await runD1Batches(env, programs.map((program) => env.DB.prepare(
     `INSERT INTO program_requirement_import_sources (
-       id, program_id, school_slug, source_url, source_title, adapter, enabled
-     ) VALUES (?,?,?,?,?,'html_requirement_source_v1',1)
+       id, program_id, school_slug, source_url, source_title, adapter, source_kind, enabled
+     ) VALUES (?,?,?,?,?,'html_requirement_source_v1','profile',1)
      ON CONFLICT(program_id, source_url) DO UPDATE SET
        school_slug = excluded.school_slug,
        source_title = excluded.source_title,
+       source_kind = excluded.source_kind,
        enabled = 1`
   ).bind(
     requirementSourceIdForProgram(program.id),
@@ -447,6 +456,89 @@ async function registerRequirementSourcesForSchool(env, schoolSlug) {
     `${program.name} official program profile`,
   )));
   return { registered: programs.length };
+}
+
+async function pendingMajorProfileSources(env, schoolSlug, batchLimit) {
+  if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
+  const { results } = await env.DB.prepare(
+    `SELECT source.id, source.program_id, source.school_slug, source.source_url,
+            source.source_title, source.adapter
+     FROM program_requirement_import_sources source
+     INNER JOIN programs program ON program.id = source.program_id
+     WHERE source.school_slug = ?
+       AND source.source_kind = 'profile'
+       AND source.enabled = 1
+       AND source.last_error IS NULL
+       AND program.type = 'major'
+       AND program.review_status = 'catalog_listed'
+       AND program.catalog_active = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM program_requirement_import_sources detail
+         WHERE detail.program_id = source.program_id
+           AND detail.source_kind = 'requirements_page'
+       )
+     ORDER BY source.id
+     LIMIT ?`
+  ).bind(schoolSlug, batchLimit).all();
+  return results || [];
+}
+
+async function saveMajorRequirementSource(env, profileSource, detailSource) {
+  await env.DB.prepare(
+    `INSERT INTO program_requirement_import_sources (
+       id, program_id, school_slug, source_url, source_title, adapter, source_kind, enabled
+     ) VALUES (?,?,?,?,?,'html_requirement_source_v1','requirements_page',1)
+     ON CONFLICT(program_id, source_url) DO UPDATE SET
+       source_title = excluded.source_title,
+       source_kind = excluded.source_kind,
+       enabled = 1,
+       last_error = NULL`
+  ).bind(
+    requirementDetailSourceIdForProgram(profileSource.program_id),
+    profileSource.program_id,
+    profileSource.school_slug,
+    detailSource.source_url,
+    detailSource.source_title,
+  ).run();
+}
+
+async function discoverMajorRequirementSources(env, profileSources) {
+  const discovered = [];
+  for (const profileSource of profileSources) {
+    let rawHtml = "";
+    try {
+      const response = await fetch(profileSource.source_url, { headers: FETCH_HEADERS });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      rawHtml = await response.text();
+      const detailSource = discoverProfileRequirementPage(rawHtml, profileSource, "major");
+      if (!detailSource) throw new Error("profile has no official Major Web Page link");
+      await saveMajorRequirementSource(env, profileSource, detailSource);
+      await logScrape(
+        env,
+        `requirements-discovery:${profileSource.id}`,
+        "ok",
+        { groupsWritten: 0, coursesWritten: 0, notesWritten: 1 },
+        `saved official major requirements source ${detailSource.source_url}; no review status changed`,
+        rawHtml.slice(0, 1500),
+      );
+      discovered.push({ ok: true, source_id: profileSource.id, program_id: profileSource.program_id });
+    } catch (err) {
+      await env.DB.prepare(
+        `UPDATE program_requirement_import_sources SET last_error = ? WHERE id = ?`
+      ).bind(String(err?.message || err), profileSource.id).run();
+      await logScrape(
+        env,
+        `requirements-discovery:${profileSource.id}`,
+        "error",
+        null,
+        `requirements-source discovery failed: ${err.message}`,
+        rawHtml.slice(0, 1500),
+      );
+      discovered.push({ ok: false, source_id: profileSource.id, program_id: profileSource.program_id, error: err.message });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return discovered;
 }
 
 async function saveProgramRequirementSnapshot(env, snapshot) {
@@ -1840,12 +1932,32 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       }
     }
 
+    // Profiles provide catalog identity; this discovers the department page
+    // explicitly labelled as the selected major's official requirements.
+    // It stores draft source metadata only and never publishes an audit.
+    if (path === "/api/admin/requirement-sources/discover" && request.method === "POST") {
+      const school = url.searchParams.get("school") || "";
+      try {
+        const registration = await registerRequirementSourcesForSchool(env, school);
+        if (!registration.registered) return json({ error: "no active SAS major profiles found for this school" }, 404);
+        const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
+        const profileSources = await pendingMajorProfileSources(env, school, batchLimit);
+        if (!profileSources.length) {
+          return json({ ok: true, mode: "complete", school, queued: 0, note: "Every eligible SAS major profile has a discovered requirements source or a recorded discovery error." });
+        }
+        ctx.waitUntil(discoverMajorRequirementSources(env, profileSources));
+        return json({ ok: true, mode: "background", school, queued: profileSources.length, note: "Discovering official major requirement sources only; no program was automatically marked reviewed." });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
+    }
+
     if (path === "/api/admin/requirement-sources" && request.method === "GET") {
       const school = url.searchParams.get("school") || "";
       if (!isSafeHomeSchoolSlug(school)) return json({ error: "pass a valid ?school=..." }, 400);
       const { results } = await env.DB.prepare(
         `SELECT source.id, source.program_id, source.source_url, source.source_title,
-                source.adapter, source.enabled, source.last_imported_at,
+                source.adapter, source.source_kind, source.enabled, source.last_imported_at,
                 source.last_content_hash, source.last_error,
                 (SELECT COUNT(*) FROM program_requirement_source_snapshots snapshot
                  WHERE snapshot.source_id = source.id) AS snapshot_count
