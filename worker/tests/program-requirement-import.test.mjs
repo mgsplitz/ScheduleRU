@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   discoverProfileRequirementPage,
+  extractRequirementDraftCandidate,
   importProgramRequirementSource,
   parseProgramRequirementSource,
 } from "../src/program-requirement-import.js";
@@ -64,6 +65,49 @@ test("the requirements importer saves only a non-empty official HTTPS snapshot",
     }),
     /valid official HTTPS source/
   );
+});
+
+test("a requirement snapshot becomes labeled source-section candidates without inferring degree rules", () => {
+  const candidate = extractRequirementDraftCandidate({
+    source_id: SOURCE.id,
+    program_id: SOURCE.program_id,
+    source_url: SOURCE.source_url,
+    content_hash: "0123456789abcdef",
+    content_text: [
+      "Example Major Requirements",
+      "Required courses",
+      "Complete 01:123:101 and 01:123:102.",
+      "Advanced electives",
+      "Choose two courses from 01:123:301, 01:123:302, or 01:123:401.",
+    ].join("\n"),
+    parsed_json: JSON.stringify({
+      version: 1,
+      headings: ["Example Major Requirements", "Required courses", "Advanced electives"],
+      course_codes: ["01:123:101", "01:123:102", "01:123:301", "01:123:302", "01:123:401"],
+    }),
+  });
+
+  assert.deepEqual(candidate, {
+    extractor_version: 1,
+    source_id: SOURCE.id,
+    program_id: SOURCE.program_id,
+    source_url: SOURCE.source_url,
+    content_hash: "0123456789abcdef",
+    sections: [
+      {
+        heading: "Required courses",
+        source_text: "Complete 01:123:101 and 01:123:102.",
+        course_codes: ["01:123:101", "01:123:102"],
+      },
+      {
+        heading: "Advanced electives",
+        source_text: "Choose two courses from 01:123:301, 01:123:302, or 01:123:401.",
+        course_codes: ["01:123:301", "01:123:302", "01:123:401"],
+      },
+    ],
+  });
+  assert.equal("rule" in candidate.sections[0], false);
+  assert.equal("count" in candidate.sections[1], false);
 });
 
 test("a SAS profile yields its official Major Web Page", () => {

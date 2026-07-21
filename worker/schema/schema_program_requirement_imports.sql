@@ -39,3 +39,21 @@ CREATE TABLE IF NOT EXISTS program_requirement_source_snapshots (
 );
 CREATE INDEX IF NOT EXISTS idx_program_requirement_source_snapshots_program
   ON program_requirement_source_snapshots(program_id, fetched_at DESC);
+
+-- Generic, source-backed structural drafts. These rows are not requirement
+-- groups and cannot be published: they give a reviewer the exact heading,
+-- prose, and course codes from an official snapshot without hardcoding a
+-- program-specific requirement file.
+CREATE TABLE IF NOT EXISTS program_requirement_draft_candidates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_id TEXT NOT NULL REFERENCES program_requirement_import_sources(id),
+  program_id TEXT NOT NULL REFERENCES programs(id),
+  source_url TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  extractor_version INTEGER NOT NULL,
+  candidate_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE(source_id, content_hash, extractor_version)
+);
+CREATE INDEX IF NOT EXISTS idx_program_requirement_draft_candidates_program
+  ON program_requirement_draft_candidates(program_id, created_at DESC);
