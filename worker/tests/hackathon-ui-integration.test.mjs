@@ -1,6 +1,43 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import vm from "node:vm";
+
+const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+
+function functionSource(name) {
+  const marker = `function ${name}(`;
+  const start = html.indexOf(marker);
+  assert.notEqual(start, -1, `${name} must be defined`);
+  const bodyStart = html.indexOf("{", start);
+  let depth = 0;
+  for (let index = bodyStart; index < html.length; index += 1) {
+    if (html[index] === "{") depth += 1;
+    if (html[index] === "}") depth -= 1;
+    if (depth === 0) return html.slice(start, index + 1);
+  }
+  throw new Error(`Could not parse ${name}`);
+}
+
+function asyncFunctionSource(name) {
+  const marker = `async function ${name}(`;
+  const start = html.indexOf(marker);
+  assert.notEqual(start, -1, `${name} must be defined`);
+  const bodyStart = html.indexOf("{", start);
+  let depth = 0;
+  for (let index = bodyStart; index < html.length; index += 1) {
+    if (html[index] === "{") depth += 1;
+    if (html[index] === "}") depth -= 1;
+    if (depth === 0) return html.slice(start, index + 1);
+  }
+  throw new Error(`Could not parse ${name}`);
+}
+
+function plannerTermsFor(academicPosition) {
+  const context = { ST: { academicPosition }, globalThis: {} };
+  vm.runInNewContext(`${functionSource("plannerTermsFromAcademicPosition")}; globalThis.terms = plannerTermsFromAcademicPosition();`, context);
+  return context.globalThis.terms;
+}
 
 test("hackathon UI wires the approved modules and removes hard-coded future builders", () => {
   const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
@@ -63,10 +100,8 @@ test("program roles, grouped Issues, and closed sections have explicit UI contra
 });
 
 test("planner horizon, legacy completion state, and modal transitions stay safe", () => {
-  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
-  assert.match(html, /function plannerTermsFromAcademicPosition\([\s\S]*?while\(year<=4\)/);
-  assert.doesNotMatch(html, /plannerTermsFromAcademicPosition\([\s\S]*?index<8/);
-  assert.match(html, /termKeys=new Set\(terms\.map/);
+  assert.match(html, /function plannerTermsFromAcademicPosition\([\s\S]*?terms\.length<8/);
+  assert.match(html, /lockedPlacements=ScheduleRUPlannerStateLogic\.lockedPlacementsForTerms\(ST\.schedule,terms\)/);
   assert.match(html, /concrete=sourceType==="core"\?selected/);
   assert.match(html, /function legacyCompletedAcademicCodes\([\s\S]*?ST\.completed[\s\S]*?ST\.apOn/);
   assert.match(html, /function completedAcademicCodes\([\s\S]*?legacyCompletedAcademicCodes\(\)/);
@@ -78,6 +113,102 @@ test("planner horizon, legacy completion state, and modal transitions stay safe"
   assert.match(html, /event\.target===document\.getElementById\("programOv"\)[\s\S]*?closeProgramPicker\(\)/);
   assert.match(html, /function rerenderOnboardingApStep\([\s\S]*?renderOnboarding\(\)/);
   assert.match(html, /refreshApFulfillment\(\);[\s\S]*?rerenderOnboardingApStep\(\);[\s\S]*?renderSchedule\(\)/);
+});
+
+test("planner horizon always contains eight consecutive Fall/Spring terms from Year 2 Fall", () => {
+  const terms = plannerTermsFor({ year: 2, startingSemester: "fall" });
+  assert.equal(terms.length, 8);
+  assert.deepEqual(JSON.parse(JSON.stringify(terms)), [
+    { year: 2, sem: "fall" }, { year: 2, sem: "spring" },
+    { year: 3, sem: "fall" }, { year: 3, sem: "spring" },
+    { year: 4, sem: "fall" }, { year: 4, sem: "spring" },
+    { year: 5, sem: "fall" }, { year: 5, sem: "spring" },
+  ]);
+});
+
+test("planner horizon always contains eight consecutive Fall/Spring terms from Year 4 Spring", () => {
+  const terms = plannerTermsFor({ year: 4, startingSemester: "spring" });
+  assert.equal(terms.length, 8);
+  assert.deepEqual(JSON.parse(JSON.stringify(terms)), [
+    { year: 4, sem: "spring" }, { year: 5, sem: "fall" },
+    { year: 5, sem: "spring" }, { year: 6, sem: "fall" },
+    { year: 6, sem: "spring" }, { year: 7, sem: "fall" },
+    { year: 7, sem: "spring" }, { year: 8, sem: "fall" },
+  ]);
+  assert.match(html, /function academicYearLabel\(year\)/);
+  assert.doesNotMatch(html, /YL\[term\.year\]/);
+  const context = { ST: { academicPosition: { year: 4, startingSemester: "spring" } }, globalThis: {} };
+  vm.runInNewContext(`${functionSource("academicYearLabel")}; ${functionSource("plannerDisplayMaxYear")}; globalThis.labels = [4, 5, 6, 7, 8].map(academicYearLabel); globalThis.maximum = plannerDisplayMaxYear();`, context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.globalThis.labels)), ["4th Year", "5th Year", "6th Year", "7th Year", "8th Year"]);
+  assert.equal(context.globalThis.maximum, 8);
+});
+
+test("active builder gate matches the backend calendar term through a persisted anchor", () => {
+  assert.match(html, /function ensureAcademicCalendarAnchor\(/);
+  assert.match(html, /ScheduleRUPlannerStateLogic\.calendarYearForPlanTerm\(ensureAcademicCalendarAnchor\(\),year,sem\)/);
+  assert.match(html, /calendarYear===Number\(activeBackendYear\(\)\)/);
+  assert.doesNotMatch(html, /function termIsActive\(year,sem\)\{ return year===activePlanYear\(\)/);
+  assert.match(html, /academicCalendarStartYear:ST\.academicCalendarStartYear/);
+});
+
+test("placed-course cards have an explicit lock action and planning sends only locked placements", () => {
+  assert.match(html, /data-placement-lock=/);
+  assert.match(html, /entry\.locked=!entry\.locked/);
+  assert.match(html, /ScheduleRUPlannerStateLogic\.lockedPlacementsForTerms\(ST\.schedule,terms\)/);
+  assert.match(html, /locked:prev\?\.locked \?\? true/);
+  assert.match(html, /unless you unlock/);
+});
+
+test("home-school replacement rolls back on failure and ignores stale responses", () => {
+  assert.match(html, /function acceptedHomeSchoolSnapshot\(\)/);
+  assert.match(html, /function restoreHomeSchoolSnapshot\(snapshot\)/);
+  assert.match(html, /function loadHomeSchoolCandidate\(nextSchool\)/);
+  assert.match(html, /const generation=\(ST\.homeSchoolChangeGeneration\|\|0\)\+1/);
+  assert.match(html, /if\(generation!==ST\.homeSchoolChangeGeneration\)return;/);
+  assert.match(html, /commitHomeSchoolCandidate\(candidate\);\s*savePlannerState\(\)/);
+  assert.match(html, /restoreHomeSchoolSnapshot\(snapshot\);/);
+  assert.doesNotMatch(html, /ST\.selectedPrograms=\[\];\s*ST\.groupSelections=\{\};\s*ST\.requirementTrees=\{\};/);
+});
+
+test("home-school transaction restores the accepted context and discards stale candidates", async () => {
+  const commits = [];
+  const restores = [];
+  const saves = [];
+  const deferred = new Map();
+  const context = {
+    ST: { homeSchoolSlug: "sasnb", selectedPrograms: ["sas-major"], homeSchoolChangeGeneration: 0 },
+    schoolProfileBySlug: (slug) => ({ slug }),
+    acceptedHomeSchoolSnapshot: () => ({ homeSchoolSlug: "sasnb", selectedPrograms: ["sas-major"] }),
+    restoreHomeSchoolSnapshot: (snapshot) => { restores.push(snapshot); Object.assign(context.ST, snapshot); },
+    loadHomeSchoolCandidate: (school) => new Promise((resolve, reject) => { deferred.set(school.slug, { resolve, reject }); }),
+    commitHomeSchoolCandidate: (candidate) => { commits.push(candidate); Object.assign(context.ST, candidate); },
+    savePlannerState: () => saves.push("save"),
+    updateProgramTitle: () => {},
+    renderProgramSchoolSelector: () => {},
+    renderPanel: () => {},
+    openProgramPicker: () => {},
+    modalController: { show: () => {} },
+    escapeHtml: (value) => value,
+    globalThis: {},
+  };
+  vm.runInNewContext(`${asyncFunctionSource("changeHomeSchool")}; globalThis.changeHomeSchool = changeHomeSchool;`, context);
+
+  const failing = context.globalThis.changeHomeSchool("rbsnb", true);
+  deferred.get("rbsnb").reject(new Error("offline"));
+  await failing;
+  assert.equal(context.ST.homeSchoolSlug, "sasnb");
+  assert.equal(restores.length, 1);
+  assert.equal(saves.length, 0);
+
+  const first = context.globalThis.changeHomeSchool("rbsnb", true);
+  const second = context.globalThis.changeHomeSchool("sebs", true);
+  deferred.get("rbsnb").resolve({ homeSchoolSlug: "rbsnb" });
+  await first;
+  assert.equal(commits.length, 0);
+  deferred.get("sebs").resolve({ homeSchoolSlug: "sebs" });
+  await second;
+  assert.deepEqual(JSON.parse(JSON.stringify(commits)), [{ homeSchoolSlug: "sebs" }]);
+  assert.equal(saves.length, 1);
 });
 
 test("desktop polish keeps semantic overlays and visual workflow hooks", () => {

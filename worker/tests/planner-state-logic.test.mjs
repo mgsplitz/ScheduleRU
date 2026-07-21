@@ -20,6 +20,7 @@ test("exposes the planner-state public API", () => {
   for (const name of [
     "STATE_VERSION", "migratePlannerState", "normalizeAcademicRecord",
     "academicCreditEntries", "termKey", "preferencesForTerm", "withAcceptedPlan",
+    "deriveAcademicCalendarStartYear", "calendarYearForPlanTerm", "lockedPlacementsForTerms",
   ]) {
     assert.ok(name in logic, `ScheduleRUPlannerStateLogic must expose ${name}`);
   }
@@ -31,10 +32,36 @@ test("migrates an existing plan without moving scheduled courses", () => {
     schedule: { "01:198:111": { code: "01:198:111", year: 1, sem: "fall" } },
     selectedProgramIds: [12],
   });
-  assert.equal(state.version, 3);
+  assert.equal(state.version, 4);
   assert.equal(state.schedule["01:198:111"].sem, "fall");
   assert.equal(state.schedule["01:198:111"].locked, true);
   assert.deepEqual(plain(state.selectedProgramIds), [12]);
+});
+
+test("derives and preserves a stable academic calendar anchor", () => {
+  const state = plannerLogic().migratePlannerState({
+    academicPosition: { year: 2, startingSemester: "fall" },
+    academicCalendarStartYear: 2025,
+  });
+  assert.equal(state.academicCalendarStartYear, 2025);
+  assert.equal(plannerLogic().deriveAcademicCalendarStartYear({ year: 2, startingSemester: "fall" }, 2026), 2025);
+  assert.equal(plannerLogic().deriveAcademicCalendarStartYear({ year: 2, startingSemester: "spring" }, 2026), 2024);
+  assert.equal(plannerLogic().calendarYearForPlanTerm(2025, 2, "spring"), 2027);
+});
+
+test("migrates existing placements as locked and sends only explicitly locked courses to the planner", () => {
+  const state = plannerLogic().migratePlannerState({
+    schedule: {
+      "01:198:111": { code: "01:198:111", year: 2, sem: "fall" },
+      "01:198:112": { code: "01:198:112", year: 2, sem: "spring", locked: false },
+    },
+  });
+  const locked = plannerLogic().lockedPlacementsForTerms(state.schedule, [
+    { year: 2, sem: "fall" }, { year: 2, sem: "spring" },
+  ]);
+  assert.equal(state.schedule["01:198:111"].locked, true);
+  assert.equal(state.schedule["01:198:112"].locked, false);
+  assert.deepEqual(plain(Object.keys(locked)), ["01:198:111"]);
 });
 
 test("records AP 4 and 5 as reviewed-credit candidates and lower scores as unapplied", () => {

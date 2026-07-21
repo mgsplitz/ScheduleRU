@@ -1,8 +1,39 @@
 (function exposePlannerStateLogic(root) {
-  const STATE_VERSION = 3;
+  const STATE_VERSION = 4;
   const COURSE_CODE = /^\d{2}:\d{3}:\d{3}$/;
   const clone = (value) => JSON.parse(JSON.stringify(value ?? {}));
   const termKey = (term) => `${Number(term?.year)}:${String(term?.sem || "").toLowerCase()}`;
+
+  function normalizeAcademicPosition(position = {}) {
+    const year = Number(position.year);
+    return {
+      year: Number.isInteger(year) && year >= 1 && year <= 4 ? year : 1,
+      startingSemester: position.startingSemester === "spring" ? "spring" : "fall",
+    };
+  }
+
+  function deriveAcademicCalendarStartYear(position, activeYear) {
+    const year = Number(position?.year);
+    const calendarYear = Number(activeYear);
+    if (!Number.isInteger(year) || year < 1 || year > 4 || !Number.isInteger(calendarYear)) return null;
+    return calendarYear - (year - 1) - (position?.startingSemester === "spring" ? 1 : 0);
+  }
+
+  function calendarYearForPlanTerm(academicCalendarStartYear, year, sem) {
+    const anchor = Number(academicCalendarStartYear);
+    const academicYear = Number(year);
+    const semester = String(sem || "").toLowerCase();
+    if (!Number.isInteger(anchor) || !Number.isInteger(academicYear) || academicYear < 1 || !["fall", "spring"].includes(semester)) return null;
+    return anchor + academicYear - 1 + (semester === "spring" ? 1 : 0);
+  }
+
+  function lockedPlacementsForTerms(schedule, terms) {
+    const termKeys = new Set((Array.isArray(terms) ? terms : []).map(termKey));
+    return Object.fromEntries(Object.values(schedule && typeof schedule === "object" ? schedule : {})
+      .filter((entry) => entry?.locked === true && termKeys.has(termKey(entry)))
+      .map((entry) => [entry.code, { ...entry, locked: true }])
+      .filter(([code]) => typeof code === "string" && code));
+  }
 
   function normalizeAcademicRecord(record = {}) {
     const type = ["ap", "rutgers_completed", "transfer"].includes(record.type) ? record.type : "transfer";
@@ -30,7 +61,9 @@
     const state = clone(raw);
     state.version = STATE_VERSION;
     state.onboarding ||= { completed: false, step: 0 };
-    state.academicPosition ||= { year: 1, startingSemester: "fall" };
+    state.academicPosition = normalizeAcademicPosition(state.academicPosition);
+    const anchor = Number(state.academicCalendarStartYear);
+    state.academicCalendarStartYear = Number.isInteger(anchor) ? anchor : null;
     state.academicRecords = (Array.isArray(state.academicRecords) ? state.academicRecords : []).map(normalizeAcademicRecord);
     state.primaryProgramId ??= state.selectedProgramIds?.[0] ?? null;
     state.secondaryProgramId ??= state.selectedProgramIds?.[1] ?? null;
@@ -57,5 +90,9 @@
     return { ...state, schedule: clone(preview?.schedule || {}), generatedPlanPreview: null };
   }
 
-  root.ScheduleRUPlannerStateLogic = { STATE_VERSION, migratePlannerState, normalizeAcademicRecord, academicCreditEntries, termKey, preferencesForTerm, withAcceptedPlan };
+  root.ScheduleRUPlannerStateLogic = {
+    STATE_VERSION, migratePlannerState, normalizeAcademicRecord, academicCreditEntries, termKey,
+    preferencesForTerm, withAcceptedPlan, deriveAcademicCalendarStartYear, calendarYearForPlanTerm,
+    lockedPlacementsForTerms,
+  };
 })(globalThis);

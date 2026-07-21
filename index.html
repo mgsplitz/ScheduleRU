@@ -88,6 +88,10 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .sc-card .sn{font-family:var(--fmono);font-size:10px;font-weight:700;color:var(--scarlet);}
 .sc-card .stitle{font-weight:700;line-height:1.25;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .sc-card .sct{font-family:var(--fmono);font-size:10px;color:var(--muted);display:block;margin-top:2px;}
+.sc-card-actions{display:flex;align-items:center;gap:3px;flex-shrink:0;}
+.placement-lock{background:#fff;border:1px solid var(--line);border-radius:3px;color:var(--black);
+  padding:3px 5px;font-size:9px;font-weight:700;cursor:pointer;}
+.placement-lock:hover{border-color:var(--scarlet);color:var(--scarlet);}
 .sc-card .rx{background:none;border:none;cursor:pointer;color:var(--muted);
   font-size:13px;padding:2px 4px;}
 .sc-card .rx:hover{color:var(--scarlet);}
@@ -633,8 +637,7 @@ const FALLBACK_SCHOOL_CONTEXT={
 function schoolProfileBySlug(slug){
   return (ST.availableSchools||[]).find(school=>school.slug===slug)||null;
 }
-function activeSchoolContext(){
-  const school=schoolProfileBySlug(ST.homeSchoolSlug);
+function schoolContextForProfile(school){
   if(!school) return FALLBACK_SCHOOL_CONTEXT;
   return {
     ...FALLBACK_SCHOOL_CONTEXT,
@@ -643,6 +646,7 @@ function activeSchoolContext(){
     shortName:school.short_name||school.name||FALLBACK_SCHOOL_CONTEXT.shortName,
   };
 }
+function activeSchoolContext(){ return schoolContextForProfile(schoolProfileBySlug(ST.homeSchoolSlug)); }
 function activeCoreLabel(){
   return ST.activeCoreCurriculum?.name||activeSchoolContext().coreFallbackLabel;
 }
@@ -674,8 +678,8 @@ const ST = {
 // same site address. Catalog and requirement data stay on the Worker, so the
 // saved payload remains small and can be re-evaluated against updated rules.
 const PLANNER_STATE_KEY="scheduleru_planner_state_v1";
-// Keep the v2 marker while accepting it on migration; new saves use v3.
-const PLANNER_STATE_VERSION=2;
+// Keep legacy markers while accepting v1-v3 migrations; new saves use v4.
+const PLANNER_STATE_VERSION=3;
 const CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic.STATE_VERSION;
 function savedObject(value){
   return value && typeof value==="object" && !Array.isArray(value) ? value : {};
@@ -684,7 +688,7 @@ function restorePlannerState(){
   try{
     if(typeof localStorage==="undefined") return;
     const saved=JSON.parse(localStorage.getItem(PLANNER_STATE_KEY)||"null");
-    if(!saved || (![1,PLANNER_STATE_VERSION].includes(saved.version)&&saved.version!==CURRENT_PLANNER_STATE_VERSION)) return;
+    if(!saved || (![1,2,PLANNER_STATE_VERSION].includes(saved.version)&&saved.version!==CURRENT_PLANNER_STATE_VERSION)) return;
     ST.apOn=savedObject(saved.apOn);
     ST.completed=savedObject(saved.completed);
     ST.schedule=savedObject(saved.schedule);
@@ -692,7 +696,7 @@ function restorePlannerState(){
     ST.groupSelections=savedObject(saved.groupSelections);
     ST.creditLedger=savedObject(saved.creditLedger);
     const year=Number(saved.year);
-    if(Number.isInteger(year) && year>=1 && year<=4) ST.year=year;
+    if(Number.isInteger(year) && year>=1 && year<=8) ST.year=year;
     if(typeof saved.homeSchoolSlug==="string" && /^[a-z0-9-]{2,80}$/.test(saved.homeSchoolSlug)) ST.homeSchoolSlug=saved.homeSchoolSlug;
     if(Array.isArray(saved.selectedPrograms)) ST.selectedPrograms=saved.selectedPrograms.filter(id=>typeof id==="string");
     const migrated=ScheduleRUPlannerStateLogic.migratePlannerState({...saved,selectedProgramIds:saved.selectedProgramIds||saved.selectedPrograms});
@@ -712,6 +716,7 @@ function savePlannerState(){
       creditLedger:ST.creditLedger,
       year:ST.year, homeSchoolSlug:ST.homeSchoolSlug, selectedPrograms:ST.selectedPrograms,
       onboarding:ST.onboarding, academicPosition:ST.academicPosition, academicRecords:ST.academicRecords,
+      academicCalendarStartYear:ST.academicCalendarStartYear,
       primaryProgramId:ST.primaryProgramId, secondaryProgramId:ST.secondaryProgramId,
       generatedPlanPreview:ST.generatedPlanPreview, schedulePreferences:ST.schedulePreferences,
       issueDismissals:ST.issueDismissals,
@@ -991,15 +996,16 @@ function eligibilityRuleValues(rule){
     return Array.isArray(parsed)?parsed.filter(value=>typeof value==="string"):[];
   }catch(err){ return []; }
 }
-function programIsAvailableForHomeSchool(program){
+function programIsAvailableForSchool(program,homeSchoolSlug){
   return !(program?.eligibility_rules||[]).some(rule=>{
     if(rule.decision!=="blocked") return false;
     const values=eligibilityRuleValues(rule);
-    if(rule.condition_type==="home_school_must_be_one_of") return !values.includes(ST.homeSchoolSlug);
-    if(rule.condition_type==="home_school_must_not_be_one_of") return values.includes(ST.homeSchoolSlug);
+    if(rule.condition_type==="home_school_must_be_one_of") return !values.includes(homeSchoolSlug);
+    if(rule.condition_type==="home_school_must_not_be_one_of") return values.includes(homeSchoolSlug);
     return false;
   });
 }
+function programIsAvailableForHomeSchool(program){ return programIsAvailableForSchool(program,ST.homeSchoolSlug); }
 function selectedProgramRows(){
   const selected=new Set(ST.selectedPrograms);
   return (ST.availablePrograms||[]).filter(program=>selected.has(program.id));
@@ -1048,38 +1054,76 @@ function renderProgramSchoolSelector(){
     : "Changing your home school re-evaluates your program requirements. Your planned courses stay in your browser.";
   select.onchange=()=>changeHomeSchool(select.value);
 }
-async function changeHomeSchool(nextSchoolSlug){
+function acceptedHomeSchoolSnapshot(){return {
+  homeSchoolSlug:ST.homeSchoolSlug,availablePrograms:ST.availablePrograms,programSelectionPolicies:ST.programSelectionPolicies,
+  selectedPrograms:ST.selectedPrograms,primaryProgramId:ST.primaryProgramId,secondaryProgramId:ST.secondaryProgramId,
+  requiredProgramTab:ST.requiredProgramTab,groupSelections:ST.groupSelections,requirementTrees:ST.requirementTrees,
+  referenceRequirementTrees:ST.referenceRequirementTrees,majorRequirementTree:ST.majorRequirementTree,
+  catalogListedProgramIds:ST.catalogListedProgramIds,doubleCountPolicies:ST.doubleCountPolicies,doubleCountRules:ST.doubleCountRules,
+  doubleCountExceptions:ST.doubleCountExceptions,programEligibilityRules:ST.programEligibilityRules,activeProgram:ST.activeProgram,
+  doubleCount:ST.doubleCount,requirementsError:ST.requirementsError,coreCurricula:ST.coreCurricula,
+  activeCoreCurriculum:ST.activeCoreCurriculum,coreRequirementTree:ST.coreRequirementTree,coreError:ST.coreError,
+};}
+function restoreHomeSchoolSnapshot(snapshot){Object.assign(ST,snapshot);useRequirementTree(ST.majorRequirementTree);}
+function programRolesFor(ids,programs){const majors=ids.filter(id=>programs.find(program=>program.id===id)?.type==="major");return {primaryProgramId:majors[0]||null,secondaryProgramId:majors[1]||null,requiredProgramTab:majors[0]||ids[0]||""};}
+function candidateProgramsForSchool(payload,schoolSlug){return (payload?.programs||[]).filter(program=>["major","minor","concentration","certificate"].includes(program.type)).filter(program=>programIsAvailableForSchool(program,schoolSlug));}
+async function loadHomeSchoolCandidate(nextSchool){
+  const schoolContext=schoolContextForProfile(nextSchool);
+  const [programPayload,programSelectionPolicies,corePayload]=await Promise.all([
+    backendFetch(`/api/programs?school=${encodeURIComponent(nextSchool.slug)}`),
+    backendFetch(`/api/program-selection-policies?home_school=${encodeURIComponent(nextSchool.slug)}`),
+    backendFetch(`/api/core-curricula?school=${encodeURIComponent(nextSchool.slug)}`),
+  ]);
+  const availablePrograms=candidateProgramsForSchool(programPayload,nextSchool.slug),reviewedPrograms=availablePrograms.filter(program=>program.requirements_available!==false);
+  const initial=availablePrograms.find(program=>program.id===schoolContext.defaultProgramId&&program.requirements_available!==false)||reviewedPrograms.find(program=>program.type==="major")||reviewedPrograms[0]||availablePrograms.find(program=>program.type==="major")||availablePrograms[0];
+  if(!initial)throw new Error("No reviewed program is available for that home school.");
+  const curriculum=(corePayload?.curricula||[])[0];
+  if(!curriculum)throw new Error("No reviewed Core curriculum is available for that home school.");
+  const selectedPrograms=[initial.id],referenceTypes=schoolContext.sharedRequirementReferenceTypes||[],referencePrograms=availablePrograms.filter(program=>program.requirements_available!==false&&referenceTypes.includes(program.type));
+  const [requirementsPayload,doubleCountPayload,referencePayload,coreDetail]=await Promise.all([
+    backendFetch(`/api/requirements?programs=${selectedPrograms.map(encodeURIComponent).join(",")}`),
+    backendFetch(`/api/double-count-policies?school=${encodeURIComponent(nextSchool.slug)}`),
+    referencePrograms.length<2?Promise.resolve({requirements:{}}):backendFetch(`/api/requirements?programs=${referencePrograms.map(program=>encodeURIComponent(program.id)).join(",")}`),
+    backendFetch(`/api/programs/${encodeURIComponent(curriculum.id)}/requirements`),
+  ]);
+  const returned=requirementsPayload?.requirements||{},visibleIds=selectedPrograms.filter(id=>Array.isArray(returned[id]));
+  if(!visibleIds.length)throw new Error("The replacement program requirements could not be loaded.");
+  const referenceRequirementTrees=referencePayload?.requirements||{},requirementTrees=normalizedCoreRequirementTrees(returned,visibleIds,{referenceRequirementTrees,availablePrograms});
+  const doubleCountPolicies=doubleCountPayload?.policies||[],doubleCountExceptions=requirementsPayload?.double_count_exceptions||[];
+  const roles=programRolesFor(visibleIds,availablePrograms);
+  return {
+    homeSchoolSlug:nextSchool.slug,availablePrograms,programSelectionPolicies:programSelectionPolicies||{limits:[],combination_policies:[]},
+    selectedPrograms:visibleIds,groupSelections:{},referenceRequirementTrees,requirementTrees,
+    catalogListedProgramIds:requirementsPayload?.catalog_listed_program_ids||[],doubleCountPolicies,
+    doubleCountRules:requirementsPayload?.double_count_rules||[],doubleCountExceptions,
+    programEligibilityRules:requirementsPayload?.eligibility_rules||[],majorRequirementTree:buildRequirementTree(requirementsForDisplay(requirementTrees,visibleIds)),
+    activeProgram:availablePrograms.find(program=>program.id===visibleIds[0])||null,
+    doubleCount:computeDoubleCountOverlaps(requirementTrees,visibleIds,{availablePrograms,doubleCountExceptions,doubleCountPolicies}),
+    requirementsError:"",coreCurricula:corePayload?.curricula||[],activeCoreCurriculum:curriculum,
+    coreRequirementTree:buildRequirementTree(coreDetail?.requirements||[]),coreError:"",...roles,
+  };
+}
+function commitHomeSchoolCandidate(candidate){Object.assign(ST,candidate);useRequirementTree(ST.majorRequirementTree);}
+async function changeHomeSchool(nextSchoolSlug,confirmed=false){
   const next=schoolProfileBySlug(nextSchoolSlug);
-  if(!next || next.slug===ST.homeSchoolSlug) return;
-  const prior=ST.homeSchoolSlug;
-  const priorName=activeHomeSchoolLabel();
-  if(ST.selectedPrograms.length && ST.confirmedSchoolChange!==nextSchoolSlug){
-    modalController.show({title:"Change home school?",body:`<p>Your planned courses stay saved, but program selections and requirement choices will be re-evaluated for ${escapeHtml(next.name||next.short_name||next.slug)}.</p>`,actions:[{label:"Go back",secondary:true},{label:"Continue",onClick:()=>{ST.confirmedSchoolChange=nextSchoolSlug;changeHomeSchool(nextSchoolSlug);}}]});
-    const select=document.getElementById("programSchoolSelect"); if(select) select.value=prior; return;
+  if(!next||next.slug===ST.homeSchoolSlug)return;
+  if(ST.selectedPrograms.length&&!confirmed){
+    modalController.show({title:"Change home school?",body:`<p>Your planned courses stay saved. Program selections and requirement choices will be re-evaluated for ${escapeHtml(next.name||next.short_name||next.slug)}.</p>`,actions:[{label:"Go back",secondary:true},{label:"Continue",onClick:()=>changeHomeSchool(nextSchoolSlug,true)}]});
+    renderProgramSchoolSelector();return;
   }
-  delete ST.confirmedSchoolChange;
-  ST.homeSchoolSlug=next.slug;
-  ST.selectedPrograms=[];
-  ST.groupSelections={};
-  ST.requirementTrees={};
-  ST.referenceRequirementTrees={};
-  ST.catalogListedProgramIds=[];
-  ST.majorRequirementTree=null;
-  ST.activeProgram=null;
-  ST.doubleCount=null;
-  savePlannerState();
-  ST.requirementsLoading=true;
-  ST.requirementsError="";
-  renderPanel();
-  renderProgramSchoolSelector();
+  const generation=(ST.homeSchoolChangeGeneration||0)+1;const snapshot=acceptedHomeSchoolSnapshot();ST.homeSchoolChangeGeneration=generation;ST.requirementsLoading=true;renderPanel();
   try{
-    await loadInitialRequirements({reloadSchools:false});
-  }catch(err){
-    ST.requirementsError=err.message||"Could not load the selected school.";
+    const candidate=await loadHomeSchoolCandidate(next);
+    if(generation!==ST.homeSchoolChangeGeneration)return;
+    commitHomeSchoolCandidate(candidate);
+    savePlannerState();
+    updateProgramTitle();renderProgramSchoolSelector();openProgramPicker();
+  }catch(error){
+    if(generation!==ST.homeSchoolChangeGeneration)return;
+    restoreHomeSchoolSnapshot(snapshot);
+    modalController.show({title:"Home school unchanged",body:"<p>We could not load that home school. Your current plan and requirements were kept.</p>",actions:[{label:"Close",secondary:true}]});
   }finally{
-    ST.requirementsLoading=false;
-    renderPanel();
-    openProgramPicker();
+    if(generation===ST.homeSchoolChangeGeneration){ST.requirementsLoading=false;renderProgramSchoolSelector();renderPanel();}
   }
 }
 function closeProgramPicker(){
@@ -1334,7 +1378,7 @@ function openCourseDetails(id){
     ? `Not yet available: ${prerequisiteBlockerLabel(prerequisiteEligibility)}.`
     : available
     ? (prerequisiteEligibility.plan.paths?.length ? "Available based on prerequisite courses completed or planned in earlier semesters." : "No verified prerequisite rule is blocking this course in the app.")
-    : `Not yet available in the ${YL[detailsTerm.year]||"selected"} plan year because ${standing?.label?.toLowerCase()||"of an enrollment restriction"}.`;
+    : `Not yet available in the ${academicYearLabel(detailsTerm.year)} plan year because ${standing?.label?.toLowerCase()||"of an enrollment restriction"}.`;
   body.innerHTML=`
     <div class="detail-overview">
       <h2>${escapeHtml(c.fullTitle||c.title)}</h2>
@@ -1508,14 +1552,17 @@ function wishlistRecords(){
 /* ============================================================
    SCHEDULE
    ============================================================ */
-const YL = {1:"1st Year",2:"2nd Year",3:"3rd Year",4:"4th Year"};
+function academicYearLabel(year){const value=Number(year),suffix=value%100>=11&&value%100<=13?"th":value%10===1?"st":value%10===2?"nd":value%10===3?"rd":"th";return Number.isInteger(value)&&value>0?`${value}${suffix} Year`:"Selected Year";}
+function plannerDisplayMaxYear(){const year=Math.min(4,Math.max(1,Number(ST.academicPosition?.year)||1)),startingSemester=ST.academicPosition?.startingSemester==="spring"?"spring":"fall";return year+(startingSemester==="spring"?4:3);}
 document.getElementById("yPrev").addEventListener("click", ()=>{if(ST.year>1){ST.year--;renderAll();}});
-document.getElementById("yNext").addEventListener("click", ()=>{if(ST.year<4){ST.year++;renderAll();}});
+document.getElementById("yNext").addEventListener("click", ()=>{if(ST.year<plannerDisplayMaxYear()){ST.year++;renderAll();}});
 
 function renderSchedule(){
-  document.getElementById("yLabel").textContent = YL[ST.year];
+  const displayMaxYear=plannerDisplayMaxYear();
+  if(ST.year>displayMaxYear)ST.year=displayMaxYear;
+  document.getElementById("yLabel").textContent = academicYearLabel(ST.year);
   document.getElementById("yPrev").disabled = ST.year===1;
-  document.getElementById("yNext").disabled = ST.year===4;
+  document.getElementById("yNext").disabled = ST.year===displayMaxYear;
   ["fall","spring"].forEach(sem => {
     const zoneId = sem[0]+"z";
     const crId = sem[0]+"cr";
@@ -1536,13 +1583,16 @@ function renderSchedule(){
             ${eligibilityNote?`<span class="sct">${escapeHtml(eligibilityNote)}</span>`:""}
             <span class="sct">${escapeHtml(courseCreditsLabel(e.credits,true))}${e.section_number?` · Sec ${escapeHtml(e.section_number)}`:''}</span>
           </div>
-          <button class="rx" data-rem="${escapeHtml(code)}">✕</button></div>`;
+          <div class="sc-card-actions"><button class="placement-lock" data-placement-lock="${escapeHtml(code)}" aria-label="${e.locked?"Unlock":"Lock"} ${escapeHtml(e.code)}">${e.locked?"Unlock":"Lock"}</button><button class="rx" data-rem="${escapeHtml(code)}">✕</button></div></div>`;
       }).join("");
     }
     document.getElementById(crId).textContent = `${total} credits`;
   });
   document.querySelectorAll("[data-rem]").forEach(b=>
     b.addEventListener("click",e=>{delete ST.schedule[e.target.dataset.rem];renderAll();}));
+  document.querySelectorAll("[data-placement-lock]").forEach(button=>button.addEventListener("click",event=>{
+    event.stopPropagation();const entry=ST.schedule[button.dataset.placementLock];if(!entry)return;entry.locked=!entry.locked;savePlannerState();renderAll();
+  }));
   document.querySelectorAll(".sc-card[data-id]").forEach(card=>card.addEventListener("click",e=>{
     if(e.target.closest("[data-rem]")) return;
     openCourseDetails(card.dataset.id);
@@ -1583,12 +1633,12 @@ function setupDropZones(){
       await loadCourseEligibilityForCodes([record.code]);
       const prerequisiteEligibility=prerequisiteEligibilityForTerm(record,{year:ST.year,sem});
       if(prerequisiteEligibility.status==="blocked"){
-        modalController.show({title:"Course cannot be placed",body:`<p>${escapeHtml(code)} cannot be placed in ${escapeHtml(sem)} of ${escapeHtml(YL[ST.year])}: ${escapeHtml(prerequisiteBlockerLabel(prerequisiteEligibility))}.</p>`,actions:[{label:"Close",secondary:true}]});
+        modalController.show({title:"Course cannot be placed",body:`<p>${escapeHtml(code)} cannot be placed in ${escapeHtml(sem)} of ${escapeHtml(academicYearLabel(ST.year))}: ${escapeHtml(prerequisiteBlockerLabel(prerequisiteEligibility))}.</p>`,actions:[{label:"Close",secondary:true}]});
         return;
       }
       const eligibility=courseEligibilityForTerm(record,{year:ST.year,sem});
       if(eligibility.status==="blocked"){
-        modalController.show({title:"Course cannot be placed",body:`<p>${escapeHtml(code)} cannot be placed in ${escapeHtml(sem)} of ${escapeHtml(YL[ST.year])}: ${escapeHtml(plannerEligibilityLabel(eligibility))}.</p>`,actions:[{label:"Close",secondary:true}]});
+        modalController.show({title:"Course cannot be placed",body:`<p>${escapeHtml(code)} cannot be placed in ${escapeHtml(sem)} of ${escapeHtml(academicYearLabel(ST.year))}: ${escapeHtml(plannerEligibilityLabel(eligibility))}.</p>`,actions:[{label:"Close",secondary:true}]});
         return;
       }
       const prev = ST.schedule[code];
@@ -1598,7 +1648,7 @@ function setupDropZones(){
         course: prev?.course || record,
         sectionId: prev?.sectionId, index_number: prev?.index_number,
         section_number: prev?.section_number, meetings: prev?.meetings,
-        locked: prev?.locked || false,
+        locked:prev?.locked ?? true,
         eligibilityStatus:eligibility.status, eligibilityAssumptions:eligibility.assumptions,
       };
       renderAll();
@@ -2271,8 +2321,8 @@ function sharedCoreBaselines(referenceTrees){
   }
   return baselines;
 }
-function normalizedCoreRequirementTrees(requirementTrees, programIds){
-  const baselines=sharedCoreBaselines(Object.keys(ST.referenceRequirementTrees||{}).length?ST.referenceRequirementTrees:requirementTrees);
+function normalizedCoreRequirementTrees(requirementTrees, programIds,{referenceRequirementTrees=ST.referenceRequirementTrees,availablePrograms=ST.availablePrograms}={}){
+  const baselines=sharedCoreBaselines(Object.keys(referenceRequirementTrees||{}).length?referenceRequirementTrees:requirementTrees);
   if(!baselines.size) return requirementTrees;
   const out={};
   for(const programId of programIds){
@@ -2291,7 +2341,7 @@ function normalizedCoreRequirementTrees(requirementTrees, programIds){
         return !roots.some(other=>other!==root && rootCourseCodes(other).includes(course.course_code));
       });
       if(!residualCourses.length) return [sharedRoot];
-      const program=ST.availablePrograms.find(item=>item.id===programId);
+      const program=(availablePrograms||[]).find(item=>item.id===programId);
       return [sharedRoot,{
         ...root,
         id:`${root.id}-program-additions`,
@@ -2307,10 +2357,10 @@ function requirementsForDisplay(requirementTrees, programIds){
     requirementTrees,programIds,rootRequirementSignature
   );
 }
-function computeDoubleCountOverlaps(requirementTrees, programIds){
+function computeDoubleCountOverlaps(requirementTrees, programIds,{availablePrograms=ST.availablePrograms,doubleCountExceptions=ST.doubleCountExceptions,doubleCountPolicies=ST.doubleCountPolicies}={}){
   const shared=sharedRootGroups(requirementTrees,programIds);
   const sharedKeys=new Set(shared.map(entry=>entry.key));
-  const programsById=Object.fromEntries((ST.availablePrograms||[]).map(program=>[program.id,program]));
+  const programsById=Object.fromEntries((availablePrograms||[]).map(program=>[program.id,program]));
   const coursePrograms=new Map();
   for(const id of programIds){
     const codes=new Set();
@@ -2329,10 +2379,10 @@ function computeDoubleCountOverlaps(requirementTrees, programIds){
     .map(([code,ids])=>({code,programs:[...ids]}))
     .sort((a,b)=>a.code.localeCompare(b.code));
   const partition=ScheduleRURequirementLogic.partitionDoubleCountOverlaps(
-    overlaps,programsById,ST.doubleCountExceptions||[]
+    overlaps,programsById,doubleCountExceptions||[]
   );
   const scopeResults=["major_major","major_concentration"].map(scope=>{
-    const policy=(ST.doubleCountPolicies||[]).find(item=>item.scope===scope);
+    const policy=(doubleCountPolicies||[]).find(item=>item.scope===scope);
     const codes=partition.scopes[scope]||[];
     const cap=policy?.max_shared_courses===null||policy?.max_shared_courses===undefined ? null : Number(policy.max_shared_courses);
     return {scope,policy,codes,cap,violates:cap!==null&&codes.length>cap};
@@ -3076,7 +3126,7 @@ async function addToBuilderPool(cid){
   if(ST.builder.pool.some(p=>p.code===code)) return;
   if(lockedElsewhere(code, ST.builder.year, ST.builder.sem)){
     const e=ST.schedule[code];
-    modalController.show({title:"Course already locked",body:`<p>${escapeHtml(code)} is already scheduled for ${escapeHtml(YL[e.year])} ${escapeHtml(e.sem)}. Remove it there first.</p>`,actions:[{label:"Close",secondary:true}]});
+    modalController.show({title:"Course already locked",body:`<p>${escapeHtml(code)} is already scheduled for ${escapeHtml(academicYearLabel(e.year))} ${escapeHtml(e.sem)}. Remove it there first.</p>`,actions:[{label:"Close",secondary:true}]});
     return;
   }
   const entry={code, title, fullTitle:fullTitle||title, credits, course:record, sections:[], checked:new Set(), loading:true, enabled:true, collapsed:false};
@@ -3262,14 +3312,14 @@ function renderBuilder(){
         </div>
         <div class="inline-error" id="permIndexError" aria-live="polite"></div>
         ${renderBuilderCalendar()}
-        <button class="builder-confirm" id="permConfirm">Use this schedule for ${semLabel} ${YL[b.year]}</button>
+        <button class="builder-confirm" id="permConfirm">Use this schedule for ${semLabel} ${academicYearLabel(b.year)}</button>
       `;
     }
   }
 
   root.innerHTML = `
     <div class="builder-hdr">
-      <h2>Build Schedule — ${semLabel} · ${YL[b.year]}</h2>
+      <h2>Build Schedule — ${semLabel} · ${academicYearLabel(b.year)}</h2>
       <button class="builder-back" id="builderBack">← Back to 4-Year Plan</button>
     </div>
     <div class="drop-pool" id="poolDrop">Drag courses here from the Required / Wishlist panel →</div>
@@ -3331,12 +3381,27 @@ function refreshApFulfillment(){
 function rerenderOnboardingApStep(){if(!ST.onboarding?.completed&&Number(ST.onboarding?.step)===2)renderOnboarding();}
 async function loadHackathonConfiguration(){
   try{const config=await backendFetch("/api/config");ST.activeYear=config.activeYear;ST.activeTerm=config.activeTerm;}catch(_){ST.activeYear=new Date().getFullYear();ST.activeTerm="9";}
+  ensureAcademicCalendarAnchor();
   try{const data=await backendFetch("/api/ap-equivalencies");AP=(data.equivalencies||[]).map(row=>({id:row.id,name:row.exam_name,equiv:parseJson(row.equivalent_course_codes_json).join(", "),credits:Number(row.credits)||0,fulfills:parseJson(row.fulfills_requirement_ids_json),minimumScore:Number(row.minimum_score),maximumScore:Number(row.maximum_score)}));refreshApFulfillment();}catch(_){AP=[];}
   rerenderOnboardingApStep();updateProgramTitle();renderSchedule();
 }
 
-function activePlanYear(){ return Number(ST.academicPosition?.year)||1; }
-function termIsActive(year,sem){ return year===activePlanYear()&&sem===activeRegistrationSemester(); }
+function ensureAcademicCalendarAnchor(){
+  const existing=Number(ST.academicCalendarStartYear);
+  if(Number.isInteger(existing))return existing;
+  const activeYear=Number(ST.activeYear);
+  if(!Number.isInteger(activeYear))return null;
+  const anchor=ScheduleRUPlannerStateLogic.deriveAcademicCalendarStartYear(ST.academicPosition,activeYear);
+  if(Number.isInteger(anchor)){ST.academicCalendarStartYear=anchor;savePlannerState();}
+  return anchor;
+}
+function activePlanYear(){
+  const anchor=ensureAcademicCalendarAnchor(),calendarYear=Number(activeBackendYear());
+  if(!Number.isInteger(anchor)||!Number.isInteger(calendarYear))return Number(ST.academicPosition?.year)||1;
+  const year=calendarYear-anchor+(activeRegistrationSemester()==="fall"?1:0);
+  return Number.isInteger(year)&&year>=1?year:Number(ST.academicPosition?.year)||1;
+}
+function termIsActive(year,sem){const calendarYear=ScheduleRUPlannerStateLogic.calendarYearForPlanTerm(ensureAcademicCalendarAnchor(),year,sem);return calendarYear===Number(activeBackendYear())&&String(sem).toLowerCase()===activeRegistrationSemester();}
 const legacyRenderSchedule=renderSchedule;
 renderSchedule=function(){ legacyRenderSchedule(); document.querySelectorAll(".sem-plus").forEach(button=>{const enabled=termIsActive(ST.year,button.dataset.semplus);button.hidden=!enabled;button.disabled=!enabled;}); };
 
@@ -3405,10 +3470,10 @@ replaceProgramPickerControl("programCancel",closeProgramPicker);
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.getElementById("programOv").classList.contains("open")&&!document.getElementById("appModal").classList.contains("open")&&!ST.programApplyPending){event.preventDefault();closeProgramPicker();}});
 document.getElementById("programOv").addEventListener("click",event=>{if(event.target===document.getElementById("programOv")&&!ST.programApplyPending)closeProgramPicker();});
 
-function plannerTerms(){return [1,2,3,4].flatMap(year=>[{year,sem:"fall"},{year,sem:"spring"}]);}
+function plannerTerms(){return plannerTermsFromAcademicPosition();}
 function unresolvedPlannerRequirements(){return normalizedPlannerInputs().unresolvedRequirements;}
 function generateFourYearPlan(){const input=normalizedPlannerInputs();ST.generatedPlanPreview=ScheduleRUFourYearPlanner.generatePlan(input);savePlannerState();showPlanPreview();}
-function showPlanPreview(){const preview=ST.generatedPlanPreview;if(!preview)return;const rows=plannerTerms().map(term=>{const courses=Object.values(preview.schedule).filter(entry=>entry.year===term.year&&entry.sem===term.sem);const placeholders=(preview.placeholders||[]).filter(entry=>entry.year===term.year&&entry.sem===term.sem);return `<section class="planner-term"><h3>${html(YL[term.year])} · ${html(term.sem)}</h3>${courses.map(entry=>`<div class="planner-item">${html(entry.code)} · ${html(entry.credits)} credits${entry.locked?" · locked":""}</div>`).join("")}${placeholders.map(entry=>`<div class="planner-item placeholder-item">Placeholder: ${html(entry.label)} · ${html(entry.estimatedCredits)} credits</div>`).join("")||"<div class=\"planner-item\">No placement</div>"}</section>`;}).join("");modalController.show({title:"Generated plan preview",body:`<div class="planner-preview">${rows}${(preview.issues||[]).map(issue=>`<div class="planner-issue">${html(issue.code.replaceAll("_"," "))}</div>`).join("")}</div>`,actions:[{label:"Cancel",secondary:true},{label:"Use this plan",onClick:()=>{const accepted=ScheduleRUPlannerStateLogic.withAcceptedPlan(ST,preview);Object.entries(accepted.schedule).forEach(([code,entry])=>{const prior=ST.schedule[code]||courseByCode(code)||{};accepted.schedule[code]={...prior,...entry,title:prior.title||COURSES[requirementCourseId(code)]?.title||code,fullTitle:prior.fullTitle||prior.title||code,locked:true};});Object.assign(ST,accepted);savePlannerState();renderAll();}}]});}
+function showPlanPreview(){const preview=ST.generatedPlanPreview;if(!preview)return;const rows=plannerTerms().map(term=>{const courses=Object.values(preview.schedule).filter(entry=>entry.year===term.year&&entry.sem===term.sem);const placeholders=(preview.placeholders||[]).filter(entry=>entry.year===term.year&&entry.sem===term.sem);return `<section class="planner-term"><h3>${html(academicYearLabel(term.year))} · ${html(term.sem)}</h3>${courses.map(entry=>`<div class="planner-item">${html(entry.code)} · ${html(entry.credits)} credits${entry.locked?" · locked":""}</div>`).join("")}${placeholders.map(entry=>`<div class="planner-item placeholder-item">Placeholder: ${html(entry.label)} · ${html(entry.estimatedCredits)} credits</div>`).join("")||"<div class=\"planner-item\">No placement</div>"}</section>`;}).join("");modalController.show({title:"Generated plan preview",body:`<div class="planner-preview">${rows}${(preview.issues||[]).map(issue=>`<div class="planner-issue">${html(issue.code.replaceAll("_"," "))}</div>`).join("")}</div>`,actions:[{label:"Cancel",secondary:true},{label:"Use this plan",onClick:()=>{const accepted=ScheduleRUPlannerStateLogic.withAcceptedPlan(ST,preview);Object.entries(accepted.schedule).forEach(([code,entry])=>{const prior=ST.schedule[code]||courseByCode(code)||{};accepted.schedule[code]={...prior,...entry,title:prior.title||COURSES[requirementCourseId(code)]?.title||code,fullTitle:prior.fullTitle||prior.title||code,locked:true};});Object.assign(ST,accepted);savePlannerState();renderAll();}}]});}
 
 function termPreferenceState(){const key=ScheduleRUPlannerStateLogic.termKey({year:activePlanYear(),sem:activeRegistrationSemester()});ST.schedulePreferences[key]||={version:1,constraints:[],messages:[]};return ST.schedulePreferences[key];}
 function normalizeAssistantOpenStatus(open_status){if(open_status===true||open_status===1||open_status==="1")return true;if(open_status===false||open_status===0||open_status==="0")return false;return null;}
@@ -3423,7 +3488,7 @@ let onboardingFocusRestore=null;
 function setOnboardingOpen(open,wasOpen=document.getElementById("onboarding").classList.contains("open")){const root=document.getElementById("onboarding");root.classList.toggle("open",open);root.setAttribute("aria-hidden",String(!open));[document.getElementById("app"),document.getElementById("page-courses"),document.querySelector(".pagenav")].filter(Boolean).forEach(node=>{node.inert=open;});if(open){if(!wasOpen)onboardingFocusRestore=document.activeElement;requestAnimationFrame(()=>root.querySelector("button:not([disabled]), input, select, textarea, [tabindex]")?.focus());}else if(wasOpen){const restore=onboardingFocusRestore;onboardingFocusRestore=null;requestAnimationFrame(()=>{if(restore?.isConnected&&restore!==document.body)restore.focus();else document.getElementById("restartSetup")?.focus();});}}
 
 function renderOnboarding(){const onboarding=ST.onboarding||{completed:false,step:0};const root=document.getElementById("onboarding"),content=document.getElementById("onboardingContent"),step=Math.max(0,Math.min(6,Number(onboarding.step)||0));root.classList.toggle("open",!onboarding.completed);document.getElementById("onboardingSteps").setAttribute("aria-valuenow",String(step+1));document.getElementById("onboardingSteps").innerHTML=Array.from({length:7},(_,index)=>`<i class="onboarding-step-dot ${index<=step?"active":""}"></i>`).join("");const records=academicRecords();const layout=(title,text,body,options={})=>{content.innerHTML=`<h1 id="onboardingTitle">${title}</h1><p>${text}</p>${body}<div class="onboarding-actions"><button class="choice-btn secondary" id="onboardingBack" ${step===0?"disabled":""}>Back</button><div class="right">${options.skip?'<button class="choice-btn secondary" id="onboardingSkip">Skip</button>':""}<button class="choice-btn" id="onboardingNext">${options.next||"Continue"}</button></div></div>`;document.getElementById("onboardingBack").onclick=()=>{ST.onboarding.step=step-1;savePlannerState();renderOnboarding();};document.getElementById("onboardingSkip")?.addEventListener("click",()=>{ST.onboarding.step=step+1;savePlannerState();renderOnboarding();});document.getElementById("onboardingNext").onclick=()=>{options.onNext?.();if(step===6){ST.onboarding.completed=true;}else ST.onboarding.step=step+1;savePlannerState();renderOnboarding();renderAll();};};
-if(step===0)return layout("Plan with confidence","ScheduleRU keeps this guest plan in your browser. It is a planning aid, not an official degree audit.","<div class=\"onboarding-note\">No account, transcript upload, or file parsing is used in this setup.</div>",{next:"Continue as guest"});if(step===1)return layout("Set your academic position","This anchors your remaining Fall/Spring planning terms through Year 4.",`<div class="onboarding-fields"><label>Current plan year<select id="academicYear">${[1,2,3,4].map(year=>`<option value="${year}" ${activePlanYear()===year?"selected":""}>${YL[year]}</option>`).join("")}</select></label><label>Starting semester<select id="startingSemester"><option value="fall" ${ST.academicPosition?.startingSemester!=="spring"?"selected":""}>Fall</option><option value="spring" ${ST.academicPosition?.startingSemester==="spring"?"selected":""}>Spring</option></select></label></div>`,{onNext:()=>{ST.academicPosition={year:Number(document.getElementById("academicYear").value),startingSemester:document.getElementById("startingSemester").value};}});if(step===2)return layout("Add AP credit","Enter each exam and score manually. Scores of 4 or 5 can count only when a reviewed equivalency applies; lower scores are saved but not applied for credit.",`<div class="onboarding-fields"><label>Reviewed AP exam<select id="apExam"><option value="">Select an exam</option>${AP.map(ap=>`<option value="${html(ap.id)}">${html(ap.name)} (${ap.minimumScore}–${ap.maximumScore})</option>`).join("")}</select></label><label>Score<input id="apScore" type="number" min="1" max="5"/></label></div><button class="choice-btn secondary" id="addApRecord">Add AP result</button><div class="onboarding-records">${records.filter(record=>record.type==="ap").map(record=>`<div class="onboarding-record">${html(record.exam)} · ${html(record.score)}<span>${html(record.creditStatus)}</span></div>`).join("")}</div>`,{skip:true,onNext:()=>{},next:"Continue"});if(step===3)return layout("Add completed coursework","Add Rutgers or transfer work manually. Files are not parsed in this release.",`<div class="onboarding-fields"><label>Course code<input id="recordCode" placeholder="01:198:111"/></label><label>Title<input id="recordTitle"/></label><label>Credits<input id="recordCredits" type="number" min="0" step=".5"/></label><label>Origin<select id="recordType"><option value="rutgers_completed">Rutgers</option><option value="transfer">Transfer</option></select></label><label>Grade (optional)<input id="recordGrade"/></label><label>Completed term (optional)<input id="recordTerm" placeholder="Spring 2026"/></label></div><button class="choice-btn secondary" id="addCourseRecord">Add coursework</button><div class="onboarding-records">${records.filter(record=>record.type!=="ap").map(record=>`<div class="onboarding-record">${html(record.courseCode||record.title)}<span>${html(record.type)}</span></div>`).join("")}</div>`,{skip:true});if(step===4)return layout("Choose programs","Choose one primary major, an optional secondary major, and any policy-permitted minors. A third major is not supported.",`<div class="onboarding-review"><div>Home school: ${html(activeHomeSchoolLabel())}</div><div>Primary: ${html(selectedProgramRows().find(row=>row.id===ST.primaryProgramId)?.name||"Not selected")}</div><div>Secondary: ${html(selectedProgramRows().find(row=>row.id===ST.secondaryProgramId)?.name||"None")}</div></div><button class="choice-btn secondary" id="onboardingPrograms">Choose programs</button>`);if(step===5)return layout("Review your plan setup","You can restart setup later without erasing your accepted plan.",`<div class="onboarding-review"><div>${html(activeHomeSchoolLabel())}</div><div>${html(selectedProgramRows().map(row=>row.name).join(", ")||"Programs not selected")}</div><div>${records.length} academic record${records.length===1?"":"s"}</div></div>`);return layout("Ready to plan","Use the four-year preview for a deterministic draft, then use the active-term builder for real sections and schedule preferences.","<div class=\"onboarding-note\">Existing courses stay where you put them unless you explicitly replace the accepted plan.</div>",{next:"Start planning"});
+if(step===0)return layout("Plan with confidence","ScheduleRU keeps this guest plan in your browser. It is a planning aid, not an official degree audit.","<div class=\"onboarding-note\">No account, transcript upload, or file parsing is used in this setup.</div>",{next:"Continue as guest"});if(step===1)return layout("Set your academic position","This anchors exactly eight remaining Fall/Spring planning terms.",`<div class="onboarding-fields"><label>Current plan year<select id="academicYear">${[1,2,3,4].map(year=>`<option value="${year}" ${(Number(ST.academicPosition?.year)||1)===year?"selected":""}>${academicYearLabel(year)}</option>`).join("")}</select></label><label>Starting semester<select id="startingSemester"><option value="fall" ${ST.academicPosition?.startingSemester!=="spring"?"selected":""}>Fall</option><option value="spring" ${ST.academicPosition?.startingSemester==="spring"?"selected":""}>Spring</option></select></label></div>`,{onNext:()=>{ST.academicPosition={year:Number(document.getElementById("academicYear").value),startingSemester:document.getElementById("startingSemester").value};ST.academicCalendarStartYear=ScheduleRUPlannerStateLogic.deriveAcademicCalendarStartYear(ST.academicPosition,Number(ST.activeYear));ST.year=ST.academicPosition.year;}});if(step===2)return layout("Add AP credit","Enter each exam and score manually. Scores of 4 or 5 can count only when a reviewed equivalency applies; lower scores are saved but not applied for credit.",`<div class="onboarding-fields"><label>Reviewed AP exam<select id="apExam"><option value="">Select an exam</option>${AP.map(ap=>`<option value="${html(ap.id)}">${html(ap.name)} (${ap.minimumScore}–${ap.maximumScore})</option>`).join("")}</select></label><label>Score<input id="apScore" type="number" min="1" max="5"/></label></div><button class="choice-btn secondary" id="addApRecord">Add AP result</button><div class="onboarding-records">${records.filter(record=>record.type==="ap").map(record=>`<div class="onboarding-record">${html(record.exam)} · ${html(record.score)}<span>${html(record.creditStatus)}</span></div>`).join("")}</div>`,{skip:true,onNext:()=>{},next:"Continue"});if(step===3)return layout("Add completed coursework","Add Rutgers or transfer work manually. Files are not parsed in this release.",`<div class="onboarding-fields"><label>Course code<input id="recordCode" placeholder="01:198:111"/></label><label>Title<input id="recordTitle"/></label><label>Credits<input id="recordCredits" type="number" min="0" step=".5"/></label><label>Origin<select id="recordType"><option value="rutgers_completed">Rutgers</option><option value="transfer">Transfer</option></select></label><label>Grade (optional)<input id="recordGrade"/></label><label>Completed term (optional)<input id="recordTerm" placeholder="Spring 2026"/></label></div><button class="choice-btn secondary" id="addCourseRecord">Add coursework</button><div class="onboarding-records">${records.filter(record=>record.type!=="ap").map(record=>`<div class="onboarding-record">${html(record.courseCode||record.title)}<span>${html(record.type)}</span></div>`).join("")}</div>`,{skip:true});if(step===4)return layout("Choose programs","Choose one primary major, an optional secondary major, and any policy-permitted minors. A third major is not supported.",`<div class="onboarding-review"><div>Home school: ${html(activeHomeSchoolLabel())}</div><div>Primary: ${html(selectedProgramRows().find(row=>row.id===ST.primaryProgramId)?.name||"Not selected")}</div><div>Secondary: ${html(selectedProgramRows().find(row=>row.id===ST.secondaryProgramId)?.name||"None")}</div></div><button class="choice-btn secondary" id="onboardingPrograms">Choose programs</button>`);if(step===5)return layout("Review your plan setup","You can restart setup later without erasing your accepted plan.",`<div class="onboarding-review"><div>${html(activeHomeSchoolLabel())}</div><div>${html(selectedProgramRows().map(row=>row.name).join(", ")||"Programs not selected")}</div><div>${records.length} academic record${records.length===1?"":"s"}</div></div>`);return layout("Ready to plan","Use the four-year preview for a deterministic draft, then use the active-term builder for real sections and schedule preferences.","<div class=\"onboarding-note\">Placed courses stay where you put them unless you unlock them.</div>",{next:"Start planning"});
 }
 const legacyRenderOnboarding=renderOnboarding;
 renderOnboarding=function(){const wasOpen=document.getElementById("onboarding").classList.contains("open");legacyRenderOnboarding();setOnboardingOpen(!ST.onboarding?.completed,wasOpen);};
@@ -3441,22 +3506,22 @@ function setBuilderIncludeClosed(includeClosed){if(!ST.builder)return;ST.builder
 const legacyRenderBuilderWithClosed=renderBuilder;
 renderBuilder=function(){legacyRenderBuilderWithClosed();const toggle=document.querySelector(".include-closed input");if(toggle)toggle.onchange=event=>setBuilderIncludeClosed(event.target.checked);};
 
-function plannerTermsFromAcademicPosition(){const terms=[];let year=Math.min(4,Math.max(1,Number(ST.academicPosition?.year)||1)),sem=ST.academicPosition?.startingSemester==="spring"?"spring":"fall";while(year<=4){terms.push({year,sem});if(sem==="fall")sem="spring";else{year+=1;sem="fall";}}return terms;}
+function plannerTermsFromAcademicPosition(){const terms=[];let year=Math.min(4,Math.max(1,Number(ST.academicPosition?.year)||1)),sem=ST.academicPosition?.startingSemester==="spring"?"spring":"fall";while(terms.length<8){terms.push({year,sem});if(sem==="fall")sem="spring";else{year+=1;sem="fall";}}return terms;}
 plannerTerms=plannerTermsFromAcademicPosition;
 function plannerKnownCourseCodes(){return new Set([...completedAcademicCodes(),...Object.values(ST.schedule||{}).map(entry=>entry.code).filter(Boolean)]);}
 function plannerLeafGroups(tree){return Object.values(tree?.groups||{}).filter(group=>(group.children||[]).length===0||(group.members||[]).length>0);}
 function plannerRequirementInputs(tree,{sourceType,sourceProgram=""}={}){const known=plannerKnownCourseCodes(),selectedByGroup=ST.groupSelections||{},coursesByCode=new Map(),placeholders=[];for(const group of plannerLeafGroups(tree)){const members=group.members||[],selected=members.filter(id=>selectedByGroup[group.id]?.includes(id)||known.has(tree.courses?.[id]?.code)),required=group.rule==="all"?members.length:Math.max(1,Number(group.count)||1),concrete=sourceType==="core"?selected:(group.rule==="all"?members:selected);concrete.forEach(id=>{const course=tree.courses?.[id];if(course?.code&&!known.has(course.code))coursesByCode.set(course.code,course);});if(selected.length<required&&(sourceType==="core"||group.rule!=="all"))placeholders.push({id:group.id,label:groupDisplayName(group),credits:3,sourceType:sourceType||"program",sourceProgram,requirementGroupId:group.id,candidateSelectionContext:{rule:group.rule,required}});}return {courses:[...coursesByCode.values()],placeholders};}
 function corePlannerStatus(){const inputs=plannerRequirementInputs(ST.coreRequirementTree,{sourceType:"core",sourceProgram:ST.activeCoreCurriculum?.id||"core"});return {...inputs,incomplete:inputs.placeholders.length>0};}
 normalizedPlannerInputs=function(){
-  const program=plannerRequirementInputs(ST.majorRequirementTree,{sourceType:"program",sourceProgram:ST.primaryProgramId||""}),core=corePlannerStatus(),terms=plannerTermsFromAcademicPosition(),termKeys=new Set(terms.map(term=>`${term.year}:${term.sem}`)),allCoursesById=new Map(),byCode=new Map();
+  const program=plannerRequirementInputs(ST.majorRequirementTree,{sourceType:"program",sourceProgram:ST.primaryProgramId||""}),core=corePlannerStatus(),terms=plannerTermsFromAcademicPosition(),allCoursesById=new Map(),byCode=new Map();
   [ST.majorRequirementTree,ST.coreRequirementTree].forEach(tree=>Object.entries(tree?.courses||{}).forEach(([id,course])=>allCoursesById.set(id,course)));
   const addCourse=course=>{if(course?.code)byCode.set(course.code,course);};
   [...program.courses,...core.courses,...Object.values(ST.schedule||{}).map(entry=>entry.course||entry)].forEach(addCourse);
   [...byCode.values()].forEach(course=>(course.prereqs||[]).forEach(id=>addCourse(allCoursesById.get(id))));
-  const courses=[...byCode.values()].map(course=>({code:course.code,title:course.fullTitle||course.title||course.code,credits:course.credits||0})),idToCode=new Map([...allCoursesById.entries()].map(([id,course])=>[id,course?.code])),lockedPlacements=Object.fromEntries(Object.values(ST.schedule||{}).filter(entry=>termKeys.has(`${entry.year}:${entry.sem}`)).map(entry=>[entry.code,{...entry,locked:true}]));
+  const courses=[...byCode.values()].map(course=>({code:course.code,title:course.fullTitle||course.title||course.code,credits:course.credits||0})),idToCode=new Map([...allCoursesById.entries()].map(([id,course])=>[id,course?.code])),lockedPlacements=ScheduleRUPlannerStateLogic.lockedPlacementsForTerms(ST.schedule,terms);
   return {terms,courses,completedCourseCodes:completedAcademicCodes(),lockedPlacements,prerequisitePathsByCode:Object.fromEntries(courses.map(course=>[course.code,[(byCode.get(course.code)?.prereqs||[]).map(id=>idToCode.get(id)).filter(Boolean)]])),unresolvedRequirements:[...program.placeholders,...core.placeholders],core};
 };
-const checkedGeneratePlanButton=document.getElementById("generatePlanBtn"),coreAwareGeneratePlanButton=checkedGeneratePlanButton.cloneNode(true);checkedGeneratePlanButton.replaceWith(coreAwareGeneratePlanButton);coreAwareGeneratePlanButton.addEventListener("click",async()=>{if(!ST.coreRequirementTree&&!ST.coreLoading)await loadCoreCurriculum();const core=corePlannerStatus();modalController.show({title:core.incomplete?"Core choices are incomplete":"Generate a plan preview",body:core.incomplete?"<p>Accuracy improves when Core choices are completed. Courses already placed will stay where you put them, and unresolved Core areas will appear as typed placeholders.</p>":"<p>Courses already placed will stay where you put them. This creates a preview; your accepted plan changes only after you choose Use this plan.</p>",actions:[{label:"Go back",secondary:true},{label:core.incomplete?"I understand":"Generate preview",onClick:generateFourYearPlan}]});});
+const checkedGeneratePlanButton=document.getElementById("generatePlanBtn"),coreAwareGeneratePlanButton=checkedGeneratePlanButton.cloneNode(true);checkedGeneratePlanButton.replaceWith(coreAwareGeneratePlanButton);coreAwareGeneratePlanButton.addEventListener("click",async()=>{if(!ST.coreRequirementTree&&!ST.coreLoading)await loadCoreCurriculum();const core=corePlannerStatus();modalController.show({title:core.incomplete?"Core choices are incomplete":"Generate a plan preview",body:core.incomplete?"<p>Accuracy improves when Core choices are completed. Placed courses stay where you put them unless you unlock them, and unresolved Core areas will appear as typed placeholders.</p>":"<p>Placed courses stay where you put them unless you unlock them. This creates a preview; your accepted plan changes only after you choose Use this plan.</p>",actions:[{label:"Go back",secondary:true},{label:core.incomplete?"I understand":"Generate preview",onClick:generateFourYearPlan}]});});
 
 loadHackathonConfiguration();renderOnboarding();renderAll();
 </script>
