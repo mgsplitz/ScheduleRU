@@ -351,7 +351,6 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .sem-plus{background:var(--scarlet);color:#fff;border:none;border-radius:3px;
   width:16px;height:16px;font-size:11px;line-height:1;cursor:pointer;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.sem-plus[hidden]{display:none;}
 .sem-plus:hover{background:var(--scarlet-d);}
 
 /* SCHEDULE BUILDER */
@@ -3445,10 +3444,6 @@ function activePlanYear(){
   const year=calendarYear-anchor+(activeRegistrationSemester()==="fall"?1:0);
   return Number.isInteger(year)&&year>=1?year:Number(ST.academicPosition?.year)||1;
 }
-function termIsActive(year,sem){const calendarYear=ScheduleRUPlannerStateLogic.calendarYearForPlanTerm(ensureAcademicCalendarAnchor(),year,sem);return calendarYear===Number(activeBackendYear())&&String(sem).toLowerCase()===activeRegistrationSemester();}
-const legacyRenderSchedule=renderSchedule;
-renderSchedule=function(){ legacyRenderSchedule(); document.querySelectorAll(".sem-plus").forEach(button=>{const enabled=termIsActive(ST.year,button.dataset.semplus);button.hidden=!enabled;button.disabled=!enabled;}); };
-
 function academicRecords(){ return Array.isArray(ST.academicRecords)?ST.academicRecords:[]; }
 function addAcademicRecord(record){ ST.academicRecords.push(ScheduleRUPlannerStateLogic.normalizeAcademicRecord(record)); savePlannerState(); }
 function legacyCompletedAcademicCodes(){const completed=Object.entries(ST.completed||{}).filter(([,taken])=>taken).flatMap(([id])=>[courseRecordFromId(id)?.code||id]);const ap=AP.filter(entry=>ST.apOn?.[entry.id]).flatMap(entry=>courseCodesFromText(entry.equiv));return [...new Set([...completed,...ap].filter(Boolean))];}

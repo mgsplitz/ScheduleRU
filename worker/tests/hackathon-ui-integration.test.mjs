@@ -160,12 +160,10 @@ test("planner horizon always contains eight consecutive Fall/Spring terms from Y
   assert.equal(context.globalThis.maximum, 8);
 });
 
-test("active builder gate matches the backend calendar term through a persisted anchor", () => {
-  assert.match(html, /function ensureAcademicCalendarAnchor\(/);
-  assert.match(html, /ScheduleRUPlannerStateLogic\.calendarYearForPlanTerm\(ensureAcademicCalendarAnchor\(\),year,sem\)/);
-  assert.match(html, /calendarYear===Number\(activeBackendYear\(\)\)/);
-  assert.doesNotMatch(html, /function termIsActive\(year,sem\)\{ return year===activePlanYear\(\)/);
-  assert.match(html, /academicCalendarStartYear:ST\.academicCalendarStartYear/);
+test("semester titles expose schedule-builder buttons", () => {
+  assert.match(html, /<h3>Fall <button class="sem-plus" data-semplus="fall"/);
+  assert.match(html, /<h3>Spring <button class="sem-plus" data-semplus="spring"/);
+  assert.match(html, /openBuilder\(btn\.dataset\.semplus\)/);
 });
 
 test("placed-course cards have an explicit lock action and planning sends only locked placements", () => {
@@ -317,8 +315,8 @@ test("desktop polish uses contrast-safe focus rings on light and dark surfaces",
   assert.match(html, /\.choice-btn:not\(\.secondary\):focus-visible,[\s\S]*?box-shadow:0 0 0 3px #7b0022;/);
 });
 
-test("only the active registration semester exposes the schedule builder", () => {
+test("semester schedule-builder buttons stay visible", () => {
   const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
-  assert.match(html, /renderSchedule=function\(\)\{[\s\S]*?button\.hidden=!enabled;button\.disabled=!enabled;/);
-  assert.match(html, /\.sem-plus\[hidden\]\{display:none;\}/);
+  assert.doesNotMatch(html, /button\.hidden=!enabled;button\.disabled=!enabled/);
+  assert.doesNotMatch(html, /\.sem-plus\[hidden\]\{display:none;\}/);
 });
