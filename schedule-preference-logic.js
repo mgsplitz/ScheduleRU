@@ -27,6 +27,12 @@
     const allowed = new Set(["kind", "strength", ...fields]);
     return Object.keys(raw).every((key) => allowed.has(key));
   };
+  const sameFields = (raw, normalized) => {
+    const rawKeys = Object.keys(raw).sort();
+    const normalizedKeys = Object.keys(normalized).sort();
+    return rawKeys.length === normalizedKeys.length
+      && rawKeys.every((key, index) => key === normalizedKeys[index] && raw[key] === normalized[key]);
+  };
 
   function normalizeConstraint(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw) || !KINDS.has(raw.kind)) return null;
@@ -94,10 +100,27 @@
     };
   }
 
+  function normalizePreferencePatch(raw = {}) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)
+      || !Object.keys(raw).every((key) => key === "constraints" || key === "replaceKinds")
+      || !Array.isArray(raw.constraints) || raw.constraints.length > 20) return null;
+    const replaceKinds = raw.replaceKinds === undefined ? [] : raw.replaceKinds;
+    if (!Array.isArray(replaceKinds) || replaceKinds.length > KINDS.size
+      || new Set(replaceKinds).size !== replaceKinds.length || !replaceKinds.every((kind) => KINDS.has(kind))) return null;
+    const constraints = raw.constraints.map(normalizeConstraint);
+    if (constraints.some((constraint, index) => !constraint || !sameFields(raw.constraints[index], constraint))) return null;
+    return { replaceKinds: [...replaceKinds], constraints };
+  }
+
   function mergePreferencePatch(current, patch = {}) {
     const baseline = normalizePreferenceSet(current);
-    const additions = normalizePreferenceSet({ version: 1, constraints: patch?.constraints }).constraints;
-    return { version: 1, constraints: [...baseline.constraints, ...additions] };
+    const normalizedPatch = normalizePreferencePatch(patch);
+    if (!normalizedPatch) return baseline;
+    const replacements = new Set(normalizedPatch.replaceKinds);
+    return {
+      version: 1,
+      constraints: [...baseline.constraints.filter((constraint) => !replacements.has(constraint.kind)), ...normalizedPatch.constraints],
+    };
   }
 
   function meetingsFor(schedule) {
@@ -213,5 +236,5 @@
     };
   }
 
-  root.ScheduleRUPreferenceLogic = { normalizePreferenceSet, mergePreferencePatch, scheduleMetrics, rankSchedules, recommendSchedules };
+  root.ScheduleRUPreferenceLogic = { normalizePreferenceSet, normalizePreferencePatch, mergePreferencePatch, scheduleMetrics, rankSchedules, recommendSchedules };
 })(globalThis);

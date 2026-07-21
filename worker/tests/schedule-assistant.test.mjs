@@ -39,6 +39,13 @@ function assertStrictRequiredPropertyParity(schema) {
 
 test("strict structured output requires every declared object property", () => {
   assertStrictRequiredPropertyParity(PREFERENCE_PATCH_SCHEMA);
+  const patchSchema = PREFERENCE_PATCH_SCHEMA.properties.preferencePatch;
+  assert.deepEqual(patchSchema.required, ["replaceKinds", "constraints"]);
+  assert.equal(patchSchema.properties.replaceKinds.uniqueItems, true);
+  assert.deepEqual(patchSchema.properties.replaceKinds.items.enum, [
+    "earliest_start", "latest_end", "avoid_day", "preferred_day", "light_day",
+    "time_window_exception", "compact_schedule", "maximum_gap", "campus", "modality", "open_sections",
+  ]);
 });
 
 test("rejects malformed assistant histories before calling OpenAI", async () => {
@@ -63,7 +70,7 @@ test("uses Luna structured output without sending transcript data", async () => 
   }), { OPENAI_API_KEY: "test" }, async (_url, init) => {
     upstreamBody = JSON.parse(init.body);
     return new Response(JSON.stringify({
-      output_text: JSON.stringify({ preferencePatch: { constraints: [] }, acknowledgement: "Got it." }),
+      output_text: JSON.stringify({ preferencePatch: { replaceKinds: [], constraints: [] }, acknowledgement: "Got it." }),
     }), { status: 200 });
   });
   assert.equal(upstreamBody.model, "gpt-5.6-luna");
@@ -71,7 +78,7 @@ test("uses Luna structured output without sending transcript data", async () => 
   assert.equal(upstreamBody.store, false);
   assert.equal(JSON.stringify(upstreamBody).includes("grade"), false);
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { preferencePatch: { constraints: [] }, acknowledgement: "Got it." });
+  assert.deepEqual(await response.json(), { preferencePatch: { replaceKinds: [], constraints: [] }, acknowledgement: "Got it." });
 });
 
 test("normalizes nullable strict-schema fields into a canonical preference patch", async () => {
@@ -79,6 +86,7 @@ test("normalizes nullable strict-schema fields into a canonical preference patch
     return new Response(JSON.stringify({
       output_text: JSON.stringify({
         preferencePatch: {
+          replaceKinds: ["time_window_exception"],
           constraints: [{
             kind: "time_window_exception", strength: "soft", day: null,
             startMinutes: 540, endMinutes: 720, minimumClasses: 1, maximumClasses: null,
@@ -89,6 +97,7 @@ test("normalizes nullable strict-schema fields into a canonical preference patch
     }), { status: 200 });
   });
   assert.equal(response.status, 200);
+  assert.deepEqual((await response.clone().json()).preferencePatch.replaceKinds, ["time_window_exception"]);
   assert.deepEqual((await response.json()).preferencePatch.constraints, [{
     kind: "time_window_exception", strength: "soft",
     startMinutes: 540, endMinutes: 720, minimumClasses: 1,
@@ -133,9 +142,63 @@ test("does not expose upstream failures or call a missing secret", async () => {
   });
   assert.equal(missingSecret.status, 503);
 
+  let upstreamCalls = 0;
   const upstreamFailure = await handleScheduleAssistantRequest(validRequest(), { OPENAI_API_KEY: "test" }, async () => {
+    upstreamCalls += 1;
     return new Response("sensitive upstream detail", { status: 429 });
   });
   assert.equal(upstreamFailure.status, 502);
+  assert.equal(upstreamCalls, 1);
   assert.doesNotMatch(await upstreamFailure.text(), /sensitive|test/i);
+});
+
+test("retries one invalid assistant output and returns a valid second output", async () => {
+  let calls = 0;
+  const outboundBodies = [];
+  const response = await handleScheduleAssistantRequest(validRequest(), { OPENAI_API_KEY: "test" }, async (_url, init) => {
+    calls += 1;
+    outboundBodies.push(init.body);
+    const output_text = calls === 1
+      ? "not-json"
+      : JSON.stringify({ preferencePatch: { replaceKinds: ["earliest_start"], constraints: [{ kind: "earliest_start", strength: "hard", minutes: 540 }] }, acknowledgement: "I will start no earlier than 9." });
+    return new Response(JSON.stringify({ output_text }), { status: 200 });
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(await response.json(), {
+    preferencePatch: { replaceKinds: ["earliest_start"], constraints: [{ kind: "earliest_start", strength: "hard", minutes: 540 }] },
+    acknowledgement: "I will start no earlier than 9.",
+  });
+  assert.deepEqual(outboundBodies[0], outboundBodies[1]);
+  outboundBodies.forEach((body) => {
+    assert.ok(new TextEncoder().encode(body).length <= 20 * 1024);
+    const parsed = JSON.parse(body);
+    assert.equal(parsed.store, false);
+    assert.deepEqual(parsed.reasoning, { effort: "low" });
+    assert.equal(JSON.stringify(parsed).includes("grade"), false);
+  });
+});
+
+test("returns a generic 502 after exactly two invalid assistant outputs", async () => {
+  let calls = 0;
+  const response = await handleScheduleAssistantRequest(validRequest(), { OPENAI_API_KEY: "test" }, async () => {
+    calls += 1;
+    return new Response(JSON.stringify({
+      output_text: JSON.stringify({ preferencePatch: { replaceKinds: ["earliestStart"], constraints: [] }, acknowledgement: "Nope." }),
+    }), { status: 200 });
+  });
+  assert.equal(calls, 2);
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "schedule assistant returned an invalid response" });
+});
+
+test("does not retry a valid assistant output", async () => {
+  let calls = 0;
+  const response = await handleScheduleAssistantRequest(validRequest(), { OPENAI_API_KEY: "test" }, async () => {
+    calls += 1;
+    return new Response(JSON.stringify({
+      output_text: JSON.stringify({ preferencePatch: { replaceKinds: [], constraints: [] }, acknowledgement: "Got it." }),
+    }), { status: 200 });
+  });
+  assert.equal(response.status, 200);
+  assert.equal(calls, 1);
 });
