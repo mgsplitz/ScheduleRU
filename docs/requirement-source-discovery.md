@@ -4,21 +4,26 @@
 
 Program-profile pages control the menu but are not assumed to contain degree
 requirements. The importer must discover and snapshot the official
-major-specific or minor-specific department page before attempting to create
-schedule rules.
+major-specific department page before attempting to create schedule rules.
+
+The first delivery is limited to SAS majors. Existing reviewed minor data stays
+in place, but no new minor discovery, parsing, or publication runs in this
+phase.
 
 ## Flow
 
-1. Import the official SAS directory and profile page as program identity.
-2. Extract profile links labelled for the selected program type (Major or
-   Minor), rejecting unrelated advising and career links.
+1. Select SAS catalog paths whose type is `major`; retain the official SAS
+   directory and profile page as program identity.
+2. Extract a profile link labelled for the major, rejecting unrelated advising
+   and career links.
 3. Store the discovered official HTTPS page as a requirement source and keep
    versioned source snapshots in D1.
 4. Convert only unambiguous, source-proven fixed courses or bounded selectors
    into draft requirement candidates. Keep ambiguous prose as source-backed
    advising text instead of guessing an audit rule.
 5. A reviewed-evidence gate remains the only path to a public automatic degree
-   audit. The UI can always link to the actual official source.
+   audit. The selector hides catalog-only and raw-source-only records; they are
+   published only after their structured requirement data is ready.
 
 ## Guardrails
 
@@ -26,5 +31,6 @@ schedule rules.
   seed SQL.
 - No profile recommendation is treated as a degree requirement.
 - Every generated candidate carries its source URL and content hash.
-- Failed, missing, or ambiguous sources remain selectable but are never shown
-  as completed requirements.
+- Failed, missing, or ambiguous sources remain stored for future work but are
+  hidden from the public selector.
+- Existing minor records and their reviewed audits are not modified.
