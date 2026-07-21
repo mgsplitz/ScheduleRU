@@ -33,6 +33,21 @@ test("AP equivalency migration keeps reviewed score-specific catalog rows in one
   assert.match(schema, /ap-csa5/);
 });
 
+test("AP migration runbook is dev-first, idempotent, and smoke-testable", async () => {
+  const [readme, schema] = await Promise.all([
+    readFile(new URL("../../README.md", import.meta.url), "utf8"),
+    readFile(new URL("../schema/schema_ap_equivalencies.sql", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(readme, /npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=schema\/schema_ap_equivalencies\.sql/);
+  assert.match(readme, /npx wrangler d1 execute rutgers_courses --remote --file=schema\/schema_ap_equivalencies\.sql/);
+  assert.match(readme, /approval-only/);
+  assert.match(readme, /before deploying the Worker or frontend/);
+  assert.match(readme, /Until this migration is applied, onboarding has no reviewed AP equivalency choices to offer/);
+  assert.match(readme, /curl --fail --silent --show-error "\$DEV_WORKER_URL\/api\/ap-equivalencies"/);
+  assert.match(schema, /ON CONFLICT\(id, catalog_year, campus\) DO UPDATE SET/);
+});
+
 test("configuration and AP routes use Worker configuration and reviewed D1 rows", async () => {
   const rows = [{ id: "ap-chem4", exam_name: "Chemistry", minimum_score: 4, maximum_score: 4 }];
   const db = database(rows);

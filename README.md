@@ -67,6 +67,30 @@ git diff --check
 
 Development and production are intentionally separate. Use the dev environment while testing so catalog writes and reviewed-requirement data go only to the dev Worker and dev D1 database:
 
+### Required: apply reviewed AP equivalencies first
+
+Apply the reviewed AP-equivalency migration to development before deploying the Worker or frontend. Until this migration is applied, onboarding has no reviewed AP equivalency choices to offer. Run this from `worker/` against the configured development database:
+
+```bash
+cd worker
+npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=schema/schema_ap_equivalencies.sql
+```
+
+The schema uses `CREATE TABLE IF NOT EXISTS` and an `ON CONFLICT ... DO UPDATE` upsert, so rerunning the command is idempotent and refreshes the reviewed rows.
+
+After the dev Worker is deployed, smoke-check the public route before deploying the frontend. Set the deployed dev Worker URL for your Cloudflare account, then confirm the response is JSON with a nonzero reviewed-equivalency count:
+
+```bash
+DEV_WORKER_URL="https://rutgers-course-sync-dev.<your-workers-subdomain>.workers.dev"
+curl --fail --silent --show-error "$DEV_WORKER_URL/api/ap-equivalencies" | jq '.equivalencies | length'
+```
+
+Production is approval-only. Do not run this command without explicit approval:
+
+```bash
+npx wrangler d1 execute rutgers_courses --remote --file=schema/schema_ap_equivalencies.sql
+```
+
 ```bash
 cd worker
 npx wrangler deploy --env dev --keep-vars
