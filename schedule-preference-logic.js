@@ -57,6 +57,7 @@
       const minimumClasses = raw.minimumClasses === undefined ? null : count(raw.minimumClasses);
       const maximumClasses = raw.maximumClasses === undefined ? null : count(raw.maximumClasses);
       if (startMinutes === null || endMinutes === null || startMinutes >= endMinutes
+        || (raw.minimumClasses === undefined && raw.maximumClasses === undefined)
         || (raw.day !== undefined && normalizedDay === null)
         || (raw.minimumClasses !== undefined && minimumClasses === null)
         || (raw.maximumClasses !== undefined && maximumClasses === null)
@@ -78,7 +79,7 @@
     }
     if (raw.kind === "open_sections") {
       if (!hasOnlyFields(raw, ["value"])) return null;
-      return typeof raw.value === "boolean" ? { ...base, value: raw.value } : null;
+      return raw.value === true ? { ...base, value: true } : null;
     }
     return null;
   }

@@ -149,6 +149,26 @@ test("normalization keeps only exact canonical version-1 fields and types", () =
   assert.deepEqual(plain(logic.normalizePreferenceSet({ version: "1", constraints: canonical.constraints }).constraints), []);
 });
 
+test("open-sections accepts only true and false patches do not clear an existing preference", () => {
+  const current = { version: 1, constraints: [{ kind: "open_sections", value: true, strength: "hard" }] };
+  const falseConstraint = { kind: "open_sections", value: false, strength: "hard" };
+  assert.deepEqual(plain(logic.normalizePreferenceSet({ version: 1, constraints: [falseConstraint] }).constraints), []);
+  assert.deepEqual(plain(logic.mergePreferencePatch(current, { constraints: [falseConstraint] }).constraints), current.constraints);
+});
+
+test("time-window exceptions require at least one class-count bound", () => {
+  const normalized = logic.normalizePreferenceSet({
+    version: 1,
+    constraints: [
+      { kind: "time_window_exception", day: "T", startMinutes: 480, endMinutes: 540, strength: "soft" },
+      { kind: "time_window_exception", startMinutes: 480, endMinutes: 540, maximumClasses: 1, strength: "soft" },
+    ],
+  });
+  assert.deepEqual(plain(normalized.constraints), [
+    { kind: "time_window_exception", strength: "soft", startMinutes: 480, endMinutes: 540, maximumClasses: 1 },
+  ]);
+});
+
 test("string availability is unknown and cannot satisfy a hard open-sections preference", () => {
   const schedules = [
     { stableIndex: 1, meetings: [{ day: "M", start: 540, end: 600, open: "false" }] },
