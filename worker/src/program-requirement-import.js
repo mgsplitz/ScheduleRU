@@ -87,6 +87,31 @@ export function discoverProfileRequirementPage(html, profileSource, programType)
   return null;
 }
 
+// Some department-owned major pages are overviews. Follow only a link whose
+// visible label explicitly identifies it as the major-requirements page; this
+// is a new draft source, never an automatic audit.
+export function discoverNestedMajorRequirementPage(html, source) {
+  if (!sourceIsValid(source)) return null;
+  const anchors = String(html || "").matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi);
+  for (const match of anchors) {
+    const href = attributeValue(match[1], "href");
+    const label = textFromHtml(match[2]).toLowerCase().replace(/\s+/g, " ").trim();
+    if (label !== "major requirements" && label !== "requirements for the major") continue;
+    try {
+      const sourceUrl = new URL(decodeHtml(href), source.source_url);
+      if (!isOfficialRutgersUrl(sourceUrl) || sourceUrl.href === source.source_url) continue;
+      return {
+        source_url: sourceUrl.href,
+        source_title: "Official detailed major requirements",
+        source_kind: "requirements_page",
+      };
+    } catch {
+      // Keep checking anchors when a page contains a malformed link.
+    }
+  }
+  return null;
+}
+
 // A compact deterministic content fingerprint is sufficient to skip an
 // unchanged source snapshot. It is not a security primitive.
 function contentHash(value) {
