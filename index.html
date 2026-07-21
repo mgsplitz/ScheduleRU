@@ -260,6 +260,7 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .ov{position:fixed;inset:0;background:rgba(20,15,10,.5);
   display:none;align-items:flex-start;justify-content:center;z-index:50;padding-top:5vh;}
 .ov.open{display:flex;}
+#programOv{z-index:65;}
 .modal{background:var(--card);border-radius:5px;width:640px;max-width:94vw;
   max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.3);}
 .mhdr{background:var(--scarlet);color:#fff;padding:12px 18px;
@@ -3368,7 +3369,7 @@ async function applyProgramDraft(){
 }
 const oldApply=document.getElementById("programApply"),newApply=oldApply.cloneNode(true);oldApply.replaceWith(newApply);newApply.addEventListener("click",applyProgramDraft);
 let programDialogFocusRestore=null;
-function setProgramDialogOpen(open){const root=document.getElementById("programOv"),dialog=root.querySelector("[role=dialog]");root.setAttribute("aria-hidden",String(!open));[document.getElementById("app"),document.getElementById("page-courses"),document.querySelector(".pagenav")].filter(Boolean).forEach(node=>{node.inert=open||!ST.onboarding?.completed;});if(open){programDialogFocusRestore=document.activeElement;requestAnimationFrame(()=>dialog.querySelector("input, select, button:not([disabled])")?.focus());}else{const restore=programDialogFocusRestore;programDialogFocusRestore=null;requestAnimationFrame(()=>{if(restore?.isConnected&&restore!==document.body)restore.focus();else(!ST.onboarding?.completed?document.getElementById("onboardingPrograms"):document.getElementById("programBtn"))?.focus();});}}
+function setProgramDialogOpen(open){const root=document.getElementById("programOv"),dialog=root.querySelector("[role=dialog]");root.setAttribute("aria-hidden",String(!open));[document.getElementById("app"),document.getElementById("page-courses"),document.querySelector(".pagenav")].filter(Boolean).forEach(node=>{node.inert=open||!ST.onboarding?.completed;});document.getElementById("onboarding").inert=open;if(open){programDialogFocusRestore=document.activeElement;requestAnimationFrame(()=>dialog.querySelector("input, select, button:not([disabled])")?.focus());}else{const restore=programDialogFocusRestore;programDialogFocusRestore=null;requestAnimationFrame(()=>{if(restore?.isConnected&&restore!==document.body)restore.focus();else(!ST.onboarding?.completed?document.getElementById("onboardingPrograms"):document.getElementById("programBtn"))?.focus();});}}
 const legacyOpenProgramPicker=openProgramPicker,legacyCloseProgramPicker=closeProgramPicker,legacyRenderProgramPickerList=renderProgramPickerList;
 openProgramPicker=function(){ST.programDraftPrimaryId=ST.primaryProgramId;legacyOpenProgramPicker();setProgramDialogOpen(true);};
 closeProgramPicker=function(){legacyCloseProgramPicker();setProgramDialogOpen(false);};
@@ -3429,7 +3430,7 @@ normalizedPlannerInputs=function(){
   [...program.courses,...core.courses,...Object.values(ST.schedule||{}).map(entry=>entry.course||entry)].forEach(addCourse);
   [...byCode.values()].forEach(course=>(course.prereqs||[]).forEach(id=>addCourse(allCoursesById.get(id))));
   const courses=[...byCode.values()].map(course=>({code:course.code,title:course.fullTitle||course.title||course.code,credits:course.credits||0})),idToCode=new Map([...allCoursesById.entries()].map(([id,course])=>[id,course?.code])),lockedPlacements=Object.fromEntries(Object.values(ST.schedule||{}).filter(entry=>termKeys.has(`${entry.year}:${entry.sem}`)).map(entry=>[entry.code,{...entry,locked:true}]));
-  return {terms,courses,completedCourseCodes:[...plannerKnownCourseCodes()],lockedPlacements,prerequisitePathsByCode:Object.fromEntries(courses.map(course=>[course.code,[(byCode.get(course.code)?.prereqs||[]).map(id=>idToCode.get(id)).filter(Boolean)]])),unresolvedRequirements:[...program.placeholders,...core.placeholders],core};
+  return {terms,courses,completedCourseCodes:completedAcademicCodes(),lockedPlacements,prerequisitePathsByCode:Object.fromEntries(courses.map(course=>[course.code,[(byCode.get(course.code)?.prereqs||[]).map(id=>idToCode.get(id)).filter(Boolean)]])),unresolvedRequirements:[...program.placeholders,...core.placeholders],core};
 };
 const checkedGeneratePlanButton=document.getElementById("generatePlanBtn"),coreAwareGeneratePlanButton=checkedGeneratePlanButton.cloneNode(true);checkedGeneratePlanButton.replaceWith(coreAwareGeneratePlanButton);coreAwareGeneratePlanButton.addEventListener("click",async()=>{if(!ST.coreRequirementTree&&!ST.coreLoading)await loadCoreCurriculum();const core=corePlannerStatus();modalController.show({title:core.incomplete?"Core choices are incomplete":"Generate a plan preview",body:core.incomplete?"<p>Accuracy improves when Core choices are completed. Courses already placed will stay where you put them, and unresolved Core areas will appear as typed placeholders.</p>":"<p>Courses already placed will stay where you put them. This creates a preview; your accepted plan changes only after you choose Use this plan.</p>",actions:[{label:"Go back",secondary:true},{label:core.incomplete?"I understand":"Generate preview",onClick:generateFourYearPlan}]});});
 
