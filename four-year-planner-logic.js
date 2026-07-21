@@ -31,6 +31,11 @@
     return String(value || "").trim();
   }
 
+  function normalizeTargetCredits(value) {
+    if (!Number.isFinite(value)) return DEFAULT_TARGET;
+    return Math.max(14, Math.min(DEFAULT_TARGET, value));
+  }
+
   function normalizePlannerInput(input = {}) {
     const termsByKey = new Map();
     (Array.isArray(input.terms) ? input.terms : []).forEach((term) => {
@@ -102,7 +107,7 @@
 
     const suppliedMaximum = nonNegativeNumber(input.maxCredits, DEFAULT_MAX);
     const maxCredits = Math.min(suppliedMaximum, DEFAULT_MAX);
-    const targetCredits = Math.min(nonNegativeNumber(input.targetCredits, DEFAULT_TARGET), maxCredits);
+    const targetCredits = normalizeTargetCredits(input.targetCredits);
     return { terms, courses, completedCourseCodes, lockedPlacements, prerequisitePathsByCode, unresolvedRequirements, targetCredits, maxCredits };
   }
 
@@ -214,16 +219,6 @@
       }
     });
 
-    Object.keys(schedule).sort().forEach((code) => {
-      const paths = prerequisitePathsFor(normalized, code);
-      if (paths.length && !paths.some((path) => {
-        const prerequisiteOrdinal = pathPlacementOrdinal(path, normalized.completedCourseCodes, schedule);
-        return prerequisiteOrdinal !== null && prerequisiteOrdinal < schedule[code].ordinal;
-      })) {
-        issues.push(issue("locked_prerequisite_violation", "error", { courseCode: code }));
-      }
-    });
-
     const pending = new Map(normalized.courses
       .filter((course) => !normalized.completedCourseCodes.has(course.code) && !schedule[course.code])
       .map((course) => [course.code, course]));
@@ -241,10 +236,11 @@
             .filter((term) => term.ordinal > prerequisiteOrdinal && termCredits[termKey(term)] + course.credits <= normalized.maxCredits)
             .map((term) => ({ term, prerequisiteOrdinal }));
         });
-        choices.sort((left, right) => left.term.ordinal - right.term.ordinal
-          || termCredits[termKey(left.term)] - termCredits[termKey(right.term)]
-          || code.localeCompare(code));
-        const choice = choices[0];
+        const targetChoices = choices.filter(({ term }) => termCredits[termKey(term)] + course.credits <= normalized.targetCredits);
+        const preferredChoices = targetChoices.length ? targetChoices : choices;
+        preferredChoices.sort((left, right) => left.term.ordinal - right.term.ordinal
+          || termCredits[termKey(left.term)] - termCredits[termKey(right.term)]);
+        const choice = preferredChoices[0];
         if (!choice) return;
         const term = choice.term;
         schedule[code] = { code, credits: course.credits, year: term.year, sem: term.sem, ordinal: term.ordinal, locked: false };
@@ -254,6 +250,16 @@
       });
     }
 
+    Object.keys(normalized.lockedPlacements).filter((code) => schedule[code]?.locked).sort().forEach((code) => {
+      const paths = prerequisitePathsFor(normalized, code);
+      if (paths.length && !paths.some((path) => {
+        const prerequisiteOrdinal = pathPlacementOrdinal(path, normalized.completedCourseCodes, schedule);
+        return prerequisiteOrdinal !== null && prerequisiteOrdinal < schedule[code].ordinal;
+      })) {
+        issues.push(issue("locked_prerequisite_violation", "error", { courseCode: code }));
+      }
+    });
+
     const unplacedCourses = [...pending.keys()].sort();
     const cyclic = cyclicCourseCodes(unplacedCourses, normalized);
     if (cyclic.length) issues.push(issue("cyclic_prerequisite", "error", { courseCodes: cyclic }));
@@ -262,10 +268,13 @@
     const placeholders = [];
     const unplacedRequirements = [];
     normalized.unresolvedRequirements.forEach((requirement) => {
-      const candidates = normalized.terms
+      const eligibleTerms = normalized.terms
         .filter((term) => termCredits[termKey(term)] + requirement.credits <= normalized.maxCredits)
-        .sort((left, right) => termCredits[termKey(left)] - termCredits[termKey(right)]
-          || left.ordinal - right.ordinal || termKey(left).localeCompare(termKey(right)));
+      const targetTerms = eligibleTerms.filter((term) => termCredits[termKey(term)] + requirement.credits <= normalized.targetCredits);
+      const candidates = (targetTerms.length ? targetTerms : eligibleTerms)
+        .sort((left, right) => left.ordinal - right.ordinal
+          || termCredits[termKey(left)] - termCredits[termKey(right)]
+          || termKey(left).localeCompare(termKey(right)));
       const term = candidates[0];
       if (!term) {
         unplacedRequirements.push(requirement.id || requirement.label);

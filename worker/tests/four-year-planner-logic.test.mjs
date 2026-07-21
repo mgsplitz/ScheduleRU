@@ -36,6 +36,20 @@ test("keeps locked placements and schedules prerequisites earlier", () => {
   assert.equal(result.schedule["01:198:112"].sem, "spring");
   assert.equal(result.schedule["01:198:111"].sem, "fall");
   assert.equal(result.schedule["01:198:112"].locked, true);
+  assert.equal(result.status, "complete");
+  assert.equal(result.issues.some((issue) => issue.code === "locked_prerequisite_violation"), false);
+});
+
+test("reports a locked prerequisite violation after generation when no earlier path exists", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    courses: [{ code: "01:198:112", credits: 4 }],
+    lockedPlacements: { "01:198:112": { year: 1, sem: "spring", locked: true } },
+    prerequisitePathsByCode: { "01:198:112": [["01:198:111"]] },
+  });
+
+  assert.equal(result.status, "partial");
+  assert.ok(result.issues.some((issue) => issue.code === "locked_prerequisite_violation"));
 });
 
 test("uses a typed placeholder instead of inventing an unresolved Core course", () => {
@@ -56,8 +70,50 @@ test("returns a partial plan instead of exceeding the hard credit cap", () => {
     maxCredits: 18,
   });
   assert.equal(result.status, "partial");
-  assert.ok(result.termCredits["1:fall"] <= 18);
+  assert.equal(result.termCredits["1:fall"], 18);
   assert.ok(result.issues.some((issue) => issue.code === "courses_unplaced"));
+});
+
+test("normalizes finite target credits into the agreed 14 to 16 range", () => {
+  assert.equal(planner().normalizePlannerInput({ targetCredits: 3 }).targetCredits, 14);
+  assert.equal(planner().normalizePlannerInput({ targetCredits: 15 }).targetCredits, 15);
+  assert.equal(planner().normalizePlannerInput({ targetCredits: 30 }).targetCredits, 16);
+});
+
+test("defaults invalid or missing target credits to 16", () => {
+  assert.equal(planner().normalizePlannerInput({}).targetCredits, 16);
+  assert.equal(planner().normalizePlannerInput({ targetCredits: null }).targetCredits, 16);
+  assert.equal(planner().normalizePlannerInput({ targetCredits: "15" }).targetCredits, 16);
+  assert.equal(planner().normalizePlannerInput({ targetCredits: "invalid" }).targetCredits, 16);
+  assert.equal(planner().normalizePlannerInput({ targetCredits: Infinity }).targetCredits, 16);
+});
+
+test("moves flexible work to the earliest target-respecting term before using 18 credits", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    courses: Array.from({ length: 6 }, (_, index) => ({ code: `01:198:${100 + index}`, credits: 3 })),
+    targetCredits: 16,
+    maxCredits: 18,
+  });
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.termCredits["1:fall"], 15);
+  assert.equal(result.termCredits["1:spring"], 3);
+  assert.equal(result.schedule["01:198:105"].sem, "spring");
+});
+
+test("places placeholders in the earliest term that remains within target credits", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    courses: Array.from({ length: 4 }, (_, index) => ({ code: `01:198:${100 + index}`, credits: 3 })),
+    unresolvedRequirements: [{ id: "core", label: "Core choice", credits: 3, sourceType: "core" }],
+    targetCredits: 16,
+    maxCredits: 18,
+  });
+
+  assert.equal(result.placeholders[0].sem, "fall");
+  assert.equal(result.termCredits["1:fall"], 15);
+  assert.equal(result.termCredits["1:spring"], 0);
 });
 
 test("chooses a complete reviewed prerequisite path deterministically", () => {
