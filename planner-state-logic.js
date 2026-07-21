@@ -7,6 +7,9 @@
   function normalizeAcademicRecord(record = {}) {
     const type = ["ap", "rutgers_completed", "transfer"].includes(record.type) ? record.type : "transfer";
     const score = type === "ap" ? Number(record.score) : null;
+    const equivalencyReviewStatus = record.equivalencyReviewStatus === "reviewed" ? "reviewed" : "";
+    const equivalentCourseCodes = Array.isArray(record.equivalentCourseCodes) ? [...new Set(record.equivalentCourseCodes.filter((code) => COURSE_CODE.test(code)))] : [];
+    const reviewedAppliedAp = type === "ap" && record.creditStatus === "applied" && equivalencyReviewStatus === "reviewed" && equivalentCourseCodes.length > 0;
     return {
       id: String(record.id || `${type}:${Date.now()}`),
       type,
@@ -17,8 +20,9 @@
       credits: Math.max(0, Number(record.credits) || 0),
       grade: String(record.grade || "").trim(),
       completedTerm: String(record.completedTerm || "").trim(),
-      creditStatus: type === "ap" ? (score >= 4 ? "review_required" : "not_applied") : "applied",
-      equivalentCourseCodes: Array.isArray(record.equivalentCourseCodes) ? [...new Set(record.equivalentCourseCodes.filter((code) => COURSE_CODE.test(code)))] : [],
+      creditStatus: type === "ap" ? (score >= 4 ? (reviewedAppliedAp ? "applied" : "review_required") : "not_applied") : "applied",
+      equivalencyReviewStatus,
+      equivalentCourseCodes,
     };
   }
 
@@ -27,7 +31,7 @@
     state.version = STATE_VERSION;
     state.onboarding ||= { completed: false, step: 0 };
     state.academicPosition ||= { year: 1, startingSemester: "fall" };
-    state.academicRecords = (state.academicRecords || []).map(normalizeAcademicRecord);
+    state.academicRecords = (Array.isArray(state.academicRecords) ? state.academicRecords : []).map(normalizeAcademicRecord);
     state.primaryProgramId ??= state.selectedProgramIds?.[0] ?? null;
     state.secondaryProgramId ??= state.selectedProgramIds?.[1] ?? null;
     state.schedule ||= {};
@@ -41,7 +45,7 @@
   function academicCreditEntries(state) {
     return (state?.academicRecords || []).filter((record) => record.creditStatus === "applied").map((record) => ({
       id: record.id,
-      source: record.type === "transfer" ? "transfer" : "rutgers_completed",
+      source: record.type,
       credits: record.credits,
       course_code: record.courseCode,
       equivalent_course_codes: record.equivalentCourseCodes,

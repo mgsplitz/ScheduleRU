@@ -42,6 +42,50 @@ test("records AP 4 and 5 as reviewed-credit candidates and lower scores as unapp
   assert.equal(plannerLogic().normalizeAcademicRecord({ type: "ap", exam: "Calculus AB", score: 3 }).creditStatus, "not_applied");
 });
 
+test("preserves applied AP credit only for a reviewed valid equivalency", () => {
+  const state = plannerLogic().migratePlannerState({
+    academicRecords: [
+      {
+        id: "ap:calc-ab",
+        type: "ap",
+        exam: "Calculus AB",
+        score: 4,
+        credits: 4,
+        creditStatus: "applied",
+        equivalencyReviewStatus: "reviewed",
+        equivalentCourseCodes: ["01:640:151", "invalid"],
+      },
+      {
+        id: "ap:no-equivalency",
+        type: "ap",
+        exam: "Unmatched Exam",
+        score: 5,
+        creditStatus: "applied",
+        equivalencyReviewStatus: "reviewed",
+        equivalentCourseCodes: ["invalid"],
+      },
+    ],
+  });
+
+  assert.equal(state.academicRecords[0].creditStatus, "applied");
+  assert.equal(state.academicRecords[1].creditStatus, "review_required");
+  assert.deepEqual(plain(plannerLogic().academicCreditEntries(state)), [{
+    id: "ap:calc-ab",
+    source: "ap",
+    credits: 4,
+    course_code: "",
+    equivalent_course_codes: ["01:640:151"],
+  }]);
+});
+
+test("defaults malformed academic records to an empty array", () => {
+  let state;
+  assert.doesNotThrow(() => {
+    state = plannerLogic().migratePlannerState({ academicRecords: { malformed: true } });
+  });
+  assert.deepEqual(plain(state.academicRecords), []);
+});
+
 test("accepting a preview replaces only the plan and clears the preview", () => {
   const state = plannerLogic().migratePlannerState({ version: 3, wishlist: { x: true } });
   const preview = { schedule: { a: { code: "a" } } };
