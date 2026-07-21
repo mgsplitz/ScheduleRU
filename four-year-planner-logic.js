@@ -5,6 +5,7 @@
 (function exposeFourYearPlanner(root) {
   const DEFAULT_TARGET = 16;
   const DEFAULT_MAX = 18;
+  const DEFAULT_MAX_COURSES = 6;
 
   function termOrdinal(term) {
     const year = Number(term?.year);
@@ -25,6 +26,21 @@
   function nonNegativeNumber(value, fallback) {
     const number = Number(value);
     return Number.isFinite(number) && number >= 0 ? number : fallback;
+  }
+
+  function positiveNumber(value, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? number : fallback;
+  }
+
+  function normalizedPaths(rawPaths) {
+    if (!Array.isArray(rawPaths)) return [];
+    const unique = new Map();
+    rawPaths.filter(Array.isArray).forEach((path) => {
+      const normalized = [...new Set(path.map(courseCode).filter(Boolean))].sort();
+      if (normalized.length) unique.set(normalized.join("\u0000"), normalized);
+    });
+    return [...unique.values()].sort((left, right) => left.join("\u0000").localeCompare(right.join("\u0000")));
   }
 
   function stableText(value) {
@@ -49,11 +65,19 @@
     const courseCandidates = (Array.isArray(input.courses) ? input.courses : [])
       .map((course) => ({
         code: courseCode(course?.code),
-        credits: nonNegativeNumber(course?.credits, 0),
+        credits: positiveNumber(course?.credits, 3),
         title: stableText(course?.title),
+        creditsEstimated: course?.creditsEstimated === true || !(Number(course?.credits) > 0),
+        optional: course?.optional === true,
+        prerequisiteOnly: course?.prerequisiteOnly === true,
+        minimumPlanYear: Number.isInteger(Number(course?.minimumPlanYear)) ? Math.max(1, Number(course.minimumPlanYear)) : null,
+        minimumPriorCredits: Number.isFinite(Number(course?.minimumPriorCredits)) ? Math.max(0, Number(course.minimumPriorCredits)) : null,
+        corequisitePaths: normalizedPaths(course?.corequisitePaths),
+        ruleCoverage: stableText(course?.ruleCoverage) || "unresolved",
       }))
       .filter((course) => course.code)
-      .sort((left, right) => left.code.localeCompare(right.code) || left.credits - right.credits || left.title.localeCompare(right.title));
+      .sort((left, right) => Number(left.optional) - Number(right.optional)
+        || left.code.localeCompare(right.code) || left.credits - right.credits || left.title.localeCompare(right.title));
     const coursesByCode = new Map();
     courseCandidates.forEach((course) => {
       if (!coursesByCode.has(course.code)) coursesByCode.set(course.code, course);
@@ -66,14 +90,7 @@
 
     const prerequisitePathsByCode = {};
     Object.keys(input.prerequisitePathsByCode || {}).map(courseCode).filter(Boolean).sort().forEach((code) => {
-      const rawPaths = input.prerequisitePathsByCode[code];
-      if (!Array.isArray(rawPaths)) return;
-      const unique = new Map();
-      rawPaths.filter(Array.isArray).forEach((path) => {
-        const normalized = [...new Set(path.map(courseCode).filter(Boolean))].sort();
-        unique.set(normalized.join("\u0000"), normalized);
-      });
-      prerequisitePathsByCode[code] = [...unique.values()].sort((left, right) => left.join("\u0000").localeCompare(right.join("\u0000")));
+      prerequisitePathsByCode[code] = normalizedPaths(input.prerequisitePathsByCode[code]);
     });
 
     const lockedPlacements = {};
@@ -85,7 +102,7 @@
         year: Number(placement?.year),
         sem: String(placement?.sem || "").toLowerCase(),
         ordinal,
-        credits: nonNegativeNumber(coursesByCode.get(code)?.credits ?? placement?.credits, 0),
+        credits: positiveNumber(coursesByCode.get(code)?.credits ?? placement?.credits, 3),
       };
     });
 
@@ -108,7 +125,10 @@
     const suppliedMaximum = nonNegativeNumber(input.maxCredits, DEFAULT_MAX);
     const maxCredits = Math.min(suppliedMaximum, DEFAULT_MAX);
     const targetCredits = normalizeTargetCredits(input.targetCredits);
-    return { terms, courses, completedCourseCodes, lockedPlacements, prerequisitePathsByCode, unresolvedRequirements, targetCredits, maxCredits };
+    const maxCoursesPerTerm = Math.max(1, Math.min(DEFAULT_MAX_COURSES, Math.floor(positiveNumber(input.maxCoursesPerTerm, DEFAULT_MAX_COURSES))));
+    const confirmedCredits = nonNegativeNumber(input.confirmedCredits, 0);
+    const inputIssues = (Array.isArray(input.issues) ? input.issues : []).map((entry) => ({ ...entry }));
+    return { terms, courses, coursesByCode, completedCourseCodes, lockedPlacements, prerequisitePathsByCode, unresolvedRequirements, targetCredits, maxCredits, maxCoursesPerTerm, confirmedCredits, inputIssues };
   }
 
   function createPlaceholder(requirement = {}, ordinal) {
@@ -150,6 +170,31 @@
     return latest;
   }
 
+  function courseCountForOrdinal(schedule, ordinal) {
+    return Object.values(schedule).filter((placement) => placement?.ordinal === ordinal).length;
+  }
+
+  function plannedCreditsBefore(schedule, ordinal) {
+    return Object.values(schedule).reduce((total, placement) => (
+      placement?.ordinal < ordinal ? total + positiveNumber(placement.credits, 0) : total
+    ), 0);
+  }
+
+  function corequisiteSatisfied(course, completedCourseCodes, schedule, ordinal) {
+    if (!course.corequisitePaths.length) return true;
+    return course.corequisitePaths.some((path) => path.every((code) => (
+      completedCourseCodes.has(code) || (schedule[code] && schedule[code].ordinal <= ordinal)
+    )));
+  }
+
+  function courseAllowedInTerm(normalized, course, term, schedule) {
+    if (courseCountForOrdinal(schedule, term.ordinal) >= normalized.maxCoursesPerTerm) return false;
+    if (course.minimumPlanYear !== null && term.year < course.minimumPlanYear) return false;
+    if (course.minimumPriorCredits !== null
+      && normalized.confirmedCredits + plannedCreditsBefore(schedule, term.ordinal) < course.minimumPriorCredits) return false;
+    return corequisiteSatisfied(course, normalized.completedCourseCodes, schedule, term.ordinal);
+  }
+
   function placeLockedPrerequisiteClosures(normalized, schedule, termCredits, pending) {
     const MAX_SEARCH_STATES = 4096;
     const MAX_BRANCH_STATES = 256;
@@ -165,7 +210,8 @@
 
     function candidateTerms(state, course, deadline) {
       const eligible = normalized.terms.filter((term) => term.ordinal < deadline
-        && state.termCredits[termKey(term)] + course.credits <= normalized.maxCredits);
+        && state.termCredits[termKey(term)] + course.credits <= normalized.maxCredits
+        && courseAllowedInTerm(normalized, course, term, state.schedule));
       const target = eligible.filter((term) => state.termCredits[termKey(term)] + course.credits <= normalized.targetCredits);
       const overflow = eligible.filter((term) => !target.includes(term));
       const compare = (left, right) => left.ordinal - right.ordinal
@@ -304,8 +350,14 @@
     const normalized = normalizePlannerInput(input);
     const schedule = {};
     const termCredits = Object.fromEntries(normalized.terms.map((term) => [termKey(term), 0]));
-    const issues = [];
+    const issues = [...normalized.inputIssues];
     const termsByKey = new Map(normalized.terms.map((term) => [termKey(term), term]));
+
+    normalized.courses.filter((course) => course.ruleCoverage === "unresolved").forEach((course) => {
+      if (!issues.some((entry) => entry.code === "eligibility_rule_unresolved" && entry.courseCode === course.code)) {
+        issues.push(issue("eligibility_rule_unresolved", "warning", { courseCode: course.code }));
+      }
+    });
 
     Object.keys(normalized.lockedPlacements).sort().forEach((code) => {
       const locked = normalized.lockedPlacements[code];
@@ -314,13 +366,17 @@
         issues.push(issue("invalid_locked_placement", "error", { courseCode: code }));
         return;
       }
-      schedule[code] = { code, credits: locked.credits, year: term.year, sem: term.sem, ordinal: term.ordinal, locked: true };
+      const course = normalized.coursesByCode.get(code) || {};
+      schedule[code] = { ...course, code, credits: locked.credits, year: term.year, sem: term.sem, ordinal: term.ordinal, locked: true, userPinned: true };
       termCredits[termKey(term)] += locked.credits;
     });
 
     normalized.terms.forEach((term) => {
       if (termCredits[termKey(term)] > normalized.maxCredits) {
         issues.push(issue("locked_credit_cap_exceeded", "error", { term: termKey(term), maxCredits: normalized.maxCredits }));
+      }
+      if (courseCountForOrdinal(schedule, term.ordinal) > normalized.maxCoursesPerTerm) {
+        issues.push(issue("locked_course_cap_exceeded", "error", { term: termKey(term), maxCourses: normalized.maxCoursesPerTerm }));
       }
     });
 
@@ -341,24 +397,29 @@
             if (prerequisiteOrdinal === null) return [];
             return normalized.terms
               .filter((term) => term.ordinal > prerequisiteOrdinal
-                && termCredits[termKey(term)] + course.credits <= normalized.maxCredits)
+                && termCredits[termKey(term)] + course.credits <= normalized.maxCredits
+                && courseAllowedInTerm(normalized, course, term, schedule))
               .map((term) => ({ term, prerequisiteOrdinal }));
           });
           const targetChoices = choices.filter(({ term }) => termCredits[termKey(term)] + course.credits <= normalized.targetCredits);
           const preferredChoices = targetChoices.length ? targetChoices : choices;
-          preferredChoices.sort((left, right) => left.term.ordinal - right.term.ordinal
-            || termCredits[termKey(left.term)] - termCredits[termKey(right.term)]);
+          preferredChoices.sort((left, right) => termCredits[termKey(left.term)] - termCredits[termKey(right.term)]
+            || courseCountForOrdinal(schedule, left.term.ordinal) - courseCountForOrdinal(schedule, right.term.ordinal)
+            || left.term.ordinal - right.term.ordinal);
           const choice = preferredChoices[0];
           if (!choice) return;
           const term = choice.term;
-          schedule[code] = { code, credits: course.credits, year: term.year, sem: term.sem, ordinal: term.ordinal, locked: false };
+          schedule[code] = { ...course, code, credits: course.credits, year: term.year, sem: term.sem, ordinal: term.ordinal, locked: false, userPinned: false };
           termCredits[termKey(term)] += course.credits;
           pending.delete(code);
           placedInPass = true;
         });
       }
     }
-    placePendingCourses([...pending.keys()].sort());
+    const requiredCodes = [...pending.values()].filter((course) => !course.optional).map((course) => course.code).sort();
+    const optionalCodes = [...pending.values()].filter((course) => course.optional).map((course) => course.code).sort();
+    placePendingCourses(requiredCodes);
+    placePendingCourses(optionalCodes);
 
     Object.keys(normalized.lockedPlacements).filter((code) => schedule[code]?.locked).sort().forEach((code) => {
       const paths = prerequisitePathsFor(normalized, code);
@@ -370,20 +431,24 @@
       }
     });
 
-    const unplacedCourses = [...pending.keys()].sort();
+    const unplacedCourses = [...pending.values()].filter((course) => !course.optional).map((course) => course.code).sort();
+    const unplacedOptionalCourses = [...pending.values()].filter((course) => course.optional).map((course) => course.code).sort();
     const cyclic = cyclicCourseCodes(unplacedCourses, normalized);
     if (cyclic.length) issues.push(issue("cyclic_prerequisite", "error", { courseCodes: cyclic }));
     if (unplacedCourses.length) issues.push(issue("courses_unplaced", "error", { courseCodes: unplacedCourses }));
+    if (unplacedOptionalCourses.length) issues.push(issue("optional_courses_unplaced", "warning", { courseCodes: unplacedOptionalCourses }));
 
     const placeholders = [];
     const unplacedRequirements = [];
     normalized.unresolvedRequirements.forEach((requirement) => {
       const eligibleTerms = normalized.terms
-        .filter((term) => termCredits[termKey(term)] + requirement.credits <= normalized.maxCredits)
+        .filter((term) => termCredits[termKey(term)] + requirement.credits <= normalized.maxCredits
+          && courseCountForOrdinal(schedule, term.ordinal) + placeholders.filter((entry) => entry.termOrdinal === term.ordinal).length < normalized.maxCoursesPerTerm)
       const targetTerms = eligibleTerms.filter((term) => termCredits[termKey(term)] + requirement.credits <= normalized.targetCredits);
       const candidates = (targetTerms.length ? targetTerms : eligibleTerms)
-        .sort((left, right) => left.ordinal - right.ordinal
-          || termCredits[termKey(left)] - termCredits[termKey(right)]
+        .sort((left, right) => termCredits[termKey(left)] - termCredits[termKey(right)]
+          || courseCountForOrdinal(schedule, left.ordinal) - courseCountForOrdinal(schedule, right.ordinal)
+          || left.ordinal - right.ordinal
           || termKey(left).localeCompare(termKey(right)));
       const term = candidates[0];
       if (!term) {
@@ -409,8 +474,9 @@
       placeholders,
       issues,
       assumptions: [
-        "Only supplied reviewed prerequisite paths are used for automatic placement.",
+        "Reviewed and safely parsed prerequisite paths are enforced; unresolved eligibility remains visible as a warning.",
         `Automatic planning uses a ${normalized.maxCredits}-credit hard cap per term.`,
+        `Automatic planning uses a ${normalized.maxCoursesPerTerm}-course hard cap per term.`,
         `Automatic planning targets ${normalized.targetCredits} credits per term.`,
       ],
       termCredits,

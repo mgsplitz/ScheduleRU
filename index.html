@@ -591,6 +591,7 @@ button,input,select,textarea{font:inherit;}
 <script src="requirement-group-logic.js"></script>
 <script src="course-selector-logic.js"></script>
 <script src="eligibility-logic.js"></script>
+<script src="planner-input-logic.js"></script>
 <script src="planner-state-logic.js"></script>
 <script src="four-year-planner-logic.js"></script>
 <script src="schedule-preference-logic.js"></script>
@@ -3513,13 +3514,18 @@ function plannerLeafGroups(tree){return Object.values(tree?.groups||{}).filter(g
 function plannerRequirementInputs(tree,{sourceType,sourceProgram=""}={}){const known=plannerKnownCourseCodes(),selectedByGroup=ST.groupSelections||{},coursesByCode=new Map(),placeholders=[];for(const group of plannerLeafGroups(tree)){const members=group.members||[],selected=members.filter(id=>selectedByGroup[group.id]?.includes(id)||known.has(tree.courses?.[id]?.code)),required=group.rule==="all"?members.length:Math.max(1,Number(group.count)||1),concrete=sourceType==="core"?selected:(group.rule==="all"?members:selected);concrete.forEach(id=>{const course=tree.courses?.[id];if(course?.code&&!known.has(course.code))coursesByCode.set(course.code,course);});if(selected.length<required&&(sourceType==="core"||group.rule!=="all"))placeholders.push({id:group.id,label:groupDisplayName(group),credits:3,sourceType:sourceType||"program",sourceProgram,requirementGroupId:group.id,candidateSelectionContext:{rule:group.rule,required}});}return {courses:[...coursesByCode.values()],placeholders};}
 function corePlannerStatus(){const inputs=plannerRequirementInputs(ST.coreRequirementTree,{sourceType:"core",sourceProgram:ST.activeCoreCurriculum?.id||"core"});return {...inputs,incomplete:inputs.placeholders.length>0};}
 normalizedPlannerInputs=function(){
-  const program=plannerRequirementInputs(ST.majorRequirementTree,{sourceType:"program",sourceProgram:ST.primaryProgramId||""}),core=corePlannerStatus(),terms=plannerTermsFromAcademicPosition(),allCoursesById=new Map(),byCode=new Map();
-  [ST.majorRequirementTree,ST.coreRequirementTree].forEach(tree=>Object.entries(tree?.courses||{}).forEach(([id,course])=>allCoursesById.set(id,course)));
-  const addCourse=course=>{if(course?.code)byCode.set(course.code,course);};
-  [...program.courses,...core.courses,...Object.values(ST.schedule||{}).map(entry=>entry.course||entry)].forEach(addCourse);
-  [...byCode.values()].forEach(course=>(course.prereqs||[]).forEach(id=>addCourse(allCoursesById.get(id))));
-  const courses=[...byCode.values()].map(course=>({code:course.code,title:course.fullTitle||course.title||course.code,credits:course.credits||0})),idToCode=new Map([...allCoursesById.entries()].map(([id,course])=>[id,course?.code])),lockedPlacements=ScheduleRUPlannerStateLogic.lockedPlacementsForTerms(ST.schedule,terms);
-  return {terms,courses,completedCourseCodes:completedAcademicCodes(),lockedPlacements,prerequisitePathsByCode:Object.fromEntries(courses.map(course=>[course.code,[(byCode.get(course.code)?.prereqs||[]).map(id=>idToCode.get(id)).filter(Boolean)]])),unresolvedRequirements:[...program.placeholders,...core.placeholders],core};
+  const terms=plannerTermsFromAcademicPosition(),core=corePlannerStatus();
+  const input=ScheduleRUPlannerInput.buildPlannerInput({
+    terms,
+    requirementTrees:ST.majorRequirementTree?[{id:"selected-programs",tree:ST.majorRequirementTree}]:[],
+    coreTree:ST.coreRequirementTree,
+    groupSelections:ST.groupSelections||{},
+    schedule:ST.schedule||{},
+    wishlistCourses:wishlistRecords(),
+    completedCourseCodes:completedAcademicCodes(),
+    confirmedCredits:confirmedAcademicCreditEntries().reduce((total,entry)=>total+(Number(entry.credits)||0),0),
+  });
+  return {...input,core};
 };
 const checkedGeneratePlanButton=document.getElementById("generatePlanBtn"),coreAwareGeneratePlanButton=checkedGeneratePlanButton.cloneNode(true);checkedGeneratePlanButton.replaceWith(coreAwareGeneratePlanButton);coreAwareGeneratePlanButton.addEventListener("click",async()=>{if(!ST.coreRequirementTree&&!ST.coreLoading)await loadCoreCurriculum();const core=corePlannerStatus();modalController.show({title:core.incomplete?"Core choices are incomplete":"Generate a plan preview",body:core.incomplete?"<p>Accuracy improves when Core choices are completed. Placed courses stay where you put them unless you unlock them, and unresolved Core areas will appear as typed placeholders.</p>":"<p>Placed courses stay where you put them unless you unlock them. This creates a preview; your accepted plan changes only after you choose Use this plan.</p>",actions:[{label:"Go back",secondary:true},{label:core.incomplete?"I understand":"Generate preview",onClick:generateFourYearPlan}]});});
 

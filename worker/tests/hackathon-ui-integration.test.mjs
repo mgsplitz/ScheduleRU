@@ -73,11 +73,14 @@ test("assistant projections retain Rutgers day and open-section semantics", () =
 
 test("planner generation derives concrete inputs from immutable program and Core trees", () => {
   const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  assert.match(html, /<script src="planner-input-logic\.js"><\/script>/);
+  assert.match(html, /ScheduleRUPlannerInput\.buildPlannerInput\(/);
   assert.match(html, /function plannerTermsFromAcademicPosition\(/);
   assert.match(html, /ST\.academicPosition\?\.startingSemester/);
   assert.match(html, /function plannerRequirementInputs\(tree/);
   assert.match(html, /corePlannerStatus\(\).*ST\.coreRequirementTree/);
-  assert.match(html, /unresolvedRequirements:\[\.\.\.program\.placeholders,\.\.\.core\.placeholders\]/);
+  assert.match(html, /requirementTrees:ST\.majorRequirementTree\?\[\{id:"selected-programs",tree:ST\.majorRequirementTree\}\]:\[\]/);
+  assert.match(html, /coreTree:ST\.coreRequirementTree/);
   assert.match(html, /await loadCoreCurriculum\(\)/);
   assert.doesNotMatch(html, /courses:Object\.values\(COURSES\)/);
 });
@@ -101,7 +104,7 @@ test("program roles, grouped Issues, and closed sections have explicit UI contra
 
 test("planner horizon, legacy completion state, and modal transitions stay safe", () => {
   assert.match(html, /function plannerTermsFromAcademicPosition\([\s\S]*?terms\.length<8/);
-  assert.match(html, /lockedPlacements=ScheduleRUPlannerStateLogic\.lockedPlacementsForTerms\(ST\.schedule,terms\)/);
+  assert.match(html, /schedule:ST\.schedule\|\|\{\}/);
   assert.match(html, /concrete=sourceType==="core"\?selected/);
   assert.match(html, /function legacyCompletedAcademicCodes\([\s\S]*?ST\.completed[\s\S]*?ST\.apOn/);
   assert.match(html, /function completedAcademicCodes\([\s\S]*?legacyCompletedAcademicCodes\(\)/);
@@ -154,7 +157,7 @@ test("active builder gate matches the backend calendar term through a persisted 
 test("placed-course cards have an explicit lock action and planning sends only locked placements", () => {
   assert.match(html, /data-placement-lock=/);
   assert.match(html, /entry\.locked=!entry\.locked/);
-  assert.match(html, /ScheduleRUPlannerStateLogic\.lockedPlacementsForTerms\(ST\.schedule,terms\)/);
+  assert.match(html, /schedule:ST\.schedule\|\|\{\}/);
   assert.match(html, /locked:prev\?\.locked \?\? true/);
   assert.match(html, /unless you unlock/);
 });
