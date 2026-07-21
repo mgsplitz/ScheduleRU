@@ -220,12 +220,27 @@ test("guest onboarding is the approved compact five-step workflow", () => {
   assert.match(html, /Try the four-year auto-planner/);
 });
 
+test("a long AP-credit list stays inside the onboarding dialog", () => {
+  assert.match(html, /class="onboarding-records onboarding-records-scroll"/);
+  assert.match(html, /\.onboarding-card\{[^}]*max-height:calc\(100dvh - 80px\)[^}]*display:flex[^}]*flex-direction:column[^}]*overflow:hidden/);
+  assert.match(html, /#onboardingContent\{[^}]*min-height:0[^}]*flex:1[^}]*display:flex[^}]*flex-direction:column/);
+  assert.match(html, /\.onboarding-records-scroll\{[^}]*overflow-y:auto/);
+  assert.match(html, /\.onboarding-actions\{[^}]*flex-shrink:0/);
+});
+
 test("Programs edits programs only while home-school changes use a separate control", () => {
   assert.match(html, /id="homeSchoolBtn"/);
   assert.match(html, /function openHomeSchoolPicker\(/);
   const programDialog = html.match(/<!-- PROGRAM SELECTOR -->([\s\S]*?)<div class="app-modal"/)?.[1] || "";
   assert.doesNotMatch(programDialog, /programSchoolSelect/);
   assert.match(html, /class="policy-warning-list"/);
+});
+
+test("program tabs retain shared pre-business requirements", () => {
+  assert.match(html, /function treeIncludesSourceProgram\(/);
+  assert.match(html, /function groupBelongsToRequiredProgram\(/);
+  assert.match(html, /treeIncludesSourceProgram\(ST\.requirementTrees\?\.\[programId\],group\.sourceProgramId\)/);
+  assert.match(html, /filter\(group=>groupBelongsToRequiredProgram\(group,ST\.requiredProgramTab\)\)/);
 });
 
 test("home-school replacement rolls back on failure and ignores stale responses", () => {
