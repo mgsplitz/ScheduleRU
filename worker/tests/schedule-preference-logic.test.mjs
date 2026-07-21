@@ -51,6 +51,15 @@ test("soft constraints rank by penalty and then original stable index", () => {
   assert.deepEqual(plain(logic.rankSchedules(schedules, preferences).map((item) => item.stableIndex)), [3, 9, 7]);
 });
 
+test("rankSchedules eliminates every schedule that violates a hard constraint", () => {
+  const schedules = [
+    { stableIndex: 4, meetings: [{ day: "M", start: 539, end: 600 }] },
+    { stableIndex: 8, meetings: [{ day: "T", start: 540, end: 600 }] },
+  ];
+  const preferences = { version: 1, constraints: [{ kind: "earliest_start", minutes: 540, strength: "hard" }] };
+  assert.deepEqual(plain(logic.rankSchedules(schedules, preferences).map((item) => item.stableIndex)), [8]);
+});
+
 test("impossible hard constraints return closest tradeoffs with a conflict summary", () => {
   const schedules = [
     { stableIndex: 1, meetings: [{ day: "M", start: 510, end: 600 }] },
@@ -66,22 +75,87 @@ test("impossible hard constraints return closest tradeoffs with a conflict summa
   };
   const result = logic.recommendSchedules(schedules, preferences);
   assert.deepEqual(plain(result.matches), []);
-  assert.deepEqual(plain(result.tradeoffs.map((item) => item.stableIndex)), [1, 2]);
+  assert.deepEqual(plain(result.tradeoffs.map((item) => item.stableIndex)), [2, 1, 3]);
   assert.equal(result.conflictSummary.impossible, true);
-  assert.deepEqual(plain(result.conflictSummary.constraints), ["earliest_start", "avoid_day"]);
+  assert.deepEqual(plain(result.conflictSummary.constraints), ["avoid_day", "earliest_start"]);
+});
+
+test("tradeoffs prefer a smaller hard miss before soft penalties and cap results at three", () => {
+  const schedules = [
+    { stableIndex: 1, meetings: [{ day: "F", start: 539, end: 600 }] },
+    { stableIndex: 2, meetings: [{ day: "M", start: 440, end: 500 }] },
+    { stableIndex: 3, meetings: [{ day: "M", start: 430, end: 500 }] },
+    { stableIndex: 4, meetings: [{ day: "M", start: 420, end: 500 }] },
+  ];
+  const preferences = {
+    version: 1,
+    constraints: [
+      { kind: "earliest_start", minutes: 540, strength: "hard" },
+      { kind: "avoid_day", day: "F", strength: "soft" },
+    ],
+  };
+  const result = logic.recommendSchedules(schedules, preferences);
+  assert.deepEqual(plain(result.matches), []);
+  assert.deepEqual(plain(result.tradeoffs.map((item) => item.stableIndex)), [1, 2, 3]);
 });
 
 test("normalization fails closed for unsupported kinds and malformed fields", () => {
   const normalized = logic.normalizePreferenceSet({
     version: 1,
     constraints: [
-      { kind: "campus", campus: "busch", strength: "soft" },
+      { kind: "campus", value: "busch", strength: "soft" },
       { kind: "earliest_start", minutes: "morning", strength: "hard" },
       { kind: "latest_end", minutes: 960, strength: "urgent" },
       { kind: "invented", strength: "hard" },
     ],
   });
-  assert.deepEqual(plain(normalized.constraints), [{ kind: "campus", campus: "busch", strength: "soft" }]);
+  assert.deepEqual(plain(normalized.constraints), [{ kind: "campus", strength: "soft", value: "busch" }]);
+});
+
+test("normalization keeps only exact canonical version-1 fields and types", () => {
+  const canonical = logic.normalizePreferenceSet({
+    version: 1,
+    constraints: [
+      { kind: "maximum_gap", minutes: 45, strength: "hard" },
+      { kind: "compact_schedule", strength: "soft" },
+      { kind: "modality", value: "online", strength: "soft" },
+      { kind: "open_sections", value: true, strength: "hard" },
+      { kind: "time_window_exception", day: "T", startMinutes: 480, endMinutes: 540, minimumClasses: 1, maximumClasses: 2, strength: "soft" },
+    ],
+  });
+  assert.deepEqual(plain(canonical.constraints), [
+    { kind: "maximum_gap", strength: "hard", minutes: 45 },
+    { kind: "compact_schedule", strength: "soft" },
+    { kind: "modality", strength: "soft", value: "online" },
+    { kind: "open_sections", strength: "hard", value: true },
+    { kind: "time_window_exception", strength: "soft", day: "T", startMinutes: 480, endMinutes: 540, minimumClasses: 1, maximumClasses: 2 },
+  ]);
+
+  const rejected = logic.normalizePreferenceSet({
+    version: 1,
+    constraints: [
+      { kind: "earliest_start", minutes: "540", strength: "hard" },
+      { kind: "maximum_gap", maximumGap: 45, strength: "hard" },
+      { kind: "campus", campus: "busch", strength: "soft" },
+      { kind: "modality", modality: "online", strength: "soft" },
+      { kind: "open_sections", required: true, strength: "hard" },
+      { kind: "open_sections", value: true, required: false, strength: "hard" },
+      { kind: "compact_schedule", minutes: 30, strength: "soft" },
+      { kind: "preferred_day", day: "m", strength: "soft" },
+      { kind: "avoid_day", day: "M" },
+    ],
+  });
+  assert.deepEqual(plain(rejected.constraints), []);
+  assert.deepEqual(plain(logic.normalizePreferenceSet({ version: "1", constraints: canonical.constraints }).constraints), []);
+});
+
+test("string availability is unknown and cannot satisfy a hard open-sections preference", () => {
+  const schedules = [
+    { stableIndex: 1, meetings: [{ day: "M", start: 540, end: 600, open: "false" }] },
+    { stableIndex: 2, meetings: [{ day: "T", start: 540, end: 600, open: true }] },
+  ];
+  const preferences = { version: 1, constraints: [{ kind: "open_sections", value: true, strength: "hard" }] };
+  assert.deepEqual(plain(logic.rankSchedules(schedules, preferences).map((item) => item.stableIndex)), [2]);
 });
 
 test("metrics expose daily classes, gaps, campus, modality, and availability facts", () => {
