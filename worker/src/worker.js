@@ -43,6 +43,7 @@
  */
 
 import { handleProgramsApi } from "./programs.js";
+import { handleScheduleAssistantRequest } from "./schedule-assistant.js";
 
 const RUTGERS_BASE = "https://sis.rutgers.edu/soc/api";
 const CORS_HEADERS = {
@@ -399,6 +400,34 @@ async function handleApi(request, env, ctx) {
   const path = url.pathname;
 
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
+
+  if (path === "/api/schedule-assistant/interpret") {
+    if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+    const response = await handleScheduleAssistantRequest(request, env);
+    for (const [header, value] of Object.entries(CORS_HEADERS)) response.headers.set(header, value);
+    return response;
+  }
+
+  if (path === "/api/config") {
+    const activeYear = Number(env.CURRENT_YEAR);
+    const activeTerm = String(env.CURRENT_TERM || "");
+    if (!Number.isInteger(activeYear) || activeYear < 2000 || activeYear > 2100 || !["0", "1", "7", "9"].includes(activeTerm)) {
+      return json({ error: "invalid active term configuration" }, 500);
+    }
+    return json({ activeYear, activeTerm });
+  }
+
+  if (path === "/api/ap-equivalencies") {
+    const { results } = await env.DB.prepare(
+      `SELECT id, exam_name, minimum_score, maximum_score, credits,
+              equivalent_course_codes_json, fulfills_requirement_ids_json,
+              catalog_year, campus, source_url, reviewed_at
+       FROM ap_equivalencies
+       WHERE review_status = 'reviewed'
+       ORDER BY exam_name, minimum_score, id`
+    ).bind().all();
+    return json({ equivalencies: results });
+  }
 
   if (path === "/api/courses") {
     const q = (url.searchParams.get("search") || "").trim();

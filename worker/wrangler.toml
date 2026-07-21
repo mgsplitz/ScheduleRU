@@ -19,6 +19,9 @@ database_id = "d2faadfd-d361-46a9-a4eb-ae380b295748"   # printed by `wrangler d1
 [vars]
 CURRENT_YEAR = "2026"
 CURRENT_TERM = "9"          # 0=Winter 1=Spring 7=Summer 9=Fall
+# Optional non-secret override for the server-side preference translator.
+# Leave the OpenAI API key in the OPENAI_API_KEY Worker secret; never add it here.
+SCHEDULE_ASSISTANT_MODEL = "gpt-5.6-luna"
 COURSES_PER_RUN = "400"     # courses written per cron run (~4,400 total courses / 400 ≈ 11 runs ≈ ~2.75hrs for a full pass at 15min cron)
 
 # Catalog subdomain for the degree-requirements scraper (src/programs.js).
@@ -50,6 +53,7 @@ database_id = "566147eb-e368-4293-a65a-41429e44a3cf"
 [env.dev.vars]
 CURRENT_YEAR = "2026"
 CURRENT_TERM = "9"
+SCHEDULE_ASSISTANT_MODEL = "gpt-5.6-luna"
 COURSES_PER_RUN = "400"
 CATALOG_SUBDOMAIN = "newbrunswick-undergrad-25-26"
 
