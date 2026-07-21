@@ -106,7 +106,7 @@
 - Modify: `worker/tests/program-catalog-publication.test.mjs`
 - Modify: `worker/tests/program-catalog-import-api.test.mjs`
 
-**Interfaces:** `GET /api/programs` returns only evidence-complete `review_status = 'reviewed'` records. `GET /api/programs/:id/requirements` returns 404 for catalog-listed and raw-source-only records.
+**Interfaces:** `GET /api/programs` returns only evidence-complete `review_status = 'reviewed'` records. `GET /api/programs/:id/requirements` returns 404 for catalog-listed and raw-source-only records. Batch requirement reads and program-selection validation exclude those same records.
 
 - [ ] **Step 1: Write failing policy tests**
 
@@ -123,7 +123,7 @@
   Expected: failure because catalog-listed programs are public today.
 
 - [ ] **Step 3: Implement public gating**
-  Replace public program predicates with `review_status = 'reviewed'`, retain `programHasCompleteRequirementEvidence`, and call `publishedCatalogPrograms([], reviewedPrograms)`. Require `review_status = 'reviewed'` in the direct requirements lookup. Do not delete catalog or source rows.
+  Replace public program predicates with `review_status = 'reviewed'`, retain `programHasCompleteRequirementEvidence`, and call `publishedCatalogPrograms([], reviewedPrograms)`. Require `review_status = 'reviewed'` in direct and batch requirement lookups and program-selection validation. Keep the batch response field `catalog_listed_program_ids` as an empty array for client compatibility. Do not delete catalog or source rows.
 
 - [ ] **Step 4: Verify focused and full suites**
   Run: `node --test tests/program-catalog-publication.test.mjs tests/program-catalog-import-api.test.mjs && node --test tests/*.test.mjs`

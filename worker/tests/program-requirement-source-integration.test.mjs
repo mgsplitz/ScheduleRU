@@ -24,3 +24,17 @@ test("school source imports queue a bounded batch of not-yet-snapshotted sources
   assert.match(worker, /ORDER BY id\s+LIMIT \?/);
   assert.match(worker, /batchLimit/);
 });
+
+test("major discovery stores typed detail sources without publishing audits", async () => {
+  const [schema, migration, worker] = await Promise.all([
+    readFile(new URL("../schema/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
+    readFile(new URL("../schema/migrate_requirement_import_source_kinds.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(schema, /source_kind TEXT NOT NULL DEFAULT 'profile'/);
+  assert.match(migration, /ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'profile'/);
+  assert.match(worker, /\/api\/admin\/requirement-sources\/discover/);
+  assert.match(worker, /type = 'major'/);
+  assert.doesNotMatch(worker, /UPDATE programs SET[\s\S]{0,160}review_status = 'reviewed'/);
+});

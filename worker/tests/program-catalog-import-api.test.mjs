@@ -35,3 +35,15 @@ test("program eligibility lookups batch ids so a full catalog cannot exceed D1's
 
   assert.match(worker, /for \(let offset = 0; offset < ids\.length; offset \+= 100\)/);
 });
+
+test("public program and requirement routes hide catalog-only records", async () => {
+  const worker = await readFile(workerUrl, "utf8");
+  const publicRoutes = worker.slice(
+    worker.indexOf('if (path === "/api/programs"'),
+    worker.indexOf("// ---- Admin: everything below requires ?secret= ----"),
+  );
+
+  assert.match(publicRoutes, /review_status = 'reviewed'/);
+  assert.doesNotMatch(publicRoutes, /review_status = 'catalog_listed'/);
+  assert.match(publicRoutes, /publishedCatalogPrograms\(\[\], reviewedPrograms\)/);
+});

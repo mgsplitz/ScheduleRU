@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS program_requirement_import_sources (
   source_url TEXT NOT NULL,
   source_title TEXT NOT NULL,
   adapter TEXT NOT NULL DEFAULT 'html_requirement_source_v1',
+  source_kind TEXT NOT NULL DEFAULT 'profile' CHECK (source_kind IN ('profile', 'requirements_page')),
   enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
   last_imported_at INTEGER,
   last_content_hash TEXT,
@@ -21,6 +22,8 @@ CREATE TABLE IF NOT EXISTS program_requirement_import_sources (
 );
 CREATE INDEX IF NOT EXISTS idx_program_requirement_import_sources_school
   ON program_requirement_import_sources(school_slug, enabled);
+CREATE INDEX IF NOT EXISTS idx_program_requirement_import_sources_kind
+  ON program_requirement_import_sources(school_slug, source_kind, enabled);
 
 CREATE TABLE IF NOT EXISTS program_requirement_source_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
