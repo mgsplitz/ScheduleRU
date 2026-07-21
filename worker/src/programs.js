@@ -1696,24 +1696,19 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     const school = url.searchParams.get("school");
     const type = url.searchParams.get("type");
     // Shared sets and school-level Core curricula have their own public
-    // routes. A catalog-listed program is selectable, but its empty
-    // requirement tree is never presented as an audited degree result.
+    // routes. A public program must have a reviewed, evidence-complete audit.
     let where = ` WHERE type NOT IN ('shared_requirement_set', 'core_curriculum')
-                  AND (review_status = 'reviewed'
-                    OR (review_status = 'catalog_listed' AND catalog_active = 1))`, binds = [];
+                  AND review_status = 'reviewed'`, binds = [];
     if (school) { where += " AND school_slug = ?"; binds.push(school); }
     if (type) { where += " AND type = ?"; binds.push(type); }
     const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();
     const reviewedPrograms = [];
-    const catalogPrograms = [];
     for (const program of results || []) {
-      if (program.review_status === "catalog_listed") {
-        catalogPrograms.push(program);
-      } else if (await programHasCompleteRequirementEvidence(env, program)) {
+      if (await programHasCompleteRequirementEvidence(env, program)) {
         reviewedPrograms.push(program);
       }
     }
-    const programs = publishedCatalogPrograms(catalogPrograms, reviewedPrograms);
+    const programs = publishedCatalogPrograms([], reviewedPrograms);
     const eligibilityRules = await getProgramEligibilityRules(env, reviewedPrograms.map((program) => program.id));
     const rulesByProgram = {};
     for (const rule of eligibilityRules) (rulesByProgram[rule.program_id] ||= []).push(rule);
@@ -1747,18 +1742,9 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     const program = await env.DB.prepare(
       `SELECT * FROM programs
        WHERE id = ?
-         AND (review_status = 'reviewed'
-           OR (review_status = 'catalog_listed' AND catalog_active = 1))`
+         AND review_status = 'reviewed'`
     ).bind(programId).first();
     if (!program) return json({ error: "not found" }, 404);
-    if (program.review_status === "catalog_listed") {
-      return json({
-        program: publishedCatalogPrograms([program], [])[0],
-        requirements: [],
-        eligibility_rules: [],
-        catalog_listed: true,
-      });
-    }
     if (!(await programHasCompleteRequirementEvidence(env, program))) return json({ error: "not found" }, 404);
     const [tree, eligibilityRules] = await Promise.all([
       getRequirementTree(env, programId),
@@ -1772,29 +1758,20 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     if (!ids.length || ids.length > 25) return json({ error: "pass 1-25 valid program ids in ?programs=id1,id2" }, 400);
     const out = {};
     const { results: publicPrograms } = await env.DB.prepare(
-      `SELECT id, requirement_evidence_required, review_status, catalog_active
+      `SELECT id, requirement_evidence_required, review_status
        FROM programs
        WHERE id IN (${ids.map(() => "?").join(",")})
-         AND (review_status = 'reviewed'
-           OR (review_status = 'catalog_listed' AND catalog_active = 1))`
+         AND review_status = 'reviewed'`
     ).bind(...ids).all();
     const visibleProgramIds = new Set();
-    const catalogListedProgramIds = new Set();
     for (const program of publicPrograms || []) {
-      if (program.review_status === "catalog_listed") {
-        catalogListedProgramIds.add(program.id);
-      } else if (await programHasCompleteRequirementEvidence(env, program)) {
+      if (await programHasCompleteRequirementEvidence(env, program)) {
         visibleProgramIds.add(program.id);
       }
     }
     const visibleIds = ids.filter((id) => visibleProgramIds.has(id));
-    const catalogListedIds = ids.filter((id) => catalogListedProgramIds.has(id));
 
-    // Catalog-listed programs are intentionally represented by an empty tree.
-    // The client keeps their selection and shows the source-backed coverage
-    // notice instead of suggesting that an empty audit means no requirements.
     for (const id of visibleIds) out[id] = await getRequirementTree(env, id, visibleIds);
-    for (const id of catalogListedIds) out[id] = [];
 
     let doubleCounts = [];
     if (visibleIds.length) {
@@ -1818,7 +1795,7 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     const eligibilityRules = await getProgramEligibilityRules(env, visibleIds);
     return json({
       requirements: out,
-      catalog_listed_program_ids: catalogListedIds,
+      catalog_listed_program_ids: [],
       double_count_rules: doubleCounts,
       double_count_exceptions: doubleCountExceptions,
       eligibility_rules: eligibilityRules,
@@ -1858,9 +1835,9 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     return json({ home_school_slug: homeSchoolSlug, ...(await getProgramSelectionPolicies(env, homeSchoolSlug)) });
   }
 
-  // Stateless validation before the browser saves a selection. It reads
-  // reviewed policy data plus catalog-listed program records from D1, so it
-  // remains public and contains no student data or admin secret.
+  // Stateless validation before the browser saves a selection. It reads only
+  // reviewed, evidence-complete programs and contains no student data or
+  // admin secret.
   if (path === "/api/program-selection-check" && request.method === "POST") {
     let body;
     try {
@@ -1885,12 +1862,11 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
                 catalog_active
          FROM programs
          WHERE type NOT IN ('shared_requirement_set', 'core_curriculum')
-           AND (review_status = 'reviewed'
-             OR (review_status = 'catalog_listed' AND catalog_active = 1))
+           AND review_status = 'reviewed'
            AND id IN (${ids.map(() => "?").join(",")})`
       ).bind(...ids).all();
       for (const program of results || []) {
-        if (program.review_status === "catalog_listed" || await programHasCompleteRequirementEvidence(env, program)) {
+        if (await programHasCompleteRequirementEvidence(env, program)) {
           programs.push(program);
         }
       }
