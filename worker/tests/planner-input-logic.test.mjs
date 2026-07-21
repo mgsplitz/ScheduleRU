@@ -98,3 +98,63 @@ test("catalog alternatives and standing restrictions survive planner normalizati
   assert.deepEqual(plain(result.prerequisitePathsByCode["01:198:205"]), [["01:198:111"], ["14:332:221"]]);
   assert.equal(result.courses.find((course) => course.code === "33:136:388").minimumPlanYear, 2);
 });
+
+test("regeneration drops obsolete generated entries but retains explicit pins", () => {
+  const result = build({
+    schedule: {
+      generated: { code: "01:198:998", title: "Old generated", credits: 3, year: 1, sem: "fall", locked: false, userPinned: false },
+      pinned: { code: "01:198:999", title: "Pinned extra", credits: 3, year: 4, sem: "spring", locked: true, userPinned: true },
+    },
+  });
+  assert.equal(result.courses.some((course) => course.code === "01:198:998"), false);
+  assert.equal(result.courses.some((course) => course.code === "01:198:999"), true);
+  assert.equal(result.lockedPlacements["01:198:999"].sem, "spring");
+});
+
+test("saved elective and sequence choices become concrete planner courses", () => {
+  const result = build({
+    groupSelections: {
+      electives: ["electiveA", "electiveB"],
+      science: ["physics"],
+    },
+  });
+  const codes = new Set(result.courses.map((course) => course.code));
+  assert.ok(codes.has("01:198:314"));
+  assert.ok(codes.has("01:198:323"));
+  assert.ok(codes.has("01:750:203"));
+  assert.ok(codes.has("01:750:204"));
+  assert.equal(result.unresolvedRequirements.length, 0);
+});
+
+test("distinct Core goal pools remain placeholders until a goal is explicitly chosen", () => {
+  const coreTree = {
+    roots: ["areas"],
+    courses: {
+      historyA: { code: "01:510:101", title: "History option A", credits: "3" },
+      historyB: { code: "01:510:102", title: "History option B", credits: "3" },
+      literatureA: { code: "01:195:101", title: "Literature option A", credits: "3" },
+      literatureB: { code: "01:195:102", title: "Literature option B", credits: "3" },
+    },
+    groups: {
+      areas: { id: "areas", name: "Areas of Inquiry", rule: "all", members: [], children: ["humanities"] },
+      humanities: {
+        id: "humanities",
+        name: "Arts and Humanities (2 distinct goals)",
+        rule: "distinct",
+        count: 2,
+        members: ["historyA", "historyB", "literatureA", "literatureB"],
+        children: ["history", "literature"],
+        parentId: "areas",
+      },
+      history: { id: "history", name: "Historical Analysis", rule: "all", members: ["historyA", "historyB"], children: [], parentId: "humanities" },
+      literature: { id: "literature", name: "Literary Analysis", rule: "all", members: ["literatureA", "literatureB"], children: [], parentId: "humanities" },
+    },
+  };
+
+  const result = build({ requirementTrees: [], coreTree });
+  assert.deepEqual(plain(result.courses), []);
+  assert.deepEqual(plain(result.unresolvedRequirements.map((item) => item.requirementGroupId)), [
+    "humanities",
+    "humanities",
+  ]);
+});

@@ -1,5 +1,5 @@
 (function exposePlannerStateLogic(root) {
-  const STATE_VERSION = 4;
+  const STATE_VERSION = 5;
   const COURSE_CODE = /^\d{2}:\d{3}:\d{3}$/;
   const clone = (value) => JSON.parse(JSON.stringify(value ?? {}));
   const termKey = (term) => `${Number(term?.year)}:${String(term?.sem || "").toLowerCase()}`;
@@ -30,8 +30,8 @@
   function lockedPlacementsForTerms(schedule, terms) {
     const termKeys = new Set((Array.isArray(terms) ? terms : []).map(termKey));
     return Object.fromEntries(Object.values(schedule && typeof schedule === "object" ? schedule : {})
-      .filter((entry) => entry?.locked === true && termKeys.has(termKey(entry)))
-      .map((entry) => [entry.code, { ...entry, locked: true }])
+      .filter((entry) => entry?.userPinned === true && termKeys.has(termKey(entry)))
+      .map((entry) => [entry.code, { ...entry, locked: true, userPinned: true }])
       .filter(([code]) => typeof code === "string" && code));
   }
 
@@ -68,7 +68,13 @@
     state.primaryProgramId ??= state.selectedProgramIds?.[0] ?? null;
     state.secondaryProgramId ??= state.selectedProgramIds?.[1] ?? null;
     state.schedule ||= {};
-    Object.values(state.schedule).forEach((entry) => { if (entry && entry.locked === undefined) entry.locked = true; });
+    Object.values(state.schedule).forEach((entry) => {
+      if (!entry) return;
+      if (entry.userPinned === undefined) entry.userPinned = entry.locked !== false;
+      entry.userPinned = entry.userPinned === true;
+      entry.locked = entry.userPinned;
+    });
+    state.planPlaceholders = Array.isArray(state.planPlaceholders) ? state.planPlaceholders : [];
     state.generatedPlanPreview ??= null;
     state.schedulePreferences ||= {};
     state.issueDismissals ||= {};
@@ -87,7 +93,19 @@
 
   const preferencesForTerm = (state, term) => clone(state?.schedulePreferences?.[termKey(term)] || { version: 1, constraints: [], messages: [] });
   function withAcceptedPlan(state, preview) {
-    return { ...state, schedule: clone(preview?.schedule || {}), generatedPlanPreview: null };
+    const schedule = {};
+    Object.entries(clone(preview?.schedule || {})).forEach(([code, entry]) => {
+      schedule[code] = { ...entry, locked: false, userPinned: false };
+    });
+    Object.values(state?.schedule || {}).filter((entry) => entry?.userPinned === true && entry?.code).forEach((entry) => {
+      schedule[entry.code] = { ...clone(entry), locked: true, userPinned: true };
+    });
+    return {
+      ...state,
+      schedule,
+      planPlaceholders: clone(Array.isArray(preview?.placeholders) ? preview.placeholders : []),
+      generatedPlanPreview: null,
+    };
   }
 
   root.ScheduleRUPlannerStateLogic = {

@@ -113,12 +113,20 @@
       }
 
       if (["min", "min_courses", "min_credits", "distinct"].includes(group.rule)) {
-        selected.filter((id) => group.members?.includes(id)).forEach(addCourse);
+        const selectedMembers = selected.filter((id) => group.members?.includes(id));
+        const selectedChildren = selected.filter((id) => group.children?.includes(id));
+        selectedMembers.forEach(addCourse);
+        selectedChildren.forEach(visit);
         const required = group.rule === "min_credits"
           ? Math.max(1, Math.ceil((Number(group.count) || DEFAULT_ESTIMATED_CREDITS) / DEFAULT_ESTIMATED_CREDITS))
           : Math.max(1, Number(group.count) || 1);
-        const remaining = Math.max(0, required - selected.length);
+        const remaining = Math.max(0, required - selectedMembers.length - selectedChildren.length);
         for (let index = 0; index < remaining; index += 1) placeholders.push(placeholder(group, groupProgram, index));
+        // Children of a choice group partition or refine the approved option
+        // pool. They are not additional mandatory groups. Visiting every
+        // child here turns hundreds of Core-approved alternatives into
+        // required courses (notably the four Arts & Humanities goal pools).
+        return;
       } else if (!['max', 'max_credits'].includes(group.rule)) {
         (group.members || []).forEach(addCourse);
       }
@@ -166,7 +174,8 @@
     });
     Object.values(input.schedule || {}).forEach((entry) => {
       const course = entry?.course || entry;
-      if (validCode(entry?.code) && !completed.has(entry.code) && !normalizedByCode.has(entry.code)) {
+      const explicitlyPinned = entry?.userPinned === true || entry?.locked === true;
+      if (explicitlyPinned && validCode(entry?.code) && !completed.has(entry.code) && !normalizedByCode.has(entry.code)) {
         normalizedByCode.set(entry.code, normalizedCourse({ ...course, code: entry.code, credits: entry.credits, title: entry.fullTitle || entry.title }));
       }
     });

@@ -32,7 +32,7 @@ test("migrates an existing plan without moving scheduled courses", () => {
     schedule: { "01:198:111": { code: "01:198:111", year: 1, sem: "fall" } },
     selectedProgramIds: [12],
   });
-  assert.equal(state.version, 4);
+  assert.equal(state.version, 5);
   assert.equal(state.schedule["01:198:111"].sem, "fall");
   assert.equal(state.schedule["01:198:111"].locked, true);
   assert.deepEqual(plain(state.selectedProgramIds), [12]);
@@ -60,7 +60,9 @@ test("migrates existing placements as locked and sends only explicitly locked co
     { year: 2, sem: "fall" }, { year: 2, sem: "spring" },
   ]);
   assert.equal(state.schedule["01:198:111"].locked, true);
+  assert.equal(state.schedule["01:198:111"].userPinned, true);
   assert.equal(state.schedule["01:198:112"].locked, false);
+  assert.equal(state.schedule["01:198:112"].userPinned, false);
   assert.deepEqual(plain(Object.keys(locked)), ["01:198:111"]);
 });
 
@@ -113,11 +115,30 @@ test("defaults malformed academic records to an empty array", () => {
   assert.deepEqual(plain(state.academicRecords), []);
 });
 
-test("accepting a preview replaces only the plan and clears the preview", () => {
-  const state = plannerLogic().migratePlannerState({ version: 3, wishlist: { x: true } });
-  const preview = { schedule: { a: { code: "a" } } };
+test("accepting a preview replaces unlocked work, preserves pins, and persists placeholders", () => {
+  const state = plannerLogic().migratePlannerState({
+    version: 4,
+    wishlist: { x: true },
+    schedule: {
+      "01:198:111": { code: "01:198:111", title: "Pinned", year: 1, sem: "fall", locked: true, userPinned: true },
+      "01:198:112": { code: "01:198:112", title: "Old generated", year: 1, sem: "spring", locked: false, userPinned: false },
+    },
+  });
+  const preview = {
+    schedule: {
+      "01:198:111": { code: "01:198:111", title: "Planner copy", year: 2, sem: "fall", locked: false },
+      "01:198:205": { code: "01:198:205", title: "Discrete Structures", year: 2, sem: "spring", locked: false },
+    },
+    placeholders: [{ id: "core-a", label: "Core choice", year: 2, sem: "spring", estimatedCredits: 3 }],
+  };
   const accepted = plannerLogic().withAcceptedPlan({ ...state, generatedPlanPreview: preview }, preview);
   assert.deepEqual(plain(accepted.wishlist), { x: true });
   assert.equal(accepted.generatedPlanPreview, null);
-  assert.equal(accepted.schedule.a.code, "a");
+  assert.equal(accepted.schedule["01:198:112"], undefined);
+  assert.equal(accepted.schedule["01:198:111"].year, 1);
+  assert.equal(accepted.schedule["01:198:111"].title, "Pinned");
+  assert.equal(accepted.schedule["01:198:111"].userPinned, true);
+  assert.equal(accepted.schedule["01:198:205"].locked, false);
+  assert.equal(accepted.schedule["01:198:205"].userPinned, false);
+  assert.deepEqual(plain(accepted.planPlaceholders), preview.placeholders);
 });

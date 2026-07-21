@@ -22,7 +22,7 @@ test("the browser migrates v1 state and evaluates the selected target term", asy
   const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
   assert.match(frontend, /<script src="eligibility-logic\.js"><\/script>/);
   assert.match(frontend, /const PLANNER_STATE_VERSION=3/);
-  assert.match(frontend, /\[1,2,PLANNER_STATE_VERSION\]\.includes\(saved\.version\)/);
+  assert.match(frontend, /\[1,2,PLANNER_STATE_VERSION,4\]\.includes\(saved\.version\)/);
   assert.match(frontend, /CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic\.STATE_VERSION/);
   assert.match(frontend, /ST\.creditLedger\s*=\s*savedObject\(saved\.creditLedger\)/);
   assert.match(frontend, /function confirmedAcademicCreditEntries\(/);

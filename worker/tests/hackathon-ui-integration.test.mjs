@@ -102,6 +102,13 @@ test("program roles, grouped Issues, and closed sections have explicit UI contra
   assert.match(html, /recomputeBuilderPermutations\(\);renderBuilder\(\)/);
 });
 
+test("plan previews name blocking courses without flooding the modal with warnings", () => {
+  assert.match(html, /function plannerIssueText\(/);
+  assert.match(html, /issue\.courseCodes\?\.join\(", "\)/);
+  assert.match(html, /issue\.severity==="error"/);
+  assert.match(html, /planning notes? (?:is|are) available under Issues/i);
+});
+
 test("planner horizon, legacy completion state, and modal transitions stay safe", () => {
   assert.match(html, /function plannerTermsFromAcademicPosition\([\s\S]*?terms\.length<8/);
   assert.match(html, /schedule:ST\.schedule\|\|\{\}/);
@@ -156,10 +163,62 @@ test("active builder gate matches the backend calendar term through a persisted 
 
 test("placed-course cards have an explicit lock action and planning sends only locked placements", () => {
   assert.match(html, /data-placement-lock=/);
-  assert.match(html, /entry\.locked=!entry\.locked/);
+  assert.match(html, /entry\.userPinned=!entry\.userPinned;entry\.locked=entry\.userPinned/);
   assert.match(html, /schedule:ST\.schedule\|\|\{\}/);
-  assert.match(html, /locked:prev\?\.locked \?\? true/);
+  assert.match(html, /locked:true, userPinned:true/);
   assert.match(html, /unless you unlock/);
+});
+
+test("accepted plans retain generated titles and render persisted placeholders without pinning every course", () => {
+  assert.match(html, /ST\.planPlaceholders/);
+  assert.match(html, /plan-placeholder-card/);
+  assert.match(html, /placeholder\.year===ST\.year&&placeholder\.sem===sem/);
+  assert.match(html, /ScheduleRUPlannerStateLogic\.withAcceptedPlan\(ST,preview\)/);
+  assert.doesNotMatch(html, /accepted\.schedule\[code\]=\{[\s\S]{0,400}?locked:true/);
+  assert.match(html, /entry\.userPinned=!entry\.userPinned/);
+  assert.match(html, /estimated credits planned/);
+  assert.match(html, /placeholders\.length\?`\$\{total\} estimated credits`/);
+});
+
+test("semester cards can move, plans can clear, and restart requires destructive confirmation", () => {
+  assert.match(html, /dataTransfer\.setData\("schedule-cid",card\.dataset\.id\)/);
+  assert.match(html, /const movingScheduled=e\.dataTransfer\.getData\("schedule-cid"\)===code/);
+  assert.match(html, /id="clearPlanBtn"/);
+  assert.match(html, /function confirmClearPlan\(/);
+  assert.match(html, /ST\.schedule=\{\};ST\.planPlaceholders=\[\]/);
+  assert.match(html, /title:"Restart everything\?"/);
+  assert.match(html, /localStorage\.removeItem\(PLANNER_STATE_KEY\);location\.reload\(\)/);
+});
+
+test("small choose-one requirements and full sequence choices have explicit planner controls", () => {
+  assert.match(html, /function requirementChoiceControlsHtml\(/);
+  assert.match(html, /data-plan-choice-group=/);
+  assert.match(html, /function setRequirementChoice\(/);
+  assert.match(html, /ST\.groupSelections\[groupId\]=next/);
+  assert.match(html, /data-plan-placeholder=/);
+  assert.match(html, /function focusPlanPlaceholder\(/);
+});
+
+test("guest onboarding is the approved compact five-step workflow", () => {
+  assert.match(html, /Array\.from\(\{length:5\}/);
+  assert.match(html, /Account functionality is not enabled yet\. Continue as a guest for now\./);
+  assert.doesNotMatch(html, /Set your academic position/);
+  assert.match(html, /data-onboarding-ap=/);
+  assert.match(html, /Scores of 4 or 5/);
+  assert.match(html, /id="recordCourseSearch"/);
+  assert.doesNotMatch(html, /id="recordTitle"/);
+  assert.doesNotMatch(html, /id="recordGrade"/);
+  assert.match(html, /id="onboardingHomeSchool"/);
+  assert.match(html, /Add program of study/);
+  assert.match(html, /Try the four-year auto-planner/);
+});
+
+test("Programs edits programs only while home-school changes use a separate control", () => {
+  assert.match(html, /id="homeSchoolBtn"/);
+  assert.match(html, /function openHomeSchoolPicker\(/);
+  const programDialog = html.match(/<!-- PROGRAM SELECTOR -->([\s\S]*?)<div class="app-modal"/)?.[1] || "";
+  assert.doesNotMatch(programDialog, /programSchoolSelect/);
+  assert.match(html, /class="policy-warning-list"/);
 });
 
 test("home-school replacement rolls back on failure and ignores stale responses", () => {

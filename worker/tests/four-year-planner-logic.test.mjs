@@ -272,6 +272,27 @@ test("honors standing and confirmed-prior-credit gates", () => {
   assert.ok(45 + priorPlanned >= 60);
 });
 
+test("counts unresolved requirement credits toward later standing gates", () => {
+  const terms = Array.from({ length: 8 }, (_, ordinal) => ({
+    year: Math.floor(ordinal / 2) + 1,
+    sem: ordinal % 2 ? "spring" : "fall",
+  }));
+  const result = planner().generatePlan({
+    terms,
+    courses: [{ code: "33:136:470", title: "Business Data Management", credits: 3, minimumPriorCredits: 18 }],
+    unresolvedRequirements: Array.from({ length: 8 }, (_, index) => ({
+      id: `core-${index}`,
+      label: `Core choice ${index + 1}`,
+      credits: 3,
+      sourceType: "core",
+    })),
+  });
+
+  assert.ok(result.schedule["33:136:470"], "the later course should be placed once estimated Core credits satisfy the gate");
+  assert.equal(result.issues.some((issue) => issue.code === "courses_unplaced"), false);
+  assert.ok(result.schedule["33:136:470"].year >= 4);
+});
+
 test("allows a reviewed co-requisite in the same term", () => {
   const result = planner().generatePlan({
     terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
@@ -339,6 +360,31 @@ test("chooses a complete reviewed prerequisite path deterministically", () => {
   });
   assert.equal(result.schedule["01:198:201"].sem, "spring");
   assert.equal(result.status, "complete");
+});
+
+test("keeps room for an unlocked prerequisite chain instead of balancing its first course too late", () => {
+  const terms = Array.from({ length: 8 }, (_, ordinal) => ({
+    year: Math.floor(ordinal / 2) + 1,
+    sem: ordinal % 2 ? "spring" : "fall",
+  }));
+  const result = planner().generatePlan({
+    terms,
+    courses: [
+      ...Array.from({ length: 6 }, (_, index) => ({ code: `01:198:${100 + index}`, credits: 3 })),
+      { code: "33:011:301", credits: 1, minimumPlanYear: 2 },
+      { code: "33:011:302", credits: 1, minimumPlanYear: 2 },
+      { code: "33:011:303", credits: 1, minimumPlanYear: 3 },
+    ],
+    prerequisitePathsByCode: {
+      "33:011:302": [["33:011:301"]],
+      "33:011:303": [["33:011:302"]],
+    },
+  });
+
+  assert.ok(result.schedule["33:011:301"]);
+  assert.ok(result.schedule["33:011:302"]);
+  assert.ok(result.schedule["33:011:303"]);
+  assert.equal(result.issues.some((issue) => issue.code === "courses_unplaced"), false);
 });
 
 test("does not let a placeholder satisfy a reviewed prerequisite", () => {
