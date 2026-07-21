@@ -59,6 +59,15 @@ function json(data, status = 200) {
   });
 }
 
+function activeTermConfiguration(env) {
+  const activeYear = Number(env.CURRENT_YEAR);
+  const activeTerm = String(env.CURRENT_TERM || "");
+  if (!Number.isInteger(activeYear) || activeYear < 2000 || activeYear > 2100
+    || !["0", "1", "7", "9"].includes(activeTerm)) return null;
+  const catalogStartYear = activeTerm === "9" ? activeYear : activeYear - 1;
+  return { activeYear, activeTerm, catalogYear: `${catalogStartYear}-${catalogStartYear + 1}` };
+}
+
 const COURSE_CODE_PATTERN = /^\d{2}:\d{3}:\d{3}$/;
 
 // The browser sends only selector shapes that came from a reviewed program
@@ -409,24 +418,27 @@ async function handleApi(request, env, ctx) {
   }
 
   if (path === "/api/config") {
-    const activeYear = Number(env.CURRENT_YEAR);
-    const activeTerm = String(env.CURRENT_TERM || "");
-    if (!Number.isInteger(activeYear) || activeYear < 2000 || activeYear > 2100 || !["0", "1", "7", "9"].includes(activeTerm)) {
-      return json({ error: "invalid active term configuration" }, 500);
-    }
-    return json({ activeYear, activeTerm });
+    const configuration = activeTermConfiguration(env);
+    if (!configuration) return json({ error: "invalid active term configuration" }, 500);
+    return json({ activeYear: configuration.activeYear, activeTerm: configuration.activeTerm });
   }
 
   if (path === "/api/ap-equivalencies") {
-    const { results } = await env.DB.prepare(
-      `SELECT id, exam_name, minimum_score, maximum_score, credits,
-              equivalent_course_codes_json, fulfills_requirement_ids_json,
-              catalog_year, campus, source_url, reviewed_at
-       FROM ap_equivalencies
-       WHERE review_status = 'reviewed'
-       ORDER BY exam_name, minimum_score, id`
-    ).bind().all();
-    return json({ equivalencies: results });
+    const configuration = activeTermConfiguration(env);
+    if (!configuration) return json({ error: "invalid active term configuration" }, 500);
+    try {
+      const { results } = await env.DB.prepare(
+        `SELECT id, exam_name, minimum_score, maximum_score, credits,
+                equivalent_course_codes_json, fulfills_requirement_ids_json,
+                catalog_year, campus, source_url, reviewed_at
+         FROM ap_equivalencies
+         WHERE review_status = 'reviewed' AND catalog_year = ? AND campus = ?
+         ORDER BY exam_name, minimum_score, id`
+      ).bind(configuration.catalogYear, "NB").all();
+      return json({ equivalencies: results });
+    } catch (_) {
+      return json({ error: "AP equivalencies unavailable" }, 503);
+    }
   }
 
   if (path === "/api/courses") {

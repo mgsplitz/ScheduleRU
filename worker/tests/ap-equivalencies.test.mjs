@@ -24,6 +24,9 @@ test("AP equivalency migration keeps reviewed score-specific catalog rows in one
   assert.match(schema, /CREATE TABLE IF NOT EXISTS ap_equivalencies/);
   assert.match(schema, /CHECK \(minimum_score BETWEEN 1 AND 5\)/);
   assert.match(schema, /CHECK \(review_status IN \('draft','reviewed','retired'\)\)/);
+  assert.match(schema, /PRIMARY KEY \(id, catalog_year, campus\)/);
+  assert.match(schema, /ON CONFLICT\(id, catalog_year, campus\) DO UPDATE SET/);
+  assert.doesNotMatch(schema, /INSERT OR IGNORE/);
   assert.match(schema, /ap-chem4/);
   assert.match(schema, /ap-chem5/);
   assert.match(schema, /ap-csa4/);
@@ -44,6 +47,9 @@ test("configuration and AP routes use Worker configuration and reviewed D1 rows"
   assert.equal(db.calls.length, 1);
   assert.match(db.calls[0].sql, /FROM ap_equivalencies/);
   assert.match(db.calls[0].sql, /review_status = 'reviewed'/);
+  assert.match(db.calls[0].sql, /catalog_year = \?/);
+  assert.match(db.calls[0].sql, /campus = \?/);
+  assert.deepEqual(db.calls[0].values, ["2026-2027", "NB"]);
 });
 
 test("configuration rejects invalid Worker active-term values", async () => {
@@ -52,4 +58,21 @@ test("configuration rejects invalid Worker active-term values", async () => {
   }, {});
   assert.equal(response.status, 500);
   assert.deepEqual(await response.json(), { error: "invalid active term configuration" });
+});
+
+test("AP route returns a generic public error when D1 fails", async () => {
+  const DB = {
+    prepare() {
+      return {
+        bind() {
+          return { async all() { throw new Error("sensitive D1 internals"); } };
+        },
+      };
+    },
+  };
+  const response = await worker.fetch(new Request("https://example.test/api/ap-equivalencies"), {
+    DB, CURRENT_YEAR: "2026", CURRENT_TERM: "9",
+  }, {});
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "AP equivalencies unavailable" });
 });

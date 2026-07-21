@@ -13,7 +13,7 @@ const CONSTRAINT_SCHEMAS = [
   { properties: { kind: { const: "latest_end" }, strength: { enum: ["hard", "soft"] }, minutes: { type: "integer", minimum: 0, maximum: 1439 } }, required: ["kind", "strength", "minutes"] },
   { properties: { kind: { enum: ["avoid_day", "preferred_day"] }, strength: { enum: ["hard", "soft"] }, day: { enum: ["M", "T", "W", "R", "F", "S", "U"] } }, required: ["kind", "strength", "day"] },
   { properties: { kind: { const: "light_day" }, strength: { enum: ["hard", "soft"] }, day: { enum: ["M", "T", "W", "R", "F", "S", "U"] }, maximumClasses: { type: "integer", minimum: 0, maximum: 100 } }, required: ["kind", "strength", "day", "maximumClasses"] },
-  { properties: { kind: { const: "time_window_exception" }, strength: { enum: ["hard", "soft"] }, day: { enum: ["M", "T", "W", "R", "F", "S", "U"] }, startMinutes: { type: "integer", minimum: 0, maximum: 1439 }, endMinutes: { type: "integer", minimum: 1, maximum: 1439 }, minimumClasses: { type: "integer", minimum: 0, maximum: 100 }, maximumClasses: { type: "integer", minimum: 0, maximum: 100 } }, required: ["kind", "strength", "startMinutes", "endMinutes"], anyOf: [{ required: ["minimumClasses"] }, { required: ["maximumClasses"] }] },
+  { properties: { kind: { const: "time_window_exception" }, strength: { enum: ["hard", "soft"] }, day: { enum: ["M", "T", "W", "R", "F", "S", "U", null] }, startMinutes: { type: "integer", minimum: 0, maximum: 1439 }, endMinutes: { type: "integer", minimum: 1, maximum: 1439 }, minimumClasses: { type: ["integer", "null"], minimum: 0, maximum: 100 }, maximumClasses: { type: ["integer", "null"], minimum: 0, maximum: 100 } }, required: ["kind", "strength", "day", "startMinutes", "endMinutes", "minimumClasses", "maximumClasses"] },
   { properties: { kind: { const: "compact_schedule" }, strength: { enum: ["hard", "soft"] } }, required: ["kind", "strength"] },
   { properties: { kind: { const: "maximum_gap" }, strength: { enum: ["hard", "soft"] }, minutes: { type: "integer", minimum: 0, maximum: 1439 } }, required: ["kind", "strength", "minutes"] },
   { properties: { kind: { enum: ["campus", "modality"] }, strength: { enum: ["hard", "soft"] }, value: { type: "string", minLength: 1, maxLength: 100 } }, required: ["kind", "strength", "value"] },
@@ -51,7 +51,8 @@ function validMessages(messages) {
 }
 
 function normalizedPreferences(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw) || raw.version !== 1 || !Array.isArray(raw.constraints)) return null;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || raw.version !== 1
+    || !Array.isArray(raw.constraints) || raw.constraints.length > 20) return null;
   const normalized = preferenceLogic.normalizePreferenceSet(raw);
   return sameJson(normalized.constraints, raw.constraints) ? normalized : null;
 }
@@ -81,8 +82,11 @@ function validOutput(raw) {
   if (!acknowledgement || acknowledgement.length > MAX_ACKNOWLEDGEMENT_CHARACTERS) return null;
   const constraints = raw.preferencePatch?.constraints;
   if (!Array.isArray(constraints) || constraints.length > 20) return null;
-  const normalized = preferenceLogic.normalizePreferenceSet({ version: 1, constraints });
-  if (!sameJson(normalized.constraints, constraints)) return null;
+  const canonicalConstraints = constraints.map((constraint) => Object.fromEntries(
+    Object.entries(constraint || {}).filter(([, value]) => value !== null),
+  ));
+  const normalized = preferenceLogic.normalizePreferenceSet({ version: 1, constraints: canonicalConstraints });
+  if (!sameJson(normalized.constraints, canonicalConstraints)) return null;
   return { preferencePatch: { constraints: normalized.constraints }, acknowledgement };
 }
 
@@ -119,12 +123,16 @@ export async function handleScheduleAssistantRequest(request, env, upstreamFetch
       format: { type: "json_schema", name: "schedule_preference_patch", strict: true, schema: PREFERENCE_PATCH_SCHEMA },
     },
   };
+  const serializedBody = JSON.stringify(body);
+  if (new TextEncoder().encode(serializedBody).length > MAX_REQUEST_BYTES) {
+    return response({ error: "invalid assistant request" }, 400);
+  }
   let upstreamResponse;
   try {
     upstreamResponse = await upstreamFetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.OPENAI_API_KEY}` },
-      body: JSON.stringify(body),
+      body: serializedBody,
     });
   } catch (_) {
     return response({ error: "schedule assistant is temporarily unavailable" }, 502);

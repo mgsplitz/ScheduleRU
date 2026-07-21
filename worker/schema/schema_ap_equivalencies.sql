@@ -1,7 +1,7 @@
 -- Reviewed Rutgers--New Brunswick AP equivalencies transcribed from the
 -- existing frontend catalog. Each row is scoped to its reviewed catalog year.
 CREATE TABLE IF NOT EXISTS ap_equivalencies (
-  id TEXT PRIMARY KEY,
+  id TEXT NOT NULL,
   exam_name TEXT NOT NULL,
   minimum_score INTEGER NOT NULL CHECK (minimum_score BETWEEN 1 AND 5),
   maximum_score INTEGER NOT NULL CHECK (maximum_score BETWEEN minimum_score AND 5),
@@ -12,10 +12,11 @@ CREATE TABLE IF NOT EXISTS ap_equivalencies (
   campus TEXT NOT NULL DEFAULT 'NB',
   source_url TEXT NOT NULL,
   review_status TEXT NOT NULL CHECK (review_status IN ('draft','reviewed','retired')),
-  reviewed_at TEXT
+  reviewed_at TEXT,
+  PRIMARY KEY (id, catalog_year, campus)
 );
 
-INSERT OR IGNORE INTO ap_equivalencies (id, exam_name, minimum_score, maximum_score, credits, equivalent_course_codes_json, fulfills_requirement_ids_json, catalog_year, campus, source_url, review_status, reviewed_at) VALUES
+INSERT INTO ap_equivalencies (id, exam_name, minimum_score, maximum_score, credits, equivalent_course_codes_json, fulfills_requirement_ids_json, catalog_year, campus, source_url, review_status, reviewed_at) VALUES
 ('ap-afam','African American Studies',4,5,3,'["01:014:103"]','[]','2026-2027','NB','https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178','reviewed','2026-07-21'),
 ('ap-arthist','Art History',4,5,6,'["01:082:105","01:082:106"]','[]','2026-2027','NB','https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178','reviewed','2026-07-21'),
 ('ap-bio','Biology',4,5,10,'["01:119:115","01:119:116","01:119:117"]','[]','2026-2027','NB','https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178','reviewed','2026-07-21'),
@@ -52,4 +53,14 @@ INSERT OR IGNORE INTO ap_equivalencies (id, exam_name, minimum_score, maximum_sc
 ('ap-spanlit','Spanish Literature',4,5,3,'["01:940:215"]','[]','2026-2027','NB','https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178','reviewed','2026-07-21'),
 ('ap-stat','Statistics',4,5,3,'["01:960:211"]','["01960285"]','2026-2027','NB','https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178','reviewed','2026-07-21'),
 ('ap-ushist','United States History',4,5,3,'["01:512:103"]','[]','2026-2027','NB','https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178','reviewed','2026-07-21'),
-('ap-world','World History',4,5,3,'["01:506:101"]','[]','2026-2027','NB','https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178','reviewed','2026-07-21');
+('ap-world','World History',4,5,3,'["01:506:101"]','[]','2026-2027','NB','https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178','reviewed','2026-07-21')
+ON CONFLICT(id, catalog_year, campus) DO UPDATE SET
+  exam_name = excluded.exam_name,
+  minimum_score = excluded.minimum_score,
+  maximum_score = excluded.maximum_score,
+  credits = excluded.credits,
+  equivalent_course_codes_json = excluded.equivalent_course_codes_json,
+  fulfills_requirement_ids_json = excluded.fulfills_requirement_ids_json,
+  source_url = excluded.source_url,
+  review_status = excluded.review_status,
+  reviewed_at = excluded.reviewed_at;
