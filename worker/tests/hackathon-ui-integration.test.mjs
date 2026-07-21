@@ -59,3 +59,20 @@ test("program roles, grouped Issues, and closed sections have explicit UI contra
   assert.match(html, /autoIncludedClosed/);
   assert.match(html, /recomputeBuilderPermutations\(\);renderBuilder\(\)/);
 });
+
+test("planner horizon, legacy completion state, and modal transitions stay safe", () => {
+  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  assert.match(html, /function plannerTermsFromAcademicPosition\([\s\S]*?while\(year<=4\)/);
+  assert.doesNotMatch(html, /plannerTermsFromAcademicPosition\([\s\S]*?index<8/);
+  assert.match(html, /termKeys=new Set\(terms\.map/);
+  assert.match(html, /concrete=sourceType==="core"\?selected/);
+  assert.match(html, /function legacyCompletedAcademicCodes\([\s\S]*?ST\.completed[\s\S]*?ST\.apOn/);
+  assert.match(html, /function completedAcademicCodes\([\s\S]*?legacyCompletedAcademicCodes\(\)/);
+  assert.match(html, /function plannerKnownCourseCodes\([\s\S]*?completedAcademicCodes\(\)/);
+  assert.match(html, /completedCourseCodes:[\s\S]*?plannerKnownCourseCodes\(\)/);
+  assert.match(html, /renderOnboarding=function\(\)\{const wasOpen=.*legacyRenderOnboarding\(\);setOnboardingOpen\([^,]+,wasOpen\)/);
+  assert.match(html, /event\.key==="Escape"[\s\S]*?closeProgramPicker\(\)/);
+  assert.match(html, /event\.target===document\.getElementById\("programOv"\)[\s\S]*?closeProgramPicker\(\)/);
+  assert.match(html, /function rerenderOnboardingApStep\([\s\S]*?renderOnboarding\(\)/);
+  assert.match(html, /refreshApFulfillment\(\);[\s\S]*?rerenderOnboardingApStep\(\);[\s\S]*?renderSchedule\(\)/);
+});
