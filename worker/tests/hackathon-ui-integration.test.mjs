@@ -79,3 +79,31 @@ test("planner horizon, legacy completion state, and modal transitions stay safe"
   assert.match(html, /function rerenderOnboardingApStep\([\s\S]*?renderOnboarding\(\)/);
   assert.match(html, /refreshApFulfillment\(\);[\s\S]*?rerenderOnboardingApStep\(\);[\s\S]*?renderSchedule\(\)/);
 });
+
+test("desktop polish keeps semantic overlays and visual workflow hooks", () => {
+  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  assert.match(html, /id="onboarding"[^>]*role="dialog"[^>]*aria-modal="true"/);
+  assert.match(html, /id="programOv"[\s\S]*?role="dialog"[\s\S]*?aria-modal="true"/);
+  assert.match(html, /id="appModal"[\s\S]*?role="dialog"[\s\S]*?aria-modal="true"/);
+  assert.match(html, /class="program-subtab /);
+  assert.match(html, /program-subtab-minor/);
+  assert.match(html, /class="planner-issue planner-issue-\$\{issue\.severity\}"/);
+  assert.match(html, /class="issue-severity issue-severity-\$\{issue\.severity\}"/);
+  assert.match(html, /class="assistant-drawer" id="assistantDrawer" aria-label="Schedule assistant"/);
+  assert.match(html, /id="onboardingSteps"[^>]*role="progressbar"[^>]*aria-label="Onboarding progress"/);
+  assert.match(html, /onboardingSteps"\)\.setAttribute\("aria-valuenow",String\(step\+1\)\)/);
+  assert.doesNotMatch(html, /<title>[^<]*Degree Gooner[^<]*<\/title>/i);
+});
+
+test("desktop polish uses contrast-safe focus rings on light and dark surfaces", () => {
+  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  assert.match(html, /:focus-visible\{outline:3px solid #7b0022;outline-offset:3px;\}/);
+  assert.match(html, /\.topbar :focus-visible,[\s\S]*?outline-color:#fff;/);
+  assert.match(html, /\.choice-btn:not\(\.secondary\):focus-visible,[\s\S]*?box-shadow:0 0 0 3px #7b0022;/);
+});
+
+test("only the active registration semester exposes the schedule builder", () => {
+  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  assert.match(html, /renderSchedule=function\(\)\{[\s\S]*?button\.hidden=!enabled;button\.disabled=!enabled;/);
+  assert.match(html, /\.sem-plus\[hidden\]\{display:none;\}/);
+});
