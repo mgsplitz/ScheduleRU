@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<title>Degree Gooner</title>
+<title>ScheduleRU</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>
 :root{
@@ -31,7 +31,7 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .program-btn:hover{background:#ffe6ec;}
 
-/* PAGE NAV (Degree Navigator / Courses) */
+/* PAGE NAV (Planner / Courses) */
 .pagenav{background:var(--black);display:flex;align-items:center;
   height:40px;padding:0 14px;flex-shrink:0;}
 .pagenav-btn{background:none;border:none;color:#aaa;font-size:12px;font-weight:700;
@@ -413,22 +413,28 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .pool-course-disabled{opacity:.5;}
 .pool-course-disabled .pool-sec-row{pointer-events:none;}
 .pool-sections.collapsed{display:none;}
+
+/* Guided planning release surfaces */
+.topbar-school{font-size:14px;font-weight:700;border-left:1px solid rgba(255,255,255,.45);padding-left:12px;}.header-actions{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.onboarding{position:fixed;inset:0;z-index:60;background:linear-gradient(135deg,#f6f0ed,#ebe9e3);display:none;align-items:center;justify-content:center;padding:32px;overflow:auto;}.onboarding.open{display:flex}.onboarding-card{width:760px;max-width:100%;background:#fff;border-radius:12px;box-shadow:0 16px 48px rgba(20,15,10,.18);padding:32px}.onboarding-kicker{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--scarlet);font-weight:700;margin-bottom:7px}.onboarding h1{font-family:var(--fserif);font-size:30px;margin-bottom:8px}.onboarding p{font-size:13px;line-height:1.5;color:#4c4944;max-width:660px}.onboarding-steps{display:flex;gap:5px;margin:22px 0 25px}.onboarding-step-dot{height:5px;flex:1;background:#dedbd3;border-radius:99px}.onboarding-step-dot.active{background:var(--scarlet)}.onboarding-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0}.onboarding-fields label{font-size:11px;font-weight:700;color:#4b4741;display:grid;gap:5px}.onboarding-fields input,.onboarding-fields select{font:inherit;border:1px solid var(--line);border-radius:5px;padding:8px;background:#fff}.onboarding-records{margin:16px 0;display:grid;gap:8px}.onboarding-record{display:flex;align-items:center;justify-content:space-between;background:#f9f7f0;border:1px solid var(--line);border-radius:5px;padding:8px 10px;font-size:12px}.onboarding-actions{display:flex;justify-content:space-between;gap:8px;margin-top:25px}.onboarding-actions .right{display:flex;gap:8px}.onboarding-note{margin-top:12px;padding:9px 10px;border-radius:5px;background:#f8f4eb;color:#62594d;font-size:11px;line-height:1.45}.onboarding-review{margin:18px 0;display:grid;gap:7px;font-size:12px}.onboarding-review div{padding:9px 10px;background:#f9f7f0;border-radius:5px}
+.subtabs{display:flex;gap:5px;overflow:auto;padding:0 0 9px;margin:0 0 8px;border-bottom:1px solid var(--line)}.program-subtab{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:99px;padding:5px 8px;font-size:10px;font-weight:700;color:#4d4943;cursor:pointer}.program-subtab.active{background:var(--black);border-color:var(--black);color:#fff}.program-subtab-minor{opacity:.58}.required-tools{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}.issues-btn{border:1px solid #dca7b5;background:#fff5f7;color:#861c38;border-radius:4px;padding:5px 8px;font-size:10px;font-weight:700;cursor:pointer}.planning-disclaimer{font-size:10px;line-height:1.35;color:var(--muted);margin-top:12px}
+.generate-btn{margin-left:8px;background:var(--scarlet);color:#fff;border:0;border-radius:4px;padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer}.generate-btn:hover{background:var(--scarlet-d)}.planner-preview{display:grid;gap:12px;max-height:52vh;overflow:auto}.planner-term{border:1px solid var(--line);border-radius:5px;padding:9px}.planner-term h3{font-size:12px;margin-bottom:5px}.planner-item{font-size:11px;padding:3px 0;border-top:1px solid #eee}.placeholder-item{color:#795a18;font-style:italic}.planner-issue{padding:8px;border-radius:4px;background:#fff5f7;color:#7a1d34;font-size:11px;line-height:1.4}
+.app-modal{position:fixed;inset:0;z-index:70;background:rgba(20,15,10,.52);display:none;align-items:center;justify-content:center;padding:24px}.app-modal.open{display:flex}.app-modal-card{background:#fff;width:560px;max-width:100%;max-height:85vh;overflow:auto;border-radius:8px;box-shadow:0 14px 44px rgba(0,0,0,.25)}.app-modal-head{padding:14px 16px;border-bottom:1px solid var(--line);font-weight:700;font-size:14px}.app-modal-body{padding:16px;font-size:12px;line-height:1.45}.app-modal-actions{padding:0 16px 16px;display:flex;justify-content:flex-end;gap:8px}.inline-error{font-size:11px;color:#9d0027;margin-top:7px;min-height:16px}
+.schedule-assistant-toggle{border:1px solid var(--line);background:#fff;border-radius:4px;padding:6px 9px;font-size:10.5px;font-weight:700;cursor:pointer}.assistant-drawer{position:fixed;right:0;top:90px;bottom:0;width:340px;z-index:30;background:#fff;border-left:1px solid var(--line);box-shadow:-6px 0 20px rgba(20,15,10,.08);display:none;flex-direction:column}.assistant-drawer.open{display:flex}.assistant-head{padding:12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.assistant-messages{padding:12px;overflow:auto;flex:1;display:grid;align-content:start;gap:8px}.assistant-message{font-size:11px;line-height:1.4;background:#f5f3ee;border-radius:5px;padding:8px}.assistant-message.user{background:#fff0f3;border-left:3px solid var(--scarlet)}.assistant-compose{padding:10px;border-top:1px solid var(--line);display:grid;gap:7px}.assistant-compose textarea{min-height:58px;resize:vertical;border:1px solid var(--line);border-radius:4px;padding:7px;font:11px var(--ff)}.assistant-recs{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}.assistant-recs button{border:1px solid var(--scarlet);color:var(--scarlet);background:#fff;border-radius:3px;padding:3px 5px;font-size:10px;font-weight:700;cursor:pointer}.builder-nav-index{width:44px;border:1px solid var(--line);border-radius:3px;padding:3px 4px;font:inherit;text-align:center}.include-closed{font-size:10.5px;margin:8px 0;display:flex;gap:6px;align-items:center}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div class="block-r">R</div>
-  <div class="brand"><b>RUTGERS</b><span>BUSINESS SCHOOL · NB</span></div>
-  <div class="topbar-title" id="topProgramTitle">Degree Navigator</div>
-  <button class="program-btn" id="programBtn">Programs</button>
-  <div class="sp"></div>
-  <div class="topbar-user"><b>Fall 2026</b><br/><span id="topProgramMeta">Business Analytics &amp; IT</span></div>
+  <div class="brand"><b>Rutgers</b></div>
+  <div class="topbar-school" id="topSchoolTitle">Home school</div>
 </div>
 
 <div class="pagenav">
-  <button class="pagenav-btn active" data-page="nav">Degree Navigator</button>
+  <button class="pagenav-btn active" data-page="nav">Planner</button>
   <button class="pagenav-btn" data-page="courses">Courses</button>
+  <button class="pagenav-btn" id="programBtn">Programs</button>
+  <button class="pagenav-btn" id="restartSetup">Restart setup</button>
 </div>
 
 <div class="page" id="page-nav">
@@ -438,7 +444,7 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   <div class="main">
     <div id="planRoot">
     <div class="hdr">
-      <div><h1>4-Year Plan</h1><div class="sub">Drag courses from the panel → into a semester</div></div>
+      <div><h1>4-Year Plan <button class="generate-btn" id="generatePlanBtn">Generate plan</button></h1><div class="sub">Drag courses from the panel → into a semester</div></div>
       <div class="pill" id="pill">0 / 120 credits planned</div>
     </div>
     <div class="yr-sw">
@@ -477,6 +483,14 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 <div class="page courses-page" id="page-courses" style="display:none">
   <div id="coursesRoot"></div>
 </div>
+
+<section class="onboarding" id="onboarding" aria-labelledby="onboardingTitle">
+  <div class="onboarding-card">
+    <div class="onboarding-kicker">Local guest setup</div>
+    <div class="onboarding-steps" id="onboardingSteps"></div>
+    <div id="onboardingContent"></div>
+  </div>
+</section>
 
 <!-- AP MODAL -->
 <div class="ov" id="apOv">
@@ -530,52 +544,29 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   </div>
 </div>
 
+<div class="app-modal" id="appModal" aria-hidden="true">
+  <div class="app-modal-card" role="dialog" aria-modal="true" aria-labelledby="appModalTitle" tabindex="-1">
+    <div class="app-modal-head" id="appModalTitle"></div>
+    <div class="app-modal-body" id="appModalBody"></div>
+    <div class="app-modal-actions" id="appModalActions"></div>
+  </div>
+</div>
+
+<aside class="assistant-drawer" id="assistantDrawer" aria-label="Schedule assistant">
+  <div class="assistant-head"><strong>Schedule assistant</strong><button class="xbtn" id="assistantClose" aria-label="Close schedule assistant">✕</button></div>
+  <div class="assistant-messages" id="assistantMessages"></div>
+  <div class="assistant-compose"><textarea id="assistantInput" placeholder="Try: no classes before 10, and keep Friday light"></textarea><div><button class="choice-btn secondary" id="assistantUndo">Undo</button> <button class="choice-btn secondary" id="assistantClear">Clear</button> <button class="choice-btn" id="assistantSend">Send</button></div></div>
+</aside>
+
 <script src="requirement-group-logic.js"></script>
 <script src="course-selector-logic.js"></script>
 <script src="eligibility-logic.js"></script>
+<script src="planner-state-logic.js"></script>
+<script src="four-year-planner-logic.js"></script>
+<script src="schedule-preference-logic.js"></script>
 <script>
-/* ============================================================
-   DATA — scraped from official Rutgers pages June 2026!
-   ============================================================ */
-const AP = [
-  {id:"ap-afam",   name:"African American Studies",              equiv:"01:014:103",     credits:3,  fulfills:[]},
-  {id:"ap-arthist",name:"Art History",                           equiv:"01:082:105+106", credits:6,  fulfills:[]},
-  {id:"ap-bio",    name:"Biology",                               equiv:"01:119:115,116,117", credits:10, fulfills:[]},
-  {id:"ap-calcab", name:"Calculus AB",                           equiv:"01:640:151",     credits:4,  fulfills:["01640135"]},
-  {id:"ap-calcbc", name:"Calculus BC",                           equiv:"01:640:151+152", credits:8,  fulfills:["01640135"]},
-  {id:"ap-chem4",  name:"Chemistry (score 4)",                   equiv:"01:160:161+171", credits:5,  fulfills:[]},
-  {id:"ap-chem5",  name:"Chemistry (score 5)",                   equiv:"01:160:161,162,171", credits:9, fulfills:[]},
-  {id:"ap-chinese",name:"Chinese Language and Culture",          equiv:"01:165:102",     credits:4,  fulfills:[]},
-  {id:"ap-csa4",   name:"Computer Science A (score 4)",          equiv:"01:198:110",     credits:3,  fulfills:[]},
-  {id:"ap-csa5",   name:"Computer Science A (score 5)",          equiv:"01:198:111",     credits:4,  fulfills:[]},
-  {id:"ap-csp",    name:"Computer Science: Principles",          equiv:"01:198:110",     credits:3,  fulfills:[]},
-  {id:"ap-macro",  name:"Economics — Macro",                     equiv:"01:220:103",     credits:3,  fulfills:["01220103"]},
-  {id:"ap-micro",  name:"Economics — Micro",                     equiv:"01:220:102",     credits:3,  fulfills:["01220102"]},
-  {id:"ap-engcomp",name:"English Language & Composition",        equiv:"01:355:101",     credits:3,  fulfills:["01355101"]},
-  {id:"ap-englit", name:"English Literature & Composition",      equiv:"01:355:101",     credits:3,  fulfills:["01355101"]},
-  {id:"ap-envsci", name:"Environmental Science",                 equiv:"11:375:101",     credits:3,  fulfills:[]},
-  {id:"ap-euro",   name:"European History",                      equiv:"01:510:102",     credits:3,  fulfills:[]},
-  {id:"ap-french", name:"French Language",                       equiv:"01:420:210",     credits:3,  fulfills:[]},
-  {id:"ap-german", name:"German Language",                       equiv:"01:470:131+132", credits:6,  fulfills:[]},
-  {id:"ap-govcomp",name:"Government & Politics: Comparative",    equiv:"01:790:103",     credits:3,  fulfills:[]},
-  {id:"ap-govus",  name:"Government & Politics: U.S.",           equiv:"01:790:104",     credits:3,  fulfills:["01790101"]},
-  {id:"ap-humgeo", name:"Human Geography",                       equiv:"01:450:103",     credits:3,  fulfills:[]},
-  {id:"ap-it4",    name:"Italian Language & Culture (score 4)",  equiv:"01:560:131",     credits:4,  fulfills:[]},
-  {id:"ap-it5",    name:"Italian Language & Culture (score 5)",  equiv:"01:560:131+132", credits:8,  fulfills:[]},
-  {id:"ap-jp",     name:"Japanese Language & Culture",           equiv:"01:565:102",     credits:4,  fulfills:[]},
-  {id:"ap-music",  name:"Music Theory",                          equiv:"07:700:103",     credits:3,  fulfills:["07700103"]},
-  {id:"ap-phys1",  name:"Physics 1",                             equiv:"01:750:203,205", credits:4,  fulfills:[]},
-  {id:"ap-phys2",  name:"Physics 2",                             equiv:"01:750:204,206", credits:4,  fulfills:[]},
-  {id:"ap-physce", name:"Physics C: E&M",                        equiv:"01:750:204,206", credits:4,  fulfills:[]},
-  {id:"ap-physcm", name:"Physics C: Mechanics",                  equiv:"01:750:203,205", credits:4,  fulfills:[]},
-  {id:"ap-precalc",name:"Precalculus",                           equiv:"01:640:115",     credits:4,  fulfills:[]},
-  {id:"ap-psych",  name:"Psychology",                            equiv:"01:830:101",     credits:3,  fulfills:["01830101"]},
-  {id:"ap-spanish",name:"Spanish Language",                      equiv:"01:940:203",     credits:3,  fulfills:[]},
-  {id:"ap-spanlit",name:"Spanish Literature",                    equiv:"01:940:215",     credits:3,  fulfills:[]},
-  {id:"ap-stat",   name:"Statistics",                            equiv:"01:960:211",     credits:3,  fulfills:["01960285"]},
-  {id:"ap-ushist", name:"United States History",                 equiv:"01:512:103",     credits:3,  fulfills:[]},
-  {id:"ap-world",  name:"World History",                         equiv:"01:506:101",     credits:3,  fulfills:[]},
-];
+/* AP equivalencies are loaded from the reviewed Worker endpoint. */
+let AP = [];
 
 // Requirement data is populated from the public Worker API at startup.
 // These containers deliberately contain no course or group data in source.
@@ -633,7 +624,7 @@ function activeCoreLabel(){
 const ST = {
   apOn:{}, completed:{}, schedule:{}, wishlist:{}, groupSelections:{}, creditLedger:{}, courseEligibilityByCode:{}, courseEligibilityFetched:{},
   year:1, tab:"required", panelFull:false,
-  page:"nav", // top-level page: "nav" (Degree Navigator) | "courses" (Courses)
+  page:"nav", // top-level page: "nav" (Planner) | "courses" (Courses)
   // Backend (Cloudflare Worker + D1) integration — see worker.js/schema.sql.
   // The worker reads Rutgers on a cron and serves cached results from D1,
   // so this is a plain same-origin-friendly fetch (the worker sends CORS
@@ -657,7 +648,9 @@ const ST = {
 // same site address. Catalog and requirement data stay on the Worker, so the
 // saved payload remains small and can be re-evaluated against updated rules.
 const PLANNER_STATE_KEY="scheduleru_planner_state_v1";
+// Keep the v2 marker while accepting it on migration; new saves use v3.
 const PLANNER_STATE_VERSION=2;
+const CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic.STATE_VERSION;
 function savedObject(value){
   return value && typeof value==="object" && !Array.isArray(value) ? value : {};
 }
@@ -665,7 +658,7 @@ function restorePlannerState(){
   try{
     if(typeof localStorage==="undefined") return;
     const saved=JSON.parse(localStorage.getItem(PLANNER_STATE_KEY)||"null");
-    if(!saved || ![1,PLANNER_STATE_VERSION].includes(saved.version)) return;
+    if(!saved || (![1,PLANNER_STATE_VERSION].includes(saved.version)&&saved.version!==CURRENT_PLANNER_STATE_VERSION)) return;
     ST.apOn=savedObject(saved.apOn);
     ST.completed=savedObject(saved.completed);
     ST.schedule=savedObject(saved.schedule);
@@ -676,6 +669,9 @@ function restorePlannerState(){
     if(Number.isInteger(year) && year>=1 && year<=4) ST.year=year;
     if(typeof saved.homeSchoolSlug==="string" && /^[a-z0-9-]{2,80}$/.test(saved.homeSchoolSlug)) ST.homeSchoolSlug=saved.homeSchoolSlug;
     if(Array.isArray(saved.selectedPrograms)) ST.selectedPrograms=saved.selectedPrograms.filter(id=>typeof id==="string");
+    const migrated=ScheduleRUPlannerStateLogic.migratePlannerState({...saved,selectedProgramIds:saved.selectedProgramIds||saved.selectedPrograms});
+    Object.assign(ST,migrated);
+    ST.selectedPrograms=Array.isArray(saved.selectedPrograms)?saved.selectedPrograms.filter(id=>typeof id==="string"):[];
   }catch(e){
     // A malformed or outdated local value should never prevent the planner
     // from opening; the user can continue with a fresh in-browser plan.
@@ -685,10 +681,14 @@ function savePlannerState(){
   try{
     if(typeof localStorage==="undefined") return;
     localStorage.setItem(PLANNER_STATE_KEY,JSON.stringify({
-      version:PLANNER_STATE_VERSION, savedAt:Date.now(), apOn:ST.apOn, completed:ST.completed,
+      version:CURRENT_PLANNER_STATE_VERSION, savedAt:Date.now(), apOn:ST.apOn, completed:ST.completed,
       schedule:ST.schedule, wishlist:ST.wishlist, groupSelections:ST.groupSelections,
       creditLedger:ST.creditLedger,
       year:ST.year, homeSchoolSlug:ST.homeSchoolSlug, selectedPrograms:ST.selectedPrograms,
+      onboarding:ST.onboarding, academicPosition:ST.academicPosition, academicRecords:ST.academicRecords,
+      primaryProgramId:ST.primaryProgramId, secondaryProgramId:ST.secondaryProgramId,
+      generatedPlanPreview:ST.generatedPlanPreview, schedulePreferences:ST.schedulePreferences,
+      issueDismissals:ST.issueDismissals,
     }));
   }catch(e){
     // Browsers can disable or limit local storage. Planning still works for
@@ -696,13 +696,16 @@ function savePlannerState(){
   }
 }
 restorePlannerState();
+Object.assign(ST,ScheduleRUPlannerStateLogic.migratePlannerState({...ST,selectedProgramIds:ST.selectedPrograms}));
+ST.expandedIds=new Set();
 const PAGE_SIZE = 25;
 
-// Must match CURRENT_YEAR/CURRENT_TERM in wrangler.toml — used to turn a bare
-// course code ("33:010:272") into the backend's course id format
-// ("01:010:272:2026:9") so we can fetch its real sections/times.
-const BACKEND_YEAR = "2026";
-const BACKEND_TERM = "9"; // 0=Winter 1=Spring 7=Summer 9=Fall
+function activeBackendYear(){ return String(ST.activeYear||new Date().getFullYear()); }
+function activeBackendTerm(){ return String(ST.activeTerm||"9"); }
+function activeRegistrationSemester(){
+  const term=activeBackendTerm().toLowerCase();
+  return term==="1"||term==="spring" ? "spring" : "fall";
+}
 
 /* AP fulfillment: build map courseId -> [apIds that fulfill it] */
 const AP_FULFILLS = {};
@@ -780,7 +783,7 @@ function isCompleted(id){
   const c = COURSES[id];
   if(c && Object.values(ST.schedule).some(e=>e.code===c.code)) return true;
   // A reviewed requirement may name a course that has an approved
-  // alternative in Degree Navigator. Keep that relationship in the
+  // alternative in the planner. Keep that relationship in the
   // requirements database; the interface only evaluates the data it gets.
   if(c && (c.alternatives||[]).some(alt=>{
     const code=alt.code||alt.course_code||"";
@@ -917,7 +920,7 @@ function selectorGuidanceHtml(g){
 }
 
 /* ============================================================
-   TOP-LEVEL PAGE SWITCH (Degree Navigator / Courses)
+   TOP-LEVEL PAGE SWITCH (Planner / Courses)
    ============================================================ */
 function setTopLevelPage(page){
   ST.page=page==="courses"?"courses":"nav";
@@ -1005,9 +1008,7 @@ function showProgramPolicyFeedback(check){
   node.innerHTML=issues.map(issue=>`<div>${escapeHtml(issue.message||issue.note||"This selection needs review.")}</div>`).join("");
 }
 function updateProgramTitle(){
-  const names=selectedProgramRows().map(program=>program.name);
-  document.getElementById("topProgramTitle").textContent=names.length?`${names.join(" + ")} Degree Navigator`:"Degree Navigator";
-  document.getElementById("topProgramMeta").textContent=names.join(" + ")||activeHomeSchoolLabel();
+  document.getElementById("topSchoolTitle").textContent=activeHomeSchoolLabel();
 }
 function renderProgramSchoolSelector(){
   const select=document.getElementById("programSchoolSelect");
@@ -1026,11 +1027,11 @@ async function changeHomeSchool(nextSchoolSlug){
   if(!next || next.slug===ST.homeSchoolSlug) return;
   const prior=ST.homeSchoolSlug;
   const priorName=activeHomeSchoolLabel();
-  if(ST.selectedPrograms.length && !confirm(`Change your home school from ${priorName} to ${next.name||next.short_name||next.slug}? Your planned courses stay saved, but program selections and requirement choices will be re-evaluated.`)){
-    const select=document.getElementById("programSchoolSelect");
-    if(select) select.value=prior;
-    return;
+  if(ST.selectedPrograms.length && ST.confirmedSchoolChange!==nextSchoolSlug){
+    modalController.show({title:"Change home school?",body:`<p>Your planned courses stay saved, but program selections and requirement choices will be re-evaluated for ${escapeHtml(next.name||next.short_name||next.slug)}.</p>`,actions:[{label:"Go back",secondary:true},{label:"Continue",onClick:()=>{ST.confirmedSchoolChange=nextSchoolSlug;changeHomeSchool(nextSchoolSlug);}}]});
+    const select=document.getElementById("programSchoolSelect"); if(select) select.value=prior; return;
   }
+  delete ST.confirmedSchoolChange;
   ST.homeSchoolSlug=next.slug;
   ST.selectedPrograms=[];
   ST.groupSelections={};
@@ -1112,7 +1113,7 @@ document.getElementById("programClose").addEventListener("click", closeProgramPi
 document.getElementById("programCancel").addEventListener("click", closeProgramPicker);
 document.getElementById("programApply").addEventListener("click", async()=>{
   const ids=(ST.programDraft||[]);
-  if(!ids.length){ alert("Choose at least one program."); return; }
+  if(!ids.length){ showProgramPolicyFeedback({errors:[{message:"Choose at least one program."}]}); return; }
   let selectionCheck;
   try{
     selectionCheck=await backendFetch("/api/program-selection-check",{
@@ -1399,7 +1400,7 @@ function renderRequirementPicker(){
       const proposed=[...current,id];
       const violation=parentSelectionConstraintViolation(g, proposed);
       if(violation){
-        alert(violation);
+        modalController.show({title:"Selection needs review",body:`<p>${escapeHtml(violation)}</p>`,actions:[{label:"Close",secondary:true}]});
         return;
       }
       ST.groupSelections[g.id]=proposed;
@@ -1550,18 +1551,18 @@ function setupDropZones(){
         code=record.code; title=record.title; fullTitle=record.fullTitle; credits=record.credits;
       }
       if(lockedElsewhere(code, ST.year, sem)){
-        alert(`${code} is already scheduled (with a chosen section) for a different semester. Remove it there first.`);
+        modalController.show({title:"Course already locked",body:`<p>${escapeHtml(code)} is already scheduled with a chosen section for a different semester. Remove it there first.</p>`,actions:[{label:"Close",secondary:true}]});
         return;
       }
       await loadCourseEligibilityForCodes([record.code]);
       const prerequisiteEligibility=prerequisiteEligibilityForTerm(record,{year:ST.year,sem});
       if(prerequisiteEligibility.status==="blocked"){
-        alert(`${code} cannot be placed in ${sem} of ${YL[ST.year]}: ${prerequisiteBlockerLabel(prerequisiteEligibility)}.`);
+        modalController.show({title:"Course cannot be placed",body:`<p>${escapeHtml(code)} cannot be placed in ${escapeHtml(sem)} of ${escapeHtml(YL[ST.year])}: ${escapeHtml(prerequisiteBlockerLabel(prerequisiteEligibility))}.</p>`,actions:[{label:"Close",secondary:true}]});
         return;
       }
       const eligibility=courseEligibilityForTerm(record,{year:ST.year,sem});
       if(eligibility.status==="blocked"){
-        alert(code+" cannot be placed in "+sem+" of "+YL[ST.year]+": "+plannerEligibilityLabel(eligibility)+".");
+        modalController.show({title:"Course cannot be placed",body:`<p>${escapeHtml(code)} cannot be placed in ${escapeHtml(sem)} of ${escapeHtml(YL[ST.year])}: ${escapeHtml(plannerEligibilityLabel(eligibility))}.</p>`,actions:[{label:"Close",secondary:true}]});
         return;
       }
       const prev = ST.schedule[code];
@@ -3020,7 +3021,7 @@ function closeBuilder(){
 // checked (it's the one already locked in); otherwise all open sections do.
 async function hydratePoolEntry(entry, preselectIndex){
   const parts=entry.code.split(":");
-  const backendId=`${parts[0]}:${parts[1]}:${parts[2]}:${BACKEND_YEAR}:${BACKEND_TERM}`;
+  const backendId=`${parts[0]}:${parts[1]}:${parts[2]}:${activeBackendYear()}:${activeBackendTerm()}`;
   try{
     if(!entry.title||entry.credits===undefined){
       const meta = await backendFetch(`/api/courses/${encodeURIComponent(backendId)}`);
@@ -3049,7 +3050,7 @@ async function addToBuilderPool(cid){
   if(ST.builder.pool.some(p=>p.code===code)) return;
   if(lockedElsewhere(code, ST.builder.year, ST.builder.sem)){
     const e=ST.schedule[code];
-    alert(`${code} is already scheduled for ${YL[e.year]} ${e.sem}. Remove it there first.`);
+    modalController.show({title:"Course already locked",body:`<p>${escapeHtml(code)} is already scheduled for ${escapeHtml(YL[e.year])} ${escapeHtml(e.sem)}. Remove it there first.</p>`,actions:[{label:"Close",secondary:true}]});
     return;
   }
   const entry={code, title, fullTitle:fullTitle||title, credits, course:record, sections:[], checked:new Set(), loading:true, enabled:true, collapsed:false};
@@ -3111,7 +3112,7 @@ function toggleBuilderCourseEnabled(code){
 function confirmBuilderSchedule(){
   if(!ST.builder) return;
   const combo = ST.builder.permutations[ST.builder.permIndex];
-  if(!combo || !combo.length){ alert("No valid conflict-free schedule to confirm yet — check at least one section for every required course."); return; }
+  if(!combo || !combo.length){ modalController.show({title:"No schedule to use",body:"<p>Check at least one section for every required course before using a conflict-free schedule.</p>",actions:[{label:"Close",secondary:true}]}); return; }
   const {year, sem} = ST.builder;
   combo.forEach(c=>{
     ST.schedule[c.code] = {
@@ -3230,9 +3231,10 @@ function renderBuilder(){
         ${renderCampusLegend()}
         <div class="builder-nav">
           <button id="permPrev" ${b.permIndex<=0?"disabled":""}>← Prev</button>
-          <span>Schedule ${b.permIndex+1} of ${n}</span>
+          <label>Schedule <input id="permIndex" class="builder-nav-index" type="number" min="1" max="${n}" value="${b.permIndex+1}" aria-label="Schedule number"/> of ${n}</label>
           <button id="permNext" ${b.permIndex>=n-1?"disabled":""}>Next →</button>
         </div>
+        <div class="inline-error" id="permIndexError" aria-live="polite"></div>
         ${renderBuilderCalendar()}
         <button class="builder-confirm" id="permConfirm">Use this schedule for ${semLabel} ${YL[b.year]}</button>
       `;
@@ -3267,6 +3269,12 @@ function renderBuilder(){
   root.querySelectorAll("[data-poolenable]").forEach(el=>el.addEventListener("change",()=>toggleBuilderCourseEnabled(el.dataset.poolenable)));
   document.getElementById("permPrev")?.addEventListener("click", ()=>{ b.permIndex=Math.max(0,b.permIndex-1); renderBuilder(); });
   document.getElementById("permNext")?.addEventListener("click", ()=>{ b.permIndex=Math.min(n-1,b.permIndex+1); renderBuilder(); });
+  document.getElementById("permIndex")?.addEventListener("keydown",event=>{
+    if(event.key==="Escape"){event.preventDefault();event.currentTarget.value=String(b.permIndex+1);event.currentTarget.blur();return;}
+    if(event.key!=="Enter")return;event.preventDefault();const requested=Number(event.currentTarget.value),error=document.getElementById("permIndexError");
+    if(!Number.isInteger(requested)||requested<1||requested>n){error.textContent=`Enter a schedule number from 1 to ${n}.`;return;}
+    b.permIndex=requested-1;renderBuilder();
+  });
   document.getElementById("permConfirm")?.addEventListener("click", confirmBuilderSchedule);
 }
 
@@ -3278,6 +3286,96 @@ document.querySelectorAll(".sem-plus").forEach(btn=>btn.addEventListener("click"
 // Initial load
 renderAll();
 loadInitialRequirements();
+</script>
+<script>
+/* The release shell keeps the legacy planner interactive while adding the reviewed, local-first flows. */
+const modalController=(()=>{
+  const root=document.getElementById("appModal"),card=root.querySelector("[role=dialog]"); let restore=null,dismissible=true;
+  function close(){ if(!root.classList.contains("open")) return; root.classList.remove("open"); root.setAttribute("aria-hidden","true"); restore?.focus?.(); }
+  function show({title,body,actions=[],canDismiss=true}){ restore=document.activeElement; dismissible=canDismiss; document.getElementById("appModalTitle").textContent=title; document.getElementById("appModalBody").innerHTML=body; const actionsRoot=document.getElementById("appModalActions"); actionsRoot.innerHTML=""; actions.forEach(action=>{const button=document.createElement("button");button.className=`choice-btn ${action.secondary?"secondary":""}`;button.textContent=action.label;button.addEventListener("click",()=>{if(action.close!==false) close(); action.onClick?.();});actionsRoot.append(button);}); root.classList.add("open");root.setAttribute("aria-hidden","false");(actionsRoot.querySelector("button")||card).focus(); }
+  root.addEventListener("click",event=>{if(event.target===root&&dismissible)close();}); document.addEventListener("keydown",event=>{if(event.key==="Escape"&&root.classList.contains("open")&&dismissible){event.preventDefault();close();}}); return {show,close};
+})();
+
+function html(value){ return escapeHtml(String(value??"")); }
+function parseJson(value){ try{return JSON.parse(value||"[]");}catch(_){return [];} }
+function refreshApFulfillment(){
+  Object.keys(AP_FULFILLS).forEach(key=>delete AP_FULFILLS[key]);
+  AP.forEach(ap=>(ap.fulfills||[]).forEach(id=>{(AP_FULFILLS[id]||=[]).push(ap.id);}));
+}
+async function loadHackathonConfiguration(){
+  try{const config=await backendFetch("/api/config");ST.activeYear=config.activeYear;ST.activeTerm=config.activeTerm;}catch(_){ST.activeYear=new Date().getFullYear();ST.activeTerm="9";}
+  try{const data=await backendFetch("/api/ap-equivalencies");AP=(data.equivalencies||[]).map(row=>({id:row.id,name:row.exam_name,equiv:parseJson(row.equivalent_course_codes_json).join(", "),credits:Number(row.credits)||0,fulfills:parseJson(row.fulfills_requirement_ids_json),minimumScore:Number(row.minimum_score),maximumScore:Number(row.maximum_score)}));refreshApFulfillment();}catch(_){AP=[];}
+  updateProgramTitle(); renderSchedule();
+}
+
+function activePlanYear(){ return Number(ST.academicPosition?.year)||1; }
+function termIsActive(year,sem){ return year===activePlanYear()&&sem===activeRegistrationSemester(); }
+const legacyRenderSchedule=renderSchedule;
+renderSchedule=function(){ legacyRenderSchedule(); document.querySelectorAll(".sem-plus").forEach(button=>{const enabled=termIsActive(ST.year,button.dataset.semplus);button.hidden=!enabled;button.disabled=!enabled;}); };
+
+function academicRecords(){ return Array.isArray(ST.academicRecords)?ST.academicRecords:[]; }
+function addAcademicRecord(record){ ST.academicRecords.push(ScheduleRUPlannerStateLogic.normalizeAcademicRecord(record)); savePlannerState(); }
+function completedAcademicCodes(){ return [...new Set(academicRecords().filter(record=>record.creditStatus==="applied").flatMap(record=>[record.courseCode,...(record.equivalentCourseCodes||[])]).filter(Boolean))]; }
+const legacyConfirmedEntries=confirmedAcademicCreditEntries;
+confirmedAcademicCreditEntries=function(){ return [...legacyConfirmedEntries(),...ScheduleRUPlannerStateLogic.academicCreditEntries(ST)]; };
+const legacyIsCompleted=isCompleted;
+isCompleted=function(id){ const code=COURSES[id]?.code||id; return legacyIsCompleted(id)||completedAcademicCodes().some(value=>requirementCourseId(value)===requirementCourseId(code)); };
+
+function issueList(){
+  const issues=[]; if(ST.requirementsError)issues.push({severity:"error",text:ST.requirementsError});
+  selectedProgramRows().filter(row=>row.requirements_available===false||row.coverage_status==="catalog_listed").forEach(row=>issues.push({severity:"warning",text:`${row.name}: requirements are still under review.`}));
+  (ST.generatedPlanPreview?.issues||[]).forEach(issue=>issues.push({severity:issue.severity||"warning",text:issue.code.replaceAll("_"," ")}));
+  return issues;
+}
+function showIssues(){ const issues=issueList(); modalController.show({title:`Issues · ${issues.length}`,body:issues.length?issues.map(issue=>`<div class="planner-issue"><b>${html(issue.severity)}</b> · ${html(issue.text)}</div>`).join(""):"<p>No active planning issues.</p>",actions:[{label:"Close",secondary:true}]}); }
+function orderedPrograms(){ const rows=selectedProgramRows(); const byId=new Map(rows.map(row=>[row.id,row])); const ids=[ST.primaryProgramId,ST.secondaryProgramId,...rows.map(row=>row.id)].filter((id,index,list)=>id&&list.indexOf(id)===index);return ids.map(id=>byId.get(id)).filter(Boolean); }
+function setRequiredProgram(id){ST.requiredProgramTab=id;renderPanel();}
+const legacyRenderRequired=renderRequired;
+renderRequired=function(){
+  useRequirementTree(ST.majorRequirementTree); const pb=document.getElementById("pb"); if(ST.requirementsLoading||ST.requirementsError){legacyRenderRequired();return;}
+  const programs=orderedPrograms(); if(!ST.requiredProgramTab||!programs.some(program=>program.id===ST.requiredProgramTab))ST.requiredProgramTab=programs[0]?.id||"";
+  const issueCount=issueList().length; const subtabs=programs.map(program=>`<button class="program-subtab ${program.id===ST.requiredProgramTab?"active":""} ${program.type==="minor"?"program-subtab-minor":""}" data-required-program="${html(program.id)}">${html(program.name)}</button>`).join("");
+  let groups=ROOT_GROUPS.map(id=>GROUPS[id]).filter(Boolean).filter(group=>!group.sourceProgramId||group.sourceProgramId===ST.requiredProgramTab);
+  let content=groups.map(group=>group.rule==="all"?`<div class="sec-hdr">${html(groupDisplayName(group))}</div>${selectorGuidanceHtml(group)}<div class="cgrid">${(group.members||[]).map(cardHtml).join("")}</div>${(group.children||[]).map(groupHtml).join("")}`:groupHtml(group.id)).join("");
+  if(!content)content=`<div class="empty" style="margin-top:30px;">No reviewed requirements are available for this program yet.</div>`;
+  pb.innerHTML=`<div class="required-tools"><span class="leg">Reviewed requirements for this program.</span><button class="issues-btn" id="issuesBtn">Issues · ${issueCount}</button></div><div class="subtabs">${subtabs}</div>${content}<div class="planning-disclaimer">ScheduleRU is a planning aid, not an official degree audit.</div>`;
+  attachCardEvents(pb);pb.querySelectorAll("[data-required-program]").forEach(button=>button.addEventListener("click",()=>setRequiredProgram(button.dataset.requiredProgram)));pb.querySelectorAll("[data-gtog]").forEach(toggle=>{document.getElementById("gb-"+toggle.dataset.gtog)?.classList.add("open");toggle.addEventListener("click",()=>document.getElementById("gb-"+toggle.dataset.gtog)?.classList.toggle("open"));});pb.querySelectorAll("[data-gpicker]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openRequirementPicker(button.dataset.gpicker);}));pb.querySelectorAll("[data-gbrowse]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openSelectorCourseBrowser(button.dataset.gbrowse);}));pb.querySelectorAll("[data-gclear]").forEach(button=>button.addEventListener("click",()=>{delete ST.groupSelections[button.dataset.gclear];renderPanel();}));document.getElementById("issuesBtn")?.addEventListener("click",showIssues);
+};
+
+function applyProgramRoles(ids){const majors=(ST.availablePrograms||[]).filter(program=>ids.includes(program.id)&&program.type==="major");ST.primaryProgramId=majors[0]?.id||null;ST.secondaryProgramId=majors[1]?.id||null;ST.requiredProgramTab=ST.primaryProgramId||ids[0]||"";}
+async function applyProgramDraft(){
+  const ids=[...new Set(ST.programDraft||[])], majors=(ST.availablePrograms||[]).filter(program=>ids.includes(program.id)&&program.type==="major");
+  if(!majors.length){showProgramPolicyFeedback({errors:[{message:"Choose one primary major before applying programs."}]});return;}if(majors.length>2){showProgramPolicyFeedback({errors:[{message:"Choose one primary major and, if needed, one secondary major. Three majors are not supported."}]});return;}
+  let check;try{check=await backendFetch("/api/program-selection-check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({home_school:ST.homeSchoolSlug,program_ids:ids})});}catch(_){showProgramPolicyFeedback({errors:[{message:"Program policy checks could not be loaded. Your saved programs were not changed."}]});return;}
+  if(!check.allowed){showProgramPolicyFeedback(check);return;} const accept=async()=>{const snapshot={selectedPrograms:ST.selectedPrograms,requirementTrees:ST.requirementTrees,referenceRequirementTrees:ST.referenceRequirementTrees,majorRequirementTree:ST.majorRequirementTree};try{ST.requirementsLoading=true;renderPanel();await loadSelectedRequirements(ids);ST.selectedPrograms=ids;applyProgramRoles(ids);updateProgramTitle();closeProgramPicker();}catch(error){Object.assign(ST,snapshot);showProgramPolicyFeedback({errors:[{message:`Programs were not changed: ${error.message||"requirements could not load"}.`} ]});}finally{ST.requirementsLoading=false;renderPanel();}};
+  if(check.warnings?.length){modalController.show({title:"Review program warnings",body:check.warnings.map(warning=>`<p>${html(warning.message||warning.note||"This program combination needs advising.")}</p>`).join(""),actions:[{label:"Go back",secondary:true},{label:"Apply anyway",onClick:accept}]});}else await accept();
+}
+const oldApply=document.getElementById("programApply"),newApply=oldApply.cloneNode(true);oldApply.replaceWith(newApply);newApply.addEventListener("click",applyProgramDraft);
+
+function plannerTerms(){return [1,2,3,4].flatMap(year=>[{year,sem:"fall"},{year,sem:"spring"}]);}
+function unresolvedPlannerRequirements(){const unresolved=[];ROOT_GROUPS.map(id=>GROUPS[id]).filter(Boolean).forEach(group=>{if(groupFulfilled(group.id))return; if(group.members?.length) return; unresolved.push({id:group.id,label:groupDisplayName(group),credits:3,sourceType:group.sourceProgramId?"program":"core",sourceProgram:group.sourceProgramId||"",requirementGroupId:group.id});});if(ST.coreRequirementTree)Object.values(GROUPS).filter(group=>group&&/core/i.test(group.sourceProgramId||"")&&!groupFulfilled(group.id)).slice(0,8).forEach(group=>unresolved.push({id:group.id,label:groupDisplayName(group),credits:3,sourceType:"core",requirementGroupId:group.id}));return unresolved;}
+function generateFourYearPlan(){const input={terms:plannerTerms(),courses:Object.values(COURSES).map(course=>({code:course.code,title:course.title,credits:course.credits})),completedCourseCodes:completedAcademicCodes(),lockedPlacements:Object.fromEntries(Object.values(ST.schedule).map(entry=>[entry.code,{...entry,locked:true}])),prerequisitePathsByCode:Object.fromEntries(Object.values(COURSES).map(course=>[course.code,prerequisitePlanForCourse(course).paths||[[]]])),unresolvedRequirements:unresolvedPlannerRequirements()};ST.generatedPlanPreview=ScheduleRUFourYearPlanner.generatePlan(input);savePlannerState();showPlanPreview();}
+function showPlanPreview(){const preview=ST.generatedPlanPreview;if(!preview)return;const rows=plannerTerms().map(term=>{const courses=Object.values(preview.schedule).filter(entry=>entry.year===term.year&&entry.sem===term.sem);const placeholders=(preview.placeholders||[]).filter(entry=>entry.year===term.year&&entry.sem===term.sem);return `<section class="planner-term"><h3>${html(YL[term.year])} · ${html(term.sem)}</h3>${courses.map(entry=>`<div class="planner-item">${html(entry.code)} · ${html(entry.credits)} credits${entry.locked?" · locked":""}</div>`).join("")}${placeholders.map(entry=>`<div class="planner-item placeholder-item">Placeholder: ${html(entry.label)} · ${html(entry.estimatedCredits)} credits</div>`).join("")||"<div class=\"planner-item\">No placement</div>"}</section>`;}).join("");modalController.show({title:"Generated plan preview",body:`<div class="planner-preview">${rows}${(preview.issues||[]).map(issue=>`<div class="planner-issue">${html(issue.code.replaceAll("_"," "))}</div>`).join("")}</div>`,actions:[{label:"Cancel",secondary:true},{label:"Use this plan",onClick:()=>{const accepted=ScheduleRUPlannerStateLogic.withAcceptedPlan(ST,preview);Object.entries(accepted.schedule).forEach(([code,entry])=>{const prior=ST.schedule[code]||courseByCode(code)||{};accepted.schedule[code]={...prior,...entry,title:prior.title||COURSES[requirementCourseId(code)]?.title||code,fullTitle:prior.fullTitle||prior.title||code,locked:true};});Object.assign(ST,accepted);savePlannerState();renderAll();}}]});}
+document.getElementById("generatePlanBtn").addEventListener("click",()=>{const needsCore=!!ST.coreRequirementTree&&!Object.values(GROUPS).filter(group=>group&&/core/i.test(group.sourceProgramId||"")).every(group=>groupFulfilled(group.id));modalController.show({title:needsCore?"Core choices are incomplete":"Generate a plan preview",body:needsCore?"<p>Accuracy improves when Core choices are completed. Courses already placed will stay where you put them, and unresolved Core areas will appear as typed placeholders.</p>":"<p>Courses already placed will stay where you put them. This creates a preview; your accepted plan changes only after you choose Use this plan.</p>",actions:[{label:"Go back",secondary:true},{label:needsCore?"I understand":"Generate preview",onClick:generateFourYearPlan}]});});
+
+function termPreferenceState(){const key=ScheduleRUPlannerStateLogic.termKey({year:activePlanYear(),sem:activeRegistrationSemester()});ST.schedulePreferences[key]||={version:1,constraints:[],messages:[]};return ST.schedulePreferences[key];}
+function builderScheduleFacts(){return (ST.builder?.permutations||[]).map((combo,index)=>({stableIndex:combo.stableIndex||index+1,meetings:combo.flatMap(section=>(section.meetings||[]).map(meeting=>({day:({M:"M",T:"T",W:"W",H:"R",R:"R",F:"F"})[String(meeting.day_of_week||"").toUpperCase()]||"M",start:meetingTimeRange(meeting)?.start,end:meetingTimeRange(meeting)?.end,campus:campusFor(meeting),modality:meeting.mode||meeting.meeting_mode||"",open:section.open_status!==false})))}));}
+function renderAssistant(){const state=termPreferenceState(),root=document.getElementById("assistantMessages");const messages=state.messages||[];root.innerHTML=(messages.length?messages:[{role:"assistant",content:"Tell me preferences like ‘no classes before 10’ or ‘keep Friday light.’ I only recommend verified schedule numbers."}]).map(message=>`<div class="assistant-message ${message.role==="user"?"user":""}">${html(message.content)}${message.recommendations?.length?`<div class="assistant-recs">${message.recommendations.slice(0,3).map(index=>`<button data-assistant-index="${index}">Try #${index}</button>`).join("")}</div>`:""}</div>`).join("");root.querySelectorAll("[data-assistant-index]").forEach(button=>button.addEventListener("click",()=>{const index=Number(button.dataset.assistantIndex);if(ST.builder){const found=ST.builder.permutations.findIndex(combo=>combo.stableIndex===index);if(found>=0){ST.builder.permIndex=found;renderBuilder();}}}));}
+async function sendAssistant(){const input=document.getElementById("assistantInput"),content=input.value.trim();if(!content)return;const state=termPreferenceState();(state.undo||=[]).push(JSON.parse(JSON.stringify({constraints:state.constraints||[],messages:state.messages||[]})));state.messages.push({role:"user",content});input.value="";renderAssistant();try{const response=await backendFetch("/api/schedule-assistant/interpret",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:state.messages.slice(-20),currentPreferences:{version:1,constraints:state.constraints||[]}})});state.constraints=ScheduleRUPreferenceLogic.mergePreferencePatch({version:1,constraints:state.constraints||[]},response.preferencePatch).constraints;const recommendation=ScheduleRUPreferenceLogic.recommendSchedules(builderScheduleFacts(),{version:1,constraints:state.constraints});const indices=(recommendation.matches.length?recommendation.matches:recommendation.tradeoffs).slice(0,3).map(item=>item.stableIndex);state.messages.push({role:"assistant",content:recommendation.conflictSummary?`${response.acknowledgement} ${recommendation.conflictSummary.message} Which preference matters most?`:response.acknowledgement,recommendations:indices});}catch(_){state.messages.push({role:"assistant",content:"I could not update preferences. You can keep browsing verified schedules."});}savePlannerState();renderAssistant();}
+document.getElementById("assistantClose").addEventListener("click",()=>document.getElementById("assistantDrawer").classList.remove("open"));document.getElementById("assistantSend").addEventListener("click",sendAssistant);document.getElementById("assistantUndo").addEventListener("click",()=>{const state=termPreferenceState(),snapshot=state.undo?.pop();if(snapshot){state.constraints=snapshot.constraints;state.messages=snapshot.messages;}savePlannerState();renderAssistant();});document.getElementById("assistantClear").addEventListener("click",()=>{const state=termPreferenceState();state.messages=[];state.constraints=[];state.undo=[];savePlannerState();renderAssistant();});
+
+function renderOnboarding(){const onboarding=ST.onboarding||{completed:false,step:0};const root=document.getElementById("onboarding"),content=document.getElementById("onboardingContent"),step=Math.max(0,Math.min(6,Number(onboarding.step)||0));root.classList.toggle("open",!onboarding.completed);document.getElementById("onboardingSteps").innerHTML=Array.from({length:7},(_,index)=>`<i class="onboarding-step-dot ${index<=step?"active":""}"></i>`).join("");const records=academicRecords();const layout=(title,text,body,options={})=>{content.innerHTML=`<h1 id="onboardingTitle">${title}</h1><p>${text}</p>${body}<div class="onboarding-actions"><button class="choice-btn secondary" id="onboardingBack" ${step===0?"disabled":""}>Back</button><div class="right">${options.skip?'<button class="choice-btn secondary" id="onboardingSkip">Skip</button>':""}<button class="choice-btn" id="onboardingNext">${options.next||"Continue"}</button></div></div>`;document.getElementById("onboardingBack").onclick=()=>{ST.onboarding.step=step-1;savePlannerState();renderOnboarding();};document.getElementById("onboardingSkip")?.addEventListener("click",()=>{ST.onboarding.step=step+1;savePlannerState();renderOnboarding();});document.getElementById("onboardingNext").onclick=()=>{options.onNext?.();if(step===6){ST.onboarding.completed=true;}else ST.onboarding.step=step+1;savePlannerState();renderOnboarding();renderAll();};};
+if(step===0)return layout("Plan with confidence","ScheduleRU keeps this guest plan in your browser. It is a planning aid, not an official degree audit.","<div class=\"onboarding-note\">No account, transcript upload, or file parsing is used in this setup.</div>",{next:"Continue as guest"});if(step===1)return layout("Set your academic position","This anchors the eight Fall/Spring planning terms.",`<div class="onboarding-fields"><label>Current plan year<select id="academicYear">${[1,2,3,4].map(year=>`<option value="${year}" ${activePlanYear()===year?"selected":""}>${YL[year]}</option>`).join("")}</select></label><label>Starting semester<select id="startingSemester"><option value="fall" ${ST.academicPosition?.startingSemester!=="spring"?"selected":""}>Fall</option><option value="spring" ${ST.academicPosition?.startingSemester==="spring"?"selected":""}>Spring</option></select></label></div>`,{onNext:()=>{ST.academicPosition={year:Number(document.getElementById("academicYear").value),startingSemester:document.getElementById("startingSemester").value};}});if(step===2)return layout("Add AP credit","Enter each exam and score manually. Scores of 4 or 5 can count only when a reviewed equivalency applies; lower scores are saved but not applied for credit.",`<div class="onboarding-fields"><label>Reviewed AP exam<select id="apExam"><option value="">Select an exam</option>${AP.map(ap=>`<option value="${html(ap.id)}">${html(ap.name)} (${ap.minimumScore}–${ap.maximumScore})</option>`).join("")}</select></label><label>Score<input id="apScore" type="number" min="1" max="5"/></label></div><button class="choice-btn secondary" id="addApRecord">Add AP result</button><div class="onboarding-records">${records.filter(record=>record.type==="ap").map(record=>`<div class="onboarding-record">${html(record.exam)} · ${html(record.score)}<span>${html(record.creditStatus)}</span></div>`).join("")}</div>`,{skip:true,onNext:()=>{},next:"Continue"});if(step===3)return layout("Add completed coursework","Add Rutgers or transfer work manually. Files are not parsed in this release.",`<div class="onboarding-fields"><label>Course code<input id="recordCode" placeholder="01:198:111"/></label><label>Title<input id="recordTitle"/></label><label>Credits<input id="recordCredits" type="number" min="0" step=".5"/></label><label>Origin<select id="recordType"><option value="rutgers_completed">Rutgers</option><option value="transfer">Transfer</option></select></label><label>Grade (optional)<input id="recordGrade"/></label><label>Completed term (optional)<input id="recordTerm" placeholder="Spring 2026"/></label></div><button class="choice-btn secondary" id="addCourseRecord">Add coursework</button><div class="onboarding-records">${records.filter(record=>record.type!=="ap").map(record=>`<div class="onboarding-record">${html(record.courseCode||record.title)}<span>${html(record.type)}</span></div>`).join("")}</div>`,{skip:true});if(step===4)return layout("Choose programs","Choose one primary major, an optional secondary major, and any policy-permitted minors. A third major is not supported.",`<div class="onboarding-review"><div>Home school: ${html(activeHomeSchoolLabel())}</div><div>Primary: ${html(selectedProgramRows().find(row=>row.id===ST.primaryProgramId)?.name||"Not selected")}</div><div>Secondary: ${html(selectedProgramRows().find(row=>row.id===ST.secondaryProgramId)?.name||"None")}</div></div><button class="choice-btn secondary" id="onboardingPrograms">Choose programs</button>`);if(step===5)return layout("Review your plan setup","You can restart setup later without erasing your accepted plan.",`<div class="onboarding-review"><div>${html(activeHomeSchoolLabel())}</div><div>${html(selectedProgramRows().map(row=>row.name).join(", ")||"Programs not selected")}</div><div>${records.length} academic record${records.length===1?"":"s"}</div></div>`);return layout("Ready to plan","Use the four-year preview for a deterministic draft, then use the active-term builder for real sections and schedule preferences.","<div class=\"onboarding-note\">Existing courses stay where you put them unless you explicitly replace the accepted plan.</div>",{next:"Start planning"});
+}
+document.addEventListener("click",event=>{if(event.target.id==="addApRecord"){const ap=AP.find(item=>item.id===document.getElementById("apExam").value),score=Number(document.getElementById("apScore").value);if(!ap||score<1||score>5)return;const reviewed=score>=4&&score>=ap.minimumScore&&score<=ap.maximumScore;addAcademicRecord({type:"ap",exam:ap.name,score,credits:ap.credits,equivalencyReviewStatus:reviewed?"reviewed":"",equivalentCourseCodes:reviewed?courseCodesFromText(ap.equiv):[],creditStatus:reviewed?"applied":"not_applied"});renderOnboarding();}if(event.target.id==="addCourseRecord"){addAcademicRecord({type:document.getElementById("recordType").value,courseCode:document.getElementById("recordCode").value,title:document.getElementById("recordTitle").value,credits:Number(document.getElementById("recordCredits").value)||0,grade:document.getElementById("recordGrade").value,completedTerm:document.getElementById("recordTerm").value});renderOnboarding();}if(event.target.id==="onboardingPrograms"){openProgramPicker();}});
+document.getElementById("restartSetup").addEventListener("click",()=>{ST.onboarding={completed:false,step:0};savePlannerState();renderOnboarding();});
+
+const legacyRenderBuilder=renderBuilder;
+renderBuilder=function(){legacyRenderBuilder();const root=document.getElementById("builderRoot"),header=root.querySelector(".builder-hdr");if(header){const control=document.createElement("button");control.className="schedule-assistant-toggle";control.textContent="Schedule assistant";control.onclick=()=>{document.getElementById("assistantDrawer").classList.add("open");renderAssistant();};header.append(control);}root.querySelectorAll(".pool-sec-row").forEach(row=>{if(row.querySelector(".status-closed"))row.hidden=!ST.builder?.includeClosed;});const pool=root.querySelector("#poolList");if(pool){const label=document.createElement("label");label.className="include-closed";label.innerHTML=`<input type="checkbox" ${ST.builder?.includeClosed?"checked":""}/> Include closed sections`;label.querySelector("input").onchange=event=>{ST.builder.includeClosed=event.target.checked;renderBuilder();};pool.before(label);}};
+const originalRecompute=recomputeBuilderPermutations;
+recomputeBuilderPermutations=function(){originalRecompute();(ST.builder?.permutations||[]).forEach((combo,index)=>{combo.stableIndex=index+1;});};
+
+loadHackathonConfiguration();renderOnboarding();renderAll();
 </script>
 </body>
 </html>
