@@ -1,0 +1,152 @@
+import "../../schedule-preference-logic.js";
+
+const MAX_MESSAGES = 20;
+const MAX_MESSAGE_CHARACTERS = 1_000;
+const MAX_REQUEST_BYTES = 20 * 1024;
+const MAX_ACKNOWLEDGEMENT_CHARACTERS = 280;
+const ALLOWED_ROLES = new Set(["user", "assistant"]);
+
+const preferenceLogic = globalThis.ScheduleRUPreferenceLogic;
+
+const CONSTRAINT_SCHEMAS = [
+  { properties: { kind: { const: "earliest_start" }, strength: { enum: ["hard", "soft"] }, minutes: { type: "integer", minimum: 0, maximum: 1439 } }, required: ["kind", "strength", "minutes"] },
+  { properties: { kind: { const: "latest_end" }, strength: { enum: ["hard", "soft"] }, minutes: { type: "integer", minimum: 0, maximum: 1439 } }, required: ["kind", "strength", "minutes"] },
+  { properties: { kind: { enum: ["avoid_day", "preferred_day"] }, strength: { enum: ["hard", "soft"] }, day: { enum: ["M", "T", "W", "R", "F", "S", "U"] } }, required: ["kind", "strength", "day"] },
+  { properties: { kind: { const: "light_day" }, strength: { enum: ["hard", "soft"] }, day: { enum: ["M", "T", "W", "R", "F", "S", "U"] }, maximumClasses: { type: "integer", minimum: 0, maximum: 100 } }, required: ["kind", "strength", "day", "maximumClasses"] },
+  { properties: { kind: { const: "time_window_exception" }, strength: { enum: ["hard", "soft"] }, day: { enum: ["M", "T", "W", "R", "F", "S", "U", null] }, startMinutes: { type: "integer", minimum: 0, maximum: 1439 }, endMinutes: { type: "integer", minimum: 1, maximum: 1439 }, minimumClasses: { type: ["integer", "null"], minimum: 0, maximum: 100 }, maximumClasses: { type: ["integer", "null"], minimum: 0, maximum: 100 } }, required: ["kind", "strength", "day", "startMinutes", "endMinutes", "minimumClasses", "maximumClasses"] },
+  { properties: { kind: { const: "compact_schedule" }, strength: { enum: ["hard", "soft"] } }, required: ["kind", "strength"] },
+  { properties: { kind: { const: "maximum_gap" }, strength: { enum: ["hard", "soft"] }, minutes: { type: "integer", minimum: 0, maximum: 1439 } }, required: ["kind", "strength", "minutes"] },
+  { properties: { kind: { enum: ["campus", "modality"] }, strength: { enum: ["hard", "soft"] }, value: { type: "string", minLength: 1, maxLength: 100 } }, required: ["kind", "strength", "value"] },
+  { properties: { kind: { const: "open_sections" }, strength: { enum: ["hard", "soft"] }, value: { const: true } }, required: ["kind", "strength", "value"] },
+].map((schema) => ({ type: "object", additionalProperties: false, ...schema }));
+
+export const PREFERENCE_PATCH_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    preferencePatch: {
+      type: "object",
+      additionalProperties: false,
+      properties: { constraints: { type: "array", maxItems: 20, items: { anyOf: CONSTRAINT_SCHEMAS } } },
+      required: ["constraints"],
+    },
+    acknowledgement: { type: "string", minLength: 1, maxLength: MAX_ACKNOWLEDGEMENT_CHARACTERS },
+  },
+  required: ["preferencePatch", "acknowledgement"],
+};
+
+function response(body, status) {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+function sameJson(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function validMessages(messages) {
+  return Array.isArray(messages) && messages.length > 0 && messages.length <= MAX_MESSAGES
+    && messages.every((message) => message && typeof message === "object" && !Array.isArray(message)
+      && ALLOWED_ROLES.has(message.role) && typeof message.content === "string"
+      && message.content.trim().length > 0 && message.content.length <= MAX_MESSAGE_CHARACTERS);
+}
+
+function normalizedPreferences(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || raw.version !== 1
+    || !Array.isArray(raw.constraints) || raw.constraints.length > 20) return null;
+  const normalized = preferenceLogic.normalizePreferenceSet(raw);
+  return sameJson(normalized.constraints, raw.constraints) ? normalized : null;
+}
+
+function buildPreferencePrompt(messages, currentPreferences) {
+  return [
+    {
+      role: "system",
+      content: "Translate only schedule-preference conversation into the provided JSON schema. Do not infer courses, sections, eligibility, academic records, credits, requirements, or schedule rankings. Return an empty constraints list when no supported preference is stated. Keep the acknowledgement concise.",
+    },
+    {
+      role: "user",
+      content: JSON.stringify({ messages, currentPreferences }),
+    },
+  ];
+}
+
+function outputText(payload) {
+  if (typeof payload?.output_text === "string") return payload.output_text;
+  const textPart = payload?.output?.flatMap((item) => item?.content || []).find((part) => part?.type === "output_text" && typeof part.text === "string");
+  return textPart?.text || null;
+}
+
+function validOutput(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || typeof raw.acknowledgement !== "string") return null;
+  const acknowledgement = raw.acknowledgement.trim();
+  if (!acknowledgement || acknowledgement.length > MAX_ACKNOWLEDGEMENT_CHARACTERS) return null;
+  const constraints = raw.preferencePatch?.constraints;
+  if (!Array.isArray(constraints) || constraints.length > 20) return null;
+  const canonicalConstraints = constraints.map((constraint) => Object.fromEntries(
+    Object.entries(constraint || {}).filter(([, value]) => value !== null),
+  ));
+  const normalized = preferenceLogic.normalizePreferenceSet({ version: 1, constraints: canonicalConstraints });
+  if (!sameJson(normalized.constraints, canonicalConstraints)) return null;
+  return { preferencePatch: { constraints: normalized.constraints }, acknowledgement };
+}
+
+export async function handleScheduleAssistantRequest(request, env, upstreamFetch = fetch) {
+  let rawBody;
+  try {
+    rawBody = await request.text();
+  } catch (_) {
+    return response({ error: "invalid assistant request" }, 400);
+  }
+  if (!rawBody || new TextEncoder().encode(rawBody).length > MAX_REQUEST_BYTES) {
+    return response({ error: "invalid assistant request" }, 400);
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch (_) {
+    return response({ error: "invalid assistant request" }, 400);
+  }
+  const currentPreferences = normalizedPreferences(payload?.currentPreferences);
+  if (!validMessages(payload?.messages) || !currentPreferences) {
+    return response({ error: "invalid assistant request" }, 400);
+  }
+  if (!env?.OPENAI_API_KEY) return response({ error: "schedule assistant is unavailable" }, 503);
+
+  const body = {
+    model: env.SCHEDULE_ASSISTANT_MODEL || "gpt-5.6-luna",
+    reasoning: { effort: "low" },
+    store: false,
+    input: buildPreferencePrompt(payload.messages, currentPreferences),
+    text: {
+      verbosity: "low",
+      format: { type: "json_schema", name: "schedule_preference_patch", strict: true, schema: PREFERENCE_PATCH_SCHEMA },
+    },
+  };
+  const serializedBody = JSON.stringify(body);
+  if (new TextEncoder().encode(serializedBody).length > MAX_REQUEST_BYTES) {
+    return response({ error: "invalid assistant request" }, 400);
+  }
+  let upstreamResponse;
+  try {
+    upstreamResponse = await upstreamFetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.OPENAI_API_KEY}` },
+      body: serializedBody,
+    });
+  } catch (_) {
+    return response({ error: "schedule assistant is temporarily unavailable" }, 502);
+  }
+  if (!upstreamResponse?.ok) return response({ error: "schedule assistant is temporarily unavailable" }, 502);
+
+  let upstreamPayload;
+  let translated;
+  try {
+    upstreamPayload = await upstreamResponse.json();
+    translated = validOutput(JSON.parse(outputText(upstreamPayload)));
+  } catch (_) {
+    return response({ error: "schedule assistant returned an invalid response" }, 502);
+  }
+  if (!translated) return response({ error: "schedule assistant returned an invalid response" }, 502);
+  return response(translated, 200);
+}

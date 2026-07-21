@@ -43,6 +43,7 @@
  */
 
 import { handleProgramsApi } from "./programs.js";
+import { handleScheduleAssistantRequest } from "./schedule-assistant.js";
 
 const RUTGERS_BASE = "https://sis.rutgers.edu/soc/api";
 const CORS_HEADERS = {
@@ -56,6 +57,15 @@ function json(data, status = 200) {
     status,
     headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
+}
+
+function activeTermConfiguration(env) {
+  const activeYear = Number(env.CURRENT_YEAR);
+  const activeTerm = String(env.CURRENT_TERM || "");
+  if (!Number.isInteger(activeYear) || activeYear < 2000 || activeYear > 2100
+    || !["0", "1", "7", "9"].includes(activeTerm)) return null;
+  const catalogStartYear = activeTerm === "9" ? activeYear : activeYear - 1;
+  return { activeYear, activeTerm, catalogYear: `${catalogStartYear}-${catalogStartYear + 1}` };
 }
 
 const COURSE_CODE_PATTERN = /^\d{2}:\d{3}:\d{3}$/;
@@ -399,6 +409,37 @@ async function handleApi(request, env, ctx) {
   const path = url.pathname;
 
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
+
+  if (path === "/api/schedule-assistant/interpret") {
+    if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+    const response = await handleScheduleAssistantRequest(request, env);
+    for (const [header, value] of Object.entries(CORS_HEADERS)) response.headers.set(header, value);
+    return response;
+  }
+
+  if (path === "/api/config") {
+    const configuration = activeTermConfiguration(env);
+    if (!configuration) return json({ error: "invalid active term configuration" }, 500);
+    return json({ activeYear: configuration.activeYear, activeTerm: configuration.activeTerm });
+  }
+
+  if (path === "/api/ap-equivalencies") {
+    const configuration = activeTermConfiguration(env);
+    if (!configuration) return json({ error: "invalid active term configuration" }, 500);
+    try {
+      const { results } = await env.DB.prepare(
+        `SELECT id, exam_name, minimum_score, maximum_score, credits,
+                equivalent_course_codes_json, fulfills_requirement_ids_json,
+                catalog_year, campus, source_url, reviewed_at
+         FROM ap_equivalencies
+         WHERE review_status = 'reviewed' AND catalog_year = ? AND campus = ?
+         ORDER BY exam_name, minimum_score, id`
+      ).bind(configuration.catalogYear, "NB").all();
+      return json({ equivalencies: results });
+    } catch (_) {
+      return json({ error: "AP equivalencies unavailable" }, 503);
+    }
+  }
 
   if (path === "/api/courses") {
     const q = (url.searchParams.get("search") || "").trim();
