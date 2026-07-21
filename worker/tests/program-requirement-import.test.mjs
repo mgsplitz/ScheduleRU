@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  discoverNestedMajorRequirementPage,
   discoverProfileRequirementPage,
   extractRequirementDraftCandidate,
   importProgramRequirementSource,
@@ -121,6 +122,33 @@ test("a SAS profile yields its official Major Web Page", () => {
     source_title: "Official major requirements",
     source_kind: "requirements_page",
   });
+});
+
+test("an official overview page yields only its explicitly labeled major requirements link", () => {
+  const detail = discoverNestedMajorRequirementPage(`
+    <main>
+      <a href="/academics/undergraduate/anthropology-major-requirements">Major Requirements</a>
+      <a href="/academics/undergraduate/anthropology-minor-requirements">Minor Requirements</a>
+      <a href="https://example.com/advising">Advising</a>
+    </main>
+  `, SOURCE);
+
+  assert.deepEqual(detail, {
+    source_url: "https://department.rutgers.edu/academics/undergraduate/anthropology-major-requirements",
+    source_title: "Official detailed major requirements",
+    source_kind: "requirements_page",
+  });
+});
+
+test("nested major requirement discovery rejects unrelated and self-referential links", () => {
+  assert.equal(
+    discoverNestedMajorRequirementPage('<a href="https://department.rutgers.edu/minor">Minor Requirements</a>', SOURCE),
+    null,
+  );
+  assert.equal(
+    discoverNestedMajorRequirementPage(`<a href="${SOURCE.source_url}">Major Requirements</a>`, SOURCE),
+    null,
+  );
 });
 
 test("major-page discovery rejects minor, non-Rutgers, and malformed links", () => {

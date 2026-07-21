@@ -53,3 +53,18 @@ test("the Worker stores generic draft candidates separately from reviewed requir
   assert.match(worker, /source\.source_kind = 'requirements_page'/);
   assert.match(worker, /extractRequirementDraftCandidate/);
 });
+
+test("the Worker can record one generic second-level major-requirements lookup per overview source", async () => {
+  const [schema, migration, worker] = await Promise.all([
+    readFile(new URL("../schema/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
+    readFile(new URL("../schema/migrate_requirement_source_discovery_attempts.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS program_requirement_source_discovery_attempts/);
+  assert.match(schema, /UNIQUE\(parent_source_id, discovery_kind\)/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS program_requirement_source_discovery_attempts/);
+  assert.match(worker, /\/api\/admin\/requirement-sources\/discover-details/);
+  assert.match(worker, /source\.id LIKE 'detail-%'/);
+  assert.match(worker, /discoverNestedMajorRequirementPage/);
+});

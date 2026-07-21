@@ -34,6 +34,7 @@ import { requirementEvidenceComplete } from "./requirement-evidence.js";
 import { publicSchoolProfile } from "./school-profiles.js";
 import { importProgramDirectory } from "./program-directory-import.js";
 import {
+  discoverNestedMajorRequirementPage,
   discoverProfileRequirementPage,
   extractRequirementDraftCandidate,
   importProgramRequirementSource,
@@ -420,6 +421,10 @@ function requirementDetailSourceIdForProgram(programId) {
   return `detail-${programId}`;
 }
 
+function nestedRequirementDetailSourceIdForProgram(programId) {
+  return `nested-${programId}`;
+}
+
 function isSupportedRequirementImportSource(source) {
   return source
     && source.adapter === "html_requirement_source_v1"
@@ -536,6 +541,97 @@ async function discoverMajorRequirementSources(env, profileSources) {
         rawHtml.slice(0, 1500),
       );
       discovered.push({ ok: false, source_id: profileSource.id, program_id: profileSource.program_id, error: err.message });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return discovered;
+}
+
+async function pendingNestedRequirementDetailSources(env, schoolSlug, batchLimit) {
+  if (schoolSlug !== "sasnb") throw new Error("nested requirement discovery currently supports school=sasnb majors only");
+  const { results } = await env.DB.prepare(
+    `SELECT source.id, source.program_id, source.school_slug, source.source_url,
+            source.source_title, source.adapter
+     FROM program_requirement_import_sources source
+     INNER JOIN program_requirement_draft_candidates candidate
+       ON candidate.source_id = source.id
+     INNER JOIN programs program ON program.id = source.program_id
+     WHERE source.school_slug = ?
+       AND source.id LIKE 'detail-%'
+       AND source.source_kind = 'requirements_page'
+       AND source.enabled = 1
+       AND program.type = 'major'
+       AND program.review_status = 'catalog_listed'
+       AND candidate.extractor_version = 1
+       AND json_array_length(candidate.candidate_json, '$.sections') = 0
+       AND NOT EXISTS (
+         SELECT 1 FROM program_requirement_source_discovery_attempts attempt
+         WHERE attempt.parent_source_id = source.id
+           AND attempt.discovery_kind = 'nested_major_requirements'
+       )
+     ORDER BY source.id
+     LIMIT ?`
+  ).bind(schoolSlug, batchLimit).all();
+  return results || [];
+}
+
+async function recordNestedRequirementDiscovery(env, source, status, discoveredUrl = null, note = null) {
+  await env.DB.prepare(
+    `INSERT INTO program_requirement_source_discovery_attempts (
+       parent_source_id, program_id, discovery_kind, status,
+       discovered_source_url, checked_at, note
+     ) VALUES (?,?,'nested_major_requirements',?,?,?,?)
+     ON CONFLICT(parent_source_id, discovery_kind) DO UPDATE SET
+       status = excluded.status,
+       discovered_source_url = excluded.discovered_source_url,
+       checked_at = excluded.checked_at,
+       note = excluded.note`
+  ).bind(source.id, source.program_id, status, discoveredUrl, Date.now(), note).run();
+}
+
+async function saveNestedRequirementDetailSource(env, parentSource, detailSource) {
+  await env.DB.prepare(
+    `INSERT INTO program_requirement_import_sources (
+       id, program_id, school_slug, source_url, source_title, adapter, source_kind, enabled
+     ) VALUES (?,?,?,?,?,'html_requirement_source_v1','requirements_page',1)
+     ON CONFLICT(id) DO UPDATE SET
+       source_url = excluded.source_url,
+       source_title = excluded.source_title,
+       source_kind = excluded.source_kind,
+       enabled = 1,
+       last_error = NULL`
+  ).bind(
+    nestedRequirementDetailSourceIdForProgram(parentSource.program_id),
+    parentSource.program_id,
+    parentSource.school_slug,
+    detailSource.source_url,
+    detailSource.source_title,
+  ).run();
+}
+
+async function discoverNestedRequirementDetailSources(env, parentSources) {
+  const discovered = [];
+  for (const source of parentSources) {
+    let rawHtml = "";
+    try {
+      const response = await fetch(source.source_url, { headers: FETCH_HEADERS });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      rawHtml = await response.text();
+      const detailSource = discoverNestedMajorRequirementPage(rawHtml, source);
+      if (!detailSource) {
+        await recordNestedRequirementDiscovery(env, source, "no_link", null, "no explicitly labelled Major Requirements link");
+        await logScrape(env, `requirements-detail-discovery:${source.id}`, "ok", { groupsWritten: 0, coursesWritten: 0, notesWritten: 1 }, "no explicit nested major-requirements link found; no audit changed", rawHtml.slice(0, 1500));
+        discovered.push({ ok: true, source_id: source.id, program_id: source.program_id, found: false });
+      } else {
+        await saveNestedRequirementDetailSource(env, source, detailSource);
+        await recordNestedRequirementDiscovery(env, source, "found", detailSource.source_url, "saved official detailed major requirements source");
+        await logScrape(env, `requirements-detail-discovery:${source.id}`, "ok", { groupsWritten: 0, coursesWritten: 0, notesWritten: 1 }, `saved official nested major requirements source ${detailSource.source_url}; no review status changed`, rawHtml.slice(0, 1500));
+        discovered.push({ ok: true, source_id: source.id, program_id: source.program_id, found: true });
+      }
+    } catch (err) {
+      await recordNestedRequirementDiscovery(env, source, "error", null, String(err?.message || err));
+      await logScrape(env, `requirements-detail-discovery:${source.id}`, "error", null, `nested requirements-source discovery failed: ${err.message}`, rawHtml.slice(0, 1500));
+      discovered.push({ ok: false, source_id: source.id, program_id: source.program_id, error: err.message });
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -2001,6 +2097,24 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
         }
         ctx.waitUntil(discoverMajorRequirementSources(env, profileSources));
         return json({ ok: true, mode: "background", school, queued: profileSources.length, note: "Discovering official major requirement sources only; no program was automatically marked reviewed." });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
+    }
+
+    // Some official department pages are major overviews. This performs one
+    // bounded, explicitly-labelled link lookup and stores another draft
+    // source when available; it never changes an audit or review status.
+    if (path === "/api/admin/requirement-sources/discover-details" && request.method === "POST") {
+      const school = url.searchParams.get("school") || "";
+      try {
+        const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
+        const parentSources = await pendingNestedRequirementDetailSources(env, school, batchLimit);
+        if (!parentSources.length) {
+          return json({ ok: true, mode: "complete", school, queued: 0, note: "Every eligible SAS major overview source has a recorded nested-link result; no program was automatically marked reviewed." });
+        }
+        ctx.waitUntil(discoverNestedRequirementDetailSources(env, parentSources));
+        return json({ ok: true, mode: "background", school, queued: parentSources.length, note: "Discovering explicitly labelled official major-requirements links only; no audit or review status changes." });
       } catch (err) {
         return json({ error: err.message }, 400);
       }
