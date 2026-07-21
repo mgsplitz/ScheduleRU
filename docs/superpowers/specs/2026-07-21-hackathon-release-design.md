@@ -1,7 +1,7 @@
 # ScheduleRU Hackathon Release Design
 
-**Date:** July 21, 2026  
-**Status:** Approved design, pending written-spec review  
+**Date:** July 21, 2026<br>
+**Status:** Approved design<br>
 **Target branch flow:** feature work → `dev` → `main` only after explicit user approval
 
 ## 1. Outcome
@@ -269,4 +269,3 @@ Final acceptance requires:
 6. Run full verification and Terra review.
 7. Complete README/repository hygiene.
 8. Expand reviewed SAS coverage only after the primary release is stable.
-

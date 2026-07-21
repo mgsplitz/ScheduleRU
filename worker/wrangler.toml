@@ -67,5 +67,4 @@ CATALOG_SUBDOMAIN = "newbrunswick-undergrad-25-26"
 #   (paste the existing secret securely when prompted)
 #
 # worker.js/programs.js both read it as env.ADMIN_SECRET either way, so no
-# code change is needed here — just don't add a line like
-# ADMIN_SECRET="RutgersGaps" directly into this file.
+# code change is needed here. ADMIN_SECRET must never be assigned in this file.
