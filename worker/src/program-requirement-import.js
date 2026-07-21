@@ -40,6 +40,11 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function attributeValue(attributes, name) {
+  const match = String(attributes || "").match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "i"));
+  return match ? (match[1] ?? match[2] ?? "") : "";
+}
+
 function sourceIsValid(source) {
   if (!source || typeof source !== "object") return false;
   if (!/^[a-z0-9][a-z0-9-]{2,119}$/i.test(String(source.id || ""))) return false;
@@ -50,6 +55,36 @@ function sourceIsValid(source) {
   } catch {
     return false;
   }
+}
+
+function isOfficialRutgersUrl(url) {
+  return url.protocol === "https:"
+    && !url.username
+    && !url.password
+    && (url.hostname === "rutgers.edu" || url.hostname.endsWith(".rutgers.edu"));
+}
+
+// SAS profiles identify the department-owned requirements page explicitly.
+// Profile recommendations and advising links are intentionally ignored.
+export function discoverProfileRequirementPage(html, profileSource, programType) {
+  if (programType !== "major" || !sourceIsValid(profileSource)) return null;
+  const anchors = String(html || "").matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi);
+  for (const match of anchors) {
+    const href = attributeValue(match[1], "href");
+    if (!href || textFromHtml(match[2]).toLowerCase() !== "major web page") continue;
+    try {
+      const sourceUrl = new URL(decodeHtml(href), profileSource.source_url);
+      if (!isOfficialRutgersUrl(sourceUrl)) continue;
+      return {
+        source_url: sourceUrl.href,
+        source_title: "Official major requirements",
+        source_kind: "requirements_page",
+      };
+    } catch {
+      // Keep checking anchors when a profile contains a malformed link.
+    }
+  }
+  return null;
 }
 
 // A compact deterministic content fingerprint is sufficient to skip an

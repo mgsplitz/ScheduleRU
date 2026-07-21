@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  discoverProfileRequirementPage,
   importProgramRequirementSource,
   parseProgramRequirementSource,
 } from "../src/program-requirement-import.js";
@@ -62,5 +63,33 @@ test("the requirements importer saves only a non-empty official HTTPS snapshot",
       saveSnapshot: async () => assert.fail("unsafe source must not be saved"),
     }),
     /valid official HTTPS source/
+  );
+});
+
+test("a SAS profile yields its official Major Web Page", () => {
+  const detail = discoverProfileRequirementPage(`
+    <li class="field-entry major-url"><a href="https://www.math.rutgers.edu/academics/undergraduate/majors">Major Web Page</a></li>
+    <li class="field-entry minor-url"><a href="https://www.math.rutgers.edu/academics/undergraduate/minors">Minor Web Page</a></li>
+  `, SOURCE, "major");
+
+  assert.deepEqual(detail, {
+    source_url: "https://www.math.rutgers.edu/academics/undergraduate/majors",
+    source_title: "Official major requirements",
+    source_kind: "requirements_page",
+  });
+});
+
+test("major-page discovery rejects minor, non-Rutgers, and malformed links", () => {
+  assert.equal(
+    discoverProfileRequirementPage('<a href="https://example.com/requirements">Major Web Page</a>', SOURCE, "major"),
+    null,
+  );
+  assert.equal(
+    discoverProfileRequirementPage('<a href="https://math.rutgers.edu/minors">Minor Web Page</a>', SOURCE, "major"),
+    null,
+  );
+  assert.equal(
+    discoverProfileRequirementPage('<a href="https://math.rutgers.edu/major">Major Web Page</a>', SOURCE, "minor"),
+    null,
   );
 });
