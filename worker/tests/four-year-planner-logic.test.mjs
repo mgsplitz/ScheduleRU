@@ -154,7 +154,8 @@ test("skips an infeasible first locked prerequisite alternative for a viable lat
   });
 
   assert.equal(result.schedule["01:198:112"]?.sem, "fall");
-  assert.equal(result.schedule["01:198:111"]?.sem, "spring");
+  assert.equal(result.schedule["01:198:111"]?.year, 2);
+  assert.equal(result.schedule["01:198:111"]?.sem, "fall");
   assert.equal(result.status, "complete");
   assert.equal(result.issues.some((issue) => issue.code === "locked_prerequisite_violation"), false);
 });
@@ -195,7 +196,7 @@ test("defaults invalid or missing target credits to 16", () => {
   assert.equal(planner().normalizePlannerInput({ targetCredits: Infinity }).targetCredits, 16);
 });
 
-test("moves flexible work to the earliest target-respecting term before using 18 credits", () => {
+test("balances flexible work across the available planning horizon", () => {
   const result = planner().generatePlan({
     terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
     courses: Array.from({ length: 6 }, (_, index) => ({ code: `01:198:${100 + index}`, credits: 3 })),
@@ -204,12 +205,11 @@ test("moves flexible work to the earliest target-respecting term before using 18
   });
 
   assert.equal(result.status, "complete");
-  assert.equal(result.termCredits["1:fall"], 15);
-  assert.equal(result.termCredits["1:spring"], 3);
-  assert.equal(result.schedule["01:198:105"].sem, "spring");
+  assert.equal(result.termCredits["1:fall"], 9);
+  assert.equal(result.termCredits["1:spring"], 9);
 });
 
-test("places placeholders in the earliest term that remains within target credits", () => {
+test("balances placeholders with concrete work", () => {
   const result = planner().generatePlan({
     terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
     courses: Array.from({ length: 4 }, (_, index) => ({ code: `01:198:${100 + index}`, credits: 3 })),
@@ -219,8 +219,128 @@ test("places placeholders in the earliest term that remains within target credit
   });
 
   assert.equal(result.placeholders[0].sem, "fall");
-  assert.equal(result.termCredits["1:fall"], 15);
-  assert.equal(result.termCredits["1:spring"], 0);
+  assert.equal(result.termCredits["1:fall"], 9);
+  assert.equal(result.termCredits["1:spring"], 6);
+});
+
+test("spreads a four-year workload across all eight Fall and Spring terms", () => {
+  const terms = Array.from({ length: 8 }, (_, index) => ({
+    year: Math.floor(index / 2) + 1,
+    sem: index % 2 ? "spring" : "fall",
+  }));
+  const result = planner().generatePlan({
+    terms,
+    courses: Array.from({ length: 16 }, (_, index) => ({ code: `01:198:${String(100 + index)}`, credits: 3 })),
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(Object.values(result.termCredits), Array(8).fill(6));
+  assert.equal(Object.keys(result.schedule).length, 16);
+});
+
+test("enforces the six-course term limit independently of the credit cap", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }],
+    courses: Array.from({ length: 7 }, (_, index) => ({ code: `01:198:${String(100 + index)}`, credits: 1 })),
+  });
+
+  assert.equal(Object.keys(result.schedule).length, 6);
+  assert.ok(result.issues.some((issue) => issue.code === "courses_unplaced"));
+});
+
+test("honors standing and confirmed-prior-credit gates", () => {
+  const terms = [
+    { year: 1, sem: "fall" }, { year: 1, sem: "spring" },
+    { year: 2, sem: "fall" }, { year: 2, sem: "spring" },
+    { year: 3, sem: "fall" }, { year: 3, sem: "spring" },
+  ];
+  const result = planner().generatePlan({
+    terms,
+    confirmedCredits: 45,
+    courses: [
+      { code: "01:198:300", title: "Junior course", credits: 3, minimumPlanYear: 3 },
+      { code: "01:198:301", title: "Sixty-credit course", credits: 3, minimumPriorCredits: 60 },
+      ...Array.from({ length: 5 }, (_, index) => ({ code: `01:198:${String(200 + index)}`, credits: 3 })),
+    ],
+  });
+
+  assert.ok(result.schedule["01:198:300"].year >= 3);
+  const creditGate = result.schedule["01:198:301"];
+  const priorPlanned = Object.values(result.schedule)
+    .filter((entry) => (entry.year - 1) * 2 + (entry.sem === "spring" ? 1 : 0) < (creditGate.year - 1) * 2 + (creditGate.sem === "spring" ? 1 : 0))
+    .reduce((total, entry) => total + entry.credits, 0);
+  assert.ok(45 + priorPlanned >= 60);
+});
+
+test("counts unresolved requirement credits toward later standing gates", () => {
+  const terms = Array.from({ length: 8 }, (_, ordinal) => ({
+    year: Math.floor(ordinal / 2) + 1,
+    sem: ordinal % 2 ? "spring" : "fall",
+  }));
+  const result = planner().generatePlan({
+    terms,
+    courses: [{ code: "33:136:470", title: "Business Data Management", credits: 3, minimumPriorCredits: 18 }],
+    unresolvedRequirements: Array.from({ length: 8 }, (_, index) => ({
+      id: `core-${index}`,
+      label: `Core choice ${index + 1}`,
+      credits: 3,
+      sourceType: "core",
+    })),
+  });
+
+  assert.ok(result.schedule["33:136:470"], "the later course should be placed once estimated Core credits satisfy the gate");
+  assert.equal(result.issues.some((issue) => issue.code === "courses_unplaced"), false);
+  assert.ok(result.schedule["33:136:470"].year >= 4);
+});
+
+test("allows a reviewed co-requisite in the same term", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    courses: [
+      { code: "01:198:201", credits: 3, corequisitePaths: [["01:198:202"]] },
+      { code: "01:198:202", credits: 1 },
+    ],
+  });
+
+  assert.equal(result.status, "complete");
+  const target = result.schedule["01:198:201"];
+  const corequisite = result.schedule["01:198:202"];
+  const targetOrdinal = (target.year - 1) * 2 + (target.sem === "spring" ? 1 : 0);
+  const corequisiteOrdinal = (corequisite.year - 1) * 2 + (corequisite.sem === "spring" ? 1 : 0);
+  assert.ok(corequisiteOrdinal <= targetOrdinal);
+});
+
+test("preserves course metadata and reports input uncertainty without dropping courses", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }],
+    courses: [{
+      code: "01:198:111", title: "Introduction to Computer Science", credits: 3,
+      creditsEstimated: true, ruleCoverage: "unresolved",
+    }],
+    issues: [{ code: "estimated_course_credits", severity: "warning", courseCode: "01:198:111" }],
+  });
+
+  assert.equal(result.schedule["01:198:111"].title, "Introduction to Computer Science");
+  assert.equal(result.schedule["01:198:111"].creditsEstimated, true);
+  assert.ok(result.issues.some((issue) => issue.code === "estimated_course_credits"));
+  assert.ok(result.issues.some((issue) => issue.code === "eligibility_rule_unresolved"));
+  assert.equal(result.status, "complete");
+});
+
+test("places required courses before wishlist courses and does not fail on optional overflow", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }],
+    courses: [
+      ...Array.from({ length: 6 }, (_, index) => ({ code: `01:198:${String(100 + index)}`, credits: 1 })),
+      { code: "01:198:999", title: "Wishlist", credits: 1, optional: true },
+    ],
+  });
+
+  assert.equal(Object.keys(result.schedule).length, 6);
+  assert.equal(result.schedule["01:198:999"], undefined);
+  assert.equal(result.issues.some((issue) => issue.code === "courses_unplaced"), false);
+  assert.ok(result.issues.some((issue) => issue.code === "optional_courses_unplaced"));
+  assert.equal(result.status, "complete");
 });
 
 test("chooses a complete reviewed prerequisite path deterministically", () => {
@@ -238,8 +358,33 @@ test("chooses a complete reviewed prerequisite path deterministically", () => {
     completedCourseCodes: ["01:198:101"],
     prerequisitePathsByCode: { "01:198:201": [["01:198:101"], ["01:198:102"]] },
   });
-  assert.equal(result.schedule["01:198:201"].sem, "fall");
+  assert.equal(result.schedule["01:198:201"].sem, "spring");
   assert.equal(result.status, "complete");
+});
+
+test("keeps room for an unlocked prerequisite chain instead of balancing its first course too late", () => {
+  const terms = Array.from({ length: 8 }, (_, ordinal) => ({
+    year: Math.floor(ordinal / 2) + 1,
+    sem: ordinal % 2 ? "spring" : "fall",
+  }));
+  const result = planner().generatePlan({
+    terms,
+    courses: [
+      ...Array.from({ length: 6 }, (_, index) => ({ code: `01:198:${100 + index}`, credits: 3 })),
+      { code: "33:011:301", credits: 1, minimumPlanYear: 2 },
+      { code: "33:011:302", credits: 1, minimumPlanYear: 2 },
+      { code: "33:011:303", credits: 1, minimumPlanYear: 3 },
+    ],
+    prerequisitePathsByCode: {
+      "33:011:302": [["33:011:301"]],
+      "33:011:303": [["33:011:302"]],
+    },
+  });
+
+  assert.ok(result.schedule["33:011:301"]);
+  assert.ok(result.schedule["33:011:302"]);
+  assert.ok(result.schedule["33:011:303"]);
+  assert.equal(result.issues.some((issue) => issue.code === "courses_unplaced"), false);
 });
 
 test("does not let a placeholder satisfy a reviewed prerequisite", () => {
