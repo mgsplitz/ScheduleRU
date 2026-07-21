@@ -33,8 +33,8 @@
 | UI integrator | `index.html`, `worker/tests/hackathon-ui-integration.test.mjs` | Onboarding, header, programs, subtabs, issues, planner preview, active builder, assistant drawer |
 | Release | `README.md`, `.gitignore`, `worker/wrangler.toml` | Public documentation, generated-state hygiene, model configuration documentation |
 
-Parallel wave 1: Tasks 1–3.  
-Parallel wave 2 after wave 1 merge: Tasks 4 and 7; Task 5 begins when Tasks 1–4 interfaces are present.  
+Parallel wave 1: Tasks 1–3.<br>
+Parallel wave 2 after wave 1 merge: Tasks 4 and 7; Task 5 begins when Tasks 1–4 interfaces are present.<br>
 Final integration: Tasks 6 and 8.
 
 ---
@@ -93,7 +93,7 @@ test("accepting a preview replaces only the plan and clears the preview", () => 
 
 - [ ] **Step 2: Run the focused test and confirm it fails on the missing public API**
 
-Run: `node --test worker/tests/planner-state-logic.test.mjs`  
+Run: `node --test worker/tests/planner-state-logic.test.mjs`<br>
 Expected: FAIL because `ScheduleRUPlannerStateLogic` does not yet expose the required functions. The test loader must convert a missing file/module into this explicit assertion failure rather than an uncaught loader error.
 
 - [ ] **Step 3: Implement the state module**
@@ -160,7 +160,7 @@ Expected: FAIL because `ScheduleRUPlannerStateLogic` does not yet expose the req
 
 - [ ] **Step 4: Run the focused test and then the existing eligibility tests**
 
-Run: `node --test worker/tests/planner-state-logic.test.mjs worker/tests/eligibility-logic.test.mjs`  
+Run: `node --test worker/tests/planner-state-logic.test.mjs worker/tests/eligibility-logic.test.mjs`<br>
 Expected: PASS.
 
 - [ ] **Step 5: Commit the isolated module**
@@ -234,7 +234,7 @@ test("returns a partial plan instead of exceeding the hard credit cap", () => {
 
 - [ ] **Step 2: Run the test and confirm module absence**
 
-Run: `node --test worker/tests/four-year-planner-logic.test.mjs`  
+Run: `node --test worker/tests/four-year-planner-logic.test.mjs`<br>
 Expected: FAIL because `ScheduleRUFourYearPlanner.generatePlan` is not yet available. The test loader must report an assertion failure rather than an uncaught loader error.
 
 - [ ] **Step 3: Implement deterministic normalized generation**
@@ -259,7 +259,7 @@ Expose only data; do not read the DOM or `localStorage`. Treat a placeholder as 
 
 - [ ] **Step 4: Run engine and eligibility tests**
 
-Run: `node --test worker/tests/four-year-planner-logic.test.mjs worker/tests/eligibility-logic.test.mjs worker/tests/requirement-group-logic.test.mjs`  
+Run: `node --test worker/tests/four-year-planner-logic.test.mjs worker/tests/eligibility-logic.test.mjs worker/tests/requirement-group-logic.test.mjs`<br>
 Expected: PASS.
 
 - [ ] **Step 5: Commit the engine**
@@ -318,7 +318,7 @@ test("recommendations preserve original indices and never exceed three", () => {
 
 - [ ] **Step 2: Run the test and confirm module absence**
 
-Run: `node --test worker/tests/schedule-preference-logic.test.mjs`  
+Run: `node --test worker/tests/schedule-preference-logic.test.mjs`<br>
 Expected: FAIL because `ScheduleRUPreferenceLogic.recommendSchedules` is not yet available. The test loader must report an assertion failure rather than an uncaught loader error.
 
 - [ ] **Step 3: Implement preference normalization and ranking**
@@ -337,7 +337,7 @@ Hard constraints eliminate schedules. Soft constraints contribute deterministic 
 
 - [ ] **Step 4: Run focused tests**
 
-Run: `node --test worker/tests/schedule-preference-logic.test.mjs`  
+Run: `node --test worker/tests/schedule-preference-logic.test.mjs`<br>
 Expected: PASS.
 
 - [ ] **Step 5: Commit the engine**
@@ -408,7 +408,7 @@ test("uses Luna structured output without sending transcript data", async () => 
 
 - [ ] **Step 2: Run the test and confirm module absence**
 
-Run: `node --test worker/tests/schedule-assistant.test.mjs`  
+Run: `node --test worker/tests/schedule-assistant.test.mjs`<br>
 Expected: FAIL on an explicit assertion that the request handler is not yet implemented; avoid treating an uncaught import error as the red test.
 
 - [ ] **Step 3: Implement the Responses API adapter**
@@ -464,7 +464,7 @@ Transcribe the current frontend AP rows into this single reviewed migration, pre
 
 - [ ] **Step 6: Run focused and Worker tests**
 
-Run: `node --test worker/tests/schedule-assistant.test.mjs worker/tests/ap-equivalencies.test.mjs worker/tests/course-eligibility-integration.test.mjs worker/tests/program-selection-policy.test.mjs`  
+Run: `node --test worker/tests/schedule-assistant.test.mjs worker/tests/ap-equivalencies.test.mjs worker/tests/course-eligibility-integration.test.mjs worker/tests/program-selection-policy.test.mjs`<br>
 Expected: PASS.
 
 - [ ] **Step 7: Commit the Worker adapter and reviewed configuration APIs**
@@ -541,7 +541,7 @@ Use one modal controller for onboarding confirmation, Programs warnings, incompl
 
 - [ ] **Step 9: Run focused UI-contract and existing integration tests**
 
-Run: `node --test worker/tests/hackathon-ui-integration.test.mjs worker/tests/advisory-policy-ui.test.mjs worker/tests/course-selector-integration.test.mjs worker/tests/course-eligibility-integration.test.mjs`  
+Run: `node --test worker/tests/hackathon-ui-integration.test.mjs worker/tests/advisory-policy-ui.test.mjs worker/tests/course-selector-integration.test.mjs worker/tests/course-eligibility-integration.test.mjs`<br>
 Expected: PASS.
 
 - [ ] **Step 10: Commit the integrated experience**
@@ -582,7 +582,7 @@ Verify at normal desktop width:
 
 - [ ] **Step 4: Run the focused tests and commit polish**
 
-Run: `node --test worker/tests/hackathon-ui-integration.test.mjs`  
+Run: `node --test worker/tests/hackathon-ui-integration.test.mjs`<br>
 Expected: PASS.
 
 ```bash
@@ -629,7 +629,7 @@ Do not delete worktrees or branches during parallel development. Record that `fe
 
 - [ ] **Step 4: Verify and commit documentation**
 
-Run: `git diff --check`  
+Run: `git diff --check`<br>
 Expected: no output and exit 0.
 
 ```bash
@@ -660,7 +660,7 @@ Expected: only intended files changed; secret scan returns no embedded value.
 
 - [ ] **Step 2: Run the complete automated suite**
 
-Run: `node --test worker/tests/*.test.mjs`  
+Run: `node --test worker/tests/*.test.mjs`<br>
 Expected: all tests pass.
 
 - [ ] **Step 3: Run repository verification**
