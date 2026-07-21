@@ -35,6 +35,7 @@ import { publicSchoolProfile } from "./school-profiles.js";
 import { importProgramDirectory } from "./program-directory-import.js";
 import {
   discoverProfileRequirementPage,
+  extractRequirementDraftCandidate,
   importProgramRequirementSource,
 } from "./program-requirement-import.js";
 
@@ -634,6 +635,83 @@ async function importRequirementSourceBatch(env, sources) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return imported;
+}
+
+async function pendingRequirementCandidateSnapshots(env, schoolSlug, batchLimit) {
+  if (schoolSlug !== "sasnb") throw new Error("draft candidate extraction currently supports school=sasnb majors only");
+  const { results } = await env.DB.prepare(
+    `SELECT snapshot.source_id, snapshot.program_id, snapshot.source_url,
+            snapshot.content_hash, snapshot.content_text, snapshot.parsed_json
+     FROM program_requirement_source_snapshots snapshot
+     INNER JOIN program_requirement_import_sources source ON source.id = snapshot.source_id
+     INNER JOIN programs program ON program.id = snapshot.program_id
+     WHERE source.school_slug = ?
+       AND source.source_kind = 'requirements_page'
+       AND source.enabled = 1
+       AND program.type = 'major'
+       AND program.review_status = 'catalog_listed'
+       AND NOT EXISTS (
+         SELECT 1 FROM program_requirement_draft_candidates candidate
+         WHERE candidate.source_id = snapshot.source_id
+           AND candidate.content_hash = snapshot.content_hash
+           AND candidate.extractor_version = 1
+       )
+     ORDER BY snapshot.fetched_at, snapshot.id
+     LIMIT ?`
+  ).bind(schoolSlug, batchLimit).all();
+  return results || [];
+}
+
+async function saveRequirementDraftCandidate(env, snapshot) {
+  const candidate = extractRequirementDraftCandidate(snapshot);
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO program_requirement_draft_candidates (
+       source_id, program_id, source_url, content_hash, extractor_version,
+       candidate_json, created_at
+     ) VALUES (?,?,?,?,?,?,?)`
+  ).bind(
+    candidate.source_id,
+    candidate.program_id,
+    candidate.source_url,
+    candidate.content_hash,
+    candidate.extractor_version,
+    JSON.stringify(candidate),
+    Date.now(),
+  ).run();
+  return {
+    changed: (inserted.meta?.changes || 0) === 1,
+    sections_found: candidate.sections.length,
+    courses_found: candidate.sections.reduce((total, section) => total + section.course_codes.length, 0),
+  };
+}
+
+async function extractRequirementCandidateBatch(env, snapshots) {
+  const extracted = [];
+  for (const snapshot of snapshots) {
+    try {
+      const result = await saveRequirementDraftCandidate(env, snapshot);
+      await logScrape(
+        env,
+        `requirements-candidate:${snapshot.source_id}`,
+        "ok",
+        { groupsWritten: 0, coursesWritten: result.courses_found, notesWritten: result.sections_found },
+        `${result.changed ? "saved" : "reused"} generic source-section draft; no review status changed`,
+        snapshot.content_text.slice(0, 1500),
+      );
+      extracted.push({ ok: true, source_id: snapshot.source_id, program_id: snapshot.program_id, ...result });
+    } catch (err) {
+      await logScrape(
+        env,
+        `requirements-candidate:${snapshot.source_id}`,
+        "error",
+        null,
+        `requirements-candidate extraction failed: ${err.message}`,
+        String(snapshot.content_text || "").slice(0, 1500),
+      );
+      extracted.push({ ok: false, source_id: snapshot.source_id, program_id: snapshot.program_id, error: err.message });
+    }
+  }
+  return extracted;
 }
 
 async function scrapeCoreCurriculum(env, program) {
@@ -1967,6 +2045,38 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       } catch (err) {
         return json({ error: err.message }, 400);
       }
+    }
+
+    // This is a source-structure draft, not an audit generator. It only
+    // records course-bearing sections for a reviewer to interpret later.
+    if (path === "/api/admin/requirement-candidates/extract" && request.method === "POST") {
+      const school = url.searchParams.get("school") || "";
+      try {
+        const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
+        const snapshots = await pendingRequirementCandidateSnapshots(env, school, batchLimit);
+        if (!snapshots.length) {
+          return json({ ok: true, mode: "complete", school, queued: 0, note: "Every snapshotted SAS major source has a generic draft candidate; no program was automatically marked reviewed." });
+        }
+        ctx.waitUntil(extractRequirementCandidateBatch(env, snapshots));
+        return json({ ok: true, mode: "background", school, queued: snapshots.length, note: "Extracting draft source sections only; no degree audit or review status changes." });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
+    }
+
+    if (path === "/api/admin/requirement-candidates" && request.method === "GET") {
+      const school = url.searchParams.get("school") || "";
+      if (school !== "sasnb") return json({ error: "draft candidate extraction currently supports ?school=sasnb majors only" }, 400);
+      const { results } = await env.DB.prepare(
+        `SELECT candidate.id, candidate.source_id, candidate.program_id, candidate.source_url,
+                candidate.content_hash, candidate.extractor_version, candidate.candidate_json,
+                candidate.created_at
+         FROM program_requirement_draft_candidates candidate
+         INNER JOIN program_requirement_import_sources source ON source.id = candidate.source_id
+         WHERE source.school_slug = ?
+         ORDER BY candidate.program_id, candidate.created_at DESC`
+      ).bind(school).all();
+      return json({ school, candidates: results || [] });
     }
 
     // Seed a program by hand — the reliable path, always works regardless

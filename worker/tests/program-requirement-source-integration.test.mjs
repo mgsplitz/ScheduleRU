@@ -38,3 +38,18 @@ test("major discovery stores typed detail sources without publishing audits", as
   assert.match(worker, /type = 'major'/);
   assert.doesNotMatch(worker, /UPDATE programs SET[\s\S]{0,160}review_status = 'reviewed'/);
 });
+
+test("the Worker stores generic draft candidates separately from reviewed requirement audits", async () => {
+  const [schema, migration, worker] = await Promise.all([
+    readFile(new URL("../schema/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
+    readFile(new URL("../schema/migrate_requirement_draft_candidates.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS program_requirement_draft_candidates/);
+  assert.match(schema, /UNIQUE\(source_id, content_hash, extractor_version\)/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS program_requirement_draft_candidates/);
+  assert.match(worker, /\/api\/admin\/requirement-candidates\/extract/);
+  assert.match(worker, /source\.source_kind = 'requirements_page'/);
+  assert.match(worker, /extractRequirementDraftCandidate/);
+});

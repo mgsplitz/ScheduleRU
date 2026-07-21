@@ -98,6 +98,59 @@ function contentHash(value) {
   return hash.toString(16).padStart(16, "0");
 }
 
+function snapshotHeadings(snapshot) {
+  try {
+    const parsed = JSON.parse(String(snapshot?.parsed_json || "{}"));
+    return Array.isArray(parsed.headings)
+      ? unique(parsed.headings.map((heading) => String(heading || "").trim()))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function courseCodesInText(value) {
+  return unique(String(value || "").match(COURSE_CODE_RE) || []);
+}
+
+// This intentionally preserves source structure rather than translating
+// prose into requirement rules. A reviewer can use these candidates to build
+// a real audit with evidence, while ambiguous text remains draft-only.
+export function extractRequirementDraftCandidate(snapshot) {
+  const headings = snapshotHeadings(snapshot);
+  const headingSet = new Set(headings);
+  const lines = String(snapshot?.content_text || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const sourceSections = [];
+  let activeSection = null;
+
+  for (const line of lines) {
+    if (headingSet.has(line)) {
+      activeSection = { heading: line, lines: [] };
+      sourceSections.push(activeSection);
+    } else if (activeSection) {
+      activeSection.lines.push(line);
+    }
+  }
+
+  return {
+    extractor_version: 1,
+    source_id: String(snapshot?.source_id || ""),
+    program_id: String(snapshot?.program_id || ""),
+    source_url: String(snapshot?.source_url || ""),
+    content_hash: String(snapshot?.content_hash || ""),
+    sections: sourceSections
+      .map((section) => ({
+        heading: section.heading,
+        source_text: section.lines.join(" "),
+        course_codes: courseCodesInText(section.lines.join(" ")),
+      }))
+      .filter((section) => section.course_codes.length > 0),
+  };
+}
+
 export function parseProgramRequirementSource(html, source) {
   if (!sourceIsValid(source)) throw new Error("a valid official HTTPS source is required");
   const visibleHtml = visibleRequirementHtml(html);
