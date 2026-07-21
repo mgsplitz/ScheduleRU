@@ -5,6 +5,11 @@ const MAX_MESSAGE_CHARACTERS = 1_000;
 const MAX_REQUEST_BYTES = 20 * 1024;
 const MAX_ACKNOWLEDGEMENT_CHARACTERS = 280;
 const ALLOWED_ROLES = new Set(["user", "assistant"]);
+const REPLACE_KINDS = [
+  "earliest_start", "latest_end", "avoid_day", "preferred_day", "light_day",
+  "time_window_exception", "compact_schedule", "maximum_gap", "campus", "modality", "open_sections",
+];
+const NULLABLE_OUTPUT_FIELDS = new Set(["day", "minimumClasses", "maximumClasses"]);
 
 const preferenceLogic = globalThis.ScheduleRUPreferenceLogic;
 
@@ -27,8 +32,11 @@ export const PREFERENCE_PATCH_SCHEMA = {
     preferencePatch: {
       type: "object",
       additionalProperties: false,
-      properties: { constraints: { type: "array", maxItems: 20, items: { anyOf: CONSTRAINT_SCHEMAS } } },
-      required: ["constraints"],
+      properties: {
+        replaceKinds: { type: "array", maxItems: REPLACE_KINDS.length, uniqueItems: true, items: { enum: REPLACE_KINDS } },
+        constraints: { type: "array", maxItems: 20, items: { anyOf: CONSTRAINT_SCHEMAS } },
+      },
+      required: ["replaceKinds", "constraints"],
     },
     acknowledgement: { type: "string", minLength: 1, maxLength: MAX_ACKNOWLEDGEMENT_CHARACTERS },
   },
@@ -41,6 +49,11 @@ function response(body, status) {
 
 function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function hasExactlyKeys(raw, keys) {
+  return raw && typeof raw === "object" && !Array.isArray(raw)
+    && Object.keys(raw).length === keys.length && keys.every((key) => Object.hasOwn(raw, key));
 }
 
 function validMessages(messages) {
@@ -61,7 +74,7 @@ function buildPreferencePrompt(messages, currentPreferences) {
   return [
     {
       role: "system",
-      content: "Translate only schedule-preference conversation into the provided JSON schema. Do not infer courses, sections, eligibility, academic records, credits, requirements, or schedule rankings. Return an empty constraints list when no supported preference is stated. Keep the acknowledgement concise.",
+      content: "Translate only schedule-preference conversation into the provided JSON schema. Do not infer courses, sections, eligibility, academic records, credits, requirements, or schedule rankings. Return an empty constraints list when no supported preference is stated. Set replaceKinds to every existing preference kind that the user changes, relaxes, or cancels; for example, changing no classes before 10am to no classes before 9am replaces earliest_start, while cancelling it replaces earliest_start with no new constraint. Keep the acknowledgement concise.",
     },
     {
       role: "user",
@@ -77,17 +90,25 @@ function outputText(payload) {
 }
 
 function validOutput(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw) || typeof raw.acknowledgement !== "string") return null;
+  if (!hasExactlyKeys(raw, ["preferencePatch", "acknowledgement"]) || typeof raw.acknowledgement !== "string"
+    || !hasExactlyKeys(raw.preferencePatch, ["replaceKinds", "constraints"])) return null;
   const acknowledgement = raw.acknowledgement.trim();
   if (!acknowledgement || acknowledgement.length > MAX_ACKNOWLEDGEMENT_CHARACTERS) return null;
-  const constraints = raw.preferencePatch?.constraints;
+  const constraints = raw.preferencePatch.constraints;
   if (!Array.isArray(constraints) || constraints.length > 20) return null;
-  const canonicalConstraints = constraints.map((constraint) => Object.fromEntries(
-    Object.entries(constraint || {}).filter(([, value]) => value !== null),
-  ));
-  const normalized = preferenceLogic.normalizePreferenceSet({ version: 1, constraints: canonicalConstraints });
-  if (!sameJson(normalized.constraints, canonicalConstraints)) return null;
-  return { preferencePatch: { constraints: normalized.constraints }, acknowledgement };
+  const canonicalConstraints = constraints.map((constraint) => {
+    if (!constraint || typeof constraint !== "object" || Array.isArray(constraint)) return null;
+    return Object.fromEntries(Object.entries(constraint).filter(([key, value]) => {
+      return value !== null || constraint.kind !== "time_window_exception" || !NULLABLE_OUTPUT_FIELDS.has(key);
+    }));
+  });
+  if (canonicalConstraints.some((constraint) => !constraint)) return null;
+  const patch = preferenceLogic.normalizePreferencePatch({
+    replaceKinds: raw.preferencePatch.replaceKinds,
+    constraints: canonicalConstraints,
+  });
+  if (!patch) return null;
+  return { preferencePatch: patch, acknowledgement };
 }
 
 export async function handleScheduleAssistantRequest(request, env, upstreamFetch = fetch) {
@@ -127,26 +148,26 @@ export async function handleScheduleAssistantRequest(request, env, upstreamFetch
   if (new TextEncoder().encode(serializedBody).length > MAX_REQUEST_BYTES) {
     return response({ error: "invalid assistant request" }, 400);
   }
-  let upstreamResponse;
-  try {
-    upstreamResponse = await upstreamFetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.OPENAI_API_KEY}` },
-      body: serializedBody,
-    });
-  } catch (_) {
-    return response({ error: "schedule assistant is temporarily unavailable" }, 502);
-  }
-  if (!upstreamResponse?.ok) return response({ error: "schedule assistant is temporarily unavailable" }, 502);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let upstreamResponse;
+    try {
+      upstreamResponse = await upstreamFetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.OPENAI_API_KEY}` },
+        body: serializedBody,
+      });
+    } catch (_) {
+      return response({ error: "schedule assistant is temporarily unavailable" }, 502);
+    }
+    if (!upstreamResponse?.ok) return response({ error: "schedule assistant is temporarily unavailable" }, 502);
 
-  let upstreamPayload;
-  let translated;
-  try {
-    upstreamPayload = await upstreamResponse.json();
-    translated = validOutput(JSON.parse(outputText(upstreamPayload)));
-  } catch (_) {
-    return response({ error: "schedule assistant returned an invalid response" }, 502);
+    try {
+      const upstreamPayload = await upstreamResponse.json();
+      const translated = validOutput(JSON.parse(outputText(upstreamPayload)));
+      if (translated) return response(translated, 200);
+    } catch (_) {
+      // A malformed model response is the one retryable upstream condition.
+    }
   }
-  if (!translated) return response({ error: "schedule assistant returned an invalid response" }, 502);
-  return response(translated, 200);
+  return response({ error: "schedule assistant returned an invalid response" }, 502);
 }

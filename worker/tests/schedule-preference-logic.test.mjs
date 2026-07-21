@@ -36,6 +36,40 @@ test("preference patches accumulate without deleting earlier constraints", () =>
   assert.deepEqual(plain(first.constraints.map((constraint) => constraint.kind)), ["earliest_start", "light_day"]);
 });
 
+test("preference patches replace an earlier start-time preference", () => {
+  const merged = logic.mergePreferencePatch(
+    { version: 1, constraints: [{ kind: "earliest_start", minutes: 600, strength: "hard" }] },
+    { replaceKinds: ["earliest_start"], constraints: [{ kind: "earliest_start", minutes: 540, strength: "hard" }] },
+  );
+  assert.deepEqual(plain(merged.constraints), [{ kind: "earliest_start", minutes: 540, strength: "hard" }]);
+});
+
+test("preference patches remove a replaced kind when no replacement constraint is supplied", () => {
+  const merged = logic.mergePreferencePatch(
+    {
+      version: 1,
+      constraints: [
+        { kind: "earliest_start", minutes: 600, strength: "hard" },
+        { kind: "light_day", day: "F", maximumClasses: 2, strength: "soft" },
+      ],
+    },
+    { replaceKinds: ["earliest_start"], constraints: [] },
+  );
+  assert.deepEqual(plain(merged.constraints), [{ kind: "light_day", day: "F", maximumClasses: 2, strength: "soft" }]);
+});
+
+test("replacement patches fail closed for aliases, duplicates, extras, and unsupported kinds", () => {
+  const current = { version: 1, constraints: [{ kind: "earliest_start", minutes: 600, strength: "hard" }] };
+  for (const patch of [
+    { replaceKinds: ["earliestStart"], constraints: [] },
+    { replaceKinds: ["earliest_start", "earliest_start"], constraints: [] },
+    { replaceKinds: ["earliest_start"], constraints: [], extra: true },
+    { replaceKinds: "earliest_start", constraints: [] },
+  ]) {
+    assert.deepEqual(plain(logic.mergePreferencePatch(current, patch).constraints), current.constraints);
+  }
+});
+
 test("recommendations preserve original indices and never exceed three", () => {
   const schedules = Array.from({ length: 10 }, (_, index) => ({ stableIndex: index + 10, meetings: [] }));
   assert.deepEqual(plain(logic.recommendSchedules(schedules, { version: 1, constraints: [] }).matches.map((x) => x.stableIndex)), [10, 11, 12]);
