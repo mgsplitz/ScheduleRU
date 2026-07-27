@@ -5,17 +5,17 @@ await import("../../planner-ui-logic.js");
 
 const logic = globalThis.ScheduleRUPlannerUI;
 
-test("requirement selection and Wishlist expose independent row actions", () => {
+test("requirement rows expose one context-sensitive action", () => {
   assert.deepEqual(logic.pickerActions({
     alreadyApplied: false,
     selected: false,
     canSelect: true,
     inWishlist: false,
   }), {
-    requirementLabel: "Use for requirement",
-    requirementDisabled: false,
-    wishlistLabel: "Add to Wishlist",
-    wishlistSelected: false,
+    label: "Use for requirement",
+    disabled: false,
+    intent: "requirement",
+    selected: false,
   });
 
   assert.deepEqual(logic.pickerActions({
@@ -24,10 +24,34 @@ test("requirement selection and Wishlist expose independent row actions", () => 
     canSelect: false,
     inWishlist: true,
   }), {
-    requirementLabel: "Remove",
-    requirementDisabled: false,
-    wishlistLabel: "Remove from Wishlist",
-    wishlistSelected: true,
+    label: "Remove",
+    disabled: false,
+    intent: "requirement",
+    selected: true,
+  });
+
+  assert.deepEqual(logic.pickerActions({
+    alreadyApplied: false,
+    selected: false,
+    canSelect: false,
+    inWishlist: false,
+  }), {
+    label: "Add to Wishlist",
+    disabled: false,
+    intent: "wishlist",
+    selected: false,
+  });
+
+  assert.deepEqual(logic.pickerActions({
+    alreadyApplied: false,
+    selected: false,
+    canSelect: false,
+    inWishlist: true,
+  }), {
+    label: "Remove from Wishlist",
+    disabled: false,
+    intent: "wishlist",
+    selected: true,
   });
 });
 
@@ -41,6 +65,44 @@ test("placeholder destinations use finite pickers before selector browsers", () 
   assert.equal(logic.placeholderDestination({
     group: { members: [], courseSelectors: [] },
   }), "requirement_panel");
+  assert.equal(logic.placeholderDestination({
+    group: null,
+    candidateSelectionContext: { memberCourseCodes: ["01:750:203"], courseSelectors: [] },
+  }), "requirement_picker");
+  assert.equal(logic.placeholderDestination({
+    group: null,
+    candidateSelectionContext: { members: [], memberCourseCodes: [], courseSelectors: [{ selector_key: "subject" }] },
+  }), "selector_browser");
+});
+
+test("program browsing starts with schools and filters programs only after a school is chosen", () => {
+  const schools = [
+    { slug: "sasnb", name: "School of Arts and Sciences" },
+    { slug: "rbsnb", name: "Rutgers Business School" },
+    { slug: "other", name: "Unsupported School" },
+  ];
+  const programs = [
+    { id: "math", name: "Mathematics", school_slug: "sasnb", type: "major" },
+    { id: "finance", name: "Finance", school_slug: "rbsnb", type: "major" },
+  ];
+  assert.deepEqual(logic.programSchoolChoices({ schools, programs }), [
+    { slug: "sasnb", label: "School of Arts and Sciences" },
+    { slug: "rbsnb", label: "Rutgers Business School" },
+  ]);
+  assert.deepEqual(logic.programsForBrowse({ programs, schoolSlug: "" }), []);
+  assert.deepEqual(logic.programsForBrowse({ programs, schoolSlug: "rbsnb" }).map((program) => program.id), ["finance"]);
+});
+
+test("the real-schedule builder is available only for the active registration term", () => {
+  assert.equal(logic.canOpenSemesterBuilder({
+    displayedYear: 2, activeYear: 2, semester: "fall", activeSemester: "fall",
+  }), true);
+  assert.equal(logic.canOpenSemesterBuilder({
+    displayedYear: 2, activeYear: 2, semester: "spring", activeSemester: "fall",
+  }), false);
+  assert.equal(logic.canOpenSemesterBuilder({
+    displayedYear: 1, activeYear: 2, semester: "fall", activeSemester: "fall",
+  }), false);
 });
 
 test("every course resolves to an honest path presentation state", () => {

@@ -10,24 +10,57 @@
     canSelect = false,
     inWishlist = false,
   } = {}) {
+    if (alreadyApplied) {
+      return { label: "In schedule", disabled: true, intent: "none", selected: true };
+    }
+    if (selected) {
+      return { label: "Remove", disabled: false, intent: "requirement", selected: true };
+    }
+    if (canSelect) {
+      return { label: "Use for requirement", disabled: false, intent: "requirement", selected: false };
+    }
     return {
-      requirementLabel: alreadyApplied
-        ? "In schedule"
-        : selected
-          ? "Remove"
-          : canSelect
-            ? "Use for requirement"
-            : "Requirement filled",
-      requirementDisabled: alreadyApplied || (!selected && !canSelect),
-      wishlistLabel: inWishlist ? "Remove from Wishlist" : "Add to Wishlist",
-      wishlistSelected: inWishlist,
+      label: inWishlist ? "Remove from Wishlist" : "Add to Wishlist",
+      disabled: false,
+      intent: "wishlist",
+      selected: inWishlist,
     };
   }
 
-  function placeholderDestination({ group } = {}) {
-    if ((group?.members || []).length) return "requirement_picker";
-    if ((group?.courseSelectors || []).length) return "selector_browser";
+  function placeholderDestination({ group, candidateSelectionContext } = {}) {
+    const context = group || candidateSelectionContext || {};
+    if ((context.members || []).length || (context.memberCourseCodes || []).length) return "requirement_picker";
+    if ((context.courseSelectors || []).length) return "selector_browser";
     return "requirement_panel";
+  }
+
+  function programSchoolChoices({ schools = [], programs = [] } = {}) {
+    const supported = new Set((programs || []).map((program) => program?.school_slug).filter(Boolean));
+    return (schools || []).filter((school) => supported.has(school?.slug)).map((school) => ({
+      slug: school.slug,
+      label: school.name || school.short_name || school.slug,
+    }));
+  }
+
+  function programsForBrowse({ programs = [], schoolSlug = "", query = "" } = {}) {
+    if (!schoolSlug) return [];
+    const search = String(query || "").trim().toLowerCase();
+    return (programs || []).filter((program) => program?.school_slug === schoolSlug).filter((program) => {
+      if (!search) return true;
+      return [program.name, program.degree_type, program.type, program.academic_program_code]
+        .join(" ").toLowerCase().includes(search);
+    });
+  }
+
+  function canOpenSemesterBuilder({
+    displayedYear,
+    activeYear,
+    semester,
+    activeSemester,
+  } = {}) {
+    return Number(displayedYear) === Number(activeYear)
+      && (semester === "fall" || semester === "spring")
+      && semester === activeSemester;
   }
 
   function coursePathState({
@@ -73,6 +106,9 @@
   root.ScheduleRUPlannerUI = {
     pickerActions,
     placeholderDestination,
+    programSchoolChoices,
+    programsForBrowse,
+    canOpenSemesterBuilder,
     coursePathState,
     generationPreflight,
     shouldAutoCollapseSharedGroup,

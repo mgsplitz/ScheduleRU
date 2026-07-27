@@ -7,9 +7,12 @@
 (function exposeAcademicCreditLogic(root) {
   const COURSE_CODE = /^\d{2}:\d{3}:\d{3}$/;
 
-  function code(value) {
+  function normalizeCourseCode(value) {
     const normalized = String(value || "").trim();
-    return COURSE_CODE.test(normalized) ? normalized : "";
+    if (COURSE_CODE.test(normalized)) return normalized;
+    return /^\d{8}$/.test(normalized)
+      ? `${normalized.slice(0, 2)}:${normalized.slice(2, 5)}:${normalized.slice(5)}`
+      : "";
   }
 
   function normalizedTrees(values) {
@@ -22,10 +25,10 @@
     const canonicalByAlternative = new Map();
     for (const tree of normalizedTrees(requirementTrees)) {
       for (const course of Object.values(tree.courses || {})) {
-        const canonical = code(course?.code);
+        const canonical = normalizeCourseCode(course?.code);
         if (!canonical) continue;
         for (const alternative of course?.alternatives || []) {
-          const equivalent = code(
+          const equivalent = normalizeCourseCode(
             alternative?.code
             || alternative?.course_code
             || alternative?.equivalent_course_code,
@@ -41,7 +44,7 @@
   }
 
   function satisfiedCourseCodes({ confirmedCourseCodes = [], requirementTrees = [] } = {}) {
-    const satisfied = new Set((confirmedCourseCodes || []).map(code).filter(Boolean));
+    const satisfied = new Set((confirmedCourseCodes || []).map(normalizeCourseCode).filter(Boolean));
     const pending = [...satisfied];
     const edges = equivalencyEdges(requirementTrees);
     for (let index = 0; index < pending.length; index += 1) {
@@ -57,5 +60,6 @@
   root.ScheduleRUAcademicCredit = {
     satisfiedCourseCodes,
     equivalencyEdges,
+    normalizeCourseCode,
   };
 })(globalThis);

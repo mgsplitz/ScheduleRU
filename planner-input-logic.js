@@ -83,6 +83,7 @@
         members: [...(group.members || [])],
         memberCourseCodes: (group.members || []).map((id) => courses[id]?.code).filter(validCode),
         children: [...(group.children || [])],
+        courseSelectors: [...(group.courseSelectors || [])],
         sourceProgramIds: [...(group.sourceProgramIds || [])],
       },
     };
@@ -117,12 +118,17 @@
       if (["min", "min_courses", "min_credits", "distinct"].includes(group.rule)) {
         const selectedMembers = selected.filter((id) => group.members?.includes(id));
         const selectedChildren = selected.filter((id) => group.children?.includes(id));
+        const satisfiedMembers = (group.members || []).filter((id) => completed.has(courses[id]?.code));
+        const fulfilledMembers = unique([...selectedMembers, ...satisfiedMembers]);
         selectedMembers.forEach(addCourse);
         selectedChildren.forEach(visit);
-        const required = group.rule === "min_credits"
-          ? Math.max(1, Math.ceil((Number(group.count) || DEFAULT_ESTIMATED_CREDITS) / DEFAULT_ESTIMATED_CREDITS))
-          : Math.max(1, Number(group.count) || 1);
-        const remaining = Math.max(0, required - selectedMembers.length - selectedChildren.length);
+        const remaining = group.rule === "min_credits"
+          ? Math.max(0, Math.ceil((
+            Math.max(DEFAULT_ESTIMATED_CREDITS, Number(group.count) || DEFAULT_ESTIMATED_CREDITS)
+            - fulfilledMembers.reduce((sum, id) => sum + (numericCredits(courses[id]?.credits) || DEFAULT_ESTIMATED_CREDITS), 0)
+            - selectedChildren.length * DEFAULT_ESTIMATED_CREDITS
+          ) / DEFAULT_ESTIMATED_CREDITS))
+          : Math.max(0, Math.max(1, Number(group.count) || 1) - fulfilledMembers.length - selectedChildren.length);
         for (let index = 0; index < remaining; index += 1) {
           placeholders.push(placeholder(group, groupProgram, index, "requirement_placeholder", courses));
         }
@@ -153,17 +159,23 @@
       confirmedCourseCodes: input.completedCourseCodes || [],
       requirementTrees: [...trees.map((entry) => entry.tree), input.coreTree].filter(Boolean),
     });
+    const scheduleEntries = Object.values(input.schedule || {}).filter((entry) => validCode(entry?.code));
+    const requirementTreeValues = [...trees.map((entry) => entry.tree), input.coreTree].filter(Boolean);
+    const satisfiedForRequirements = academicCredit.satisfiedCourseCodes({
+      confirmedCourseCodes: [...completed, ...scheduleEntries.map((entry) => entry.code)],
+      requirementTrees: requirementTreeValues,
+    });
 
     const requirementCourses = new Map();
     const unresolvedRequirements = [];
     trees.forEach(({ id, tree }) => {
-      const result = requirementInputs(tree, id, input.groupSelections || {}, completed);
+      const result = requirementInputs(tree, id, input.groupSelections || {}, satisfiedForRequirements);
       result.courses.forEach((course) => requirementCourses.set(course.code, course));
       unresolvedRequirements.push(...result.placeholders);
     });
 
     if (input.coreTree) {
-      const result = requirementInputs(input.coreTree, "core", input.groupSelections || {}, completed);
+      const result = requirementInputs(input.coreTree, "core", input.groupSelections || {}, satisfiedForRequirements);
       result.courses.forEach((course) => requirementCourses.set(course.code, course));
       unresolvedRequirements.push(...result.placeholders);
     }
@@ -177,12 +189,28 @@
     // trees. Consuming the matching placeholder prevents the same choice from
     // being counted twice in the generated plan.
     const availableTreeCourses = new Map();
-    [...trees.map((entry) => entry.tree), input.coreTree].filter(Boolean).forEach((tree) => {
+    requirementTreeValues.forEach((tree) => {
       Object.values(tree.courses || {}).forEach((course) => {
         if (validCode(course?.code) && !availableTreeCourses.has(course.code)) {
           availableTreeCourses.set(course.code, course);
         }
       });
+    });
+    const treeCourseCodes = new Set(availableTreeCourses.keys());
+    scheduleEntries.forEach((entry) => {
+      if (completed.has(entry.code)) return;
+      const satisfiesTreeCourse = [...academicCredit.satisfiedCourseCodes({
+        confirmedCourseCodes: [entry.code],
+        requirementTrees: requirementTreeValues,
+      })].some((code) => treeCourseCodes.has(code));
+      if (!satisfiesTreeCourse || normalizedByCode.has(entry.code)) return;
+      const course = entry.course || entry;
+      normalizedByCode.set(entry.code, normalizedCourse({
+        ...course,
+        code: entry.code,
+        credits: entry.credits,
+        title: entry.fullTitle || entry.title,
+      }));
     });
     const prerequisiteQueue = [...normalizedByCode.keys()].sort();
     const prerequisiteVisited = new Set();

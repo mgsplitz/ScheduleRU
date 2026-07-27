@@ -9,6 +9,15 @@ function tree(courses) {
   return { courses };
 }
 
+test("compact Rutgers requirement IDs normalize to prerequisite-ready course codes", () => {
+  assert.equal(logic.normalizeCourseCode("01640135"), "01:640:135");
+  assert.equal(logic.normalizeCourseCode("01:640:151"), "01:640:151");
+  assert.equal(logic.normalizeCourseCode("bad"), "");
+  assert.deepEqual([...logic.satisfiedCourseCodes({
+    confirmedCourseCodes: ["01640135", "01:640:151"],
+  })].sort(), ["01:640:135", "01:640:151"]);
+});
+
 test("reviewed alternatives close transitively across every loaded requirement tree", () => {
   const result = logic.satisfiedCourseCodes({
     confirmedCourseCodes: ["01:198:111"],

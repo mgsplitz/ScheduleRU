@@ -6,7 +6,7 @@
   const KINDS = new Set([
     "earliest_start", "latest_end", "avoid_day", "preferred_day",
     "light_day", "time_window_exception", "compact_schedule",
-    "maximum_gap", "campus", "modality", "open_sections",
+    "maximum_gap", "campus", "modality", "open_sections", "course_separation",
   ]);
   const DAYS = new Set(["M", "T", "W", "R", "F", "S", "U"]);
   const strengths = new Set(["hard", "soft"]);
@@ -87,6 +87,15 @@
       if (!hasOnlyFields(raw, ["value"])) return null;
       return raw.value === true ? { ...base, value: true } : null;
     }
+    if (raw.kind === "course_separation") {
+      if (!hasOnlyFields(raw, ["courseA", "courseB", "minutes", "campusPreference"])) return null;
+      const courseA = text(raw.courseA);
+      const courseB = text(raw.courseB);
+      const gap = minutes(raw.minutes);
+      if (!courseA || !courseB || courseA.toLowerCase() === courseB.toLowerCase()
+        || ![30, 45, 60].includes(gap) || !["same", "any"].includes(raw.campusPreference)) return null;
+      return { ...base, courseA, courseB, minutes: gap, campusPreference: raw.campusPreference };
+    }
     return null;
   }
 
@@ -131,6 +140,8 @@
       const meetingDay = day(meeting?.day);
       return start === null || end === null || end <= start || !meetingDay ? null : {
         day: meetingDay, start, end,
+        courseCode: text(meeting.courseCode),
+        courseTitle: text(meeting.courseTitle),
         campus: text(meeting.campus), modality: text(meeting.modality),
         open: typeof meeting.open === "boolean" ? meeting.open : null,
       };
@@ -167,6 +178,40 @@
     };
   }
 
+  function normalizedCourseSearch(value) {
+    return text(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  function meetingMatchesCourse(meeting, query) {
+    const needle = normalizedCourseSearch(query);
+    if (!needle) return false;
+    const haystack = normalizedCourseSearch(`${meeting.courseCode} ${meeting.courseTitle}`);
+    return needle.split(/\s+/).every((token) => haystack.includes(token));
+  }
+
+  function courseSeparationViolation(constraint, meetings) {
+    const first = meetings.filter((meeting) => meetingMatchesCourse(meeting, constraint.courseA));
+    const second = meetings.filter((meeting) => meetingMatchesCourse(meeting, constraint.courseB));
+    if (!first.length || !second.length) return 1;
+    let amount = 0;
+    const sameDayPairs = first.flatMap((left) => second
+      .filter((right) => right.day === left.day)
+      .map((right) => ({ left, right })));
+    if (sameDayPairs.length) {
+      const minimumGap = Math.min(...sameDayPairs.map(({ left, right }) => {
+        if (left.end <= right.start) return right.start - left.end;
+        if (right.end <= left.start) return left.start - right.end;
+        return 0;
+      }));
+      amount += Math.max(0, constraint.minutes - minimumGap);
+    }
+    if (constraint.campusPreference === "same") {
+      const campuses = new Set([...first, ...second].map((meeting) => meeting.campus).filter(Boolean));
+      if (campuses.size > 1) amount += 1;
+    }
+    return amount;
+  }
+
   function violation(constraint, metrics) {
     const meetings = metrics.meetings;
     if (constraint.kind === "earliest_start") return metrics.earliestStart !== null && metrics.earliestStart < constraint.minutes ? constraint.minutes - metrics.earliestStart : 0;
@@ -185,6 +230,7 @@
     if (constraint.kind === "campus") return metrics.campuses.includes(constraint.value) ? 0 : 1;
     if (constraint.kind === "modality") return metrics.modalities.includes(constraint.value) ? 0 : 1;
     if (constraint.kind === "open_sections") return metrics.allOpen !== null && constraint.value === metrics.allOpen ? 0 : 1;
+    if (constraint.kind === "course_separation") return courseSeparationViolation(constraint, meetings);
     return 0;
   }
 

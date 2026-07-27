@@ -8,6 +8,7 @@ const ALLOWED_ROLES = new Set(["user", "assistant"]);
 const REPLACE_KINDS = [
   "earliest_start", "latest_end", "avoid_day", "preferred_day", "light_day",
   "time_window_exception", "compact_schedule", "maximum_gap", "campus", "modality", "open_sections",
+  "course_separation",
 ];
 const NULLABLE_OUTPUT_FIELDS = new Set(["day", "minimumClasses", "maximumClasses"]);
 
@@ -23,6 +24,7 @@ const CONSTRAINT_SCHEMAS = [
   { properties: { kind: { const: "maximum_gap" }, strength: { enum: ["hard", "soft"] }, minutes: { type: "integer", minimum: 0, maximum: 1439 } }, required: ["kind", "strength", "minutes"] },
   { properties: { kind: { enum: ["campus", "modality"] }, strength: { enum: ["hard", "soft"] }, value: { type: "string", minLength: 1, maxLength: 100 } }, required: ["kind", "strength", "value"] },
   { properties: { kind: { const: "open_sections" }, strength: { enum: ["hard", "soft"] }, value: { const: true } }, required: ["kind", "strength", "value"] },
+  { properties: { kind: { const: "course_separation" }, strength: { enum: ["hard", "soft"] }, courseA: { type: "string", minLength: 1, maxLength: 100 }, courseB: { type: "string", minLength: 1, maxLength: 100 }, minutes: { enum: [30, 45, 60] }, campusPreference: { enum: ["same", "any"] } }, required: ["kind", "strength", "courseA", "courseB", "minutes", "campusPreference"] },
 ].map((schema) => ({ type: "object", additionalProperties: false, ...schema }));
 
 export const PREFERENCE_PATCH_SCHEMA = {
@@ -45,6 +47,13 @@ export const PREFERENCE_PATCH_SCHEMA = {
 
 function response(body, status) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+function upstreamFailureCode(status) {
+  if (status === 429) return "assistant_quota";
+  if (status === 401 || status === 403) return "assistant_authentication";
+  if (status === 400 || status === 404) return "assistant_configuration";
+  return "assistant_upstream";
 }
 
 function sameJson(left, right) {
@@ -74,13 +83,21 @@ function buildPreferencePrompt(messages, currentPreferences) {
   return [
     {
       role: "system",
-      content: "Translate only schedule-preference conversation into the provided JSON schema. Do not infer courses, sections, eligibility, academic records, credits, requirements, or schedule rankings. Return an empty constraints list when no supported preference is stated. Set replaceKinds to every existing preference kind that the user changes, relaxes, or cancels; for example, changing no classes before 10am to no classes before 9am replaces earliest_start, while cancelling it replaces earliest_start with no new constraint. Keep the acknowledgement concise.",
+      content: "Translate only schedule-preference conversation into the provided JSON schema. Do not infer sections, eligibility, academic records, credits, requirements, or schedule rankings. Return an empty constraints list when no supported preference is stated. A course_separation constraint may be created only after the conversation states both courses, one of 30, 45, or 60 minutes, and whether campuses must be the same or may be any. Set replaceKinds to every existing preference kind that the user changes, relaxes, or cancels; for example, changing no classes before 10am to no classes before 9am replaces earliest_start, while cancelling it replaces earliest_start with no new constraint. Keep the acknowledgement concise.",
     },
     {
       role: "user",
       content: JSON.stringify({ messages, currentPreferences }),
     },
   ];
+}
+
+function vagueNamedCourseSpacing(messages) {
+  const latest = [...messages].reverse().find((message) => message.role === "user")?.content || "";
+  const vagueSpacing = /\b(?:so\s+close|too\s+close|close\s+together|farther\s+apart|further\s+apart|more\s+space\s+between)\b/i.test(latest);
+  const namesRelationship = /\b(?:and|between|them|these)\b/i.test(latest);
+  const explicitGap = /\b(?:30|45|60)\s*(?:m|min|mins|minute|minutes)\b|\b1\s*(?:h|hr|hour)\b/i.test(latest);
+  return vagueSpacing && namesRelationship && !explicitGap;
 }
 
 function outputText(payload) {
@@ -132,16 +149,23 @@ export async function handleScheduleAssistantRequest(request, env, upstreamFetch
   if (!validMessages(payload?.messages) || !currentPreferences) {
     return response({ error: "invalid assistant request" }, 400);
   }
+  if (vagueNamedCourseSpacing(payload.messages)) {
+    return response({
+      preferencePatch: { replaceKinds: [], constraints: [] },
+      acknowledgement: "How much space would you prefer: 30 minutes, 45 minutes, or 1 hour? Should I keep the courses on the same campus, or are campus changes okay?",
+      clarification: {
+        replyOptions: ["30 minutes", "45 minutes", "1 hour", "Same campus", "Campus changes okay"],
+      },
+    }, 200);
+  }
   if (!env?.OPENAI_API_KEY) return response({ error: "schedule assistant is unavailable" }, 503);
 
   const body = {
-    model: env.SCHEDULE_ASSISTANT_MODEL || "gpt-5.6-luna",
-    reasoning: { effort: "low" },
-    max_output_tokens: 768,
+    model: env.SCHEDULE_ASSISTANT_MODEL || "gpt-4o-mini",
+    max_output_tokens: 400,
     store: false,
     input: buildPreferencePrompt(payload.messages, currentPreferences),
     text: {
-      verbosity: "low",
       format: { type: "json_schema", name: "schedule_preference_patch", strict: true, schema: PREFERENCE_PATCH_SCHEMA },
     },
   };
@@ -160,7 +184,15 @@ export async function handleScheduleAssistantRequest(request, env, upstreamFetch
     } catch (_) {
       return response({ error: "schedule assistant is temporarily unavailable" }, 502);
     }
-    if (!upstreamResponse?.ok) return response({ error: "schedule assistant is temporarily unavailable" }, 502);
+    if (!upstreamResponse?.ok) {
+      const code = upstreamFailureCode(upstreamResponse?.status);
+      console.warn("schedule assistant upstream failure", {
+        status: upstreamResponse?.status || 0,
+        code,
+        model: body.model,
+      });
+      return response({ error: "schedule assistant is temporarily unavailable", code }, 502);
+    }
 
     try {
       const upstreamPayload = await upstreamResponse.json();

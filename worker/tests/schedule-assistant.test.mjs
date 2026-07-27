@@ -45,6 +45,7 @@ test("strict structured output requires every declared object property", () => {
   assert.deepEqual(patchSchema.properties.replaceKinds.items.enum, [
     "earliest_start", "latest_end", "avoid_day", "preferred_day", "light_day",
     "time_window_exception", "compact_schedule", "maximum_gap", "campus", "modality", "open_sections",
+    "course_separation",
   ]);
 });
 
@@ -57,7 +58,7 @@ test("rejects malformed assistant histories before calling OpenAI", async () => 
   assert.equal(response.status, 400);
 });
 
-test("uses Luna structured output without sending transcript data", async () => {
+test("uses a supported low-cost API model without sending transcript data", async () => {
   assert.equal(typeof handleScheduleAssistantRequest, "function");
   let upstreamBody;
   const response = await handleScheduleAssistantRequest(new Request("https://x/api/schedule-assistant/interpret", {
@@ -73,14 +74,38 @@ test("uses Luna structured output without sending transcript data", async () => 
       output_text: JSON.stringify({ preferencePatch: { replaceKinds: [], constraints: [] }, acknowledgement: "Got it." }),
     }), { status: 200 });
   });
-  assert.equal(upstreamBody.model, "gpt-5.6-luna");
-  assert.deepEqual(upstreamBody.reasoning, { effort: "low" });
+  assert.equal(upstreamBody.model, "gpt-4o-mini");
+  assert.equal(upstreamBody.reasoning, undefined);
+  assert.equal(upstreamBody.text.verbosity, undefined);
   assert.ok(Number.isInteger(upstreamBody.max_output_tokens));
   assert.ok(upstreamBody.max_output_tokens >= 256 && upstreamBody.max_output_tokens <= 1024);
   assert.equal(upstreamBody.store, false);
   assert.equal(JSON.stringify(upstreamBody).includes("grade"), false);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { preferencePatch: { replaceKinds: [], constraints: [] }, acknowledgement: "Got it." });
+});
+
+test("vague named-course spacing asks for 30, 45, or 60 minutes and campus preference without calling OpenAI", async () => {
+  let called = false;
+  const response = await handleScheduleAssistantRequest(new Request("https://x/api/schedule-assistant/interpret", {
+    method: "POST",
+    body: JSON.stringify({
+      messages: [{ role: "user", content: "I don't want micro and computer science so close together" }],
+      currentPreferences: { version: 1, constraints: [] },
+    }),
+  }), { OPENAI_API_KEY: "test" }, async () => {
+    called = true;
+    throw new Error("must not call upstream");
+  });
+  assert.equal(called, false);
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.deepEqual(payload.preferencePatch, { replaceKinds: [], constraints: [] });
+  assert.match(payload.acknowledgement, /30 minutes/i);
+  assert.match(payload.acknowledgement, /45 minutes/i);
+  assert.match(payload.acknowledgement, /1 hour/i);
+  assert.match(payload.acknowledgement, /campus/i);
+  assert.deepEqual(payload.clarification.replyOptions, ["30 minutes", "45 minutes", "1 hour", "Same campus", "Campus changes okay"]);
 });
 
 test("normalizes nullable strict-schema fields into a canonical preference patch", async () => {
@@ -151,7 +176,9 @@ test("does not expose upstream failures or call a missing secret", async () => {
   });
   assert.equal(upstreamFailure.status, 502);
   assert.equal(upstreamCalls, 1);
-  assert.doesNotMatch(await upstreamFailure.text(), /sensitive|test/i);
+  const upstreamFailureBody = await upstreamFailure.text();
+  assert.doesNotMatch(upstreamFailureBody, /sensitive|test/i);
+  assert.match(upstreamFailureBody, /assistant_quota/);
 });
 
 test("retries one invalid assistant output and returns a valid second output", async () => {
@@ -175,7 +202,7 @@ test("retries one invalid assistant output and returns a valid second output", a
     assert.ok(new TextEncoder().encode(body).length <= 20 * 1024);
     const parsed = JSON.parse(body);
     assert.equal(parsed.store, false);
-    assert.deepEqual(parsed.reasoning, { effort: "low" });
+    assert.equal(parsed.reasoning, undefined);
     assert.equal(JSON.stringify(parsed).includes("grade"), false);
   });
 });

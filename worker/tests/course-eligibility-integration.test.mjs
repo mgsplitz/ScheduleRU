@@ -26,7 +26,8 @@ test("the browser migrates v1 state and evaluates the selected target term", asy
   assert.match(frontend, /CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic\.STATE_VERSION/);
   assert.match(frontend, /ST\.creditLedger\s*=\s*savedObject\(saved\.creditLedger\)/);
   assert.match(frontend, /function confirmedAcademicCreditEntries\(/);
-  assert.match(frontend, /equivalent_course_codes:courseCodesFromText\(ap\.equiv\)/);
+  assert.match(frontend, /\.\.\.courseCodesFromText\(ap\.equiv\)/);
+  assert.match(frontend, /ScheduleRUAcademicCredit\.normalizeCourseCode\(value\)/);
   assert.match(frontend, /function apFulfillsRequirementCourse\(/);
   assert.match(frontend, /function plannedScheduleCreditEntries\(/);
   assert.match(frontend, /function courseEligibilityForTerm\(/);

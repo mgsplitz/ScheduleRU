@@ -27,6 +27,44 @@ test("hard earliest-start constraints reject early schedules", () => {
   assert.deepEqual(plain(result.tradeoffs), []);
 });
 
+test("named-course separation enforces the chosen gap and same-campus preference", () => {
+  const schedules = [
+    {
+      stableIndex: 1,
+      meetings: [
+        { courseCode: "01:220:320", courseTitle: "Intermediate Microeconomic Analysis", day: "M", start: 540, end: 600, campus: "BUSCH" },
+        { courseCode: "01:198:111", courseTitle: "Introduction to Computer Science", day: "M", start: 620, end: 680, campus: "BUSCH" },
+      ],
+    },
+    {
+      stableIndex: 2,
+      meetings: [
+        { courseCode: "01:220:320", courseTitle: "Intermediate Microeconomic Analysis", day: "M", start: 540, end: 600, campus: "BUSCH" },
+        { courseCode: "01:198:111", courseTitle: "Introduction to Computer Science", day: "M", start: 645, end: 705, campus: "BUSCH" },
+      ],
+    },
+    {
+      stableIndex: 3,
+      meetings: [
+        { courseCode: "01:220:320", courseTitle: "Intermediate Microeconomic Analysis", day: "M", start: 540, end: 600, campus: "BUSCH" },
+        { courseCode: "01:198:111", courseTitle: "Introduction to Computer Science", day: "M", start: 645, end: 705, campus: "LIVINGSTON" },
+      ],
+    },
+  ];
+  const preferences = {
+    version: 1,
+    constraints: [{
+      kind: "course_separation",
+      strength: "hard",
+      courseA: "micro",
+      courseB: "computer science",
+      minutes: 45,
+      campusPreference: "same",
+    }],
+  };
+  assert.deepEqual(plain(logic.rankSchedules(schedules, preferences).map((item) => item.stableIndex)), [2]);
+});
+
 test("preference patches accumulate without deleting earlier constraints", () => {
   const first = logic.mergePreferencePatch(
     { version: 1, constraints: [{ kind: "earliest_start", minutes: 540, strength: "hard" }] },
@@ -155,6 +193,7 @@ test("normalization keeps only exact canonical version-1 fields and types", () =
       { kind: "modality", value: "online", strength: "soft" },
       { kind: "open_sections", value: true, strength: "hard" },
       { kind: "time_window_exception", day: "T", startMinutes: 480, endMinutes: 540, minimumClasses: 1, maximumClasses: 2, strength: "soft" },
+      { kind: "course_separation", courseA: "micro", courseB: "computer science", minutes: 30, campusPreference: "any", strength: "hard" },
     ],
   });
   assert.deepEqual(plain(canonical.constraints), [
@@ -163,6 +202,7 @@ test("normalization keeps only exact canonical version-1 fields and types", () =
     { kind: "modality", strength: "soft", value: "online" },
     { kind: "open_sections", strength: "hard", value: true },
     { kind: "time_window_exception", strength: "soft", day: "T", startMinutes: 480, endMinutes: 540, minimumClasses: 1, maximumClasses: 2 },
+    { kind: "course_separation", strength: "hard", courseA: "micro", courseB: "computer science", minutes: 30, campusPreference: "any" },
   ]);
 
   const rejected = logic.normalizePreferenceSet({

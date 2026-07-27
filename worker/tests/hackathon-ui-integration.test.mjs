@@ -75,6 +75,8 @@ test("assistant projections retain Rutgers day and open-section semantics", () =
   assert.match(html, /dayIndex\(meeting\?\.day_of_week\)/);
   assert.match(html, /open_status===true\|\|open_status===1\|\|open_status==="1"/);
   assert.match(html, /open_status===false\|\|open_status===0\|\|open_status==="0"/);
+  assert.match(html, /courseCode:section\?\.code/);
+  assert.match(html, /courseTitle:section\?\.fullTitle\|\|section\?\.title/);
   assert.doesNotMatch(html, /day_of_week\|\|""\)\.toUpperCase\(\)\]\|\|"M"/);
 });
 
@@ -231,7 +233,19 @@ test("Programs edits programs only while home-school changes use a separate cont
   assert.match(html, /function openHomeSchoolPicker\(/);
   const programDialog = html.match(/<!-- PROGRAM SELECTOR -->([\s\S]*?)<div class="app-modal"/)?.[1] || "";
   assert.doesNotMatch(programDialog, /programSchoolSelect/);
+  assert.match(programDialog, /id="programSchoolNav"/);
+  assert.match(html, /ST\.programBrowseSchoolSlug=""/);
+  assert.match(html, /Choose a school to browse its available programs/);
   assert.match(html, /class="policy-warning-list"/);
+});
+
+test("requirement picker, placeholders, and AP prerequisite credit use their systemic fallbacks", () => {
+  assert.doesNotMatch(html, /data-pwishlist=/);
+  assert.doesNotMatch(html, />Requirement filled</);
+  assert.match(html, /data-pintent=/);
+  assert.match(html, /candidateSelectionContext:placeholder\.candidateSelectionContext/);
+  assert.match(html, /ScheduleRUAcademicCredit\.normalizeCourseCode\(value\)/);
+  assert.match(html, /\.\.\.confirmedAcademicCourseCodes\(\)/);
 });
 
 test("program discovery spans supported schools while policy lookup keeps the home school", async () => {
@@ -369,8 +383,12 @@ test("desktop polish uses contrast-safe focus rings on light and dark surfaces",
   assert.match(html, /\.choice-btn:not\(\.secondary\):focus-visible,[\s\S]*?box-shadow:0 0 0 3px #7b0022;/);
 });
 
-test("semester schedule-builder buttons stay visible", () => {
+test("semester schedule-builder buttons are restricted to the active registration term", () => {
   const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
-  assert.doesNotMatch(html, /button\.hidden=!enabled;button\.disabled=!enabled/);
-  assert.doesNotMatch(html, /\.sem-plus\[hidden\]\{display:none;\}/);
+  assert.match(html, /ScheduleRUPlannerUI\.canOpenSemesterBuilder/);
+  assert.match(html, /plus\.hidden=!builderAvailable;plus\.disabled=!builderAvailable/);
+  assert.ok(
+    html.indexOf("function activePlanYear()") < html.indexOf("function renderSchedule()"),
+    "the active-plan helper must be initialized before the first schedule render",
+  );
 });

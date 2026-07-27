@@ -87,6 +87,67 @@ test("a completed approved alternative satisfies the canonical requirement cours
   assert.ok(!result.courses.some((course) => course.code === "01:640:151"));
 });
 
+test("completed and AP-satisfied members reduce unresolved choice-group counts", () => {
+  const tree = sampleTree();
+  tree.groups.root.children = ["writing", "quantitative"];
+  tree.groups.writing = {
+    id: "writing", name: "College Writing", rule: "min_courses", count: 1,
+    members: ["writing101", "writing103"], children: [], parentId: "root",
+  };
+  tree.groups.quantitative = {
+    id: "quantitative", name: "Quantitative Methods", rule: "min_courses", count: 1,
+    members: ["calc", "statistics"], children: [], parentId: "root",
+  };
+  tree.courses.writing101 = {
+    code: "01:355:101", title: "Expository Writing", credits: "3",
+  };
+  tree.courses.writing103 = {
+    code: "01:355:103", title: "Basic Composition", credits: "3",
+  };
+  tree.courses.statistics = {
+    code: "01:960:211", title: "Statistics I", credits: "3",
+  };
+
+  const result = build({
+    requirementTrees: [],
+    coreTree: tree,
+    completedCourseCodes: ["01:355:101", "01:640:135"],
+  });
+
+  assert.equal(result.unresolvedRequirements.some((item) => item.requirementGroupId === "writing"), false);
+  assert.equal(result.unresolvedRequirements.some((item) => item.requirementGroupId === "quantitative"), false);
+});
+
+test("a planned approved alternative is preserved while its canonical requirement is suppressed", () => {
+  const tree = sampleTree();
+  tree.courses.businessComputer = {
+    code: "01:198:170",
+    title: "Computer Applications for Business",
+    credits: "3",
+    alternatives: [{ code: "01:198:111" }],
+  };
+  tree.groups.fixed.members = ["businessComputer"];
+
+  const result = build({
+    requirementTrees: [{ id: "rbs", tree }],
+    schedule: {
+      intro: {
+        code: "01:198:111",
+        title: "Introduction to Computer Science",
+        credits: 4,
+        year: 1,
+        sem: "fall",
+        locked: false,
+        userPinned: false,
+      },
+    },
+  });
+
+  assert.equal(result.courses.some((course) => course.code === "01:198:170"), false);
+  assert.equal(result.courses.some((course) => course.code === "01:198:111"), true);
+  assert.equal(result.completedCourseCodes.includes("01:198:111"), false);
+});
+
 test("completed alternatives close transitively before planner courses are collected", () => {
   const requirementTree = sampleTree();
   requirementTree.courses.intro.alternatives = [{ code: "01:198:110" }];
