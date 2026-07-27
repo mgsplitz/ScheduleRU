@@ -82,6 +82,7 @@
         required: Number(group.count) || 1,
         members: [...(group.members || [])],
         children: [...(group.children || [])],
+        sourceProgramIds: [...(group.sourceProgramIds || [])],
       },
     };
   }

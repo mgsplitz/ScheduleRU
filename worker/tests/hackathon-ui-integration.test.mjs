@@ -234,6 +234,47 @@ test("Programs edits programs only while home-school changes use a separate cont
   assert.match(html, /class="policy-warning-list"/);
 });
 
+test("program discovery spans supported schools while policy lookup keeps the home school", async () => {
+  const requests = [];
+  const context = {
+    ST: {
+      homeSchoolSlug: "rbsnb",
+      availablePrograms: [],
+      selectedPrograms: ["rbsnb-finance"],
+    },
+    backendFetch: async (path) => {
+      requests.push(path);
+      if (path === "/api/programs") {
+        return {
+          programs: [
+            { id: "rbsnb-finance", type: "major", eligibility_rules: [] },
+            { id: "sasnb-economics-major", type: "major", eligibility_rules: [] },
+          ],
+        };
+      }
+      if (path === "/api/program-selection-policies?home_school=rbsnb") {
+        return { limits: [], combination_policies: [] };
+      }
+      throw new Error(`unexpected request: ${path}`);
+    },
+    savePlannerState: () => {},
+    globalThis: {},
+  };
+  vm.runInNewContext(
+    `${functionSource("eligibilityRuleValues")};`
+    + `${functionSource("programIsAvailableForSchool")};`
+    + `${functionSource("programIsAvailableForHomeSchool")};`
+    + `${asyncFunctionSource("loadAvailablePrograms")};`
+    + "globalThis.load = loadAvailablePrograms;",
+    context,
+  );
+
+  const result = await context.globalThis.load();
+  assert.deepEqual(result.map((program) => program.id), ["rbsnb-finance", "sasnb-economics-major"]);
+  assert.deepEqual(requests, ["/api/programs", "/api/program-selection-policies?home_school=rbsnb"]);
+  assert.equal(context.ST.homeSchoolSlug, "rbsnb");
+});
+
 test("program tabs include a shared family only for its contributing programs", () => {
   const context = {
     ST: { requirementTrees: {} },

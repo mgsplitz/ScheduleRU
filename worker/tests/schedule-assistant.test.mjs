@@ -75,6 +75,8 @@ test("uses Luna structured output without sending transcript data", async () => 
   });
   assert.equal(upstreamBody.model, "gpt-5.6-luna");
   assert.deepEqual(upstreamBody.reasoning, { effort: "low" });
+  assert.ok(Number.isInteger(upstreamBody.max_output_tokens));
+  assert.ok(upstreamBody.max_output_tokens >= 256 && upstreamBody.max_output_tokens <= 1024);
   assert.equal(upstreamBody.store, false);
   assert.equal(JSON.stringify(upstreamBody).includes("grade"), false);
   assert.equal(response.status, 200);

@@ -137,6 +137,7 @@ export async function handleScheduleAssistantRequest(request, env, upstreamFetch
   const body = {
     model: env.SCHEDULE_ASSISTANT_MODEL || "gpt-5.6-luna",
     reasoning: { effort: "low" },
+    max_output_tokens: 768,
     store: false,
     input: buildPreferencePrompt(payload.messages, currentPreferences),
     text: {
