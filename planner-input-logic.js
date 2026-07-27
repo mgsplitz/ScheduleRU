@@ -67,7 +67,7 @@
     };
   }
 
-  function placeholder(group, sourceProgram, index, kind = "requirement_placeholder") {
+  function placeholder(group, sourceProgram, index, kind = "requirement_placeholder", courses = {}) {
     const credits = group.rule === "min_credits" ? Math.min(DEFAULT_ESTIMATED_CREDITS, Number(group.count) || DEFAULT_ESTIMATED_CREDITS) : DEFAULT_ESTIMATED_CREDITS;
     return {
       id: `planner-choice:${sourceProgram || "program"}:${group.id}:${index}`,
@@ -81,6 +81,7 @@
         rule: group.rule,
         required: Number(group.count) || 1,
         members: [...(group.members || [])],
+        memberCourseCodes: (group.members || []).map((id) => courses[id]?.code).filter(validCode),
         children: [...(group.children || [])],
         sourceProgramIds: [...(group.sourceProgramIds || [])],
       },
@@ -109,7 +110,7 @@
       if (group.rule === "one_of") {
         const selectedChild = selected.find((id) => group.children?.includes(id));
         if (selectedChild) visit(selectedChild);
-        else placeholders.push(placeholder(group, groupProgram, 0, "choice_placeholder"));
+        else placeholders.push(placeholder(group, groupProgram, 0, "choice_placeholder", courses));
         return;
       }
 
@@ -122,7 +123,9 @@
           ? Math.max(1, Math.ceil((Number(group.count) || DEFAULT_ESTIMATED_CREDITS) / DEFAULT_ESTIMATED_CREDITS))
           : Math.max(1, Number(group.count) || 1);
         const remaining = Math.max(0, required - selectedMembers.length - selectedChildren.length);
-        for (let index = 0; index < remaining; index += 1) placeholders.push(placeholder(group, groupProgram, index));
+        for (let index = 0; index < remaining; index += 1) {
+          placeholders.push(placeholder(group, groupProgram, index, "requirement_placeholder", courses));
+        }
         // Children of a choice group partition or refine the approved option
         // pool. They are not additional mandatory groups. Visiting every
         // child here turns hundreds of Core-approved alternatives into
@@ -167,6 +170,49 @@
 
     const normalizedByCode = new Map();
     requirementCourses.forEach((course) => normalizedByCode.set(course.code, normalizedCourse(course)));
+
+    // A required downstream course may depend on one option from an unresolved
+    // reviewed choice group. Promote the first complete, deterministic path
+    // whose course records are already present in the selected requirement
+    // trees. Consuming the matching placeholder prevents the same choice from
+    // being counted twice in the generated plan.
+    const availableTreeCourses = new Map();
+    [...trees.map((entry) => entry.tree), input.coreTree].filter(Boolean).forEach((tree) => {
+      Object.values(tree.courses || {}).forEach((course) => {
+        if (validCode(course?.code) && !availableTreeCourses.has(course.code)) {
+          availableTreeCourses.set(course.code, course);
+        }
+      });
+    });
+    const prerequisiteQueue = [...normalizedByCode.keys()].sort();
+    const prerequisiteVisited = new Set();
+    while (prerequisiteQueue.length) {
+      const code = prerequisiteQueue.shift();
+      if (prerequisiteVisited.has(code)) continue;
+      prerequisiteVisited.add(code);
+      const course = normalizedByCode.get(code);
+      const paths = course?.prerequisitePaths || [];
+      const path = paths.find((candidate) => candidate.every((prerequisiteCode) =>
+        completed.has(prerequisiteCode)
+        || normalizedByCode.has(prerequisiteCode)
+        || availableTreeCourses.has(prerequisiteCode)));
+      if (!path) continue;
+      path.forEach((prerequisiteCode) => {
+        if (completed.has(prerequisiteCode) || normalizedByCode.has(prerequisiteCode)) return;
+        const prerequisite = availableTreeCourses.get(prerequisiteCode);
+        if (!prerequisite) return;
+        const placeholderIndex = unresolvedRequirements.findIndex((item) =>
+          item.candidateSelectionContext?.memberCourseCodes?.includes(prerequisiteCode));
+        const fulfillsChoice = placeholderIndex >= 0;
+        if (fulfillsChoice) unresolvedRequirements.splice(placeholderIndex, 1);
+        normalizedByCode.set(prerequisiteCode, normalizedCourse(prerequisite, {
+          prerequisiteOnly: !fulfillsChoice,
+        }));
+        prerequisiteQueue.push(prerequisiteCode);
+      });
+      prerequisiteQueue.sort();
+    }
+
     (input.wishlistCourses || []).forEach((course) => {
       if (validCode(course?.code) && !completed.has(course.code) && !normalizedByCode.has(course.code)) {
         normalizedByCode.set(course.code, normalizedCourse(course, { optional: true }));

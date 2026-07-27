@@ -201,3 +201,61 @@ test("distinct Core goal pools remain placeholders until a goal is explicitly ch
     "humanities",
   ]);
 });
+
+test("a required downstream course promotes one reviewed prerequisite choice without double-counting its placeholder", () => {
+  const tree = {
+    roots: ["root"],
+    courses: {
+      dataManagement: {
+        code: "33:136:470",
+        title: "Business Data Management",
+        credits: "3",
+        catalogPrereqs: "((33:136:370 MANAGEMENT INFORMATION SYSTEMS or 33:010:458 ACCTNG INFORM SYSTS) and (33:136:388 FOUNDATIONS OF BUSINESS PROGRAMMING))",
+      },
+      programming: {
+        code: "33:136:388",
+        title: "Foundations of Business Programming",
+        credits: "3",
+      },
+      informationSystems: {
+        code: "33:136:370",
+        title: "Management Information Systems",
+        credits: "3",
+      },
+      accountingSystems: {
+        code: "33:010:458",
+        title: "Accounting Information Systems",
+        credits: "3",
+      },
+    },
+    groups: {
+      root: {
+        id: "root",
+        name: "Business requirements",
+        rule: "all",
+        members: ["dataManagement", "programming"],
+        children: ["systemsChoice"],
+      },
+      systemsChoice: {
+        id: "systemsChoice",
+        name: "Choose one information systems course",
+        rule: "min_courses",
+        count: 1,
+        members: ["informationSystems", "accountingSystems"],
+        children: [],
+        parentId: "root",
+      },
+    },
+  };
+
+  const result = build({
+    requirementTrees: [{ id: "rbsnb-bait", tree }],
+  });
+
+  assert.deepEqual(plain(result.courses.map((course) => course.code).sort()), [
+    "33:136:370",
+    "33:136:388",
+    "33:136:470",
+  ]);
+  assert.deepEqual(plain(result.unresolvedRequirements), []);
+});
