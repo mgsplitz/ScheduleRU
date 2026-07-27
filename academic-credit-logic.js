@@ -57,8 +57,43 @@
     return satisfied;
   }
 
+  function reachableCourseCodes(start, edges) {
+    const reachable = new Set();
+    const pending = [start];
+    for (let index = 0; index < pending.length; index += 1) {
+      for (const target of edges.get(pending[index]) || []) {
+        if (target === start || reachable.has(target)) continue;
+        reachable.add(target);
+        pending.push(target);
+      }
+    }
+    return reachable;
+  }
+
+  function redundantCanonicalCourseCodes({ courseCodes = [], requirementTrees = [] } = {}) {
+    const concrete = new Set((courseCodes || []).map(normalizeCourseCode).filter(Boolean));
+    const edges = equivalencyEdges(requirementTrees);
+    const reachableByCode = new Map(
+      [...concrete].sort().map((code) => [code, reachableCourseCodes(code, edges)]),
+    );
+    const redundant = new Set();
+
+    for (const alternative of [...concrete].sort()) {
+      for (const canonical of [...(reachableByCode.get(alternative) || [])].sort()) {
+        if (!concrete.has(canonical)) continue;
+        // A reciprocal path represents ambiguous/cyclic source data. Keep both
+        // courses instead of silently removing either one.
+        const reverseReachable = reachableByCode.get(canonical)
+          || reachableCourseCodes(canonical, edges);
+        if (!reverseReachable.has(alternative)) redundant.add(canonical);
+      }
+    }
+    return redundant;
+  }
+
   root.ScheduleRUAcademicCredit = {
     satisfiedCourseCodes,
+    redundantCanonicalCourseCodes,
     equivalencyEdges,
     normalizeCourseCode,
   };

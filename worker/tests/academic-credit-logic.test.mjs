@@ -60,6 +60,26 @@ test("an alternative satisfies only its canonical reviewed requirement", () => {
   assert.deepEqual([...result].sort(), ["01:960:211", "01:960:285"]);
 });
 
+test("simultaneously planned reviewed alternatives make only their canonical courses redundant", () => {
+  const result = logic.redundantCanonicalCourseCodes({
+    courseCodes: ["01:198:111", "01:198:170", "33:136:385"],
+    requirementTrees: [
+      tree({
+        businessComputer: {
+          code: "01:198:170",
+          alternatives: [{ code: "01:198:111" }],
+        },
+        statisticalMethods: {
+          code: "33:136:385",
+          alternatives: [],
+        },
+      }),
+    ],
+  });
+
+  assert.deepEqual([...result], ["01:198:170"]);
+});
+
 test("malformed codes and unreviewed prose do not create equivalencies", () => {
   const result = logic.satisfiedCourseCodes({
     confirmedCourseCodes: ["01:198:111", "not-a-course"],

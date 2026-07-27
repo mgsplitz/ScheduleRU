@@ -387,6 +387,7 @@ test("semester schedule-builder buttons are restricted to the active registratio
   const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
   assert.match(html, /ScheduleRUPlannerUI\.canOpenSemesterBuilder/);
   assert.match(html, /plus\.hidden=!builderAvailable;plus\.disabled=!builderAvailable/);
+  assert.match(html, /\.sem-plus\[hidden\]\{display:none;\}/);
   assert.ok(
     html.indexOf("function activePlanYear()") < html.indexOf("function renderSchedule()"),
     "the active-plan helper must be initialized before the first schedule render",

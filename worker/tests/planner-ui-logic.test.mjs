@@ -105,6 +105,13 @@ test("the real-schedule builder is available only for the active registration te
   }), false);
 });
 
+test("requirement progress counts selected and applied courses once", () => {
+  assert.deepEqual(logic.requirementProgressCourseIds({
+    appliedIds: ["financeA", "financeB"],
+    selectedIds: ["financeB", "financeC"],
+  }), ["financeA", "financeB", "financeC"]);
+});
+
 test("every course resolves to an honest path presentation state", () => {
   assert.equal(logic.coursePathState({
     plan: { paths: [["01:198:111"]], references: [] },

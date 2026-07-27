@@ -63,6 +63,10 @@
       && semester === activeSemester;
   }
 
+  function requirementProgressCourseIds({ appliedIds = [], selectedIds = [] } = {}) {
+    return [...new Set([...appliedIds, ...selectedIds].filter(Boolean))];
+  }
+
   function coursePathState({
     plan,
     verifiedNoPrerequisites = false,
@@ -109,6 +113,7 @@
     programSchoolChoices,
     programsForBrowse,
     canOpenSemesterBuilder,
+    requirementProgressCourseIds,
     coursePathState,
     generationPreflight,
     shouldAutoCollapseSharedGroup,

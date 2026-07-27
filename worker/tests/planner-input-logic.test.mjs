@@ -148,6 +148,31 @@ test("a planned approved alternative is preserved while its canonical requiremen
   assert.equal(result.completedCourseCodes.includes("01:198:111"), false);
 });
 
+test("future reviewed alternatives suppress redundant canonical courses without suppressing unrelated requirements", () => {
+  const tree = sampleTree();
+  tree.courses.businessComputer = {
+    code: "01:198:170",
+    title: "Computer Applications for Business",
+    credits: "3",
+    alternatives: [{ code: "01:198:111" }],
+  };
+  tree.courses.statisticalMethods = {
+    code: "33:136:385",
+    title: "Statistical Methods in Business",
+    credits: "3",
+  };
+  tree.groups.fixed.members = ["intro", "businessComputer", "statisticalMethods"];
+
+  const result = build({
+    requirementTrees: [{ id: "rbs", tree }],
+  });
+  const codes = new Set(result.courses.map((course) => course.code));
+
+  assert.equal(codes.has("01:198:111"), true);
+  assert.equal(codes.has("01:198:170"), false);
+  assert.equal(codes.has("33:136:385"), true);
+});
+
 test("completed alternatives close transitively before planner courses are collected", () => {
   const requirementTree = sampleTree();
   requirementTree.courses.intro.alternatives = [{ code: "01:198:110" }];

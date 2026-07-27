@@ -180,6 +180,11 @@
       unresolvedRequirements.push(...result.placeholders);
     }
 
+    academicCredit.redundantCanonicalCourseCodes({
+      courseCodes: [...requirementCourses.keys()],
+      requirementTrees: requirementTreeValues,
+    }).forEach((code) => requirementCourses.delete(code));
+
     const normalizedByCode = new Map();
     requirementCourses.forEach((course) => normalizedByCode.set(course.code, normalizedCourse(course)));
 
