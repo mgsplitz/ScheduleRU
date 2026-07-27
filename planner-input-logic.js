@@ -139,17 +139,16 @@
   }
 
   function buildPlannerInput(input = {}) {
-    const completed = new Set((input.completedCourseCodes || []).map(text).filter(validCode));
     const trees = (Array.isArray(input.requirementTrees) ? input.requirementTrees : [])
       .filter((entry) => entry?.tree);
-
-    // A reviewed requirement alternative satisfies the canonical requirement
-    // code everywhere, not only in the Required panel.
-    trees.forEach(({ tree }) => Object.values(tree.courses || {}).forEach((course) => {
-      if ((course.alternatives || []).some((alternative) => completed.has(text(alternative?.code || alternative?.course_code)))) {
-        if (validCode(course.code)) completed.add(course.code);
-      }
-    }));
+    const academicCredit = root.ScheduleRUAcademicCredit;
+    if (!academicCredit?.satisfiedCourseCodes) {
+      throw new Error("ScheduleRUAcademicCredit must load before planner-input-logic.js");
+    }
+    const completed = academicCredit.satisfiedCourseCodes({
+      confirmedCourseCodes: input.completedCourseCodes || [],
+      requirementTrees: [...trees.map((entry) => entry.tree), input.coreTree].filter(Boolean),
+    });
 
     const requirementCourses = new Map();
     const unresolvedRequirements = [];

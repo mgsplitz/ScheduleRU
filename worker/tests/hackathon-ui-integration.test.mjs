@@ -234,11 +234,24 @@ test("Programs edits programs only while home-school changes use a separate cont
   assert.match(html, /class="policy-warning-list"/);
 });
 
-test("program tabs retain shared pre-business requirements", () => {
-  assert.match(html, /function treeIncludesSourceProgram\(/);
-  assert.match(html, /function groupBelongsToRequiredProgram\(/);
-  assert.match(html, /treeIncludesSourceProgram\(ST\.requirementTrees\?\.\[programId\],group\.sourceProgramId\)/);
-  assert.match(html, /filter\(group=>groupBelongsToRequiredProgram\(group,ST\.requiredProgramTab\)\)/);
+test("program tabs include a shared family only for its contributing programs", () => {
+  const context = {
+    ST: { requirementTrees: {} },
+    globalThis: {},
+  };
+  vm.runInNewContext(
+    `${functionSource("treeIncludesSourceProgram")};`
+    + `${functionSource("groupBelongsToRequiredProgram")};`
+    + "globalThis.belongs = groupBelongsToRequiredProgram;",
+    context,
+  );
+  const sharedCore = {
+    sourceProgramId: "accounting-core-variant",
+    sourceProgramIds: ["rbsnb-bait", "rbsnb-finance"],
+  };
+  assert.equal(context.globalThis.belongs(sharedCore, "rbsnb-finance"), true);
+  assert.equal(context.globalThis.belongs(sharedCore, "rbsnb-bait"), true);
+  assert.equal(context.globalThis.belongs(sharedCore, "rbsnb-accounting"), false);
 });
 
 test("home-school replacement rolls back on failure and ignores stale responses", () => {

@@ -30,6 +30,21 @@ test("a shared requirement family remains singular regardless of program order",
   assert.deepEqual(selected.map((item) => item.id), ["accounting-core"]);
 });
 
+test("a deduplicated display family retains every contributing program owner", () => {
+  const finance = root("finance-core", "rbsnb-business-core", 10);
+  const accounting = root("accounting-core", "rbsnb-business-core", 100);
+  const selected = requirementsForDisplay({
+    finance: [finance],
+    accounting: [accounting],
+  }, ["finance", "accounting"], (item) => item.id);
+
+  assert.equal(selected.length, 1);
+  assert.equal(selected[0].id, "accounting-core");
+  assert.deepEqual(selected[0].sourceProgramIds, ["finance", "accounting"]);
+  assert.equal(finance.sourceProgramIds, undefined);
+  assert.equal(accounting.sourceProgramIds, undefined);
+});
+
 test("identical roots without a display family are still de-duplicated", () => {
   const shared = root("same", null, 0, [{ course_code: "33:000:101" }]);
   const selected = requirementsForDisplay({ one: [shared], two: [shared] }, ["one", "two"], (item) => JSON.stringify(item));

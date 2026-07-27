@@ -6,6 +6,8 @@ import vm from "node:vm";
 const context = { globalThis: {} };
 const eligibilityUrl = new URL("../../eligibility-logic.js", import.meta.url);
 vm.runInNewContext(fs.readFileSync(eligibilityUrl, "utf8"), context);
+const academicCreditUrl = new URL("../../academic-credit-logic.js", import.meta.url);
+vm.runInNewContext(fs.readFileSync(academicCreditUrl, "utf8"), context);
 const moduleUrl = new URL("../../planner-input-logic.js", import.meta.url);
 if (fs.existsSync(moduleUrl)) vm.runInNewContext(fs.readFileSync(moduleUrl, "utf8"), context);
 const logic = context.globalThis.ScheduleRUPlannerInput;
@@ -83,6 +85,47 @@ test("a completed approved alternative satisfies the canonical requirement cours
   const result = build({ completedCourseCodes: ["01:640:135"] });
   assert.ok(result.completedCourseCodes.includes("01:640:151"));
   assert.ok(!result.courses.some((course) => course.code === "01:640:151"));
+});
+
+test("completed alternatives close transitively before planner courses are collected", () => {
+  const requirementTree = sampleTree();
+  requirementTree.courses.intro.alternatives = [{ code: "01:198:110" }];
+  requirementTree.courses.businessComputer = {
+    code: "01:198:170",
+    title: "Computer Applications for Business",
+    credits: "3",
+    alternatives: [{ code: "01:198:111" }],
+  };
+  requirementTree.groups.fixed.members.push("businessComputer");
+
+  const result = build({
+    completedCourseCodes: ["01:198:110"],
+    requirementTrees: [
+      {
+        id: "business",
+        tree: {
+          roots: ["business-root"],
+          groups: {
+            "business-root": {
+              id: "business-root", rule: "all", members: ["informationSystems"], children: [],
+            },
+          },
+          courses: {
+            informationSystems: {
+              code: "33:136:370",
+              alternatives: [{ code: "01:198:170" }],
+            },
+          },
+        },
+      },
+      { id: "computer-science", tree: requirementTree },
+    ],
+  });
+
+  assert.ok(result.completedCourseCodes.includes("01:198:111"));
+  assert.ok(result.completedCourseCodes.includes("01:198:170"));
+  assert.ok(result.completedCourseCodes.includes("33:136:370"));
+  assert.ok(!result.courses.some((course) => ["01:198:111", "01:198:170", "33:136:370"].includes(course.code)));
 });
 
 test("missing credits remain visible as a three-credit estimate instead of zero", () => {

@@ -336,29 +336,49 @@
       ? signatureForRoot
       : (root) => JSON.stringify(root || {});
     const roots = [];
-    const seenSignatures = new Set();
+    const signatureIndexes = new Map();
     const familyIndexes = new Map();
+    const ownersFor = (root, programId) => [...new Set([
+      ...(Array.isArray(root?.sourceProgramIds) ? root.sourceProgramIds : []),
+      programId,
+    ].filter(Boolean))];
 
     for (const programId of programIds || []) {
       for (const root of requirementTrees?.[programId] || []) {
         const family = typeof root?.display_family === "string" ? root.display_family.trim() : "";
         if (!family) {
           const rootSignature = signature(root);
-          if (seenSignatures.has(rootSignature)) continue;
-          seenSignatures.add(rootSignature);
-          roots.push(root);
+          const existingIndex = signatureIndexes.get(rootSignature);
+          if (existingIndex !== undefined) {
+            roots[existingIndex] = {
+              ...roots[existingIndex],
+              sourceProgramIds: [...new Set([
+                ...ownersFor(roots[existingIndex], programId),
+                ...ownersFor(root, programId),
+              ])],
+            };
+            continue;
+          }
+          signatureIndexes.set(rootSignature, roots.length);
+          roots.push({ ...root, sourceProgramIds: ownersFor(root, programId) });
           continue;
         }
 
         const existingIndex = familyIndexes.get(family);
         if (existingIndex === undefined) {
           familyIndexes.set(family, roots.length);
-          roots.push(root);
+          roots.push({ ...root, sourceProgramIds: ownersFor(root, programId) });
           continue;
         }
 
+        const sourceProgramIds = [...new Set([
+          ...ownersFor(roots[existingIndex], programId),
+          ...ownersFor(root, programId),
+        ])];
         if (asDisplayPriority(root) > asDisplayPriority(roots[existingIndex])) {
-          roots[existingIndex] = root;
+          roots[existingIndex] = { ...root, sourceProgramIds };
+        } else {
+          roots[existingIndex] = { ...roots[existingIndex], sourceProgramIds };
         }
       }
     }

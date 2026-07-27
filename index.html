@@ -592,6 +592,7 @@ button,input,select,textarea{font:inherit;}
 <script src="requirement-group-logic.js"></script>
 <script src="course-selector-logic.js"></script>
 <script src="eligibility-logic.js"></script>
+<script src="academic-credit-logic.js"></script>
 <script src="planner-input-logic.js"></script>
 <script src="planner-state-logic.js"></script>
 <script src="four-year-planner-logic.js"></script>
@@ -769,9 +770,18 @@ function confirmedAcademicCreditEntries(){
   Object.values(ST.creditLedger||{}).forEach(entry=>entries.push(entry));
   return globalThis.ScheduleRUEligibilityLogic.confirmedCreditEntries(entries);
 }
+function academicRequirementTrees(){
+  return [ST.majorRequirementTree,ST.coreRequirementTree].filter(Boolean);
+}
+function resolvedAcademicCourseCodes(codes){
+  return [...globalThis.ScheduleRUAcademicCredit.satisfiedCourseCodes({
+    confirmedCourseCodes:codes,
+    requirementTrees:academicRequirementTrees(),
+  })];
+}
 function confirmedAcademicCourseCodes(){
   const logic=globalThis.ScheduleRUEligibilityLogic;
-  return [...new Set(confirmedAcademicCreditEntries().flatMap(entry=>logic.entryCourseCodes(entry)))];
+  return resolvedAcademicCourseCodes(confirmedAcademicCreditEntries().flatMap(entry=>logic.entryCourseCodes(entry)));
 }
 function plannedScheduleCreditEntries(){
   return Object.values(ST.schedule||{}).map(entry=>({
@@ -2237,10 +2247,15 @@ function buildRequirementTree(requirements){
   const courseRows=[];
   const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : rule==="min_credits" ? "min_credits" : rule==="max_credits" ? "max_credits" : rule==="min_distinct_children" ? "distinct" : rule==="one_of" ? "one_of" : "all";
 
-  function addGroup(raw, parentId=null){
+  function addGroup(raw, parentId=null, inheritedSourceProgramIds=[]){
+    const sourceProgramIds=[...new Set([
+      ...(Array.isArray(raw.sourceProgramIds)?raw.sourceProgramIds:[]),
+      ...inheritedSourceProgramIds,
+    ].filter(Boolean))];
     const group={
       id:raw.id, name:raw.name, rule:mapRule(raw.rule), count:raw.count,
       parentId, members:[], children:[], sourceProgramId:raw.program_id,
+      sourceProgramIds,
       display_family:cleanApiText(raw.display_family),
       display_priority:Number(raw.display_priority)||0,
       allocation:raw.allocation,
@@ -2287,7 +2302,7 @@ function buildRequirementTree(requirements){
       group.members.push(id);
       courseRows.push({id,row});
     }
-    for(const child of raw.children||[]) group.children.push(addGroup(child, group.id));
+    for(const child of raw.children||[]) group.children.push(addGroup(child, group.id,sourceProgramIds));
     return group.id;
   }
 
@@ -3447,7 +3462,7 @@ function activePlanYear(){
 function academicRecords(){ return Array.isArray(ST.academicRecords)?ST.academicRecords:[]; }
 function addAcademicRecord(record){ ST.academicRecords.push(ScheduleRUPlannerStateLogic.normalizeAcademicRecord(record)); savePlannerState(); }
 function legacyCompletedAcademicCodes(){const completed=Object.entries(ST.completed||{}).filter(([,taken])=>taken).flatMap(([id])=>[courseRecordFromId(id)?.code||id]);const ap=AP.filter(entry=>ST.apOn?.[entry.id]).flatMap(entry=>courseCodesFromText(entry.equiv));return [...new Set([...completed,...ap].filter(Boolean))];}
-function completedAcademicCodes(){ return [...new Set([...legacyCompletedAcademicCodes(),...academicRecords().filter(record=>record.creditStatus==="applied").flatMap(record=>[record.courseCode,...(record.equivalentCourseCodes||[])])].filter(Boolean))]; }
+function completedAcademicCodes(){ return resolvedAcademicCourseCodes([...legacyCompletedAcademicCodes(),...academicRecords().filter(record=>record.creditStatus==="applied").flatMap(record=>[record.courseCode,...(record.equivalentCourseCodes||[])])]); }
 const legacyConfirmedEntries=confirmedAcademicCreditEntries;
 confirmedAcademicCreditEntries=function(){ return [...legacyConfirmedEntries(),...ScheduleRUPlannerStateLogic.academicCreditEntries(ST)]; };
 const legacyIsCompleted=isCompleted;
@@ -3476,7 +3491,7 @@ function showIssues(){const issues=issueList(),groups=new Map();issues.forEach(i
 function orderedPrograms(){ const rows=selectedProgramRows(); const byId=new Map(rows.map(row=>[row.id,row])); const ids=[ST.primaryProgramId,ST.secondaryProgramId,...rows.map(row=>row.id)].filter((id,index,list)=>id&&list.indexOf(id)===index);return ids.map(id=>byId.get(id)).filter(Boolean); }
 function setRequiredProgram(id){ST.requiredProgramTab=id;renderPanel();}
 function treeIncludesSourceProgram(roots,sourceProgramId){return (roots||[]).some(root=>root?.program_id===sourceProgramId||treeIncludesSourceProgram(root?.children,sourceProgramId));}
-function groupBelongsToRequiredProgram(group,programId){return !group?.sourceProgramId||group.sourceProgramId===programId||treeIncludesSourceProgram(ST.requirementTrees?.[programId],group.sourceProgramId);}
+function groupBelongsToRequiredProgram(group,programId){if(Array.isArray(group?.sourceProgramIds)&&group.sourceProgramIds.length)return group.sourceProgramIds.includes(programId);return !group?.sourceProgramId||group.sourceProgramId===programId||treeIncludesSourceProgram(ST.requirementTrees?.[programId],group.sourceProgramId);}
 const legacyRenderRequired=renderRequired;
 renderRequired=function(){
   useRequirementTree(ST.majorRequirementTree); const pb=document.getElementById("pb"); if(ST.requirementsLoading||ST.requirementsError){legacyRenderRequired();return;}
