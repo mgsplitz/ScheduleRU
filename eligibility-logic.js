@@ -119,7 +119,10 @@
   }
 
   function prerequisiteExpressionTokens(text) {
-    return [...normalizedCatalogText(text).matchAll(/\b\d{2}:\d{3}:\d{3}\b|\(|\)|\b(?:and|or)\b/gi)]
+    // Catalog strings contain ordinary conjunctions inside course titles
+    // ("Life and Social Sciences"). Treat AND/OR as grammar only when the
+    // next operand is visibly a course code or parenthesized expression.
+    return [...normalizedCatalogText(text).matchAll(/\b\d{2}:\d{3}:\d{3}\b|\(|\)|\b(?:and|or)\b(?=\s*(?:\(|\d{2}:\d{3}:\d{3}\b))/gi)]
       .map((match) => {
         const value = match[0];
         if (COURSE_CODE.test(value)) return { type: "course", value };

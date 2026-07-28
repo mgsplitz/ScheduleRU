@@ -168,6 +168,17 @@ test("catalog prerequisite paths preserve OR alternatives instead of flattening 
   ]);
 });
 
+test("course-title conjunctions do not become prerequisite operators", () => {
+  const parsed = logic.parseCatalogPrerequisitePaths(
+    "(01:220:320 INTERMEDIATE MICROECONOMIC ANALYSIS and 01:220:321 INTERMEDIATE MACROECONOMIC ANALYSIS and 01:220:322 ECONOMETRICS and 01:640:136 CALCULUS II FOR THE LIFE AND SOCIAL SCIENCES) OR (01:220:320 INTERMEDIATE MICROECONOMIC ANALYSIS and 01:220:321 INTERMEDIATE MACROECONOMIC ANALYSIS and 01:220:322 ECONOMETRICS and 01:640:152 CALCULUS II FOR MATHEMATICAL AND PHYSICAL SCIENCES)"
+  );
+  assert.equal(parsed.reviewable, true);
+  assert.deepEqual(parsed.paths, [
+    ["01:220:320", "01:220:321", "01:220:322", "01:640:136"],
+    ["01:220:320", "01:220:321", "01:220:322", "01:640:152"],
+  ]);
+});
+
 test("catalog prerequisite eligibility requires courses in an earlier term, not merely somewhere in the plan", () => {
   const paths = [["01:220:320"]];
   const sameTerm = logic.evaluatePrerequisitePaths({

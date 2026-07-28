@@ -281,6 +281,24 @@ test("catalog alternatives and standing restrictions survive planner normalizati
   assert.equal(result.courses.find((course) => course.code === "33:136:388").minimumPlanYear, 2);
 });
 
+test("advanced microeconomics exposes both complete prerequisite paths to the planner", () => {
+  const tree = sampleTree();
+  tree.courses.advancedMicro = {
+    code: "01:220:485",
+    title: "Advanced Microeconomic Theory",
+    credits: "3",
+    catalogPrereqs: "(01:220:320 INTERMEDIATE MICROECONOMIC ANALYSIS and 01:220:321 INTERMEDIATE MACROECONOMIC ANALYSIS and 01:220:322 ECONOMETRICS and 01:640:136 CALCULUS II FOR THE LIFE AND SOCIAL SCIENCES) OR (01:220:320 INTERMEDIATE MICROECONOMIC ANALYSIS and 01:220:321 INTERMEDIATE MACROECONOMIC ANALYSIS and 01:220:322 ECONOMETRICS and 01:640:152 CALCULUS II FOR MATHEMATICAL AND PHYSICAL SCIENCES)",
+  };
+  tree.groups.fixed.members.push("advancedMicro");
+
+  const result = build({ requirementTrees: [{ id: "economics", tree }] });
+
+  assert.deepEqual(plain(result.prerequisitePathsByCode["01:220:485"]), [
+    ["01:220:320", "01:220:321", "01:220:322", "01:640:136"],
+    ["01:220:320", "01:220:321", "01:220:322", "01:640:152"],
+  ]);
+});
+
 test("regeneration drops obsolete generated entries but retains explicit pins", () => {
   const result = build({
     schedule: {
