@@ -6,6 +6,7 @@
   const DEFAULT_TARGET = 16;
   const DEFAULT_MAX = 18;
   const DEFAULT_MAX_COURSES = 6;
+  const DEFAULT_FEASIBILITY_SEARCH_STATES = 50000;
 
   function termOrdinal(term) {
     const year = Number(term?.year);
@@ -127,9 +128,13 @@
     const maxCredits = Math.min(suppliedMaximum, DEFAULT_MAX);
     const targetCredits = normalizeTargetCredits(input.targetCredits);
     const maxCoursesPerTerm = Math.max(1, Math.min(DEFAULT_MAX_COURSES, Math.floor(positiveNumber(input.maxCoursesPerTerm, DEFAULT_MAX_COURSES))));
+    const feasibilitySearchMaxStates = Math.max(1, Math.floor(positiveNumber(
+      input.feasibilitySearchMaxStates,
+      DEFAULT_FEASIBILITY_SEARCH_STATES,
+    )));
     const confirmedCredits = nonNegativeNumber(input.confirmedCredits, 0);
     const inputIssues = (Array.isArray(input.issues) ? input.issues : []).map((entry) => ({ ...entry }));
-    return { terms, courses, coursesByCode, completedCourseCodes, lockedPlacements, prerequisitePathsByCode, unresolvedRequirements, targetCredits, maxCredits, maxCoursesPerTerm, confirmedCredits, inputIssues };
+    return { terms, courses, coursesByCode, completedCourseCodes, lockedPlacements, prerequisitePathsByCode, unresolvedRequirements, targetCredits, maxCredits, maxCoursesPerTerm, feasibilitySearchMaxStates, confirmedCredits, inputIssues };
   }
 
   function createPlaceholder(requirement = {}, ordinal) {
@@ -223,6 +228,271 @@
     return requirement.prerequisitePaths.some((path) => {
       const prerequisiteOrdinal = pathPlacementOrdinal(path, normalized.completedCourseCodes, schedule);
       return prerequisiteOrdinal !== null && prerequisiteOrdinal < term.ordinal;
+    });
+  }
+
+  function requiredFeasibilityItems(normalized) {
+    return [
+      ...normalized.courses.filter((course) => !course.optional).map((course) => ({
+        key: `course:${course.code}`,
+        type: "course",
+        code: course.code,
+        label: course.title || course.code,
+        credits: course.credits,
+        minimumOrdinal: course.minimumPlanYear === null ? 0 : (course.minimumPlanYear - 1) * 2,
+        minimumPriorCredits: course.minimumPriorCredits,
+        prerequisitePaths: prerequisitePathsFor(normalized, course.code),
+        corequisitePaths: course.corequisitePaths,
+        lockedOrdinal: normalized.lockedPlacements[course.code]?.ordinal ?? null,
+        course,
+      })),
+      ...normalized.unresolvedRequirements.map((requirement) => ({
+        key: `requirement:${requirement.inputOrdinal}:${requirement.id}`,
+        type: "requirement",
+        code: null,
+        label: requirement.label,
+        credits: requirement.credits,
+        minimumOrdinal: 0,
+        minimumPriorCredits: null,
+        prerequisitePaths: requirement.prerequisitePaths.length ? requirement.prerequisitePaths : [[]],
+        corequisitePaths: [],
+        lockedOrdinal: null,
+        requirement,
+      })),
+    ];
+  }
+
+  function earliestFeasibilityOrdinals(normalized, items) {
+    const courses = new Map(items.filter((item) => item.type === "course").map((item) => [item.code, item]));
+    const memo = new Map();
+    function earliestCourse(code, visiting = new Set()) {
+      if (normalized.completedCourseCodes.has(code)) return -1;
+      if (memo.has(code)) return memo.get(code);
+      const item = courses.get(code);
+      if (!item || visiting.has(code)) return Number.POSITIVE_INFINITY;
+      const next = new Set(visiting);
+      next.add(code);
+      const pathOrdinals = item.prerequisitePaths.map((path) => {
+        let latest = -1;
+        for (const prerequisite of path) {
+          const ordinal = earliestCourse(prerequisite, next);
+          if (!Number.isFinite(ordinal)) return Number.POSITIVE_INFINITY;
+          latest = Math.max(latest, ordinal);
+        }
+        return latest + 1;
+      });
+      const prerequisiteOrdinal = pathOrdinals.length
+        ? Math.min(...pathOrdinals)
+        : 0;
+      const earliest = Math.max(item.minimumOrdinal, prerequisiteOrdinal);
+      memo.set(code, earliest);
+      return earliest;
+    }
+    return new Map(items.map((item) => {
+      if (item.type === "course") return [item.key, earliestCourse(item.code)];
+      const pathOrdinals = item.prerequisitePaths.map((path) => {
+        let latest = -1;
+        for (const prerequisite of path) {
+          const ordinal = earliestCourse(prerequisite);
+          if (!Number.isFinite(ordinal)) return Number.POSITIVE_INFINITY;
+          latest = Math.max(latest, ordinal);
+        }
+        return latest + 1;
+      });
+      return [item.key, pathOrdinals.length ? Math.min(...pathOrdinals) : 0];
+    }));
+  }
+
+  function sequencingCapacityIssue(normalized, items, earliestByKey) {
+    const lastTermOrdinal = normalized.terms.at(-1)?.ordinal ?? -1;
+    const beyondHorizon = items.filter((item) => {
+      const earliest = earliestByKey.get(item.key);
+      return !Number.isFinite(earliest) || earliest > lastTermOrdinal
+        || (item.lockedOrdinal !== null && earliest > item.lockedOrdinal);
+    });
+    if (beyondHorizon.length) {
+      const earliestTermOrdinal = Math.min(...beyondHorizon.map((item) => earliestByKey.get(item.key)));
+      return issue("plan_sequence_capacity_exceeded", "error", {
+        courseCodes: beyondHorizon.map((item) => item.code).filter(Boolean).sort(),
+        requirementLabels: beyondHorizon.filter((item) => !item.code).map((item) => item.label).sort(),
+        earliestTermOrdinal,
+        lastTermOrdinal,
+      });
+    }
+
+    const firstTermOrdinal = normalized.terms[0]?.ordinal ?? 0;
+    for (const start of normalized.terms.map((term) => term.ordinal).filter((ordinal) => ordinal > firstTermOrdinal)) {
+      const constrained = items.filter((item) => earliestByKey.get(item.key) >= start);
+      const availableTerms = normalized.terms.filter((term) => term.ordinal >= start).length;
+      const requiredCredits = constrained.reduce((total, item) => total + item.credits, 0);
+      const availableCredits = availableTerms * normalized.maxCredits;
+      const availableItems = availableTerms * normalized.maxCoursesPerTerm;
+      if (requiredCredits <= availableCredits && constrained.length <= availableItems) continue;
+      return issue("plan_sequence_capacity_exceeded", "error", {
+        courseCodes: constrained.map((item) => item.code).filter(Boolean).sort(),
+        requirementLabels: constrained.filter((item) => !item.code).map((item) => item.label).sort(),
+        startTermOrdinal: start,
+        requiredCredits,
+        availableCredits,
+        requiredItems: constrained.length,
+        availableItems,
+        lastTermOrdinal,
+      });
+    }
+    return null;
+  }
+
+  function searchFeasibleAssignments(normalized, items, earliestByKey) {
+    const itemByCourse = new Map(items.filter((item) => item.type === "course").map((item) => [item.code, item]));
+    const assignment = new Map();
+    const creditsByOrdinal = Object.fromEntries(normalized.terms.map((term) => [term.ordinal, 0]));
+    const countByOrdinal = Object.fromEntries(normalized.terms.map((term) => [term.ordinal, 0]));
+    let states = 0;
+    let exhausted = false;
+
+    function reserve(item, ordinal) {
+      assignment.set(item.key, ordinal);
+      creditsByOrdinal[ordinal] += item.credits;
+      countByOrdinal[ordinal] += 1;
+    }
+    function release(item, ordinal) {
+      assignment.delete(item.key);
+      creditsByOrdinal[ordinal] -= item.credits;
+      countByOrdinal[ordinal] -= 1;
+    }
+    for (const item of items.filter((candidate) => candidate.lockedOrdinal !== null)) {
+      if (!Object.prototype.hasOwnProperty.call(creditsByOrdinal, item.lockedOrdinal)
+        || creditsByOrdinal[item.lockedOrdinal] + item.credits > normalized.maxCredits
+        || countByOrdinal[item.lockedOrdinal] >= normalized.maxCoursesPerTerm) {
+        return { status: "unsatisfiable", assignments: null, states };
+      }
+      reserve(item, item.lockedOrdinal);
+    }
+
+    function pathCanFit(path, ordinal, sameTermAllowed) {
+      return path.every((code) => {
+        if (normalized.completedCourseCodes.has(code)) return true;
+        const prerequisiteItem = itemByCourse.get(code);
+        if (!prerequisiteItem) return false;
+        const assigned = assignment.get(prerequisiteItem.key);
+        if (assigned !== undefined) return sameTermAllowed ? assigned <= ordinal : assigned < ordinal;
+        const earliest = earliestByKey.get(prerequisiteItem.key);
+        return Number.isFinite(earliest) && (sameTermAllowed ? earliest <= ordinal : earliest < ordinal);
+      });
+    }
+
+    function priorCredits(ordinal) {
+      return normalized.confirmedCredits + Object.entries(creditsByOrdinal).reduce((total, [candidateOrdinal, credits]) => (
+        Number(candidateOrdinal) < ordinal ? total + credits : total
+      ), 0);
+    }
+
+    function potentialPriorCredits(item, ordinal) {
+      return priorCredits(ordinal) + items.reduce((total, candidate) => {
+        if (candidate.key === item.key || assignment.has(candidate.key)) return total;
+        if (candidate.lockedOrdinal !== null) {
+          return candidate.lockedOrdinal < ordinal ? total + candidate.credits : total;
+        }
+        return candidate.minimumOrdinal < ordinal ? total + candidate.credits : total;
+      }, 0);
+    }
+
+    function candidateOrdinals(item) {
+      if (item.lockedOrdinal !== null) return assignment.has(item.key) ? [] : [item.lockedOrdinal];
+      return normalized.terms.map((term) => term.ordinal).filter((ordinal) => {
+        if (ordinal < item.minimumOrdinal) return false;
+        if (creditsByOrdinal[ordinal] + item.credits > normalized.maxCredits) return false;
+        if (countByOrdinal[ordinal] >= normalized.maxCoursesPerTerm) return false;
+        if (item.minimumPriorCredits !== null
+          && potentialPriorCredits(item, ordinal) < item.minimumPriorCredits) return false;
+        if (item.prerequisitePaths.length
+          && !item.prerequisitePaths.some((path) => pathCanFit(path, ordinal, false))) return false;
+        if (item.corequisitePaths.length
+          && !item.corequisitePaths.some((path) => pathCanFit(path, ordinal, true))) return false;
+        return true;
+      }).sort((left, right) => {
+        const leftTarget = creditsByOrdinal[left] + item.credits <= normalized.targetCredits ? 0 : 1;
+        const rightTarget = creditsByOrdinal[right] + item.credits <= normalized.targetCredits ? 0 : 1;
+        return leftTarget - rightTarget
+          || creditsByOrdinal[left] - creditsByOrdinal[right]
+          || countByOrdinal[left] - countByOrdinal[right]
+          || left - right;
+      });
+    }
+
+    function finalConstraintsHold() {
+      return items.every((item) => {
+        const ordinal = assignment.get(item.key);
+        if (ordinal === undefined) return false;
+        if (item.minimumPriorCredits !== null && priorCredits(ordinal) < item.minimumPriorCredits) return false;
+        if (item.prerequisitePaths.length
+          && !item.prerequisitePaths.some((path) => pathCanFit(path, ordinal, false))) return false;
+        return !item.corequisitePaths.length
+          || item.corequisitePaths.some((path) => pathCanFit(path, ordinal, true));
+      });
+    }
+
+    function visit() {
+      states += 1;
+      if (states > normalized.feasibilitySearchMaxStates) {
+        exhausted = true;
+        return false;
+      }
+      const remaining = items.filter((item) => !assignment.has(item.key));
+      if (!remaining.length) return finalConstraintsHold();
+      const choices = remaining.map((item) => ({ item, ordinals: candidateOrdinals(item) }))
+        .sort((left, right) => left.ordinals.length - right.ordinals.length
+          || Number(right.item.minimumPriorCredits !== null) - Number(left.item.minimumPriorCredits !== null)
+          || right.item.minimumOrdinal - left.item.minimumOrdinal
+          || right.item.credits - left.item.credits
+          || left.item.key.localeCompare(right.item.key));
+      const choice = choices[0];
+      if (!choice.ordinals.length) return false;
+      for (const ordinal of choice.ordinals) {
+        reserve(choice.item, ordinal);
+        if (visit()) return true;
+        release(choice.item, ordinal);
+        if (exhausted) return false;
+      }
+      return false;
+    }
+
+    const found = visit();
+    return {
+      status: found ? "complete" : exhausted ? "indeterminate" : "unsatisfiable",
+      assignments: found ? new Map(assignment) : null,
+      states,
+    };
+  }
+
+  function applyFeasibleAssignments(normalized, items, assignments, schedule, termCredits, placeholders) {
+    Object.keys(schedule).forEach((code) => delete schedule[code]);
+    Object.keys(termCredits).forEach((key) => { termCredits[key] = 0; });
+    placeholders.splice(0, placeholders.length);
+    const termByOrdinal = new Map(normalized.terms.map((term) => [term.ordinal, term]));
+    items.forEach((item) => {
+      const ordinal = assignments.get(item.key);
+      const term = termByOrdinal.get(ordinal);
+      if (!term) return;
+      termCredits[termKey(term)] += item.credits;
+      if (item.type === "course") {
+        const locked = item.lockedOrdinal !== null;
+        schedule[item.code] = {
+          ...item.course,
+          code: item.code,
+          credits: item.credits,
+          year: term.year,
+          sem: term.sem,
+          ordinal,
+          locked,
+          userPinned: locked,
+        };
+        return;
+      }
+      const placeholder = createPlaceholder(item.requirement, ordinal);
+      placeholder.year = term.year;
+      placeholder.sem = term.sem;
+      placeholders.push(placeholder);
     });
   }
 
@@ -389,6 +659,8 @@
       .reduce((total, course) => total + course.credits, 0)
       + normalized.unresolvedRequirements.reduce((total, requirement) => total + requirement.credits, 0);
     const availableCredits = normalized.terms.length * normalized.maxCredits;
+    const feasibilityItems = requiredFeasibilityItems(normalized);
+    const earliestByKey = earliestFeasibilityOrdinals(normalized, feasibilityItems);
     if (requiredCredits > availableCredits) {
       issues.push(issue("plan_capacity_exceeded", "error", {
         requiredCredits,
@@ -396,6 +668,16 @@
         overByCredits: requiredCredits - availableCredits,
       }));
     }
+    const availableItems = normalized.terms.length * normalized.maxCoursesPerTerm;
+    if (feasibilityItems.length > availableItems) {
+      issues.push(issue("plan_course_slots_exceeded", "error", {
+        requiredItems: feasibilityItems.length,
+        availableItems,
+        overByItems: feasibilityItems.length - availableItems,
+      }));
+    }
+    const sequenceIssue = sequencingCapacityIssue(normalized, feasibilityItems, earliestByKey);
+    if (sequenceIssue) issues.push(sequenceIssue);
 
     normalized.courses.filter((course) => course.ruleCoverage === "unresolved").forEach((course) => {
       if (!issues.some((entry) => entry.code === "eligibility_rule_unresolved" && entry.courseCode === course.code)) {
@@ -482,15 +764,12 @@
       }
     });
 
-    const unplacedCourses = [...pending.values()].filter((course) => !course.optional).map((course) => course.code).sort();
-    const unplacedOptionalCourses = [...pending.values()].filter((course) => course.optional).map((course) => course.code).sort();
+    let unplacedCourses = [...pending.values()].filter((course) => !course.optional).map((course) => course.code).sort();
+    let unplacedOptionalCourses = [...pending.values()].filter((course) => course.optional).map((course) => course.code).sort();
     const cyclic = cyclicCourseCodes(unplacedCourses, normalized);
-    if (cyclic.length) issues.push(issue("cyclic_prerequisite", "error", { courseCodes: cyclic }));
-    if (unplacedCourses.length) issues.push(issue("courses_unplaced", "error", { courseCodes: unplacedCourses }));
-    if (unplacedOptionalCourses.length) issues.push(issue("optional_courses_unplaced", "warning", { courseCodes: unplacedOptionalCourses }));
 
     const placeholders = [];
-    const unplacedRequirements = [];
+    let unplacedRequirements = [];
     normalized.unresolvedRequirements.forEach((requirement) => {
       const eligibleTerms = normalized.terms
         .filter((term) => termCredits[termKey(term)] + requirement.credits <= normalized.maxCredits
@@ -513,6 +792,43 @@
       placeholders.push(placeholder);
       termCredits[termKey(term)] += placeholder.estimatedCredits;
     });
+
+    const proofIssueCodes = new Set([
+      "plan_capacity_exceeded",
+      "plan_course_slots_exceeded",
+      "plan_sequence_capacity_exceeded",
+    ]);
+    const hasProof = issues.some((entry) => proofIssueCodes.has(entry.code));
+    if ((unplacedCourses.length || unplacedRequirements.length) && !hasProof && !cyclic.length) {
+      const search = searchFeasibleAssignments(normalized, feasibilityItems, earliestByKey);
+      if (search.status === "complete") {
+        applyFeasibleAssignments(normalized, feasibilityItems, search.assignments, schedule, termCredits, placeholders);
+        unplacedCourses = [];
+        unplacedRequirements = [];
+        unplacedOptionalCourses = normalized.courses.filter((course) => course.optional).map((course) => course.code).sort();
+        for (let index = issues.length - 1; index >= 0; index -= 1) {
+          if (["locked_prerequisite_violation", "courses_unplaced", "requirements_unplaced"].includes(issues[index].code)) {
+            issues.splice(index, 1);
+          }
+        }
+      } else if (search.status === "indeterminate") {
+        issues.push(issue("plan_feasibility_inconclusive", "error", {
+          searchedStates: search.states,
+          courseCodes: unplacedCourses,
+          requirementIds: [...unplacedRequirements].sort(),
+        }));
+      } else {
+        issues.push(issue("plan_sequence_capacity_exceeded", "error", {
+          courseCodes: unplacedCourses,
+          requirementIds: [...unplacedRequirements].sort(),
+          lastTermOrdinal: normalized.terms.at(-1)?.ordinal ?? -1,
+        }));
+      }
+    }
+
+    if (cyclic.length) issues.push(issue("cyclic_prerequisite", "error", { courseCodes: cyclic }));
+    if (unplacedCourses.length) issues.push(issue("courses_unplaced", "error", { courseCodes: unplacedCourses }));
+    if (unplacedOptionalCourses.length) issues.push(issue("optional_courses_unplaced", "warning", { courseCodes: unplacedOptionalCourses }));
     if (unplacedRequirements.length) issues.push(issue("requirements_unplaced", "error", { requirementIds: unplacedRequirements.sort() }));
 
     const resultSchedule = {};

@@ -39,10 +39,12 @@ It enforces:
 
 Optional Wishlist courses never make a required plan infeasible.
 
-The result has one of four states:
+The result has one of five states:
 
 - `complete`: every required item has a valid placement;
 - `aggregate_capacity`: required credits alone exceed available term credits;
+- `course_slot_capacity`: the number of required courses and placeholders
+  exceeds the configured course-count limit across the available terms;
 - `sequencing_capacity`: the search proves that prerequisite, standing, or
   locked-term constraints make the eight-term horizon infeasible; or
 - `indeterminate`: the bounded search cannot prove either feasibility or

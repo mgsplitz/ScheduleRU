@@ -119,6 +119,56 @@
       && !(preview?.issues || []).some((issue) => issue?.severity === "error");
   }
 
+  function previewResult(preview = {}) {
+    const issues = Array.isArray(preview?.issues) ? preview.issues : [];
+    const aggregate = issues.find((issue) => issue?.code === "plan_capacity_exceeded");
+    if (aggregate) {
+      return {
+        kind: "aggregate_capacity",
+        title: "Plan exceeds four-year credit capacity",
+        message: `These selections need about ${aggregate.requiredCredits} remaining credits, but the available semesters hold at most ${aggregate.availableCredits}. Reduce the plan by at least ${aggregate.overByCredits} credits, apply completed/AP credit, or plan additional terms.`,
+      };
+    }
+    const courseSlots = issues.find((issue) => issue?.code === "plan_course_slots_exceeded");
+    if (courseSlots) {
+      return {
+        kind: "course_slot_capacity",
+        title: "Plan exceeds four-year course capacity",
+        message: `These selections need ${courseSlots.requiredItems} required course slots, but the available semesters allow ${courseSlots.availableItems}. Reduce the plan by at least ${courseSlots.overByItems} course slot${courseSlots.overByItems === 1 ? "" : "s"}, apply completed/AP credit, or plan additional terms.`,
+      };
+    }
+    const sequencing = issues.find((issue) => issue?.code === "plan_sequence_capacity_exceeded");
+    if (sequencing) {
+      const blockers = [...(sequencing.courseCodes || []), ...(sequencing.requirementLabels || [])].slice(0, 6);
+      return {
+        kind: "sequencing_capacity",
+        title: "Required sequence extends beyond four years",
+        message: blockers.length
+          ? `The prerequisite or standing sequence ending with ${blockers.join(", ")} extends beyond the final planned semester.`
+          : "Prerequisite, standing, locked-term, and semester-capacity constraints cannot all fit within the current eight-semester horizon.",
+      };
+    }
+    if (issues.some((issue) => issue?.code === "plan_feasibility_inconclusive")) {
+      return {
+        kind: "indeterminate",
+        title: "Planner could not finish the feasibility check",
+        message: "The automatic search reached its safety limit before it could prove whether a complete eight-semester arrangement exists. Your current plan was not changed.",
+      };
+    }
+    if (canAcceptGeneratedPlan(preview)) {
+      return {
+        kind: "complete",
+        title: "Generated plan preview",
+        message: "Every required course and unresolved requirement slot fits within the current planning constraints.",
+      };
+    }
+    return {
+      kind: "incomplete",
+      title: "Plan needs changes",
+      message: "The planner could not place every required item. Review the blocking details below before changing your current plan.",
+    };
+  }
+
   function shouldAutoCollapseSharedGroup({ group, selectedMajorIds = [] } = {}) {
     const selected = new Set(selectedMajorIds || []);
     const sharedMajorCount = [...new Set(group?.sourceProgramIds || [])]
@@ -140,6 +190,7 @@
     coursePathState,
     generationPreflight,
     canAcceptGeneratedPlan,
+    previewResult,
     shouldAutoCollapseSharedGroup,
   };
 })(globalThis);

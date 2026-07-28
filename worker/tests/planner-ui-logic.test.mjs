@@ -204,6 +204,72 @@ test("only complete generated plans can replace the accepted plan", () => {
   }), false);
 });
 
+test("plan previews explain aggregate credit capacity with exact totals", () => {
+  assert.deepEqual(logic.previewResult({
+    status: "partial",
+    issues: [{
+      code: "plan_capacity_exceeded",
+      severity: "error",
+      requiredCredits: 151,
+      availableCredits: 144,
+      overByCredits: 7,
+    }],
+  }), {
+    kind: "aggregate_capacity",
+    title: "Plan exceeds four-year credit capacity",
+    message: "These selections need about 151 remaining credits, but the available semesters hold at most 144. Reduce the plan by at least 7 credits, apply completed/AP credit, or plan additional terms.",
+  });
+});
+
+test("plan previews explain course-slot capacity independently of credits", () => {
+  assert.deepEqual(logic.previewResult({
+    status: "partial",
+    issues: [{
+      code: "plan_course_slots_exceeded",
+      severity: "error",
+      requiredItems: 49,
+      availableItems: 48,
+      overByItems: 1,
+    }],
+  }), {
+    kind: "course_slot_capacity",
+    title: "Plan exceeds four-year course capacity",
+    message: "These selections need 49 required course slots, but the available semesters allow 48. Reduce the plan by at least 1 course slot, apply completed/AP credit, or plan additional terms.",
+  });
+});
+
+test("plan previews name a proven prerequisite sequencing bottleneck", () => {
+  assert.deepEqual(logic.previewResult({
+    status: "partial",
+    issues: [{
+      code: "plan_sequence_capacity_exceeded",
+      severity: "error",
+      courseCodes: ["01:198:108"],
+      earliestTermOrdinal: 8,
+      lastTermOrdinal: 7,
+    }],
+  }), {
+    kind: "sequencing_capacity",
+    title: "Required sequence extends beyond four years",
+    message: "The prerequisite or standing sequence ending with 01:198:108 extends beyond the final planned semester.",
+  });
+});
+
+test("plan previews report an exhausted search without declaring impossibility", () => {
+  assert.deepEqual(logic.previewResult({
+    status: "partial",
+    issues: [{
+      code: "plan_feasibility_inconclusive",
+      severity: "error",
+      searchedStates: 50001,
+    }],
+  }), {
+    kind: "indeterminate",
+    title: "Planner could not finish the feasibility check",
+    message: "The automatic search reached its safety limit before it could prove whether a complete eight-semester arrangement exists. Your current plan was not changed.",
+  });
+});
+
 test("only Core families shared by multiple selected majors auto-collapse", () => {
   assert.equal(logic.shouldAutoCollapseSharedGroup({
     group: {

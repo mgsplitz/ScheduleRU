@@ -451,6 +451,132 @@ test("plans that require more credits than the available terms report the capaci
   });
 });
 
+test("plans below the credit cap report when required items exceed available course slots", () => {
+  const result = planner().generatePlan({
+    terms: Array.from({ length: 8 }, (_, ordinal) => ({
+      year: Math.floor(ordinal / 2) + 1,
+      sem: ordinal % 2 ? "spring" : "fall",
+    })),
+    courses: Array.from({ length: 49 }, (_, index) => ({
+      code: `01:198:${String(index + 100).padStart(3, "0")}`,
+      title: `One-credit requirement ${index + 1}`,
+      credits: 1,
+    })),
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(
+    result.issues.find((issue) => issue.code === "plan_course_slots_exceeded"),
+  )), {
+    code: "plan_course_slots_exceeded",
+    severity: "error",
+    requiredItems: 49,
+    availableItems: 48,
+    overByItems: 1,
+  });
+  assert.equal(result.issues.some((issue) => issue.code === "plan_capacity_exceeded"), false);
+});
+
+test("a prerequisite chain longer than the horizon reports a sequencing bottleneck", () => {
+  const courses = Array.from({ length: 9 }, (_, index) => ({
+    code: `01:198:${String(index + 100).padStart(3, "0")}`,
+    title: `Sequence course ${index + 1}`,
+    credits: 1,
+  }));
+  const result = planner().generatePlan({
+    terms: Array.from({ length: 8 }, (_, ordinal) => ({
+      year: Math.floor(ordinal / 2) + 1,
+      sem: ordinal % 2 ? "spring" : "fall",
+    })),
+    courses,
+    prerequisitePathsByCode: Object.fromEntries(courses.slice(1).map((course, index) => [
+      course.code,
+      [[courses[index].code]],
+    ])),
+  });
+
+  const issue = JSON.parse(JSON.stringify(
+    result.issues.find((entry) => entry.code === "plan_sequence_capacity_exceeded"),
+  ));
+  assert.equal(issue.severity, "error");
+  assert.deepEqual(issue.courseCodes, ["01:198:108"]);
+  assert.equal(issue.earliestTermOrdinal, 8);
+  assert.equal(issue.lastTermOrdinal, 7);
+  assert.equal(result.issues.some((entry) => entry.code === "plan_capacity_exceeded"), false);
+});
+
+test("the feasibility fallback rearranges a greedy dead end into a complete plan", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    maxCredits: 10,
+    courses: [
+      { code: "01:198:100", credits: 6 },
+      { code: "01:198:101", credits: 4 },
+      { code: "01:198:102", credits: 4 },
+      { code: "01:198:103", credits: 6 },
+    ],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(Object.values(result.termCredits).sort((left, right) => left - right), [10, 10]);
+  assert.equal(result.issues.some((issue) => issue.severity === "error"), false);
+});
+
+test("the feasibility fallback preserves prerequisite ordering while rearranging terms", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    maxCredits: 10,
+    courses: [
+      { code: "01:198:100", credits: 4 },
+      { code: "01:198:101", credits: 6 },
+      { code: "01:198:102", credits: 4 },
+      { code: "01:198:103", credits: 6 },
+    ],
+    prerequisitePathsByCode: {
+      "01:198:103": [["01:198:100"]],
+    },
+  });
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.schedule["01:198:100"].sem, "fall");
+  assert.equal(result.schedule["01:198:103"].sem, "spring");
+  assert.deepEqual(Object.values(result.termCredits).sort((left, right) => left - right), [10, 10]);
+});
+
+test("the feasibility fallback can build the prior credits needed by a gated course", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    maxCredits: 10,
+    courses: [
+      { code: "01:198:100", credits: 4 },
+      { code: "01:198:101", credits: 6 },
+      { code: "01:198:102", credits: 4 },
+      { code: "01:198:103", credits: 6, minimumPriorCredits: 10 },
+    ],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.schedule["01:198:103"].sem, "spring");
+  assert.deepEqual(Object.values(result.termCredits).sort((left, right) => left - right), [10, 10]);
+});
+
+test("an exhausted feasibility search reports uncertainty instead of impossibility", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    maxCredits: 10,
+    feasibilitySearchMaxStates: 1,
+    courses: [
+      { code: "01:198:100", credits: 6 },
+      { code: "01:198:101", credits: 4 },
+      { code: "01:198:102", credits: 4 },
+      { code: "01:198:103", credits: 6 },
+    ],
+  });
+
+  assert.ok(result.issues.some((issue) =>
+    issue.code === "plan_feasibility_inconclusive" && issue.severity === "error"));
+  assert.equal(result.issues.some((issue) => issue.code === "plan_sequence_capacity_exceeded"), false);
+});
+
 test("reports invalid locks and prerequisite cycles without moving locked work", () => {
   const result = planner().generatePlan({
     terms: [{ year: 1, sem: "fall" }],
