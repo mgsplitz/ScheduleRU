@@ -63,6 +63,14 @@
       && semester === activeSemester;
   }
 
+  function activePlannerTerm({ academicPosition = {}, activeSemester = "fall" } = {}) {
+    const savedYear = Number(academicPosition?.year);
+    return {
+      year: Number.isInteger(savedYear) && savedYear >= 1 ? savedYear : 1,
+      semester: activeSemester === "spring" ? "spring" : "fall",
+    };
+  }
+
   function requirementProgressCourseIds({ appliedIds = [], selectedIds = [] } = {}) {
     return [...new Set([...appliedIds, ...selectedIds].filter(Boolean))];
   }
@@ -113,6 +121,7 @@
     programSchoolChoices,
     programsForBrowse,
     canOpenSemesterBuilder,
+    activePlannerTerm,
     requirementProgressCourseIds,
     coursePathState,
     generationPreflight,

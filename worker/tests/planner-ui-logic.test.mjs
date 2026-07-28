@@ -105,6 +105,26 @@ test("the real-schedule builder is available only for the active registration te
   }), false);
 });
 
+test("the active planner term follows the student's saved position instead of a stale calendar anchor", () => {
+  const activeTerm = logic.activePlannerTerm({
+    academicPosition: { year: 1 },
+    activeSemester: "fall",
+  });
+  assert.deepEqual(activeTerm, { year: 1, semester: "fall" });
+  assert.equal(logic.canOpenSemesterBuilder({
+    displayedYear: 1,
+    activeYear: activeTerm.year,
+    semester: "fall",
+    activeSemester: activeTerm.semester,
+  }), true);
+  assert.equal(logic.canOpenSemesterBuilder({
+    displayedYear: 2,
+    activeYear: activeTerm.year,
+    semester: "fall",
+    activeSemester: activeTerm.semester,
+  }), false);
+});
+
 test("requirement progress counts selected and applied courses once", () => {
   assert.deepEqual(logic.requirementProgressCourseIds({
     appliedIds: ["financeA", "financeB"],

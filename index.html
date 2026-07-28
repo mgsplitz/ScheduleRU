@@ -762,6 +762,12 @@ function activePlanYear(){
   const year=calendarYear-anchor+(activeRegistrationSemester()==="fall"?1:0);
   return Number.isInteger(year)&&year>=1?year:Number(ST.academicPosition?.year)||1;
 }
+function currentPlannerTerm(){
+  return globalThis.ScheduleRUPlannerUI.activePlannerTerm({
+    academicPosition:ST.academicPosition,
+    activeSemester:activeRegistrationSemester(),
+  });
+}
 
 /* AP fulfillment: build map courseId -> [apIds that fulfill it] */
 const AP_FULFILLS = {};
@@ -1647,15 +1653,16 @@ function renderSchedule(){
   document.getElementById("yLabel").textContent = academicYearLabel(ST.year);
   document.getElementById("yPrev").disabled = ST.year===1;
   document.getElementById("yNext").disabled = ST.year===displayMaxYear;
+  const currentTerm=currentPlannerTerm();
   ["fall","spring"].forEach(sem => {
     const zoneId = sem[0]+"z";
     const crId = sem[0]+"cr";
     const zone = document.getElementById(zoneId);
     const builderAvailable=globalThis.ScheduleRUPlannerUI.canOpenSemesterBuilder({
       displayedYear:ST.year,
-      activeYear:activePlanYear(),
+      activeYear:currentTerm.year,
       semester:sem,
-      activeSemester:activeRegistrationSemester(),
+      activeSemester:currentTerm.semester,
     });
     const plus=document.querySelector(`[data-semplus="${sem}"]`);
     if(plus){plus.hidden=!builderAvailable;plus.disabled=!builderAvailable;}
@@ -3246,11 +3253,12 @@ function recomputeBuilderPermutations(){
 }
 
 function openBuilder(sem){
+  const currentTerm=currentPlannerTerm();
   if(!globalThis.ScheduleRUPlannerUI.canOpenSemesterBuilder({
     displayedYear:ST.year,
-    activeYear:activePlanYear(),
+    activeYear:currentTerm.year,
     semester:sem,
-    activeSemester:activeRegistrationSemester(),
+    activeSemester:currentTerm.semester,
   }))return;
   ST.builder = { year:ST.year, sem, pool:[], permutations:[], blockers:[], requiredCount:0, permIndex:0 };
   renderMain();
@@ -3661,7 +3669,7 @@ document.getElementById("clearPlanBtn").addEventListener("click",confirmClearPla
 function acceptGeneratedPlan(preview){const accepted=ScheduleRUPlannerStateLogic.withAcceptedPlan(ST,preview);Object.assign(ST,accepted);const firstPopulated=plannerTerms().find(term=>Object.values(ST.schedule).some(entry=>entry.year===term.year&&entry.sem===term.sem)||(ST.planPlaceholders||[]).some(placeholder=>placeholder.year===term.year&&placeholder.sem===term.sem));if(firstPopulated)ST.year=firstPopulated.year;savePlannerState();renderAll();}
 function showPlanPreview(){const preview=ST.generatedPlanPreview;if(!preview)return;const rows=plannerTerms().map(term=>{const courses=Object.values(preview.schedule).filter(entry=>entry.year===term.year&&entry.sem===term.sem);const placeholders=(preview.placeholders||[]).filter(entry=>entry.year===term.year&&entry.sem===term.sem);const items=courses.map(entry=>`<div class="planner-item"><strong>${html(entry.code)}</strong> · ${html(entry.title||entry.code)} · ${html(entry.credits)} credits${entry.userPinned||entry.locked?" · pinned":""}</div>`).join("")+placeholders.map(entry=>`<div class="planner-item placeholder-item">To be selected: ${html(entry.label)} · ${html(entry.estimatedCredits)} estimated credits</div>`).join("");return `<section class="planner-term"><h3>${html(academicYearLabel(term.year))} · ${html(term.sem)}</h3>${items||"<div class=\"planner-item\">No placement</div>"}</section>`;}).join("");const blocking=(preview.issues||[]).filter(issue=>issue.severity==="error"),warningCount=(preview.issues||[]).length-blocking.length;modalController.show({title:"Generated plan preview",body:`<div class="planner-preview">${rows}${blocking.map(issue=>`<div class="planner-issue planner-issue-error">${html(plannerIssueText(issue))}</div>`).join("")}${warningCount?`<div class="planner-issue">${warningCount} planning notes are available under Issues.</div>`:""}</div>`,actions:[{label:"Cancel",secondary:true},{label:"Use this plan",onClick:()=>acceptGeneratedPlan(preview)}]});}
 
-function termPreferenceState(){const key=ScheduleRUPlannerStateLogic.termKey({year:activePlanYear(),sem:activeRegistrationSemester()});ST.schedulePreferences[key]||={version:1,constraints:[],messages:[]};return ST.schedulePreferences[key];}
+function termPreferenceState(){const currentTerm=currentPlannerTerm(),key=ScheduleRUPlannerStateLogic.termKey({year:currentTerm.year,sem:currentTerm.semester});ST.schedulePreferences[key]||={version:1,constraints:[],messages:[]};return ST.schedulePreferences[key];}
 function normalizeAssistantOpenStatus(open_status){if(open_status===true||open_status===1||open_status==="1")return true;if(open_status===false||open_status===0||open_status==="0")return false;return null;}
 function normalizeAssistantMeeting(meeting,section){const day=["M","T","W","R","F","S","U"][dayIndex(meeting?.day_of_week)],range=meetingTimeRange(meeting);if(!day||!range)return null;return {day,start:range.start,end:range.end,courseCode:section?.code||"",courseTitle:section?.fullTitle||section?.title||"",campus:campusFor(meeting),modality:meeting?.mode||meeting?.meeting_mode||"",open:normalizeAssistantOpenStatus(section?.open_status)};}
 globalThis.ScheduleRUUIContracts={normalizeAssistantOpenStatus,normalizeAssistantMeeting};
