@@ -2857,6 +2857,7 @@ async function toggleCourseExpand(id){
 function courseRowHtml(c){
   const code = `${c.school}:${c.subject_code}:${c.course_number}`;
   const inW = !!ST.wishlist[code] || wishlistRecords().some(item=>item.code===code);
+  const wishlistAction=globalThis.ScheduleRUPlannerUI.catalogWishlistAction({inWishlist:inW});
   const isOpen = ST.expandedIds.has(c.id);
   const openCt = c.open_count ?? 0, totalCt = c.section_count ?? 0;
 
@@ -2903,7 +2904,7 @@ function courseRowHtml(c){
       <span class="cr-title">${escapeHtml(c.title)}<span class="sub"> ${escapeHtml(c.subject_description||"")}</span></span>
       <span class="cr-credits">${escapeHtml(courseCreditsLabel(c.credits,true))}</span>
       <span class="cr-sections" style="color:${openCt>0?'#3a8a3a':'var(--grayt)'}">${openCt}/${totalCt} open</span>
-      <button class="cr-wish" data-wadd="${escapeHtml(code)}" ${inW?"disabled":""}>${inW?"✓ Added":"+ Wishlist"}</button>
+      <button class="cr-wish${wishlistAction.remove?" selected":""}" data-wadd="${escapeHtml(code)}" aria-pressed="${wishlistAction.remove}">${wishlistAction.label}</button>
     </div>
     <div class="course-row-body${isOpen?" open":""}">${bodyHtml}</div>
   </div>`;
@@ -3027,8 +3028,15 @@ function attachCoursesPageControls(){
   }));
   document.querySelectorAll("[data-wadd]").forEach(b=>b.addEventListener("click", e=>{
     e.stopPropagation();
-    addToWishlist(e.target.dataset.wadd);
-    renderCoursesPage();
+    const code=b.dataset.wadd;
+    const saved=wishlistRecords().find(item=>item.code===code);
+    if(saved) delete ST.wishlist[saved.key];
+    else addToWishlist(code);
+    savePlannerState();
+    const action=globalThis.ScheduleRUPlannerUI.catalogWishlistAction({inWishlist:!saved});
+    b.textContent=action.label;
+    b.classList.toggle("selected",action.remove);
+    b.setAttribute("aria-pressed",String(action.remove));
   }));
 }
 

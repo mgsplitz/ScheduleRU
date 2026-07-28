@@ -55,6 +55,19 @@ test("requirement rows expose one context-sensitive action", () => {
   });
 });
 
+test("catalog wishlist controls remain enabled and toggle in place", () => {
+  assert.deepEqual(logic.catalogWishlistAction({ inWishlist: false }), {
+    label: "+ Wishlist",
+    remove: false,
+    disabled: false,
+  });
+  assert.deepEqual(logic.catalogWishlistAction({ inWishlist: true }), {
+    label: "Remove",
+    remove: true,
+    disabled: false,
+  });
+});
+
 test("placeholder destinations use finite pickers before selector browsers", () => {
   assert.equal(logic.placeholderDestination({
     group: { members: ["a", "b"], courseSelectors: [{ selector_key: "ignored" }] },

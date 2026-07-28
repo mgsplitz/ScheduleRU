@@ -27,6 +27,14 @@
     };
   }
 
+  function catalogWishlistAction({ inWishlist = false } = {}) {
+    return {
+      label: inWishlist ? "Remove" : "+ Wishlist",
+      remove: inWishlist === true,
+      disabled: false,
+    };
+  }
+
   function placeholderDestination({ group, candidateSelectionContext } = {}) {
     const context = group || candidateSelectionContext || {};
     if ((context.members || []).length || (context.memberCourseCodes || []).length) return "requirement_picker";
@@ -117,6 +125,7 @@
 
   root.ScheduleRUPlannerUI = {
     pickerActions,
+    catalogWishlistAction,
     placeholderDestination,
     programSchoolChoices,
     programsForBrowse,
