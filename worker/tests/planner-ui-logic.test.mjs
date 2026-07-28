@@ -145,6 +145,13 @@ test("requirement progress counts selected and applied courses once", () => {
   }), ["financeA", "financeB", "financeC"]);
 });
 
+test("Finance elective progress includes scheduled and newly selected courses exactly once", () => {
+  assert.deepEqual(logic.requirementProgressCourseIds({
+    appliedIds: ["33:390:435"],
+    selectedIds: ["33:390:331", "33:390:375"],
+  }), ["33:390:435", "33:390:331", "33:390:375"]);
+});
+
 test("every course resolves to an honest path presentation state", () => {
   assert.equal(logic.coursePathState({
     plan: { paths: [["01:198:111"]], references: [] },
