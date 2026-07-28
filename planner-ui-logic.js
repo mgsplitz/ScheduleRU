@@ -38,7 +38,7 @@
   function placeholderDestination({ group, candidateSelectionContext } = {}) {
     const context = group || candidateSelectionContext || {};
     if ((context.members || []).length || (context.memberCourseCodes || []).length) return "requirement_picker";
-    if ((context.courseSelectors || []).length) return "selector_browser";
+    if ((context.courseSelectors || []).length) return "requirement_picker";
     return "requirement_panel";
   }
 

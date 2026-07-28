@@ -404,6 +404,12 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .cal-outside{font-size:10px;color:var(--muted);background:#f9f7f0;border:1px solid var(--line);
   border-radius:4px;padding:7px 9px;margin-top:7px;line-height:1.45;}
 .cal-block-closed{border-style:dashed !important;}
+.builder-cal.minute-scale{display:block;position:relative;height:712px;overflow:hidden;background:#fff;}
+.minute-scale .cal-days{position:absolute;left:52px;right:0;top:28px;height:672px;
+  background:repeating-linear-gradient(to bottom,#fff 0,#fff 23px,#ece9e2 23px,#ece9e2 24px);}
+.minute-scale .cal-daylabel{position:absolute;top:-28px;height:28px;box-sizing:border-box;}
+.minute-scale .cal-timelabel{position:absolute;left:0;width:52px;box-sizing:border-box;transform:translateY(-6px);}
+.minute-scale .cal-block{position:absolute;box-sizing:border-box;margin:0;min-height:18px;}
 
 /* CAMPUS COLOR LEGEND (schedule builder calendar) */
 .cal-legend{display:flex;flex-wrap:wrap;gap:9px;align-items:center;
@@ -596,6 +602,7 @@ button,input,select,textarea{font:inherit;}
 
 <script src="requirement-group-logic.js"></script>
 <script src="course-selector-logic.js"></script>
+<script src="course-interaction-logic.js"></script>
 <script src="eligibility-logic.js"></script>
 <script src="academic-credit-logic.js"></script>
 <script src="planner-input-logic.js"></script>
@@ -680,6 +687,8 @@ const ST = {
   backendSubjects:[], backendStatus:null,
   expandedIds: new Set(),   // course ids currently expanded on the Courses page
   sectionsCache: {},        // course id -> { sections } | { error }, lazy-loaded
+  pickerSelector:null,      // selector-backed requirement modal state
+  requiredRootOpen:{}, nestedGroupOpen:{},
   builder: null,            // { year, sem, pool:[{code,title,credits,sections,checked,loading,error}], permutations, permIndex } | null
 };
 
@@ -902,13 +911,25 @@ function reviewedGroupSelectors(g){
     }catch(_){ return null; }
   }).filter(Boolean);
 }
-function plannedOrCompletedCourseRecords(){
+function selectedCourseRecords(excludeGroupId=""){
+  const selections=Object.fromEntries(Object.entries(ST.groupSelections||{})
+    .filter(([groupId])=>groupId!==excludeGroupId));
+  return globalThis.ScheduleRUCourseInteractionLogic.selectedCourseCodes(
+    selections,
+    id=>COURSES[id] ? requirementCourseRecord(id) : courseRecordFromId(id),
+  ).map(courseRecordFromId).filter(Boolean);
+}
+function plannedOrCompletedCourseRecords(excludeGroupId=""){
   const records=new Map();
   const add=record=>{
     const code=String(record?.code||"").trim();
-    if(/^\d{2}:\d{3}:\d{3}$/.test(code)) records.set(code,{...record,code});
+    if(!/^\d{2}:\d{3}:\d{3}$/.test(code)) return;
+    records.set(code,globalThis.ScheduleRUCourseInteractionLogic.mergeCourseRecords([
+      records.get(code),record,{code},
+    ]));
   };
   Object.values(ST.schedule||{}).forEach(entry=>add(entry?.course||entry));
+  selectedCourseRecords(excludeGroupId).forEach(add);
   Object.entries(ST.completed||{}).forEach(([id,taken])=>{
     if(!taken) return;
     add(courseRecordFromId(id));
@@ -922,26 +943,31 @@ function registerSelectorCourseRecord(record){
   const id=requirementCourseId(code);
   if(!id) return null;
   const existing=COURSES[id]||{};
-  const title=cleanApiText(record?.fullTitle)||cleanApiText(record?.title)||existing.fullTitle||existing.title||code;
-  COURSES[id]={
-    ...existing, code, title, fullTitle:title,
-    credits:record?.credits??existing.credits??"",
-    description:cleanApiText(record?.description)||existing.description||"",
-    catalogPrereqs:cleanApiText(record?.catalogPrereqs)||existing.catalogPrereqs||"",
-    subjectNotes:cleanApiText(record?.subjectNotes)||existing.subjectNotes||"",
-    restrictions:cleanApiText(record?.restrictions)||existing.restrictions||"",
-    requirementNotes:Array.isArray(existing.requirementNotes)?existing.requirementNotes:[],
-    prereqs:Array.isArray(existing.prereqs)?existing.prereqs:[],
-    alternatives:Array.isArray(existing.alternatives)?existing.alternatives:[],
+  const incoming={
+    code,
+    title:cleanApiText(record?.fullTitle)||cleanApiText(record?.title),
+    fullTitle:cleanApiText(record?.fullTitle)||cleanApiText(record?.title),
+    credits:record?.credits,
+    description:cleanApiText(record?.description),
+    catalogPrereqs:cleanApiText(record?.catalogPrereqs),
+    subjectNotes:cleanApiText(record?.subjectNotes),
+    restrictions:cleanApiText(record?.restrictions),
   };
+  COURSES[id]=globalThis.ScheduleRUCourseInteractionLogic.mergeCourseRecords([
+    existing,incoming,{
+      code,title:code,fullTitle:code,credits:"",
+      requirementNotes:[],prereqs:[],alternatives:[],
+    },
+  ]);
   return id;
 }
 function baseGroupAppliedCourseIds(g){
-  const explicit=(g?.members||[]).filter(id=>isCompleted(id));
+  const selectedElsewhere=new Set(selectedCourseRecords(g?.id).map(record=>record.code));
+  const explicit=(g?.members||[]).filter(id=>isCompleted(id)||selectedElsewhere.has(COURSES[id]?.code));
   const selectors=reviewedGroupSelectors(g);
   const engine=globalThis.ScheduleRUCourseSelectorLogic;
   if(!selectors.length||!engine) return explicit;
-  const selectorMatches=plannedOrCompletedCourseRecords()
+  const selectorMatches=plannedOrCompletedCourseRecords(g?.id)
     .filter(record=>engine.matchesAnySelector(record,selectors))
     .map(registerSelectorCourseRecord)
     .filter(Boolean);
@@ -1492,15 +1518,49 @@ document.getElementById("prClose").addEventListener("click", closeCourseDetails)
 function closeRequirementPicker(){
   document.getElementById("pickerOv").classList.remove("open");
   ST.pickerGroupId=null;
+  ST.pickerSelector=null;
 }
 function openRequirementPicker(gk){
   const g=GROUPS[gk];
-  if(!g||(g.members||[]).length===0) return;
+  const selectors=reviewedGroupSelectors(g);
+  if(!g) return;
+  if(!(g.members||[]).length&&!selectors.length) return;
   ST.pickerGroupId=gk;
+  ST.pickerSelector=selectors.length?{
+    groupId:gk,records:[],loading:false,error:"",page:1,total:0,search:"",requestGeneration:0,
+  }:null;
   document.getElementById("pickerTitle").textContent=groupDisplayName(g);
   document.getElementById("pickerOv").classList.add("open");
+  document.getElementById("pickerSearch").value="";
   renderRequirementPicker();
   document.getElementById("pickerSearch").focus();
+  if(ST.pickerSelector) loadRequirementPickerSelectorCourses();
+}
+function groupAcceptsCourseId(g,id){
+  if((g?.members||[]).includes(id))return true;
+  const record=COURSES[id] ? requirementCourseRecord(id) : courseRecordFromId(id);
+  return !!record&&globalThis.ScheduleRUCourseSelectorLogic.matchesAnySelector(record,reviewedGroupSelectors(g));
+}
+async function loadRequirementPickerSelectorCourses(){
+  const state=ST.pickerSelector,group=GROUPS[ST.pickerGroupId];
+  if(!state||!group||state.groupId!==group.id)return;
+  const generation=state.requestGeneration+1;
+  state.requestGeneration=generation;state.loading=true;state.error="";renderRequirementPicker();
+  try{
+    const params=new URLSearchParams({
+      search:state.search||"",limit:String(PAGE_SIZE),offset:String((state.page-1)*PAGE_SIZE),
+      selector:JSON.stringify(reviewedGroupSelectors(group)),
+    });
+    const response=await backendFetch("/api/courses?"+params.toString());
+    if(ST.pickerSelector!==state||state.requestGeneration!==generation)return;
+    state.records=(response.courses||[]).map(backendCourseRecord).filter(Boolean);
+    state.records.forEach(registerSelectorCourseRecord);
+    state.total=Number(response.total)||state.records.length;
+  }catch(error){
+    if(ST.pickerSelector===state&&state.requestGeneration===generation)state.error=error.message||"Approved courses could not be loaded.";
+  }finally{
+    if(ST.pickerSelector===state&&state.requestGeneration===generation){state.loading=false;renderRequirementPicker();}
+  }
 }
 function renderRequirementPicker(){
   const g=GROUPS[ST.pickerGroupId];
@@ -1513,13 +1573,19 @@ function renderRequirementPicker(){
   document.getElementById("pickerIntro").textContent=
     g.rule==="distinct"
       ? `Choose ${limit} approved courses that cover ${g.count} distinct Arts and Humanities learning goals. Save any course here to your Wishlist without changing the requirement choice.`
-      : `Scheduled and completed courses apply here automatically. Choose up to ${Math.max(0,limit-applied.length)} additional approved ${limit===1?"course":"courses"} for this requirement.${constraints.length?` Your choices must also satisfy: ${constraints.map(child=>`${groupDisplayName(child)} (${groupRuleLabel(child)})`).join("; ")}.`:""} Wishlist choices stay separate.`;
-  const ids=(g.members||[]).filter(id=>{
+      : `Scheduled, completed, and shared selected courses apply automatically. Choose up to ${Math.max(0,limit-applied.length)} additional approved ${limit===1?"course":"courses"} for this requirement.${constraints.length?` Your choices must also satisfy: ${constraints.map(child=>`${groupDisplayName(child)} (${groupRuleLabel(child)})`).join("; ")}.`:""} Chosen courses are also saved to your Wishlist.`;
+  const selectorState=ST.pickerSelector;
+  const sourceIds=selectorState
+    ? selectorState.records.map(registerSelectorCourseRecord).filter(Boolean)
+    : (g.members||[]);
+  const ids=sourceIds.filter(id=>{
     const c=COURSES[id];
     return c && (!search || `${c.code} ${c.title} ${c.fullTitle||""}`.toLowerCase().includes(search));
   });
   const list=document.getElementById("pickerList");
-  list.innerHTML=ids.length?ids.map(id=>{
+  if(selectorState?.loading)list.innerHTML=`<div class="loading">Loading approved courses…</div>`;
+  else if(selectorState?.error)list.innerHTML=`<div class="api-status err">${escapeHtml(selectorState.error)}</div><div class="choice-actions"><button class="choice-btn" id="pickerRetry">Retry</button></div>`;
+  else list.innerHTML=ids.length?ids.map(id=>{
     const c=COURSES[id];
     const picked=selected.includes(id);
     const alreadyApplied=applied.includes(id);
@@ -1535,6 +1601,13 @@ function renderRequirementPicker(){
       <div class="picker-actions"><button class="picker-btn view" data-pview="${id}">Details</button><button class="picker-btn${pickerActions.intent==="wishlist"?" secondary":""}${pickerActions.intent==="wishlist"&&pickerActions.selected?" wishlist-active":""}" data-paction="${id}" data-pintent="${pickerActions.intent}" ${pickerActions.disabled?"disabled":""}>${pickerActions.label}</button></div>
     </div>`;
   }).join(""):`<div class="api-status">No approved course matches that search.</div>`;
+  if(selectorState&&!selectorState.loading&&!selectorState.error){
+    const pages=Math.max(1,Math.ceil(selectorState.total/PAGE_SIZE));
+    list.insertAdjacentHTML("beforeend",`<div class="pager"><button id="pickerPrev" ${selectorState.page<=1?"disabled":""}>← Prev</button><span class="pg-info">Page ${selectorState.page} of ${pages}</span><button id="pickerNext" ${selectorState.page>=pages?"disabled":""}>Next →</button></div>`);
+  }
+  document.getElementById("pickerRetry")?.addEventListener("click",loadRequirementPickerSelectorCourses);
+  document.getElementById("pickerPrev")?.addEventListener("click",()=>{selectorState.page-=1;loadRequirementPickerSelectorCourses();});
+  document.getElementById("pickerNext")?.addEventListener("click",()=>{selectorState.page+=1;loadRequirementPickerSelectorCourses();});
   list.querySelectorAll("[data-pview]").forEach(b=>b.addEventListener("click",()=>{
     ST.returnToPicker=true;
     document.getElementById("pickerOv").classList.remove("open");
@@ -1566,13 +1639,20 @@ function renderRequirementPicker(){
         return;
       }
       ST.groupSelections[g.id]=proposed;
+      addToWishlist(id,courseRecordFromId(id));
     }
     renderAll();
     renderRequirementPicker();
   }));
 }
 document.getElementById("pickerClose").addEventListener("click", closeRequirementPicker);
-document.getElementById("pickerSearch").addEventListener("input", renderRequirementPicker);
+let pickerSearchTimer;
+document.getElementById("pickerSearch").addEventListener("input",event=>{
+  if(!ST.pickerSelector){renderRequirementPicker();return;}
+  ST.pickerSelector.search=event.target.value;ST.pickerSelector.page=1;
+  clearTimeout(pickerSearchTimer);
+  pickerSearchTimer=setTimeout(loadRequirementPickerSelectorCourses,250);
+});
 
 /* ============================================================
    COURSE RECORDS — one shape for requirements, catalog, wishlist and plan
@@ -1604,18 +1684,18 @@ function backendCourseRecord(c){
 }
 function courseRecordFromId(ref){
   const id=String(ref||"");
-  if(COURSES[id]) return requirementCourseRecord(id);
-  const wishlist=ST.wishlist[id];
-  if(wishlist && typeof wishlist==="object") return wishlist;
-  const scheduled=ST.schedule[id];
-  if(scheduled?.course) return scheduled.course;
-  const byCode=Object.values(COURSES).find(c=>c.code===id);
-  if(byCode){
-    const requirementId=Object.keys(COURSES).find(key=>COURSES[key]===byCode);
-    return requirementCourseRecord(requirementId);
-  }
-  const catalog=(ST.backendCourses||[]).find(c=>c.id===id || catalogCourseCode(c)===id);
-  if(catalog) return backendCourseRecord(catalog);
+  const directRequirement=COURSES[id] ? requirementCourseRecord(id) : null;
+  const requirementEntry=Object.entries(COURSES).find(([,course])=>course.code===id);
+  const requirement=requirementEntry ? requirementCourseRecord(requirementEntry[0]) : directRequirement;
+  const code=requirement?.code||(/^\d{2}:\d{3}:\d{3}$/.test(id)?id:"");
+  const wishlist=Object.values(ST.wishlist||{}).find(record=>record&&typeof record==="object"
+    && (record.code===code||record.id===id)) || (ST.wishlist[id]&&typeof ST.wishlist[id]==="object"?ST.wishlist[id]:null);
+  const scheduled=Object.values(ST.schedule||{}).find(entry=>entry?.code===code||entry?.course?.id===id);
+  const catalog=(ST.backendCourses||[]).find(c=>c.id===id || catalogCourseCode(c)===(code||id));
+  const merged=globalThis.ScheduleRUCourseInteractionLogic.mergeCourseRecords([
+    requirement,scheduled?.course,scheduled,wishlist,backendCourseRecord(catalog),
+  ]);
+  if(merged.code) return merged;
   // Older in-memory wishlist entries were saved as { courseCode: true }.
   // Preserve the code even when their original catalog page is no longer open.
   return /^\d{2}:\d{3}:\d{3}$/.test(id)
@@ -1628,7 +1708,9 @@ function addToWishlist(ref, explicitRecord=null){
   // The public course code is the stable identity shared by Rutgers' catalog,
   // a degree requirement and a scheduled section. Storing the full record here
   // prevents title/credit data from disappearing during drag-and-drop.
-  ST.wishlist[record.code]={...record,id:record.id||record.code,code:record.code};
+  ST.wishlist[record.code]=globalThis.ScheduleRUCourseInteractionLogic.mergeCourseRecords([
+    ST.wishlist[record.code],record,{id:record.id||record.code,code:record.code},
+  ]);
   savePlannerState();
 }
 function wishlistRecords(){
@@ -1681,6 +1763,7 @@ function renderSchedule(){
             <div class="sn">${escapeHtml(e.code)}${e.locked?' <span class="sched-locked">SET</span>':''}</div>
             <div class="stitle" title="${escapeHtml(e.fullTitle||e.title||e.code)}">${escapeHtml(e.fullTitle||e.title||e.code)}</div>
             ${eligibilityNote?`<span class="sct">${escapeHtml(eligibilityNote)}</span>`:""}
+            ${e.manualOverrides?.length?`<span class="sct" style="color:#9b5d00;">Override · ${escapeHtml(e.manualOverrides.map(item=>item.kind.replaceAll("_"," ")).join(", "))}</span>`:""}
             <span class="sct">${escapeHtml(courseCreditsLabel(e.credits,true))}${e.section_number?` · Sec ${escapeHtml(e.section_number)}`:''}</span>
           </div>
           <div class="sc-card-actions"><button class="placement-lock" data-placement-lock="${escapeHtml(code)}" aria-label="${e.locked?"Unlock":"Lock"} ${escapeHtml(e.code)}">${e.locked?"Unlock":"Lock"}</button><button class="rx" data-rem="${escapeHtml(code)}">✕</button></div></div>`;
@@ -1782,26 +1865,43 @@ function setupDropZones(){
       }
       await loadCourseEligibilityForCodes([record.code]);
       const prerequisiteEligibility=prerequisiteEligibilityForTerm(record,{year:ST.year,sem});
-      if(prerequisiteEligibility.status==="blocked"){
-        modalController.show({title:"Course cannot be placed",body:`<p>${escapeHtml(code)} cannot be placed in ${escapeHtml(sem)} of ${escapeHtml(academicYearLabel(ST.year))}: ${escapeHtml(prerequisiteBlockerLabel(prerequisiteEligibility))}.</p>`,actions:[{label:"Close",secondary:true}]});
-        return;
-      }
       const eligibility=courseEligibilityForTerm(record,{year:ST.year,sem});
-      if(eligibility.status==="blocked"){
-        modalController.show({title:"Course cannot be placed",body:`<p>${escapeHtml(code)} cannot be placed in ${escapeHtml(sem)} of ${escapeHtml(academicYearLabel(ST.year))}: ${escapeHtml(plannerEligibilityLabel(eligibility))}.</p>`,actions:[{label:"Close",secondary:true}]});
-        return;
-      }
       const prev = ST.schedule[code];
-      ST.schedule[code] = {
-        year:ST.year, sem, code,
-        title: prev?.title || title, fullTitle: prev?.fullTitle || fullTitle || title, credits: prev?.credits ?? credits,
-        course: prev?.course || record,
-        sectionId: prev?.sectionId, index_number: prev?.index_number,
-        section_number: prev?.section_number, meetings: prev?.meetings,
-        locked:true, userPinned:true,
-        eligibilityStatus:eligibility.status, eligibilityAssumptions:eligibility.assumptions,
+      const currentCredits=Object.values(ST.schedule).filter(entry=>
+        entry.code!==code&&entry.year===ST.year&&entry.sem===sem
+      ).reduce((sum,entry)=>sum+(Number(entry.credits)||0),0)
+        +(ST.planPlaceholders||[]).filter(item=>item.year===ST.year&&item.sem===sem)
+          .reduce((sum,item)=>sum+(Number(item.estimatedCredits||item.credits)||3),0);
+      const warnings=globalThis.ScheduleRUCourseInteractionLogic.manualPlacementWarnings({
+        currentCredits,incomingCredits:Number(prev?.credits??credits)||0,
+        prerequisiteBlocked:prerequisiteEligibility.status==="blocked",
+        prerequisiteReason:prerequisiteBlockerLabel(prerequisiteEligibility),
+        standingBlocked:eligibility.status==="blocked"
+          && (eligibility.missing||[]).some(item=>item.type!=="prerequisite_course"),
+        standingReason:plannerEligibilityLabel(eligibility),
+      });
+      const commitPlacement=()=>{
+        ST.schedule[code] = {
+          year:ST.year, sem, code,
+          title: prev?.title || title, fullTitle: prev?.fullTitle || fullTitle || title, credits: prev?.credits ?? credits,
+          course: prev?.course || record,
+          sectionId: prev?.sectionId, index_number: prev?.index_number,
+          section_number: prev?.section_number, meetings: prev?.meetings,
+          locked:true, userPinned:true,manualOverrides:warnings,
+          eligibilityStatus:eligibility.status, eligibilityAssumptions:eligibility.assumptions,
+        };
+        renderAll();
       };
-      renderAll();
+      if(!warnings.length){commitPlacement();return;}
+      const onlyCredit=warnings.length===1&&warnings[0].kind==="credit_limit";
+      modalController.show({
+        title:onlyCredit?"Override 18-credit limit?":"Place course with override?",
+        body:`<p>${escapeHtml(code)} needs your confirmation for ${escapeHtml(sem)} of ${escapeHtml(academicYearLabel(ST.year))}.</p><ul>${warnings.map(item=>`<li>${escapeHtml(item.reason)}</li>`).join("")}</ul>`,
+        actions:[
+          {label:"Go back",secondary:true},
+          {label:onlyCredit?"Override 18-credit limit":warnings.length===1?"Place with override":"Place with overrides",onClick:commitPlacement},
+        ],
+      });
     };
   });
 }
@@ -1885,11 +1985,11 @@ function isPickerGroup(g){
   return !!g && g.rule!=="all"&&g.rule!=="one_of"&&!isCreditRule(g) && (g.members||[]).length>PICKER_THRESHOLD;
 }
 function selectedRequirementCourses(gk){
-  const valid=new Set(GROUPS[gk]?.members||[]);
+  const group=GROUPS[gk];
   // Once a course is scheduled or marked complete, it is applied
   // automatically. Preserve an older manual selection in saved state so it
   // can reappear if that course is later removed from the plan.
-  return [...new Set(ST.groupSelections[gk]||[])].filter(id=>valid.has(id)&&!isCompleted(id));
+  return [...new Set(ST.groupSelections[gk]||[])].filter(id=>groupAcceptsCourseId(group,id)&&!isCompleted(id));
 }
 function selectionLimit(g){
   return Math.max(1,Number(g?.count)||1);
@@ -2315,15 +2415,7 @@ function activeCatalogSelectorContext(){
   return group&&selectors.length ? {group,selectors} : null;
 }
 function openSelectorCourseBrowser(gk){
-  const group=GROUPS[gk];
-  if(!group||!reviewedGroupSelectors(group).length) return;
-  ST.backendSelectorGroupId=gk;
-  ST.backendSearch="";
-  ST.backendSubject="";
-  ST.backendPage=1;
-  ST.expandedIds.clear();
-  setTopLevelPage("courses");
-  loadBackendCourses();
+  openRequirementPicker(gk);
 }
 function clearCatalogSelectorBrowser(){
   ST.backendSelectorGroupId=null;
@@ -2913,6 +3005,24 @@ function courseRowHtml(c){
 function renderCoursesPage(){
   const root = document.getElementById("coursesRoot");
   if(!root) return;
+  const coursePage=document.getElementById("page-courses");
+  const previousSearch=document.getElementById("cpSearch");
+  const viewState=globalThis.ScheduleRUCourseInteractionLogic.catalogViewState({
+    scrollLeft:coursePage?.scrollLeft,scrollTop:coursePage?.scrollTop,
+    activeElementId:document.activeElement?.id||"",
+    selectionStart:previousSearch?.selectionStart,selectionEnd:previousSearch?.selectionEnd,
+  });
+  const restoreView=()=>requestAnimationFrame(()=>{
+    const search=document.getElementById("cpSearch");
+    if(viewState.restoreSearchFocus&&search){
+      search.focus({preventScroll:true});
+      if(viewState.selectionStart!==null)search.setSelectionRange(viewState.selectionStart,viewState.selectionEnd);
+    }
+    if(coursePage){
+      coursePage.scrollLeft=viewState.scrollLeft;
+      coursePage.scrollTop=viewState.scrollTop;
+    }
+  });
   const selectorContext=activeCatalogSelectorContext();
 
   // Connection bar is always visible so the backend URL can be seen/changed
@@ -2948,6 +3058,7 @@ function renderCoursesPage(){
       <div class="api-status" style="margin-top:8px">Not connected yet. Deploy <code>worker.js</code> (see README.md), then paste its
         <code>https://your-worker.workers.dev</code> URL above.</div>`;
     wireConnectionBar();
+    restoreView();
     return;
   }
 
@@ -2997,6 +3108,7 @@ function renderCoursesPage(){
 
   wireConnectionBar();
   attachCoursesPageControls();
+  restoreView();
 }
 
 function attachCoursesPageControls(){
@@ -3010,9 +3122,6 @@ function attachCoursesPageControls(){
       clearTimeout(t);
       t=setTimeout(()=>{ ST.backendPage=1; loadBackendCourses(); }, 350);
     });
-    // keep focus/caret position across the re-render triggered by typing
-    searchEl.focus();
-    searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length);
   }
   if(subjEl) subjEl.addEventListener("change", e=>{
     ST.backendSubject=e.target.value; ST.backendPage=1; loadBackendCourses();
@@ -3401,7 +3510,7 @@ function poolCourseHtml(p){
   if(p.loading) body=`<div class="loading">Loading sections…</div>`;
   else if(p.error && !(p.sections||[]).length) body=`<div class="api-status err">${escapeHtml(p.error)}</div>`;
   else if(!(p.sections||[]).length) body=`<div class="api-status">No sections available.</div>`;
-  else body=(p.sections||[]).map(s=>{
+  else body=globalThis.ScheduleRUCourseInteractionLogic.sortSections(p.sections||[]).map(s=>{
     const open=s.open_status===true||s.open_status===1||s.open_status==="1";
     const checked=p.checked && p.checked.has(s.index_number);
     const meet=(s.meetings||[]).map(fmtMeeting).join(", ")||"—";
@@ -3431,11 +3540,13 @@ function renderBuilderCalendar(){
   // Match the familiar Rutgers WebReg work-week view. Weekend and untimed
   // meetings remain visible below instead of being silently dropped.
   const DAYS=["Mon","Tue","Wed","Thu","Fri"];
-  let cells = DAYS.map((d,i)=>`<div class="cal-daylabel" style="grid-column:${i+2};grid-row:1;">${d}</div>`).join("");
+  const pixelsPerMinute=.8,dayStartMinute=8*60,dayEndMinute=22*60;
+  let dayCells=DAYS.map((d,i)=>`<div class="cal-daylabel" style="left:${i*20}%;width:20%;">${d}</div>`).join("");
+  let timeLabels="";
   for(let h=8; h<=22; h++){
-    const slot=(h-8)*2;
     const label = h===12?"12pm":h>12?`${h-12}pm`:`${h}am`;
-    cells += `<div class="cal-timelabel" style="grid-row:${slot+2};">${label}</div>`;
+    const top=28+(h*60-dayStartMinute)*pixelsPerMinute;
+    timeLabels += `<div class="cal-timelabel" style="top:${top}px;">${label}</div>`;
   }
   const outside=[];
   combo.forEach(c=>{
@@ -3446,8 +3557,12 @@ function renderBuilderCalendar(){
         return;
       }
       const range=meetingTimeRange(m);
-      const s=range ? (range.start-8*60)/30 : null, e=range ? (range.end-8*60)/30 : null;
-      if(s==null||e==null||e<=s){
+      const geometry=range&&range.start>=dayStartMinute&&range.end<=dayEndMinute
+        ? globalThis.ScheduleRUCourseInteractionLogic.calendarBlockGeometry({
+          startMinute:range.start,endMinute:range.end,dayStartMinute,pixelsPerMinute,
+        })
+        : null;
+      if(!geometry){
         outside.push(`${c.code} · ${fmtMeeting(m)}`);
         return;
       }
@@ -3455,16 +3570,14 @@ function renderBuilderCalendar(){
       const col = CAMPUS_COLORS[campus] || CAMPUS_COLORS["OTHER/UNKNOWN"];
       const closed = c.open_status===false || c.open_status===0;
       const loc = [m.building,m.room].filter(Boolean).join(" ") || (campus==="ONLINE"?"Online":"");
-      const gridStart=Math.max(0,Math.floor(s));
-      const gridSpan=Math.max(1,Math.ceil(e)-gridStart);
       const time=`${formatClock(range.start)} – ${formatClock(range.end)}`;
-      cells += `<div class="cal-block${closed?" cal-block-closed":""}" style="grid-column:${day+2};grid-row:${gridStart+2} / span ${gridSpan};
+      dayCells += `<div class="cal-block${closed?" cal-block-closed":""}" style="left:calc(${day*20}% + 2px);width:calc(20% - 4px);top:${geometry.top}px;height:${geometry.height}px;
         background:${col.fill};border-color:${col.border};">
         <b>${escapeHtml(c.code)}</b><span class="cal-course-title">${escapeHtml(c.title||c.code)}</span>
         <span class="cal-detail">${escapeHtml(time)}</span><span class="cal-detail">${escapeHtml(loc)}</span></div>`;
     });
   });
-  return `<div class="calendar-scroll"><div class="builder-cal" style="grid-template-rows:28px repeat(30,18px);">${cells}</div></div>
+  return `<div class="calendar-scroll"><div class="builder-cal minute-scale">${timeLabels}<div class="cal-days">${dayCells}</div></div></div>
     ${outside.length?`<div class="cal-outside"><b>Weekend, online, or untimed meetings</b><br/>${escapeHtml(outside.join(" · "))}</div>`:""}`;
 }
 
@@ -3615,7 +3728,10 @@ function issueList(){
 }
 function showIssues(){const issues=issueList(),groups=new Map();issues.forEach(issue=>{const entries=groups.get(issue.group)||[];entries.push(issue);groups.set(issue.group,entries);});modalController.show({title:`Issues · ${issues.length}`,body:issues.length?[...groups.entries()].map(([group,entries])=>`<section><h3>${html(group)}</h3>${entries.map(issue=>`<div class="planner-issue planner-issue-${issue.severity}"><span class="issue-severity issue-severity-${issue.severity}">${html(issue.severity)}</span><span>${html(issue.text)}</span></div>`).join("")}</section>`).join(""):"<p>No active planning issues.</p>",actions:[{label:"Close",secondary:true}]}); }
 function orderedPrograms(){ const rows=selectedProgramRows(); const byId=new Map(rows.map(row=>[row.id,row])); const ids=[ST.primaryProgramId,ST.secondaryProgramId,...rows.map(row=>row.id)].filter((id,index,list)=>id&&list.indexOf(id)===index);return ids.map(id=>byId.get(id)).filter(Boolean); }
-function setRequiredProgram(id){ST.requiredProgramTab=id;renderPanel();}
+function setRequiredProgram(id){
+  if(ST.requiredProgramTab!==id){ST.requiredRootOpen={};ST.nestedGroupOpen={};}
+  ST.requiredProgramTab=id;renderPanel();
+}
 function treeIncludesSourceProgram(roots,sourceProgramId){return (roots||[]).some(root=>root?.program_id===sourceProgramId||treeIncludesSourceProgram(root?.children,sourceProgramId));}
 function groupBelongsToRequiredProgram(group,programId){if(Array.isArray(group?.sourceProgramIds)&&group.sourceProgramIds.length)return group.sourceProgramIds.includes(programId);return !group?.sourceProgramId||group.sourceProgramId===programId||treeIncludesSourceProgram(ST.requirementTrees?.[programId],group.sourceProgramId);}
 function requiredRootGroupHtml(group,collapsed){
@@ -3631,10 +3747,31 @@ renderRequired=function(){
   const issueCount=issueList().length; const subtabs=programs.map(program=>`<button class="program-subtab ${program.id===ST.requiredProgramTab?"active":""} ${program.type==="minor"?"program-subtab-minor":""}" data-required-program="${html(program.id)}">${html(program.name)}</button>`).join("");
   let groups=ROOT_GROUPS.map(id=>GROUPS[id]).filter(Boolean).filter(group=>groupBelongsToRequiredProgram(group,ST.requiredProgramTab));
   const selectedMajorIds=programs.filter(program=>program.type==="major").map(program=>program.id);
-  let content=groups.map(group=>requiredRootGroupHtml(group,globalThis.ScheduleRUPlannerUI.shouldAutoCollapseSharedGroup({group,selectedMajorIds}))).join("");
+  let content=groups.map(group=>{
+    const defaultOpen=!globalThis.ScheduleRUPlannerUI.shouldAutoCollapseSharedGroup({group,selectedMajorIds});
+    const open=globalThis.ScheduleRUCourseInteractionLogic.expansionOpen({
+      stored:ST.requiredRootOpen[group.id],defaultOpen,
+    });
+    return requiredRootGroupHtml(group,!open);
+  }).join("");
   if(!content)content=`<div class="empty" style="margin-top:30px;">No reviewed requirements are available for this program yet.</div>`;
   pb.innerHTML=`<div class="required-tools"><span class="leg">Reviewed requirements for this program.</span><button class="issues-btn" id="issuesBtn">Issues · ${issueCount}</button></div><div class="subtabs">${subtabs}</div>${content}<div class="planning-disclaimer">ScheduleRU is a planning aid, not an official degree audit.</div>`;
-  attachCardEvents(pb);pb.querySelectorAll("[data-required-program]").forEach(button=>button.addEventListener("click",()=>setRequiredProgram(button.dataset.requiredProgram)));pb.querySelectorAll("[data-required-root-toggle]").forEach(button=>button.addEventListener("click",()=>{const body=document.getElementById("required-root-"+button.dataset.requiredRootToggle),open=body?.classList.toggle("open");button.setAttribute("aria-expanded",String(!!open));button.lastElementChild.textContent=open?"Hide":"Show";}));pb.querySelectorAll("[data-gtog]").forEach(toggle=>{document.getElementById("gb-"+toggle.dataset.gtog)?.classList.add("open");toggle.addEventListener("click",()=>document.getElementById("gb-"+toggle.dataset.gtog)?.classList.toggle("open"));});pb.querySelectorAll("[data-gpicker]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openRequirementPicker(button.dataset.gpicker);}));pb.querySelectorAll("[data-gbrowse]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openSelectorCourseBrowser(button.dataset.gbrowse);}));pb.querySelectorAll("[data-gclear]").forEach(button=>button.addEventListener("click",()=>{delete ST.groupSelections[button.dataset.gclear];renderPanel();}));document.getElementById("issuesBtn")?.addEventListener("click",showIssues);
+  attachCardEvents(pb);
+  pb.querySelectorAll("[data-required-program]").forEach(button=>button.addEventListener("click",()=>setRequiredProgram(button.dataset.requiredProgram)));
+  pb.querySelectorAll("[data-required-root-toggle]").forEach(button=>button.addEventListener("click",()=>{
+    const groupId=button.dataset.requiredRootToggle,body=document.getElementById("required-root-"+groupId),open=body?.classList.toggle("open");
+    ST.requiredRootOpen[groupId]=!!open;button.setAttribute("aria-expanded",String(!!open));button.lastElementChild.textContent=open?"Hide":"Show";
+  }));
+  pb.querySelectorAll("[data-gtog]").forEach(toggle=>{
+    const groupId=toggle.dataset.gtog,body=document.getElementById("gb-"+groupId);
+    const open=globalThis.ScheduleRUCourseInteractionLogic.expansionOpen({stored:ST.nestedGroupOpen[groupId],defaultOpen:true});
+    body?.classList.toggle("open",open);
+    toggle.addEventListener("click",()=>{const next=body?.classList.toggle("open");ST.nestedGroupOpen[groupId]=!!next;});
+  });
+  pb.querySelectorAll("[data-gpicker]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openRequirementPicker(button.dataset.gpicker);}));
+  pb.querySelectorAll("[data-gbrowse]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openRequirementPicker(button.dataset.gbrowse);}));
+  pb.querySelectorAll("[data-gclear]").forEach(button=>button.addEventListener("click",()=>{delete ST.groupSelections[button.dataset.gclear];renderPanel();}));
+  document.getElementById("issuesBtn")?.addEventListener("click",showIssues);
 };
 
 function applyProgramRoles(ids,primaryId=ST.programDraftPrimaryId){const byId=new Map((ST.availablePrograms||[]).map(program=>[program.id,program]));const majors=ids.filter(id=>byId.get(id)?.type==="major");ST.primaryProgramId=majors.includes(primaryId)?primaryId:majors[0]||null;ST.secondaryProgramId=majors.find(id=>id!==ST.primaryProgramId)||null;ST.requiredProgramTab=ST.primaryProgramId||ids[0]||"";}

@@ -41,7 +41,11 @@ test("strict structured output requires every declared object property", () => {
   assertStrictRequiredPropertyParity(PREFERENCE_PATCH_SCHEMA);
   const patchSchema = PREFERENCE_PATCH_SCHEMA.properties.preferencePatch;
   assert.deepEqual(patchSchema.required, ["replaceKinds", "constraints"]);
-  assert.equal(patchSchema.properties.replaceKinds.uniqueItems, true);
+  assert.equal(
+    Object.hasOwn(patchSchema.properties.replaceKinds, "uniqueItems"),
+    false,
+    "Structured Outputs does not support the uniqueItems array keyword",
+  );
   assert.deepEqual(patchSchema.properties.replaceKinds.items.enum, [
     "earliest_start", "latest_end", "avoid_day", "preferred_day", "light_day",
     "time_window_exception", "compact_schedule", "maximum_gap", "campus", "modality", "open_sections",

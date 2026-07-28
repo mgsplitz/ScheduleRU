@@ -35,7 +35,7 @@ export const PREFERENCE_PATCH_SCHEMA = {
       type: "object",
       additionalProperties: false,
       properties: {
-        replaceKinds: { type: "array", maxItems: REPLACE_KINDS.length, uniqueItems: true, items: { enum: REPLACE_KINDS } },
+        replaceKinds: { type: "array", maxItems: REPLACE_KINDS.length, items: { enum: REPLACE_KINDS } },
         constraints: { type: "array", maxItems: 20, items: { anyOf: CONSTRAINT_SCHEMAS } },
       },
       required: ["replaceKinds", "constraints"],

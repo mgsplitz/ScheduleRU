@@ -68,13 +68,13 @@ test("catalog wishlist controls remain enabled and toggle in place", () => {
   });
 });
 
-test("placeholder destinations use finite pickers before selector browsers", () => {
+test("placeholder destinations keep finite and selector-backed choices in the requirement picker", () => {
   assert.equal(logic.placeholderDestination({
     group: { members: ["a", "b"], courseSelectors: [{ selector_key: "ignored" }] },
   }), "requirement_picker");
   assert.equal(logic.placeholderDestination({
     group: { members: [], courseSelectors: [{ selector_key: "subject" }] },
-  }), "selector_browser");
+  }), "requirement_picker");
   assert.equal(logic.placeholderDestination({
     group: { members: [], courseSelectors: [] },
   }), "requirement_panel");
@@ -85,7 +85,7 @@ test("placeholder destinations use finite pickers before selector browsers", () 
   assert.equal(logic.placeholderDestination({
     group: null,
     candidateSelectionContext: { members: [], memberCourseCodes: [], courseSelectors: [{ selector_key: "subject" }] },
-  }), "selector_browser");
+  }), "requirement_picker");
 });
 
 test("program browsing starts with schools and filters programs only after a school is chosen", () => {
