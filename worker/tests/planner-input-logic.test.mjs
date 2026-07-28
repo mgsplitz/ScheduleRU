@@ -118,7 +118,7 @@ test("completed and AP-satisfied members reduce unresolved choice-group counts",
   assert.equal(result.unresolvedRequirements.some((item) => item.requirementGroupId === "quantitative"), false);
 });
 
-test("a planned approved alternative is preserved while its canonical requirement is suppressed", () => {
+test("an explicitly pinned approved alternative is preserved while its canonical requirement is suppressed", () => {
   const tree = sampleTree();
   tree.courses.businessComputer = {
     code: "01:198:170",
@@ -137,8 +137,8 @@ test("a planned approved alternative is preserved while its canonical requiremen
         credits: 4,
         year: 1,
         sem: "fall",
-        locked: false,
-        userPinned: false,
+        locked: true,
+        userPinned: true,
       },
     },
   });
@@ -171,6 +171,59 @@ test("future reviewed alternatives suppress redundant canonical courses without 
   assert.equal(codes.has("01:198:111"), true);
   assert.equal(codes.has("01:198:170"), false);
   assert.equal(codes.has("33:136:385"), true);
+});
+
+test("regeneration rebuilds unlocked generated equivalents from requirements", () => {
+  const tree = sampleTree();
+  tree.courses.businessComputer = {
+    code: "01:198:170",
+    title: "Computer Applications for Business",
+    credits: "3",
+    alternatives: [{ code: "01:198:111" }],
+  };
+  tree.groups.fixed.members = ["intro", "businessComputer"];
+
+  const result = build({
+    requirementTrees: [{ id: "combined-programs", tree }],
+    schedule: {
+      intro: {
+        code: "01:198:111", title: "Introduction to Computer Science", credits: 4,
+        year: 1, sem: "fall", locked: false, userPinned: false,
+      },
+      businessComputer: {
+        code: "01:198:170", title: "Computer Applications for Business", credits: 3,
+        year: 1, sem: "spring", locked: false, userPinned: false,
+      },
+    },
+  });
+  const codes = new Set(result.courses.map((course) => course.code));
+
+  assert.equal(codes.has("01:198:111"), true);
+  assert.equal(codes.has("01:198:170"), false);
+});
+
+test("regeneration preserves an explicitly pinned canonical equivalent", () => {
+  const tree = sampleTree();
+  tree.courses.businessComputer = {
+    code: "01:198:170",
+    title: "Computer Applications for Business",
+    credits: "3",
+    alternatives: [{ code: "01:198:111" }],
+  };
+  tree.groups.fixed.members = ["intro", "businessComputer"];
+
+  const result = build({
+    requirementTrees: [{ id: "combined-programs", tree }],
+    schedule: {
+      businessComputer: {
+        code: "01:198:170", title: "Computer Applications for Business", credits: 3,
+        year: 2, sem: "fall", locked: true, userPinned: true,
+      },
+    },
+  });
+
+  assert.equal(result.lockedPlacements["01:198:170"].year, 2);
+  assert.equal(result.courses.some((course) => course.code === "01:198:170"), true);
 });
 
 test("completed alternatives close transitively before planner courses are collected", () => {

@@ -159,10 +159,15 @@
       confirmedCourseCodes: input.completedCourseCodes || [],
       requirementTrees: [...trees.map((entry) => entry.tree), input.coreTree].filter(Boolean),
     });
-    const scheduleEntries = Object.values(input.schedule || {}).filter((entry) => validCode(entry?.code));
+    // Regeneration is derived from requirements plus explicit user decisions.
+    // Unlocked schedule entries are prior generated output, not fresh input;
+    // feeding them back into requirement satisfaction makes obsolete
+    // equivalents survive every subsequent generation.
+    const pinnedScheduleEntries = Object.values(input.schedule || {}).filter((entry) =>
+      validCode(entry?.code) && (entry?.userPinned === true || entry?.locked === true));
     const requirementTreeValues = [...trees.map((entry) => entry.tree), input.coreTree].filter(Boolean);
     const satisfiedForRequirements = academicCredit.satisfiedCourseCodes({
-      confirmedCourseCodes: [...completed, ...scheduleEntries.map((entry) => entry.code)],
+      confirmedCourseCodes: [...completed, ...pinnedScheduleEntries.map((entry) => entry.code)],
       requirementTrees: requirementTreeValues,
     });
 
@@ -202,7 +207,7 @@
       });
     });
     const treeCourseCodes = new Set(availableTreeCourses.keys());
-    scheduleEntries.forEach((entry) => {
+    pinnedScheduleEntries.forEach((entry) => {
       if (completed.has(entry.code)) return;
       const satisfiesTreeCourse = [...academicCredit.satisfiedCourseCodes({
         confirmedCourseCodes: [entry.code],
@@ -271,8 +276,7 @@
       estimatedCredits: course.credits,
     }));
 
-    const lockedPlacements = Object.fromEntries(Object.values(input.schedule || {})
-      .filter((entry) => (entry?.userPinned === true || entry?.locked === true) && validCode(entry?.code))
+    const lockedPlacements = Object.fromEntries(pinnedScheduleEntries
       .map((entry) => [entry.code, { ...entry, locked: true, userPinned: true }]));
 
     return {
