@@ -33,9 +33,10 @@
 - [ ] **Step 1: Write the failing regeneration regression**
 
 Add a test whose requirement tree contains canonical `01:198:170` with
-alternative `01:198:111`, and whose existing schedule contains both courses as
-`userPinned: false, locked: false`. Assert that planner input contains
-`01:198:111` and excludes `01:198:170`.
+alternative `01:198:111`, contains `01:198:111` as a separate concrete
+requirement, and whose existing schedule contains both courses as
+`userPinned: false, locked: false`. Assert that regenerated planner input
+contains `01:198:111` and excludes `01:198:170`.
 
 Add a second assertion with `01:198:170` explicitly pinned and assert that the
 pinned placement remains available through `lockedPlacements`.
@@ -52,9 +53,15 @@ Expected: the unlocked regeneration case still contains `01:198:170`.
 
 - [ ] **Step 3: Implement the input invariant**
 
-Restrict the schedule-entry preservation pass in `buildPlannerInput` to
-explicitly pinned entries. Generated entries must be rebuilt from requirement
-trees, selections, completed credit, and wishlist inputs.
+Create one explicitly pinned schedule-entry collection in `buildPlannerInput`.
+Use only that collection when:
+
+- determining which requirements are already satisfied by fixed placements;
+- preserving schedule entries as planner courses;
+- producing `lockedPlacements`.
+
+Generated entries must be rebuilt from requirement trees, selections, completed
+credit, and wishlist inputs.
 
 - [ ] **Step 4: Verify the focused test passes**
 
