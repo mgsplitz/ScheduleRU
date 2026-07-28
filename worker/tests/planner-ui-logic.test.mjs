@@ -192,6 +192,18 @@ test("plan generation preflight requires acknowledgement only for incomplete Cor
   assert.equal(logic.generationPreflight({ busy: false, coreIncomplete: false }), "confirm");
 });
 
+test("only complete generated plans can replace the accepted plan", () => {
+  assert.equal(logic.canAcceptGeneratedPlan({ status: "complete", issues: [] }), true);
+  assert.equal(logic.canAcceptGeneratedPlan({
+    status: "partial",
+    issues: [{ code: "courses_unplaced", severity: "error" }],
+  }), false);
+  assert.equal(logic.canAcceptGeneratedPlan({
+    status: "complete",
+    issues: [{ code: "locked_prerequisite_violation", severity: "error" }],
+  }), false);
+});
+
 test("only Core families shared by multiple selected majors auto-collapse", () => {
   assert.equal(logic.shouldAutoCollapseSharedGroup({
     group: {

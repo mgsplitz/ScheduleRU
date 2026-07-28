@@ -114,6 +114,11 @@
     return coreIncomplete ? "warn" : "confirm";
   }
 
+  function canAcceptGeneratedPlan(preview = {}) {
+    return preview?.status === "complete"
+      && !(preview?.issues || []).some((issue) => issue?.severity === "error");
+  }
+
   function shouldAutoCollapseSharedGroup({ group, selectedMajorIds = [] } = {}) {
     const selected = new Set(selectedMajorIds || []);
     const sharedMajorCount = [...new Set(group?.sourceProgramIds || [])]
@@ -134,6 +139,7 @@
     requirementProgressCourseIds,
     coursePathState,
     generationPreflight,
+    canAcceptGeneratedPlan,
     shouldAutoCollapseSharedGroup,
   };
 })(globalThis);

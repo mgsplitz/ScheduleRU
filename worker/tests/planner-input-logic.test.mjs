@@ -6,6 +6,8 @@ import vm from "node:vm";
 const context = { globalThis: {} };
 const eligibilityUrl = new URL("../../eligibility-logic.js", import.meta.url);
 vm.runInNewContext(fs.readFileSync(eligibilityUrl, "utf8"), context);
+const selectorUrl = new URL("../../course-selector-logic.js", import.meta.url);
+vm.runInNewContext(fs.readFileSync(selectorUrl, "utf8"), context);
 const academicCreditUrl = new URL("../../academic-credit-logic.js", import.meta.url);
 vm.runInNewContext(fs.readFileSync(academicCreditUrl, "utf8"), context);
 const moduleUrl = new URL("../../planner-input-logic.js", import.meta.url);
@@ -116,6 +118,40 @@ test("completed and AP-satisfied members reduce unresolved choice-group counts",
 
   assert.equal(result.unresolvedRequirements.some((item) => item.requirementGroupId === "writing"), false);
   assert.equal(result.unresolvedRequirements.some((item) => item.requirementGroupId === "quantitative"), false);
+});
+
+test("a concrete course required by one tree satisfies a choice in another tree", () => {
+  const programTree = sampleTree();
+  programTree.groups.root.children = ["fixed"];
+  programTree.groups.fixed.members = ["calc"];
+
+  const coreTree = sampleTree();
+  coreTree.groups.root.children = ["quantitative"];
+  coreTree.groups.quantitative = {
+    id: "quantitative",
+    name: "Calculus I (choose 1)",
+    rule: "min",
+    count: 1,
+    members: ["calc", "statistics"],
+    children: [],
+    parentId: "root",
+  };
+  coreTree.courses.statistics = {
+    code: "01:960:211",
+    title: "Statistics I",
+    credits: "3",
+  };
+
+  const result = build({
+    requirementTrees: [{ id: "math", tree: programTree }],
+    coreTree,
+  });
+
+  assert.equal(result.courses.filter((course) => course.code === "01:640:151").length, 1);
+  assert.equal(
+    result.unresolvedRequirements.some((item) => item.requirementGroupId === "quantitative"),
+    false,
+  );
 });
 
 test("an explicitly pinned approved alternative is preserved while its canonical requirement is suppressed", () => {
@@ -415,4 +451,234 @@ test("a required downstream course promotes one reviewed prerequisite choice wit
     "33:136:470",
   ]);
   assert.deepEqual(plain(result.unresolvedRequirements), []);
+});
+
+test("a wishlist alternative fulfills its canonical requirement without scheduling both courses", () => {
+  const tree = sampleTree();
+  tree.courses.businessComputer = {
+    code: "01:198:170",
+    title: "Computer Applications for Business",
+    credits: "3",
+    alternatives: [{ code: "01:198:111" }],
+  };
+  tree.groups.fixed.members = ["businessComputer"];
+
+  const result = build({
+    requirementTrees: [{ id: "selected-programs", tree }],
+    wishlistCourses: [{
+      code: "01:198:111",
+      title: "Introduction to Computer Science",
+      credits: "4",
+    }],
+  });
+
+  assert.deepEqual(plain(result.courses.map((course) => course.code)), ["01:198:111"]);
+});
+
+test("nested selector subsets become part of the parent total instead of extra or missing slots", () => {
+  const selector = (value) => [{ selector_json: JSON.stringify(value) }];
+  const tree = {
+    roots: ["philosophyTotal"],
+    courses: {},
+    groups: {
+      philosophyTotal: {
+        id: "philosophyTotal",
+        name: "Six Philosophy courses of at least three credits.",
+        rule: "min",
+        count: 6,
+        members: [],
+        children: ["philosophyUpper"],
+        courseSelectors: selector({
+          version: 1,
+          kind: "subject_level",
+          school_codes: ["01"],
+          subject_codes: ["730"],
+          course_number_min: 100,
+          course_number_max: 499,
+          minimum_credits: 3,
+        }),
+      },
+      philosophyUpper: {
+        id: "philosophyUpper",
+        name: "At least three Philosophy courses at the 300 or 400 level.",
+        rule: "min",
+        count: 3,
+        members: [],
+        children: [],
+        parentId: "philosophyTotal",
+        courseSelectors: selector({
+          version: 1,
+          kind: "subject_level",
+          school_codes: ["01"],
+          subject_codes: ["730"],
+          course_number_min: 300,
+          course_number_max: 499,
+          minimum_credits: 3,
+        }),
+      },
+    },
+  };
+
+  const result = build({ requirementTrees: [{ id: "sasnb-philosophy-minor", tree }] });
+  const groupIds = result.unresolvedRequirements.map((item) => item.requirementGroupId);
+
+  assert.equal(result.unresolvedRequirements.length, 6);
+  assert.equal(groupIds.filter((id) => id === "philosophyUpper").length, 3);
+  assert.equal(groupIds.filter((id) => id === "philosophyTotal").length, 3);
+  assert.ok(result.unresolvedRequirements.every((item) => /^Course \d+ of \d+ for /.test(item.label)));
+});
+
+test("unresolved elective slots retain the prerequisite paths of their finite candidates", () => {
+  const tree = {
+    roots: ["root"],
+    courses: {
+      calculusThree: {
+        code: "01:640:251",
+        title: "Multivariable Calculus",
+        credits: "4",
+      },
+      differentialEquations: {
+        code: "01:640:244",
+        title: "Differential Equations for Engineering and Physics",
+        credits: "4",
+        catalogPrereqs: "01:640:251 MULTIVARIABLE CALCULUS",
+      },
+      elementaryDifferentialEquations: {
+        code: "01:640:252",
+        title: "Elementary Differential Equations",
+        credits: "3",
+        catalogPrereqs: "(01:640:251 MULTIVARIABLE CALCULUS and 01:640:250 INTRO LINEAR ALGEBRA)",
+      },
+    },
+    groups: {
+      root: {
+        id: "root",
+        name: "Mathematics minor",
+        rule: "all",
+        members: ["calculusThree"],
+        children: ["mathElectives"],
+      },
+      mathElectives: {
+        id: "mathElectives",
+        name: "Four additional 3-credit Mathematics courses.",
+        rule: "min",
+        count: 4,
+        members: ["differentialEquations", "elementaryDifferentialEquations"],
+        children: [],
+        parentId: "root",
+      },
+    },
+  };
+
+  const result = build({ requirementTrees: [{ id: "sasnb-mathematics-minor", tree }] });
+  const slots = result.unresolvedRequirements.filter((item) => item.requirementGroupId === "mathElectives");
+
+  assert.equal(slots.length, 4);
+  assert.ok(slots.every((slot) => slot.prerequisitePaths.some((path) => path.includes("01:640:251"))));
+});
+
+test("prerequisite promotion prefers a path already required by the plan", () => {
+  const tree = {
+    roots: ["root"],
+    courses: {
+      timeSeries: {
+        code: "33:136:485",
+        title: "Time Series Modeling for Business",
+        credits: "3",
+        catalogPrereqs: "(01:198:111 INTRO COMPUTER SCI and 01:960:285 INTRO STAT FOR BUS) OR (33:623:385) OR (33:136:385 STATISTICAL METHODS IN BUSINESS)",
+      },
+      statisticalMethods: {
+        code: "33:136:385",
+        title: "Statistical Methods in Business",
+        credits: "3",
+      },
+      introComputerScience: {
+        code: "01:198:111",
+        title: "Introduction to Computer Science",
+        credits: "4",
+      },
+      businessStatistics: {
+        code: "01:960:285",
+        title: "Introductory Statistics for Business",
+        credits: "3",
+      },
+    },
+    groups: {
+      root: {
+        id: "root",
+        name: "Program requirements",
+        rule: "all",
+        members: ["timeSeries", "statisticalMethods"],
+        children: ["coreOptions"],
+      },
+      coreOptions: {
+        id: "coreOptions",
+        name: "Core options",
+        rule: "min",
+        count: 1,
+        members: ["introComputerScience", "businessStatistics"],
+        children: [],
+        parentId: "root",
+      },
+    },
+  };
+
+  const result = build({ requirementTrees: [{ id: "selected-programs", tree }] });
+  const codes = result.courses.map((course) => course.code).sort();
+
+  assert.deepEqual(plain(codes), ["33:136:385", "33:136:485"]);
+  assert.deepEqual(plain(result.prerequisitePathsByCode["33:136:485"]), [
+    ["01:198:111", "01:960:285"],
+    ["33:623:385"],
+    ["33:136:385"],
+  ]);
+});
+
+test("prerequisite promotion skips a path whose own prerequisite chain is unavailable", () => {
+  const tree = {
+    roots: ["root"],
+    courses: {
+      downstream: {
+        code: "33:136:485",
+        title: "Time Series Modeling for Business",
+        credits: "3",
+        catalogPrereqs: "01:640:112 or 33:136:385",
+      },
+      blockedPreparation: {
+        code: "01:640:112",
+        title: "Precalculus Part II",
+        credits: "2",
+        catalogPrereqs: "01:640:111",
+      },
+      viablePreparation: {
+        code: "33:136:385",
+        title: "Statistical Methods in Business",
+        credits: "3",
+      },
+    },
+    groups: {
+      root: {
+        id: "root",
+        name: "Program requirements",
+        rule: "all",
+        members: ["downstream"],
+        children: ["preparation"],
+      },
+      preparation: {
+        id: "preparation",
+        name: "Preparation",
+        rule: "min",
+        count: 1,
+        members: ["blockedPreparation", "viablePreparation"],
+        children: [],
+        parentId: "root",
+      },
+    },
+  };
+
+  const result = build({ requirementTrees: [{ id: "bait", tree }] });
+  const codes = new Set(result.courses.map((course) => course.code));
+
+  assert.equal(codes.has("33:136:385"), true);
+  assert.equal(codes.has("01:640:112"), false);
 });

@@ -115,6 +115,7 @@
         sourceProgram: stableText(requirement?.sourceProgram || requirement?.programId),
         requirementGroupId: stableText(requirement?.requirementGroupId || requirement?.groupId || requirement?.id),
         candidateSelectionContext: requirement?.candidateSelectionContext ?? requirement?.candidateContext ?? null,
+        prerequisitePaths: normalizedPaths(requirement?.prerequisitePaths),
       }))
       .sort((left, right) => left.sourceType.localeCompare(right.sourceType)
         || left.id.localeCompare(right.id)
@@ -145,6 +146,7 @@
       estimatedCredits: nonNegativeNumber(requirement.credits, 3),
       credits: nonNegativeNumber(requirement.credits, 3),
       candidateSelectionContext: requirement.candidateSelectionContext ?? null,
+      prerequisitePaths: normalizedPaths(requirement.prerequisitePaths),
       termOrdinal: Number(ordinal),
     };
   }
@@ -214,6 +216,14 @@
         + plannedCreditsBefore(schedule, term.ordinal)
         + projectedCreditsBefore(projectedRequirementCreditsByOrdinal, term.ordinal) < course.minimumPriorCredits) return false;
     return corequisiteSatisfied(course, normalized.completedCourseCodes, schedule, term.ordinal);
+  }
+
+  function requirementAllowedInTerm(normalized, requirement, term, schedule) {
+    if (!requirement.prerequisitePaths.length) return true;
+    return requirement.prerequisitePaths.some((path) => {
+      const prerequisiteOrdinal = pathPlacementOrdinal(path, normalized.completedCourseCodes, schedule);
+      return prerequisiteOrdinal !== null && prerequisiteOrdinal < term.ordinal;
+    });
   }
 
   function placeLockedPrerequisiteClosures(normalized, schedule, termCredits, pending, projectedRequirementCreditsByOrdinal = {}) {
@@ -374,6 +384,18 @@
     const termCredits = Object.fromEntries(normalized.terms.map((term) => [termKey(term), 0]));
     const issues = [...normalized.inputIssues];
     const termsByKey = new Map(normalized.terms.map((term) => [termKey(term), term]));
+    const requiredCredits = normalized.courses
+      .filter((course) => !course.optional)
+      .reduce((total, course) => total + course.credits, 0)
+      + normalized.unresolvedRequirements.reduce((total, requirement) => total + requirement.credits, 0);
+    const availableCredits = normalized.terms.length * normalized.maxCredits;
+    if (requiredCredits > availableCredits) {
+      issues.push(issue("plan_capacity_exceeded", "error", {
+        requiredCredits,
+        availableCredits,
+        overByCredits: requiredCredits - availableCredits,
+      }));
+    }
 
     normalized.courses.filter((course) => course.ruleCoverage === "unresolved").forEach((course) => {
       if (!issues.some((entry) => entry.code === "eligibility_rule_unresolved" && entry.courseCode === course.code)) {
@@ -472,7 +494,8 @@
     normalized.unresolvedRequirements.forEach((requirement) => {
       const eligibleTerms = normalized.terms
         .filter((term) => termCredits[termKey(term)] + requirement.credits <= normalized.maxCredits
-          && courseCountForOrdinal(schedule, term.ordinal) + placeholders.filter((entry) => entry.termOrdinal === term.ordinal).length < normalized.maxCoursesPerTerm)
+          && courseCountForOrdinal(schedule, term.ordinal) + placeholders.filter((entry) => entry.termOrdinal === term.ordinal).length < normalized.maxCoursesPerTerm
+          && requirementAllowedInTerm(normalized, requirement, term, schedule))
       const targetTerms = eligibleTerms.filter((term) => termCredits[termKey(term)] + requirement.credits <= normalized.targetCredits);
       const candidates = (targetTerms.length ? targetTerms : eligibleTerms)
         .sort((left, right) => termCredits[termKey(left)] - termCredits[termKey(right)]

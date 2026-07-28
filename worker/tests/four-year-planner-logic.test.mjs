@@ -400,6 +400,57 @@ test("does not let a placeholder satisfy a reviewed prerequisite", () => {
   assert.equal(result.placeholders.length, 1);
 });
 
+test("an unresolved elective slot is placed only after one candidate prerequisite path", () => {
+  const result = planner().generatePlan({
+    terms: [
+      { year: 1, sem: "fall" },
+      { year: 1, sem: "spring" },
+      { year: 2, sem: "fall" },
+      { year: 2, sem: "spring" },
+    ],
+    courses: [{ code: "01:640:251", title: "Multivariable Calculus", credits: 4 }],
+    lockedPlacements: {
+      "01:640:251": { year: 2, sem: "fall", locked: true },
+    },
+    unresolvedRequirements: [{
+      id: "math-elective-1",
+      label: "Course 1 of 4 for Mathematics electives",
+      credits: 3,
+      sourceType: "program",
+      prerequisitePaths: [["01:640:251"]],
+    }],
+  });
+
+  const prerequisite = result.schedule["01:640:251"];
+  const slot = result.placeholders[0];
+  const prerequisiteOrdinal = (prerequisite.year - 1) * 2 + (prerequisite.sem === "spring" ? 1 : 0);
+  const slotOrdinal = (slot.year - 1) * 2 + (slot.sem === "spring" ? 1 : 0);
+
+  assert.ok(slotOrdinal > prerequisiteOrdinal);
+});
+
+test("plans that require more credits than the available terms report the capacity gap", () => {
+  const result = planner().generatePlan({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    maxCredits: 18,
+    courses: Array.from({ length: 10 }, (_, index) => ({
+      code: `01:198:${String(index + 100).padStart(3, "0")}`,
+      title: `Course ${index + 1}`,
+      credits: 4,
+    })),
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(
+    result.issues.find((issue) => issue.code === "plan_capacity_exceeded"),
+  )), {
+    code: "plan_capacity_exceeded",
+    severity: "error",
+    requiredCredits: 40,
+    availableCredits: 36,
+    overByCredits: 4,
+  });
+});
+
 test("reports invalid locks and prerequisite cycles without moving locked work", () => {
   const result = planner().generatePlan({
     terms: [{ year: 1, sem: "fall" }],
