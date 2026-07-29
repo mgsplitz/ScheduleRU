@@ -88,9 +88,9 @@ function parseCourseSelectorFilter(rawValue) {
   const selectors = [];
   for (const value of values) {
     if (!value || typeof value !== "object" || Array.isArray(value) || Number(value.version) !== 1) return null;
-    const exclude_course_codes = unique(value.exclude_course_codes, COURSE_CODE_PATTERN, 32);
+    const exclude_course_codes = unique(value.exclude_course_codes, COURSE_CODE_PATTERN, 400);
     if (value.kind === "course_codes") {
-      const include_course_codes = unique(value.include_course_codes, COURSE_CODE_PATTERN, 32);
+      const include_course_codes = unique(value.include_course_codes, COURSE_CODE_PATTERN, 400);
       if (!include_course_codes.length) return null;
       selectors.push({ kind: "course_codes", include_course_codes, exclude_course_codes });
       continue;
@@ -122,11 +122,11 @@ function selectorWhereClause(selectors) {
   const placeholders = (values) => values.map(() => "?").join(",");
   const clauses = selectors.map((selector) => {
     if (selector.kind === "course_codes") {
-      const parts = [`${catalogCode} IN (${placeholders(selector.include_course_codes)})`];
-      binds.push(...selector.include_course_codes);
+      const parts = [`${catalogCode} IN (SELECT value FROM json_each(?))`];
+      binds.push(JSON.stringify(selector.include_course_codes));
       if (selector.exclude_course_codes.length) {
-        parts.push(`${catalogCode} NOT IN (${placeholders(selector.exclude_course_codes)})`);
-        binds.push(...selector.exclude_course_codes);
+        parts.push(`${catalogCode} NOT IN (SELECT value FROM json_each(?))`);
+        binds.push(JSON.stringify(selector.exclude_course_codes));
       }
       return `(${parts.join(" AND ")})`;
     }
@@ -141,8 +141,8 @@ function selectorWhereClause(selectors) {
       binds.push(selector.minimum_credits);
     }
     if (selector.exclude_course_codes.length) {
-      parts.push(`${catalogCode} NOT IN (${placeholders(selector.exclude_course_codes)})`);
-      binds.push(...selector.exclude_course_codes);
+      parts.push(`${catalogCode} NOT IN (SELECT value FROM json_each(?))`);
+      binds.push(JSON.stringify(selector.exclude_course_codes));
     }
     return `(${parts.join(" AND ")})`;
   });

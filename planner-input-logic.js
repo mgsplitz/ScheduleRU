@@ -31,12 +31,17 @@
     const rawConditions = Array.isArray(payload?.conditions) ? payload.conditions : [];
     const conditions = rawConditions.map((condition) => logic?.normalizeCondition(condition)).filter(Boolean);
     const reviewed = payload?.review?.review_status === "reviewed" && conditions.length === rawConditions.length;
+    const reviewedNoConditions = reviewed
+      && Number(payload?.review?.no_known_conditions) === 1
+      && rawConditions.length === 0;
     const reviewedPaths = reviewed ? (logic?.prerequisitePathsFromConditions(rawConditions) || []) : [];
     const directPaths = Array.isArray(course?.prerequisiteCodes) && course.prerequisiteCodes.length
       ? [course.prerequisiteCodes.filter(validCode)]
       : [];
     const catalog = logic?.parseCatalogPrerequisitePaths(course?.catalogPrereqs || "") || { reviewable: false, paths: [] };
-    const paths = reviewedPaths.length ? reviewedPaths : directPaths[0]?.length ? directPaths : catalog.reviewable ? catalog.paths : [];
+    const paths = reviewedNoConditions
+      ? []
+      : reviewedPaths.length ? reviewedPaths : directPaths[0]?.length ? directPaths : catalog.reviewable ? catalog.paths : [];
     const minimumYearCondition = conditions.find((condition) => condition.type === "minimum_plan_year");
     const priorCreditsCondition = conditions.find((condition) => condition.type === "minimum_prior_credits");
     const corequisiteConditions = conditions.filter((condition) => condition.type === "corequisite_course");
@@ -128,6 +133,10 @@
       requirementGroupId: group.id,
       prerequisitePaths: candidatePrerequisitePaths(group, courses),
       candidateSelectionContext: {
+        sourceType: sourceProgram === "core" ? "core" : "program",
+        sourceProgram,
+        requirementGroupId: group.id,
+        groupName: groupLabel,
         rule: group.rule,
         required: Number(group.count) || 1,
         members: [...(group.members || [])],

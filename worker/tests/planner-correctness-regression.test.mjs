@@ -64,3 +64,66 @@ test("requirement trees generate and accept a visible eight-term plan end to end
   assert.ok(Object.values(accepted.schedule).filter((entry) => entry.code !== pinnedCode).every((entry) => entry.userPinned === false));
   assert.deepEqual(plain(accepted.planPlaceholders.map((entry) => entry.requirementGroupId)), ["elective"]);
 });
+
+test("reviewed College Writing stays prerequisite-free through end-to-end generation", () => {
+  const terms = Array.from({ length: 8 }, (_, index) => ({
+    year: Math.floor(index / 2) + 1,
+    sem: index % 2 ? "spring" : "fall",
+  }));
+  const tree = {
+    roots: ["root"],
+    courses: {
+      collegeWriting: {
+        code: "01:355:101",
+        title: "COLLEGE WRITING",
+        credits: "3",
+        catalogPrereqs: "01:355:100 BASIC COMPOSITION OR 01:356:156 ACADEMIC WRITING",
+        eligibility: {
+          review: {
+            course_code: "01:355:101",
+            review_status: "reviewed",
+            no_known_conditions: 1,
+          },
+          conditions: [],
+        },
+      },
+      nextWriting: {
+        code: "01:355:201",
+        title: "RESEARCH IN THE DISCIPLINES",
+        credits: "3",
+        prerequisiteCodes: ["01:355:101"],
+      },
+    },
+    groups: {
+      root: {
+        id: "root",
+        name: "Writing sequence",
+        rule: "all",
+        members: ["collegeWriting", "nextWriting"],
+        children: [],
+      },
+    },
+  };
+
+  const canonical = adapter.buildPlannerInput({
+    terms,
+    requirementTrees: [{ id: "sas-core", tree }],
+  });
+  const preview = engine.generatePlan(canonical);
+  const scheduledCodes = new Set(Object.keys(preview.schedule));
+
+  assert.equal(preview.status, "complete");
+  assert.equal(scheduledCodes.has("01:355:101"), true);
+  assert.equal(scheduledCodes.has("01:355:201"), true);
+  assert.equal(scheduledCodes.has("01:355:100"), false);
+  assert.equal(scheduledCodes.has("01:356:156"), false);
+  assert.deepEqual(plain(canonical.prerequisitePathsByCode["01:355:101"] || []), []);
+  assert.ok(
+    preview.schedule["01:355:101"].year < preview.schedule["01:355:201"].year
+      || (
+        preview.schedule["01:355:101"].year === preview.schedule["01:355:201"].year
+        && preview.schedule["01:355:101"].sem === "fall"
+        && preview.schedule["01:355:201"].sem === "spring"
+      ),
+  );
+});

@@ -317,6 +317,42 @@ test("catalog alternatives and standing restrictions survive planner normalizati
   assert.equal(result.courses.find((course) => course.code === "33:136:388").minimumPlanYear, 2);
 });
 
+test("a reviewed no-condition course never falls back to raw catalog prerequisite text", () => {
+  const tree = {
+    roots: ["writing"],
+    courses: {
+      collegeWriting: {
+        code: "01:355:101",
+        title: "COLLEGE WRITING",
+        credits: "3",
+        catalogPrereqs: "01:355:100 BASIC COMPOSITION OR 01:356:156 ACADEMIC WRITING",
+        eligibility: {
+          review: {
+            course_code: "01:355:101",
+            review_status: "reviewed",
+            no_known_conditions: 1,
+          },
+          conditions: [],
+        },
+      },
+    },
+    groups: {
+      writing: {
+        id: "writing",
+        name: "College Writing",
+        rule: "all",
+        members: ["collegeWriting"],
+        children: [],
+      },
+    },
+  };
+
+  const result = build({ requirementTrees: [{ id: "sas-core", tree }] });
+  assert.deepEqual(plain(result.prerequisitePathsByCode["01:355:101"] || []), []);
+  assert.equal(result.courses.find((course) => course.code === "01:355:101")?.ruleCoverage, "reviewed");
+  assert.equal(result.courses.some((course) => ["01:355:100", "01:356:156"].includes(course.code)), false);
+});
+
 test("advanced microeconomics exposes both complete prerequisite paths to the planner", () => {
   const tree = sampleTree();
   tree.courses.advancedMicro = {
@@ -393,6 +429,13 @@ test("distinct Core goal pools remain placeholders until a goal is explicitly ch
     "humanities",
     "humanities",
   ]);
+  assert.ok(result.unresolvedRequirements.every((item) => item.sourceType === "core"));
+  assert.ok(result.unresolvedRequirements.every((item) => item.candidateSelectionContext.sourceType === "core"));
+  assert.ok(result.unresolvedRequirements.every((item) => item.candidateSelectionContext.requirementGroupId === "humanities"));
+  assert.deepEqual(
+    plain(result.unresolvedRequirements[0].candidateSelectionContext.memberCourseCodes),
+    ["01:510:101", "01:510:102", "01:195:101", "01:195:102"]
+  );
 });
 
 test("a required downstream course promotes one reviewed prerequisite choice without double-counting its placeholder", () => {

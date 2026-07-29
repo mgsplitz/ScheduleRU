@@ -265,6 +265,7 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .program-policy-feedback.warn{background:#fff5f7;border:1px solid #f3c9ce;border-radius:4px;color:#7a1d34;padding:8px;}
 .program-policy-feedback.info{background:#f5f8fb;border:1px solid #cdd8e7;border-radius:4px;color:#38516c;padding:8px;}
 .modal-footer{display:flex;justify-content:flex-end;gap:7px;margin-top:14px;}
+#programOv .modal-footer{position:sticky;bottom:0;z-index:2;margin:14px -20px -16px;padding:12px 20px 16px;background:linear-gradient(to bottom,rgba(255,253,250,.9),#fffdfa 28%);border-top:1px solid var(--line);}
 
 /* MODALS */
 .ov{position:fixed;inset:0;background:rgba(20,15,10,.5);
@@ -603,6 +604,7 @@ button,input,select,textarea{font:inherit;}
 <script src="requirement-group-logic.js"></script>
 <script src="course-selector-logic.js"></script>
 <script src="course-interaction-logic.js"></script>
+<script src="program-picker-logic.js"></script>
 <script src="eligibility-logic.js"></script>
 <script src="academic-credit-logic.js"></script>
 <script src="planner-input-logic.js"></script>
@@ -682,7 +684,7 @@ const ST = {
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, catalogListedProgramIds:[], doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
-  backendSubject:"", backendSearch:"", backendPage:1, backendSelectorGroupId:null,
+  backendSubject:"", backendSearch:"", backendPage:1, backendSelectorGroupId:null, backendRequirementFilter:null,
   backendCourses:[], backendTotal:0, backendLoading:false, backendError:"",
   backendSubjects:[], backendStatus:null,
   expandedIds: new Set(),   // course ids currently expanded on the Courses page
@@ -737,6 +739,7 @@ function savePlannerState(){
       onboarding:ST.onboarding, academicPosition:ST.academicPosition, academicRecords:ST.academicRecords,
       academicCalendarStartYear:ST.academicCalendarStartYear,
       primaryProgramId:ST.primaryProgramId, secondaryProgramId:ST.secondaryProgramId,
+      programSelectionConfirmed:ST.programSelectionConfirmed===true,
       generatedPlanPreview:ST.generatedPlanPreview, schedulePreferences:ST.schedulePreferences,
       planPlaceholders:ST.planPlaceholders, issueDismissals:ST.issueDismissals,
     }));
@@ -1145,20 +1148,26 @@ async function loadHomeSchoolCandidate(nextSchool){
     backendFetch(`/api/program-selection-policies?home_school=${encodeURIComponent(nextSchool.slug)}`),
     backendFetch(`/api/core-curricula?school=${encodeURIComponent(nextSchool.slug)}`),
   ]);
-  const availablePrograms=candidateProgramsForSchool(programPayload,nextSchool.slug),reviewedPrograms=availablePrograms.filter(program=>program.requirements_available!==false);
-  const initial=availablePrograms.find(program=>program.id===schoolContext.defaultProgramId&&program.requirements_available!==false)||reviewedPrograms.find(program=>program.type==="major")||reviewedPrograms[0]||availablePrograms.find(program=>program.type==="major")||availablePrograms[0];
-  if(!initial)throw new Error("No reviewed program is available for that home school.");
+  const availablePrograms=candidateProgramsForSchool(programPayload,nextSchool.slug);
+  if(!availablePrograms.length)throw new Error("No reviewed program is available for that home school.");
   const curriculum=(corePayload?.curricula||[])[0];
   if(!curriculum)throw new Error("No reviewed Core curriculum is available for that home school.");
-  const selectedPrograms=[initial.id],referenceTypes=schoolContext.sharedRequirementReferenceTypes||[],referencePrograms=availablePrograms.filter(program=>program.requirements_available!==false&&referenceTypes.includes(program.type));
+  const selectedPrograms=ScheduleRUProgramPickerLogic.initialProgramIds({
+    restoredIds:[],
+    programs:availablePrograms,
+    onboardingCompleted:ST.onboarding?.completed===true,
+    selectionConfirmed:ST.programSelectionConfirmed===true,
+    defaultProgramId:schoolContext.defaultProgramId,
+  });
+  const referenceTypes=schoolContext.sharedRequirementReferenceTypes||[],referencePrograms=availablePrograms.filter(program=>program.requirements_available!==false&&referenceTypes.includes(program.type));
   const [requirementsPayload,doubleCountPayload,referencePayload,coreDetail]=await Promise.all([
-    backendFetch(`/api/requirements?programs=${selectedPrograms.map(encodeURIComponent).join(",")}`),
+    selectedPrograms.length?backendFetch(`/api/requirements?programs=${selectedPrograms.map(encodeURIComponent).join(",")}`):Promise.resolve({requirements:{}}),
     backendFetch(`/api/double-count-policies?school=${encodeURIComponent(nextSchool.slug)}`),
     referencePrograms.length<2?Promise.resolve({requirements:{}}):backendFetch(`/api/requirements?programs=${referencePrograms.map(program=>encodeURIComponent(program.id)).join(",")}`),
     backendFetch(`/api/programs/${encodeURIComponent(curriculum.id)}/requirements`),
   ]);
   const returned=requirementsPayload?.requirements||{},visibleIds=selectedPrograms.filter(id=>Array.isArray(returned[id]));
-  if(!visibleIds.length)throw new Error("The replacement program requirements could not be loaded.");
+  if(selectedPrograms.length&&!visibleIds.length)throw new Error("The replacement program requirements could not be loaded.");
   const referenceRequirementTrees=referencePayload?.requirements||{},requirementTrees=normalizedCoreRequirementTrees(returned,visibleIds,{referenceRequirementTrees,availablePrograms});
   const doubleCountPolicies=doubleCountPayload?.policies||[],doubleCountExceptions=requirementsPayload?.double_count_exceptions||[];
   const roles=programRolesFor(visibleIds,availablePrograms);
@@ -1169,7 +1178,7 @@ async function loadHomeSchoolCandidate(nextSchool){
     doubleCountRules:requirementsPayload?.double_count_rules||[],doubleCountExceptions,
     programEligibilityRules:requirementsPayload?.eligibility_rules||[],majorRequirementTree:buildRequirementTree(requirementsForDisplay(requirementTrees,visibleIds)),
     activeProgram:availablePrograms.find(program=>program.id===visibleIds[0])||null,
-    doubleCount:computeDoubleCountOverlaps(requirementTrees,visibleIds,{availablePrograms,doubleCountExceptions,doubleCountPolicies}),
+    doubleCount:visibleIds.length?computeDoubleCountOverlaps(requirementTrees,visibleIds,{availablePrograms,doubleCountExceptions,doubleCountPolicies}):null,
     requirementsError:"",coreCurricula:corePayload?.curricula||[],activeCoreCurriculum:curriculum,
     coreRequirementTree:buildRequirementTree(coreDetail?.requirements||[]),coreError:"",...roles,
   };
@@ -1270,6 +1279,7 @@ function renderProgramPickerList(){
     }
     ST.programDraft=[...draft];
     delete ST.programDraftWarningSignature;
+    renderProgramPickerList();
   }));
 }
 document.getElementById("programBtn").addEventListener("click", openProgramPicker);
@@ -1795,6 +1805,29 @@ function renderSchedule(){
   document.getElementById("pill").textContent = placeholderTotal?`${total} / 120 estimated credits planned`:`${total} / 120 credits planned`;
 }
 
+function openCorePlaceholderCourseBrowser(placeholder,group){
+  const context=placeholder?.candidateSelectionContext||{};
+  const selectorRows=group?.courseSelectors?.length?group.courseSelectors:(context.courseSelectors||[]);
+  const selectors=reviewedGroupSelectors({courseSelectors:selectorRows});
+  const courseCodes=[...new Set([
+    ...(context.memberCourseCodes||[]),
+    ...(group?.members||[]).map(id=>ST.coreRequirementTree?.courses?.[id]?.code),
+  ].filter(code=>/^\d{2}:\d{3}:\d{3}$/.test(code)))];
+  if(!selectors.length&&courseCodes.length)selectors.push({
+    version:1,
+    kind:"course_codes",
+    label:`Approved courses for ${placeholder?.label||groupDisplayName(group)}`,
+    include_course_codes:courseCodes,
+    exclude_course_codes:[],
+  });
+  ST.backendRequirementFilter={
+    group:group||{id:placeholder?.requirementGroupId,name:placeholder?.label||"Core requirement"},
+    selectors,
+  };
+  ST.backendSelectorGroupId=null;ST.backendSearch="";ST.backendSubject="";ST.backendPage=1;ST.expandedIds.clear();
+  setTopLevelPage("courses");loadBackendCourses();
+}
+
 function focusPlanPlaceholder(placeholderId){
   const placeholder=(ST.planPlaceholders||[]).find(item=>item.id===placeholderId);if(!placeholder)return;
   ST.tab=placeholder.sourceType==="core"?"core":"required";
@@ -1822,9 +1855,11 @@ function focusPlanPlaceholder(placeholderId){
       GROUPS[placeholder.requirementGroupId]=group;
     }
     const destination=globalThis.ScheduleRUPlannerUI.placeholderDestination({
+      sourceType:placeholder.sourceType,
       group,
       candidateSelectionContext:placeholder.candidateSelectionContext,
     });
+    if(destination==="course_catalog"){openCorePlaceholderCourseBrowser(placeholder,group);return;}
     if(destination==="requirement_picker"){openRequirementPicker(placeholder.requirementGroupId);return;}
     if(destination==="selector_browser"){openSelectorCourseBrowser(placeholder.requirementGroupId);return;}
     const toggle=[...document.querySelectorAll("[data-gtog]")].find(node=>node.dataset.gtog===placeholder.requirementGroupId);
@@ -2410,15 +2445,28 @@ async function backendFetch(path,options={}){
 }
 
 function activeCatalogSelectorContext(){
+  if(ST.backendRequirementFilter?.selectors?.length)return ST.backendRequirementFilter;
   const group=GROUPS[ST.backendSelectorGroupId];
   const selectors=reviewedGroupSelectors(group);
   return group&&selectors.length ? {group,selectors} : null;
 }
 function openSelectorCourseBrowser(gk){
+  const group=GROUPS[gk];
+  if(ST.tab==="core"){
+    openCorePlaceholderCourseBrowser({
+      sourceType:"core",requirementGroupId:gk,label:groupDisplayName(group),
+      candidateSelectionContext:{
+        courseSelectors:group?.courseSelectors||[],
+        memberCourseCodes:(group?.members||[]).map(id=>COURSES[id]?.code).filter(Boolean),
+      },
+    },group);
+    return;
+  }
   openRequirementPicker(gk);
 }
 function clearCatalogSelectorBrowser(){
   ST.backendSelectorGroupId=null;
+  ST.backendRequirementFilter=null;
   ST.backendPage=1;
   ST.expandedIds.clear();
   loadBackendCourses();
@@ -2834,14 +2882,20 @@ async function loadInitialRequirements({reloadSchools=true}={}){
     // part of a shared major-level baseline.
     const referenceTypes=activeSchoolContext().sharedRequirementReferenceTypes||[];
     try{ await loadSchoolReferenceRequirementTrees(programs.filter(program=>program.requirements_available!==false&&referenceTypes.includes(program.type))); }catch(e){ ST.referenceRequirementTrees={}; }
-    const restored=ST.selectedPrograms.filter(id=>programs.some(program=>program.id===id));
-    const reviewedPrograms=programs.filter(program=>program.requirements_available!==false);
-    const initial=programs.find(p=>p.id===activeSchoolContext().defaultProgramId&&p.requirements_available!==false)
-      ||reviewedPrograms.find(p=>p.type==="major")||reviewedPrograms[0]
-      ||programs.find(p=>p.type==="major")||programs[0];
-    if(!initial) throw new Error(`No catalog-listed programs are available yet for ${activeHomeSchoolLabel()}.`);
-    ST.selectedPrograms=restored.length ? restored : [initial.id];
-    await loadSelectedRequirements(ST.selectedPrograms);
+    const initialIds=ScheduleRUProgramPickerLogic.initialProgramIds({
+      restoredIds:ST.selectedPrograms,
+      programs,
+      onboardingCompleted:ST.onboarding?.completed===true,
+      selectionConfirmed:ST.programSelectionConfirmed===true,
+      defaultProgramId:activeSchoolContext().defaultProgramId,
+    });
+    if(!programs.length) throw new Error(`No catalog-listed programs are available yet for ${activeHomeSchoolLabel()}.`);
+    ST.selectedPrograms=initialIds;
+    if(initialIds.length)await loadSelectedRequirements(initialIds);
+    else{
+      ST.requirementTrees={};ST.catalogListedProgramIds=[];ST.doubleCountPolicies=[];ST.doubleCountRules=[];ST.doubleCountExceptions=[];ST.programEligibilityRules=[];ST.majorRequirementTree=buildRequirementTree([]);ST.activeProgram=null;ST.doubleCount=null;ST.primaryProgramId=null;ST.secondaryProgramId=null;ST.requiredProgramTab="";
+      useRequirementTree(ST.majorRequirementTree);
+    }
     updateProgramTitle();
   }catch(err){
     ST.requirementsError=err.message||"Unknown error";
@@ -3099,7 +3153,7 @@ function renderCoursesPage(){
   root.innerHTML = `
     <div class="cp-header"><h1>Course Catalog</h1><div class="cp-sub">${statusLine}</div></div>
     ${connectionBar}
-    ${selectorContext?`<div class="choice-summary">Showing only courses that count toward <b>${escapeHtml(groupDisplayName(selectorContext.group))}</b>: ${escapeHtml(selectorDescription)}. Add one to your wishlist, then place it in your plan to apply it automatically.</div>`:""}
+    ${selectorContext?`<div class="choice-summary">Choosing for <b>${escapeHtml(groupDisplayName(selectorContext.group))}</b>: ${escapeHtml(selectorDescription)}. Add one to your wishlist, then place it in your plan to apply it automatically.</div>`:""}
     <div class="cp-controls">
       <input id="cpSearch" placeholder="Search by title or course code…" value="${escapeHtml(ST.backendSearch)}"/>
       ${selectorContext?`<button class="choice-btn secondary" id="cpClearSelector">Clear requirement filter</button>`:`<select id="cpSubject">${subjOpts}</select>`}
@@ -3780,7 +3834,7 @@ function acceptedProgramSnapshot(){return {selectedPrograms:ST.selectedPrograms,
 async function acceptProgramDraft(ids,generation){
   if(generation!==ST.programApplyGeneration||ST.programApplyPending)return;
   const snapshot=acceptedProgramSnapshot();setProgramApplyPending(true);ST.requirementsLoading=true;renderPanel();
-  try{await loadSelectedRequirements(ids);if(generation!==ST.programApplyGeneration)return;ST.selectedPrograms=ids;applyProgramRoles(ids);ST.requirementsError="";savePlannerState();updateProgramTitle();closeProgramPicker();}
+  try{await loadSelectedRequirements(ids);if(generation!==ST.programApplyGeneration)return;ST.selectedPrograms=ids;applyProgramRoles(ids);ST.programSelectionConfirmed=true;ST.requirementsError="";savePlannerState();updateProgramTitle();renderOnboarding();closeProgramPicker();}
   catch(error){if(generation===ST.programApplyGeneration){Object.assign(ST,snapshot);showProgramPolicyFeedback({errors:[{message:`Programs were not changed: ${error.message||"requirements could not load"}.`} ]});}}
   finally{if(generation===ST.programApplyGeneration){ST.requirementsLoading=false;setProgramApplyPending(false);renderPanel();}}
 }
@@ -3799,7 +3853,7 @@ function setProgramDialogOpen(open){const root=document.getElementById("programO
 const legacyOpenProgramPicker=openProgramPicker,legacyCloseProgramPicker=closeProgramPicker,legacyRenderProgramPickerList=renderProgramPickerList;
 openProgramPicker=function(){ST.programDraftPrimaryId=ST.primaryProgramId;legacyOpenProgramPicker();setProgramDialogOpen(true);};
 closeProgramPicker=function(){legacyCloseProgramPicker();setProgramDialogOpen(false);};
-renderProgramPickerList=function(){legacyRenderProgramPickerList();const controls=document.getElementById("programRoleControls"),byId=new Map((ST.availablePrograms||[]).map(program=>[program.id,program]));if(!ST.programBrowseSchoolSlug){controls.innerHTML="";return;}const majors=(ST.programDraft||[]).filter(id=>byId.get(id)?.type==="major");if(!majors.includes(ST.programDraftPrimaryId))ST.programDraftPrimaryId=majors[0]||null;controls.innerHTML=majors.length?`<div class="onboarding-note"><b>Major roles</b><br/>${majors.map(id=>`<button class="choice-btn secondary" data-draft-primary="${html(id)}" ${id===ST.programDraftPrimaryId?"disabled":""}>${id===ST.programDraftPrimaryId?"Primary: ":"Make primary: "}${html(byId.get(id)?.name||id)}</button>`).join(" ")}<br/>The first selected major is primary by default; choose another to swap roles.</div>`:"";controls.querySelectorAll("[data-draft-primary]").forEach(button=>button.addEventListener("click",()=>{ST.programDraftPrimaryId=button.dataset.draftPrimary;renderProgramPickerList();}));};
+renderProgramPickerList=function(){legacyRenderProgramPickerList();const controls=document.getElementById("programRoleControls"),byId=new Map((ST.availablePrograms||[]).map(program=>[program.id,program]));if(!ST.programBrowseSchoolSlug){controls.innerHTML="";return;}const view=ScheduleRUProgramPickerLogic.programDraftView({draftIds:ST.programDraft,primaryId:ST.programDraftPrimaryId,programs:ST.availablePrograms});ST.programDraft=view.selectedIds;ST.programDraftPrimaryId=view.primaryId;controls.innerHTML=view.majorIds.length?`<div class="onboarding-note"><b>Major roles</b><br/>${view.majorIds.map(id=>`<button class="choice-btn secondary" data-draft-primary="${html(id)}" ${id===view.primaryId?"disabled":""}>${id===view.primaryId?"Primary: ":"Make primary: "}${html(byId.get(id)?.name||id)}</button>`).join(" ")}<br/>The first selected major is primary by default; choose another to swap roles.</div>`:"";controls.querySelectorAll("[data-draft-primary]").forEach(button=>button.addEventListener("click",()=>{ST.programDraftPrimaryId=button.dataset.draftPrimary;renderProgramPickerList();}));};
 function replaceProgramPickerControl(id,handler){const control=document.getElementById(id),replacement=control.cloneNode(true);control.replaceWith(replacement);replacement.addEventListener("click",handler);}
 replaceProgramPickerControl("programBtn",openProgramPicker);
 replaceProgramPickerControl("programClose",closeProgramPicker);
@@ -3834,7 +3888,7 @@ function renderOnboarding(){
   const records=academicRecords(),layout=(title,text,body,options={})=>{content.innerHTML=`<h1 id="onboardingTitle">${title}</h1><p>${text}</p>${body}<div class="onboarding-actions"><button class="choice-btn secondary" id="onboardingBack" ${step===0?"disabled":""}>Back</button><div class="right">${options.skip?'<button class="choice-btn secondary" id="onboardingSkip">Skip</button>':""}<button class="choice-btn" id="onboardingNext">${options.next||"Continue"}</button></div></div>`;document.getElementById("onboardingBack").onclick=()=>{ST.onboarding.step=step-1;savePlannerState();renderOnboarding();};document.getElementById("onboardingSkip")?.addEventListener("click",()=>{ST.onboarding.step=step+1;savePlannerState();renderOnboarding();});document.getElementById("onboardingNext").onclick=()=>{if(step===4)ST.onboarding.completed=true;else ST.onboarding.step=step+1;savePlannerState();renderOnboarding();renderAll();};};
   if(step===0)return layout("Welcome to ScheduleRU","Account functionality is not enabled yet. Continue as a guest for now.","",{next:"Continue as guest"});
   if(step===1){const choices=AP.length?AP.map(ap=>{const score=ap.minimumScore===ap.maximumScore?String(ap.minimumScore):`${ap.minimumScore}-${ap.maximumScore}`;return `<label class="onboarding-record"><span><input type="checkbox" data-onboarding-ap="${html(ap.id)}" ${ST.apOn?.[ap.id]?"checked":""}/> ${html(ap.name)} (${html(score)})</span><span>${html(ap.credits)} credits</span></label>`;}).join(""):"<div class=\"onboarding-note\">Reviewed AP choices are loading.</div>";return layout("Add AP credit","Scores of 4 or 5 may count when a reviewed Rutgers equivalency applies.",`<div class="onboarding-records onboarding-records-scroll">${choices}</div>`,{skip:true});}
-  if(step===2){const courseOptions=[...new Map([...Object.values(COURSES),...(ST.backendCourses||[]).map(backendCourseRecord)].filter(course=>course?.code).map(course=>[course.code,course])).values()];return layout("Add completed coursework","Search by course name or enter a Rutgers course code.",`<div class="onboarding-fields"><label>Course code or search<input id="recordCourseSearch" list="recordCourseOptions" placeholder="01:198:111 or Introduction to Computer Science"/><datalist id="recordCourseOptions">${courseOptions.map(course=>`<option value="${html(course.code)}">${html(course.fullTitle||course.title||course.code)}</option>`).join("")}</datalist></label></div><button class="choice-btn secondary" id="addCourseRecord">Add course</button><div class="onboarding-records">${records.filter(record=>record.type!=="ap").map(record=>`<div class="onboarding-record"><span>${html(record.courseCode)}${record.title?` · ${html(record.title)}`:""}</span><button class="choice-btn secondary" data-remove-record="${html(record.id)}">Remove</button></div>`).join("")}</div>`,{skip:true});}
+  if(step===2)return layout("Add completed coursework","Search by course name or enter a Rutgers course code.",`<div class="onboarding-fields"><label>Course code or search<input id="recordCourseSearch" list="recordCourseOptions" autocomplete="off" placeholder="01:198:111 or Introduction to Computer Science"/><datalist id="recordCourseOptions"></datalist><span id="recordCourseSearchStatus" class="onboarding-search-status" aria-live="polite">Start typing to search the Rutgers catalog.</span></label></div><button class="choice-btn secondary" id="addCourseRecord">Add course</button><div class="onboarding-records">${records.filter(record=>record.type!=="ap").map(record=>`<div class="onboarding-record"><span>${html(record.courseCode)}${record.title?` · ${html(record.title)}`:""}</span><button class="choice-btn secondary" data-remove-record="${html(record.id)}">Remove</button></div>`).join("")}</div>`,{skip:true});
   if(step===3)return layout("Choose programs of study","Set your home school, then add a primary major, optional second major, and minors.",`<div class="onboarding-fields"><label>Home school<select id="onboardingHomeSchool">${(ST.availableSchools||[]).map(school=>`<option value="${html(school.slug)}" ${school.slug===ST.homeSchoolSlug?"selected":""}>${html(school.name||school.short_name||school.slug)}</option>`).join("")}</select></label></div><div class="onboarding-review">${selectedProgramRows().map(program=>`<div>${html(program.name)} · ${html(program.type)}</div>`).join("")||"<div>No program selected yet.</div>"}</div><button class="choice-btn secondary" id="onboardingPrograms">Add program of study</button>`);
   return layout("Ready to explore","Try out our strongest planning features:","<ul class=\"onboarding-feature-list\"><li>Try the four-year auto-planner for a balanced eight-semester draft.</li><li>Build a real semester schedule from verified Rutgers sections.</li><li>Refine schedule options with natural-language preferences.</li></ul>",{next:"Get started"});
 }
@@ -3843,8 +3897,69 @@ renderOnboarding=function(){const wasOpen=document.getElementById("onboarding").
 const baseSetOnboardingOpen=setOnboardingOpen;
 setOnboardingOpen=function(open,wasOpen){document.getElementById("app").inert=open;document.getElementById("page-courses").inert=open;document.querySelector(".pagenav").inert=open;baseSetOnboardingOpen(open,wasOpen);};
 document.addEventListener("change",event=>{if(event.target.matches("[data-onboarding-ap]")){ST.apOn[event.target.dataset.onboardingAp]=event.target.checked;savePlannerState();renderAll();}if(event.target.id==="onboardingHomeSchool")changeHomeSchool(event.target.value);});
-function onboardingCourseRecord(value){const query=String(value||"").trim().toLowerCase(),requirement=Object.keys(COURSES).map(courseRecordFromId).find(course=>course?.code?.toLowerCase()===query||course?.title?.toLowerCase()===query||course?.fullTitle?.toLowerCase()===query),catalog=(ST.backendCourses||[]).map(backendCourseRecord).find(course=>course?.code?.toLowerCase()===query||course?.title?.toLowerCase()===query||course?.fullTitle?.toLowerCase()===query);return requirement||catalog||courseRecordFromId(value);}
-document.addEventListener("click",event=>{if(event.target.id==="addCourseRecord"){const record=onboardingCourseRecord(document.getElementById("recordCourseSearch").value);if(!record?.code)return;addAcademicRecord({type:"rutgers_completed",courseCode:record.code,title:record.fullTitle||record.title,credits:Number(record.credits)||0});renderOnboarding();renderAll();}if(event.target.matches("[data-remove-record]")){ST.academicRecords=academicRecords().filter(record=>record.id!==event.target.dataset.removeRecord);savePlannerState();renderOnboarding();renderAll();}if(event.target.id==="onboardingPrograms")openProgramPicker();});
+let onboardingCourseMatches=[];
+let onboardingCourseSearchTimer=null;
+let onboardingCourseSearchGeneration=0;
+function onboardingLocalCourseCandidates(){
+  return [...new Map([
+    ...Object.values(COURSES).map(course=>ScheduleRUCourseInteractionLogic.mergeCourseRecords([course])),
+    ...(ST.backendCourses||[]).map(backendCourseRecord),
+  ].filter(course=>course?.code).map(course=>[course.code,course])).values()];
+}
+function renderOnboardingCourseSearchResults(query,matches,error=""){
+  const options=document.getElementById("recordCourseOptions"),status=document.getElementById("recordCourseSearchStatus");
+  if(options)options.innerHTML=(matches||[]).slice(0,12).map(course=>`<option value="${html(course.code)}">${html(course.fullTitle||course.title||course.code)}</option>`).join("");
+  if(!status)return;
+  if(error)status.textContent=error;
+  else if(!String(query||"").trim())status.textContent="Start typing to search the Rutgers catalog.";
+  else if(matches?.length)status.textContent=`${matches.length} verified catalog match${matches.length===1?"":"es"} found.`;
+  else status.textContent="No verified Rutgers course matched that search.";
+}
+async function searchOnboardingCourses(query){
+  const generation=++onboardingCourseSearchGeneration;
+  const terms=ScheduleRUCourseInteractionLogic.onboardingCatalogSearchTerms(query);
+  if(!terms.length){onboardingCourseMatches=[];renderOnboardingCourseSearchResults(query,[]);return [];}
+  try{
+    const responses=await Promise.all(terms.map(term=>{
+      const params=new URLSearchParams({search:term,limit:"50",offset:"0"});
+      return backendFetch("/api/courses?"+params.toString());
+    }));
+    if(generation!==onboardingCourseSearchGeneration)return onboardingCourseMatches;
+    const candidates=[...onboardingLocalCourseCandidates(),...responses.flatMap(data=>(data.courses||[]).map(backendCourseRecord))];
+    onboardingCourseMatches=ScheduleRUCourseInteractionLogic.rankOnboardingCourseMatches(candidates,query).slice(0,25);
+    renderOnboardingCourseSearchResults(query,onboardingCourseMatches);
+    return onboardingCourseMatches;
+  }catch(_){
+    if(generation!==onboardingCourseSearchGeneration)return onboardingCourseMatches;
+    onboardingCourseMatches=ScheduleRUCourseInteractionLogic.rankOnboardingCourseMatches(onboardingLocalCourseCandidates(),query).slice(0,25);
+    renderOnboardingCourseSearchResults(query,onboardingCourseMatches,"The full catalog could not be reached. Try again in a moment.");
+    return onboardingCourseMatches;
+  }
+}
+function scheduleOnboardingCourseSearch(query){
+  clearTimeout(onboardingCourseSearchTimer);
+  const status=document.getElementById("recordCourseSearchStatus");
+  if(status)status.textContent=String(query||"").trim()?"Searching the Rutgers catalog…":"Start typing to search the Rutgers catalog.";
+  onboardingCourseSearchTimer=setTimeout(()=>searchOnboardingCourses(query),220);
+}
+async function addOnboardingCompletedCourse(){
+  const input=document.getElementById("recordCourseSearch"),button=document.getElementById("addCourseRecord"),query=input?.value?.trim()||"";
+  if(!query)return;
+  if(button)button.disabled=true;
+  const matches=await searchOnboardingCourses(query);
+  const record=ScheduleRUCourseInteractionLogic.verifiedOnboardingCourse(matches,query);
+  if(!record){
+    renderOnboardingCourseSearchResults(query,matches,"Choose a verified Rutgers course from the catalog matches.");
+    if(button)button.disabled=false;
+    return;
+  }
+  addAcademicRecord({type:"rutgers_completed",courseCode:record.code,title:record.fullTitle||record.title,credits:Number(record.credits)||0});
+  onboardingCourseMatches=[];
+  renderOnboarding();
+  renderAll();
+}
+document.addEventListener("input",event=>{if(event.target.id==="recordCourseSearch")scheduleOnboardingCourseSearch(event.target.value);});
+document.addEventListener("click",event=>{if(event.target.id==="addCourseRecord")addOnboardingCompletedCourse();if(event.target.matches("[data-remove-record]")){ST.academicRecords=academicRecords().filter(record=>record.id!==event.target.dataset.removeRecord);savePlannerState();renderOnboarding();renderAll();}if(event.target.id==="onboardingPrograms")openProgramPicker();});
 document.getElementById("restartSetup").addEventListener("click",()=>{modalController.show({title:"Restart everything?",body:"<p>This permanently clears your programs, completed coursework, AP selections, wishlist, semester plan, preferences, and setup progress from this browser.</p>",actions:[{label:"Cancel",secondary:true},{label:"Restart everything",onClick:()=>{localStorage.removeItem(PLANNER_STATE_KEY);location.reload();}}]});});
 
 const legacyRenderBuilder=renderBuilder;

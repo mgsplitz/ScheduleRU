@@ -186,3 +186,50 @@ test("calendar geometry preserves exact minutes and a visible thirty-minute gap"
   });
   assert.equal(later.top - (48 + 64), 24);
 });
+
+test("onboarding course search ranks an exact off-page Rutgers code first", () => {
+  const courses = [
+    { code: "33:011:301", title: "FOUNDATIONS FOR YOUR CAREER JOURNEY" },
+    { code: "33:011:100", title: "INTRO TO BUSINESS" },
+  ];
+  assert.equal(
+    logic.rankOnboardingCourseMatches(courses, "33:011:100")[0]?.code,
+    "33:011:100"
+  );
+});
+
+test("onboarding course search tolerates partial titles and common misspellings", () => {
+  const courses = [
+    { code: "01:198:111", title: "INTRODUCTION TO COMPUTER SCIENCE" },
+    { code: "01:198:170", title: "COMPUTER APPLICATIONS FOR BUSINESS" },
+    { code: "33:011:100", title: "INTRO TO BUSINESS" },
+  ];
+  assert.equal(
+    logic.rankOnboardingCourseMatches(courses, "computer sci")[0]?.code,
+    "01:198:111"
+  );
+  assert.equal(
+    logic.rankOnboardingCourseMatches(courses, "introduction to compter science")[0]?.code,
+    "01:198:111"
+  );
+  assert.equal(
+    logic.rankOnboardingCourseMatches(courses, "intro buisness")[0]?.code,
+    "33:011:100"
+  );
+});
+
+test("onboarding search creates bounded catalog fallbacks without accepting invented courses", () => {
+  assert.deepEqual(
+    logic.onboardingCatalogSearchTerms("introduction to compter science"),
+    ["introduction to compter science", "introduction", "science", "compter"]
+  );
+  assert.deepEqual(logic.onboardingCatalogSearchTerms("33:011:100"), ["33:011:100"]);
+  assert.equal(logic.verifiedOnboardingCourse([], "Imaginary Studies"), null);
+  assert.equal(
+    logic.verifiedOnboardingCourse(
+      [{ code: "33:011:100", title: "INTRO TO BUSINESS" }],
+      "33:011:100"
+    )?.code,
+    "33:011:100"
+  );
+});

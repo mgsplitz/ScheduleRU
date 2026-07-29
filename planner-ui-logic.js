@@ -35,7 +35,8 @@
     };
   }
 
-  function placeholderDestination({ group, candidateSelectionContext } = {}) {
+  function placeholderDestination({ sourceType, group, candidateSelectionContext } = {}) {
+    if (sourceType === "core") return "course_catalog";
     const context = group || candidateSelectionContext || {};
     if ((context.members || []).length || (context.memberCourseCodes || []).length) return "requirement_picker";
     if ((context.courseSelectors || []).length) return "requirement_picker";

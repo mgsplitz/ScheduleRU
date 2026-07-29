@@ -68,24 +68,36 @@ test("catalog wishlist controls remain enabled and toggle in place", () => {
   });
 });
 
-test("placeholder destinations keep finite and selector-backed choices in the requirement picker", () => {
+test("program choices stay in the picker while every Core placeholder opens the catalog", () => {
   assert.equal(logic.placeholderDestination({
+    sourceType: "program",
     group: { members: ["a", "b"], courseSelectors: [{ selector_key: "ignored" }] },
   }), "requirement_picker");
   assert.equal(logic.placeholderDestination({
+    sourceType: "program",
     group: { members: [], courseSelectors: [{ selector_key: "subject" }] },
   }), "requirement_picker");
   assert.equal(logic.placeholderDestination({
     group: { members: [], courseSelectors: [] },
   }), "requirement_panel");
   assert.equal(logic.placeholderDestination({
+    sourceType: "program",
     group: null,
     candidateSelectionContext: { memberCourseCodes: ["01:750:203"], courseSelectors: [] },
   }), "requirement_picker");
   assert.equal(logic.placeholderDestination({
+    sourceType: "program",
     group: null,
     candidateSelectionContext: { members: [], memberCourseCodes: [], courseSelectors: [{ selector_key: "subject" }] },
   }), "requirement_picker");
+  assert.equal(logic.placeholderDestination({
+    sourceType: "core",
+    group: { members: ["a", "b"], courseSelectors: [] },
+  }), "course_catalog");
+  assert.equal(logic.placeholderDestination({
+    sourceType: "core",
+    candidateSelectionContext: { courseSelectors: [{ selector_key: "subject" }] },
+  }), "course_catalog");
 });
 
 test("program browsing starts with schools and filters programs only after a school is chosen", () => {

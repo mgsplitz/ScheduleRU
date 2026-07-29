@@ -111,6 +111,19 @@ test("program roles, grouped Issues, and closed sections have explicit UI contra
   assert.match(html, /recomputeBuilderPermutations\(\);renderBuilder\(\)/);
 });
 
+test("program onboarding has no silent BAIT default and rerenders every draft mutation", () => {
+  assert.match(html, /<script src="program-picker-logic\.js"><\/script>/);
+  assert.match(html, /ScheduleRUProgramPickerLogic\.initialProgramIds\(/);
+  assert.match(html, /function loadHomeSchoolCandidate\([\s\S]*?ScheduleRUProgramPickerLogic\.initialProgramIds\(/);
+  assert.doesNotMatch(html, /const initial=availablePrograms\.find\(program=>program\.id===schoolContext\.defaultProgramId/);
+  assert.match(html, /programSelectionConfirmed/);
+  assert.match(html, /ScheduleRUProgramPickerLogic\.programDraftView\(/);
+  assert.match(html, /ST\.programDraft=\[\.\.\.draft\];[\s\S]*?renderProgramPickerList\(\)/);
+  assert.match(html, /ST\.programSelectionConfirmed=true/);
+  assert.match(html, /savePlannerState\(\);updateProgramTitle\(\);renderOnboarding\(\);closeProgramPicker\(\)/);
+  assert.match(html, /#programOv \.modal-footer\{[^}]*position:sticky[^}]*bottom:0/);
+});
+
 test("plan previews name blocking courses without flooding the modal with warnings", () => {
   assert.match(html, /function plannerIssueText\(/);
   assert.match(html, /issue\.courseCodes\?\.join\(", "\)/);
@@ -220,6 +233,19 @@ test("guest onboarding is the approved compact five-step workflow", () => {
   assert.match(html, /Try the four-year auto-planner/);
 });
 
+test("completed-course onboarding searches the full catalog and only adds verified matches", () => {
+  assert.match(html, /function searchOnboardingCourses\(/);
+  assert.match(html, /ScheduleRUCourseInteractionLogic\.onboardingCatalogSearchTerms\(/);
+  assert.match(html, /backendFetch\("\/api\/courses\?"/);
+  assert.match(html, /ScheduleRUCourseInteractionLogic\.rankOnboardingCourseMatches\(/);
+  assert.match(html, /ScheduleRUCourseInteractionLogic\.verifiedOnboardingCourse\(/);
+  assert.match(html, /id="recordCourseSearchStatus"/);
+  assert.doesNotMatch(
+    html,
+    /function onboardingCourseRecord\([\s\S]*?return requirement\|\|catalog\|\|courseRecordFromId\(value\)/
+  );
+});
+
 test("a long AP-credit list stays inside the onboarding dialog", () => {
   assert.match(html, /class="onboarding-records onboarding-records-scroll"/);
   assert.match(html, /\.onboarding-card\{[^}]*max-height:calc\(100dvh - 80px\)[^}]*display:flex[^}]*flex-direction:column[^}]*overflow:hidden/);
@@ -246,6 +272,17 @@ test("requirement picker, placeholders, and AP prerequisite credit use their sys
   assert.match(html, /candidateSelectionContext:placeholder\.candidateSelectionContext/);
   assert.match(html, /ScheduleRUAcademicCredit\.normalizeCourseCode\(value\)/);
   assert.match(html, /\.\.\.confirmedAcademicCourseCodes\(\)/);
+});
+
+test("Core placeholder choices open a labeled Courses catalog filter instead of a no-op modal path", () => {
+  assert.match(html, /backendRequirementFilter:null/);
+  assert.match(html, /function openCorePlaceholderCourseBrowser\(/);
+  assert.match(html, /kind:"course_codes"/);
+  assert.match(html, /setTopLevelPage\("courses"\);loadBackendCourses\(\)/);
+  assert.match(html, /placeholderDestination\(\{[\s\S]*?sourceType:placeholder\.sourceType/);
+  assert.match(html, /if\(destination==="course_catalog"\)\{openCorePlaceholderCourseBrowser\(placeholder,group\);return;\}/);
+  assert.match(html, /Choosing for <b>/);
+  assert.match(html, /ST\.backendRequirementFilter=null/);
 });
 
 test("program discovery spans supported schools while policy lookup keeps the home school", async () => {
