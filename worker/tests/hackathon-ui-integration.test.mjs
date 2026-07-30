@@ -208,6 +208,9 @@ test("semester cards can move, plans can clear, and restart requires destructive
   assert.match(html, /ST\.schedule=\{\};ST\.planPlaceholders=\[\]/);
   assert.match(html, /title:"Restart everything\?"/);
   assert.match(html, /localStorage\.removeItem\(PLANNER_STATE_KEY\);location\.reload\(\)/);
+  assert.match(html, /id="onboardingRestart"/);
+  assert.match(html, /function openRestartSetupConfirmation\(/);
+  assert.match(html, /document\.getElementById\("onboardingRestart"\)\.addEventListener\("click",openRestartSetupConfirmation\)/);
 });
 
 test("small choose-one requirements and full sequence choices have explicit planner controls", () => {
