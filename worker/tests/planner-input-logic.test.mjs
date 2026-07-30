@@ -12,7 +12,10 @@ const academicCreditUrl = new URL("../../academic-credit-logic.js", import.meta.
 vm.runInNewContext(fs.readFileSync(academicCreditUrl, "utf8"), context);
 const moduleUrl = new URL("../../planner-input-logic.js", import.meta.url);
 if (fs.existsSync(moduleUrl)) vm.runInNewContext(fs.readFileSync(moduleUrl, "utf8"), context);
+const plannerUrl = new URL("../../four-year-planner-logic.js", import.meta.url);
+vm.runInNewContext(fs.readFileSync(plannerUrl, "utf8"), context);
 const logic = context.globalThis.ScheduleRUPlannerInput;
+const planner = context.globalThis.ScheduleRUFourYearPlanner;
 const plannerInput = () => {
   assert.ok(logic, "ScheduleRUPlannerInput must be exposed on globalThis");
   return logic;
@@ -438,6 +441,100 @@ test("distinct Core goal pools remain placeholders until a goal is explicitly ch
   );
 });
 
+test("Core placeholders retain Core identity when backend groups have a program owner", () => {
+  const coreTree = {
+    roots: ["writing"],
+    courses: {
+      writingA: { code: "01:355:101", title: "Writing option A", credits: "3" },
+      writingB: { code: "01:355:201", title: "Writing option B", credits: "3" },
+    },
+    groups: {
+      writing: {
+        id: "writing",
+        name: "College Writing",
+        rule: "min",
+        count: 1,
+        members: ["writingA", "writingB"],
+        children: [],
+        sourceProgramId: "rutgers-nb-core-curriculum",
+      },
+    },
+  };
+
+  const result = build({ requirementTrees: [], coreTree });
+  assert.equal(result.unresolvedRequirements.length, 1);
+  assert.equal(result.unresolvedRequirements[0].sourceType, "core");
+  assert.equal(result.unresolvedRequirements[0].sourceProgram, "rutgers-nb-core-curriculum");
+  assert.equal(result.unresolvedRequirements[0].candidateSelectionContext.sourceType, "core");
+});
+
+test("raw off-universe prerequisites stay advisory while in-plan chains remain ordered", () => {
+  const tree = {
+    roots: ["root"],
+    courses: {
+      statistics: { code: "01:960:285", title: "Business Statistics", credits: "3" },
+      calculus: {
+        code: "01:640:135",
+        title: "Calculus I",
+        credits: "4",
+        catalogPrereqs: "01:640:025 or 01:640:026",
+      },
+      methods: {
+        code: "33:136:385",
+        title: "Statistical Methods in Business",
+        credits: "3",
+        catalogPrereqs: "01:640:135 and 01:960:285",
+      },
+      timeSeries: {
+        code: "33:136:485",
+        title: "Time Series Modeling for Business",
+        credits: "3",
+        catalogPrereqs: "33:136:385",
+      },
+    },
+    groups: {
+      root: {
+        id: "root",
+        name: "Program requirements",
+        rule: "all",
+        members: ["statistics", "methods", "timeSeries"],
+        children: ["calculusChoice"],
+      },
+      calculusChoice: {
+        id: "calculusChoice",
+        name: "Calculus I (choose 1)",
+        rule: "min",
+        count: 1,
+        members: ["calculus"],
+        children: [],
+        parentId: "root",
+        sourceProgramId: "shared-foundational-core",
+      },
+    },
+  };
+
+  const input = build({ requirementTrees: [{ id: "bait", tree }] });
+  const calculus = input.courses.find((course) => course.code === "01:640:135");
+  assert.ok(calculus, "the prerequisite choice should be promoted into the concrete plan");
+  assert.equal(calculus.ruleCoverage, "unresolved");
+  assert.deepEqual(plain(input.prerequisitePathsByCode["01:640:135"]), [
+    ["01:640:025"],
+    ["01:640:026"],
+  ]);
+  assert.equal(input.enforceablePrerequisitePathsByCode["01:640:135"], undefined);
+  assert.deepEqual(plain(input.prerequisitePathsByCode["33:136:385"]), [
+    ["01:640:135", "01:960:285"],
+  ]);
+  assert.equal(input.unresolvedRequirements.some((item) => item.requirementGroupId === "calculusChoice"), false);
+
+  const result = planner.generatePlan(input);
+  assert.equal(result.status, "complete");
+  const ordinal = (entry) => (entry.year - 1) * 2 + (entry.sem === "spring" ? 1 : 0);
+  assert.ok(ordinal(result.schedule["01:640:135"]) < ordinal(result.schedule["33:136:385"]));
+  assert.ok(ordinal(result.schedule["01:960:285"]) < ordinal(result.schedule["33:136:385"]));
+  assert.ok(ordinal(result.schedule["33:136:385"]) < ordinal(result.schedule["33:136:485"]));
+});
+
 test("a required downstream course promotes one reviewed prerequisite choice without double-counting its placeholder", () => {
   const tree = {
     roots: ["root"],
@@ -677,7 +774,7 @@ test("prerequisite promotion prefers a path already required by the plan", () =>
   ]);
 });
 
-test("prerequisite promotion skips a path whose own prerequisite chain is unavailable", () => {
+test("raw prerequisite leaves outside reviewed plan data stay advisory during promotion", () => {
   const tree = {
     roots: ["root"],
     courses: {
@@ -722,6 +819,8 @@ test("prerequisite promotion skips a path whose own prerequisite chain is unavai
   const result = build({ requirementTrees: [{ id: "bait", tree }] });
   const codes = new Set(result.courses.map((course) => course.code));
 
-  assert.equal(codes.has("33:136:385"), true);
-  assert.equal(codes.has("01:640:112"), false);
+  assert.equal(codes.has("01:640:112"), true);
+  assert.equal(codes.has("33:136:385"), false);
+  assert.equal(result.courses.find((course) => course.code === "01:640:112")?.ruleCoverage, "unresolved");
+  assert.equal(result.enforceablePrerequisitePathsByCode["01:640:112"], undefined);
 });

@@ -25,7 +25,7 @@
     return null;
   }
 
-  function normalizedEligibility(course) {
+  function normalizedEligibility(course, { knownCourseCodes, completedCourseCodes } = {}) {
     const logic = root.ScheduleRUEligibilityLogic;
     const payload = course?.eligibility;
     const rawConditions = Array.isArray(payload?.conditions) ? payload.conditions : [];
@@ -39,24 +39,45 @@
       ? [course.prerequisiteCodes.filter(validCode)]
       : [];
     const catalog = logic?.parseCatalogPrerequisitePaths(course?.catalogPrereqs || "") || { reviewable: false, paths: [] };
-    const paths = reviewedNoConditions
+    const campusCatalogPaths = logic?.campusRelevantPrerequisitePaths
+      ? logic.campusRelevantPrerequisitePaths({ courseCode: course?.code, paths: catalog.paths })
+      : catalog.paths;
+    const hasPlanningUniverse = knownCourseCodes && typeof knownCourseCodes.has === "function";
+    const enforceableCatalogPaths = hasPlanningUniverse
+      ? campusCatalogPaths.filter((path) => path.every((code) =>
+        knownCourseCodes.has(code) || completedCourseCodes?.has?.(code)))
+      : campusCatalogPaths;
+    const prerequisitePaths = reviewedNoConditions
       ? []
-      : reviewedPaths.length ? reviewedPaths : directPaths[0]?.length ? directPaths : catalog.reviewable ? catalog.paths : [];
+      : reviewedPaths.length ? reviewedPaths : directPaths[0]?.length ? directPaths : catalog.reviewable ? campusCatalogPaths : [];
+    const enforceablePrerequisitePaths = reviewedNoConditions
+      ? []
+      : reviewedPaths.length ? reviewedPaths : directPaths[0]?.length ? directPaths : catalog.reviewable ? enforceableCatalogPaths : [];
     const minimumYearCondition = conditions.find((condition) => condition.type === "minimum_plan_year");
     const priorCreditsCondition = conditions.find((condition) => condition.type === "minimum_prior_credits");
     const corequisiteConditions = conditions.filter((condition) => condition.type === "corequisite_course");
     return {
-      prerequisitePaths: paths,
+      prerequisitePaths,
+      enforceablePrerequisitePaths,
       minimumPlanYear: minimumYearCondition?.minimum_year || standingFromText(course),
       minimumPriorCredits: priorCreditsCondition?.minimum_credits ?? null,
       corequisitePaths: corequisiteConditions.map((condition) => condition.any_of_course_codes),
-      ruleCoverage: reviewed ? "reviewed" : catalog.reviewable || standingFromText(course) ? "catalog_parsed" : "unresolved",
+      ruleCoverage: reviewed
+        ? "reviewed"
+        : enforceablePrerequisitePaths.length || standingFromText(course)
+          ? "catalog_parsed"
+          : "unresolved",
     };
   }
 
-  function normalizedCourse(course, { optional = false, prerequisiteOnly = false } = {}) {
+  function normalizedCourse(course, {
+    optional = false,
+    prerequisiteOnly = false,
+    knownCourseCodes,
+    completedCourseCodes,
+  } = {}) {
     const listedCredits = numericCredits(course?.credits);
-    const eligibility = normalizedEligibility(course);
+    const eligibility = normalizedEligibility(course, { knownCourseCodes, completedCourseCodes });
     return {
       code: text(course?.code),
       title: text(course?.fullTitle || course?.title || course?.code),
@@ -69,6 +90,7 @@
       corequisitePaths: eligibility.corequisitePaths,
       ruleCoverage: eligibility.ruleCoverage,
       prerequisitePaths: eligibility.prerequisitePaths,
+      enforceablePrerequisitePaths: eligibility.enforceablePrerequisitePaths,
     };
   }
 
@@ -99,10 +121,13 @@
     });
   }
 
-  function candidatePrerequisitePaths(group, courses) {
+  function candidatePrerequisitePaths(group, courses, planningContext = {}, enforceable = false) {
     const memberCourses = (group.members || []).map((id) => courses[id]).filter((course) => validCode(course?.code));
     if (!memberCourses.length) return [];
-    const pathsByCourse = memberCourses.map((course) => normalizedEligibility(course).prerequisitePaths);
+    const pathsByCourse = memberCourses.map((course) => {
+      const eligibility = normalizedEligibility(course, planningContext);
+      return enforceable ? eligibility.enforceablePrerequisitePaths : eligibility.prerequisitePaths;
+    });
     // A placeholder represents any valid candidate. Only publish a gate when
     // every finite candidate has at least one safely parsed path; otherwise a
     // no-prerequisite or unreviewed candidate could be incorrectly delayed.
@@ -116,7 +141,16 @@
     });
   }
 
-  function placeholder(group, sourceProgram, index, kind = "requirement_placeholder", courses = {}, slot = {}) {
+  function placeholder(
+    group,
+    sourceProgram,
+    sourceType,
+    index,
+    kind = "requirement_placeholder",
+    courses = {},
+    slot = {},
+    planningContext = {},
+  ) {
     const credits = group.rule === "min_credits" ? Math.min(DEFAULT_ESTIMATED_CREDITS, Number(group.count) || DEFAULT_ESTIMATED_CREDITS) : DEFAULT_ESTIMATED_CREDITS;
     const total = Math.max(1, Number(slot.total) || 1);
     const position = Math.max(1, Number(slot.position) || index + 1);
@@ -128,12 +162,13 @@
         ? `Course ${position} of ${total} for ${groupLabel}`
         : groupLabel,
       credits,
-      sourceType: sourceProgram === "core" ? "core" : "program",
+      sourceType,
       sourceProgram,
       requirementGroupId: group.id,
-      prerequisitePaths: candidatePrerequisitePaths(group, courses),
+      prerequisitePaths: candidatePrerequisitePaths(group, courses, planningContext),
+      enforceablePrerequisitePaths: candidatePrerequisitePaths(group, courses, planningContext, true),
       candidateSelectionContext: {
-        sourceType: sourceProgram === "core" ? "core" : "program",
+        sourceType,
         sourceProgram,
         requirementGroupId: group.id,
         groupName: groupLabel,
@@ -148,7 +183,15 @@
     };
   }
 
-  function requirementInputs(tree, sourceProgram, groupSelections, completed, excluded = completed) {
+  function requirementInputs(
+    tree,
+    sourceProgram,
+    groupSelections,
+    completed,
+    excluded = completed,
+    sourceType = sourceProgram === "core" ? "core" : "program",
+    planningContext = {},
+  ) {
     const concrete = new Map();
     const placeholders = [];
     const courses = tree?.courses || {};
@@ -170,7 +213,16 @@
       if (group.rule === "one_of") {
         const selectedChild = selected.find((id) => group.children?.includes(id));
         if (selectedChild) visit(selectedChild);
-        else placeholders.push(placeholder(group, groupProgram, 0, "choice_placeholder", courses));
+        else placeholders.push(placeholder(
+          group,
+          groupProgram,
+          sourceType,
+          0,
+          "choice_placeholder",
+          courses,
+          {},
+          planningContext,
+        ));
         return;
       }
 
@@ -199,10 +251,19 @@
           ) / DEFAULT_ESTIMATED_CREDITS))
           : Math.max(0, required - fulfilledMembers.length - childContribution);
         for (let index = 0; index < remaining; index += 1) {
-          placeholders.push(placeholder(group, groupProgram, index, "requirement_placeholder", courses, {
-            position: required - remaining + index + 1,
-            total: required,
-          }));
+          placeholders.push(placeholder(
+            group,
+            groupProgram,
+            sourceType,
+            index,
+            "requirement_placeholder",
+            courses,
+            {
+              position: required - remaining + index + 1,
+              total: required,
+            },
+            planningContext,
+          ));
         }
         // Children of a choice group partition or refine the approved option
         // pool. They are not additional mandatory groups. Visiting every
@@ -239,6 +300,18 @@
       validCode(entry?.code) && (entry?.userPinned === true || entry?.locked === true));
     const wishlistCourseCodes = (input.wishlistCourses || []).map((course) => course?.code).filter(validCode);
     const requirementTreeValues = [...trees.map((entry) => entry.tree), input.coreTree].filter(Boolean);
+    const availableTreeCourses = new Map();
+    requirementTreeValues.forEach((tree) => {
+      Object.values(tree.courses || {}).forEach((course) => {
+        if (validCode(course?.code) && !availableTreeCourses.has(course.code)) {
+          availableTreeCourses.set(course.code, course);
+        }
+      });
+    });
+    const planningContext = {
+      knownCourseCodes: new Set(availableTreeCourses.keys()),
+      completedCourseCodes: completed,
+    };
     const satisfiedForRequirements = academicCredit.satisfiedCourseCodes({
       confirmedCourseCodes: [
         ...completed,
@@ -258,6 +331,8 @@
           input.groupSelections || {},
           satisfied,
           satisfiedForRequirements,
+          "program",
+          planningContext,
         );
         result.courses.forEach((course) => requirementCourses.set(course.code, course));
         unresolvedRequirements.push(...result.placeholders);
@@ -269,6 +344,8 @@
           input.groupSelections || {},
           satisfied,
           satisfiedForRequirements,
+          "core",
+          planningContext,
         );
         result.courses.forEach((course) => requirementCourses.set(course.code, course));
         unresolvedRequirements.push(...result.placeholders);
@@ -292,28 +369,23 @@
     }).forEach((code) => requirementCourses.delete(code));
 
     const normalizedByCode = new Map();
-    requirementCourses.forEach((course) => normalizedByCode.set(course.code, normalizedCourse(course)));
+    requirementCourses.forEach((course) => normalizedByCode.set(
+      course.code,
+      normalizedCourse(course, planningContext),
+    ));
 
     // A required downstream course may depend on one option from an unresolved
     // reviewed choice group. Promote the first complete, deterministic path
     // whose course records are already present in the selected requirement
     // trees. Consuming the matching placeholder prevents the same choice from
     // being counted twice in the generated plan.
-    const availableTreeCourses = new Map();
-    requirementTreeValues.forEach((tree) => {
-      Object.values(tree.courses || {}).forEach((course) => {
-        if (validCode(course?.code) && !availableTreeCourses.has(course.code)) {
-          availableTreeCourses.set(course.code, course);
-        }
-      });
-    });
     const treeCourseCodes = new Set(availableTreeCourses.keys());
     function prerequisiteCanBePlanned(code, ancestors = new Set()) {
       if (completed.has(code) || normalizedByCode.has(code)) return true;
       if (ancestors.has(code)) return false;
       const course = availableTreeCourses.get(code);
       if (!course) return false;
-      const paths = normalizedEligibility(course).prerequisitePaths;
+      const paths = normalizedEligibility(course, planningContext).enforceablePrerequisitePaths;
       if (!paths.length) return true;
       const nextAncestors = new Set(ancestors);
       nextAncestors.add(code);
@@ -333,7 +405,7 @@
         code: entry.code,
         credits: entry.credits,
         title: entry.fullTitle || entry.title,
-      }));
+      }, planningContext));
     });
     const prerequisiteQueue = [...normalizedByCode.keys()].sort();
     const prerequisiteVisited = new Set();
@@ -364,6 +436,7 @@
         if (fulfillsChoice) unresolvedRequirements.splice(placeholderIndex, 1);
         normalizedByCode.set(prerequisiteCode, normalizedCourse(prerequisite, {
           prerequisiteOnly: !fulfillsChoice,
+          ...planningContext,
         }));
         prerequisiteQueue.push(prerequisiteCode);
       });
@@ -372,20 +445,27 @@
 
     (input.wishlistCourses || []).forEach((course) => {
       if (validCode(course?.code) && !completed.has(course.code) && !normalizedByCode.has(course.code)) {
-        normalizedByCode.set(course.code, normalizedCourse(course, { optional: true }));
+        normalizedByCode.set(course.code, normalizedCourse(course, { optional: true, ...planningContext }));
       }
     });
     Object.values(input.schedule || {}).forEach((entry) => {
       const course = entry?.course || entry;
       const explicitlyPinned = entry?.userPinned === true || entry?.locked === true;
       if (explicitlyPinned && validCode(entry?.code) && !completed.has(entry.code) && !normalizedByCode.has(entry.code)) {
-        normalizedByCode.set(entry.code, normalizedCourse({ ...course, code: entry.code, credits: entry.credits, title: entry.fullTitle || entry.title }));
+        normalizedByCode.set(entry.code, normalizedCourse(
+          { ...course, code: entry.code, credits: entry.credits, title: entry.fullTitle || entry.title },
+          planningContext,
+        ));
       }
     });
 
     const prerequisitePathsByCode = {};
+    const enforceablePrerequisitePathsByCode = {};
     normalizedByCode.forEach((course) => {
       if (course.prerequisitePaths.length) prerequisitePathsByCode[course.code] = course.prerequisitePaths;
+      if (course.enforceablePrerequisitePaths.length) {
+        enforceablePrerequisitePathsByCode[course.code] = course.enforceablePrerequisitePaths;
+      }
     });
 
     const issues = [...normalizedByCode.values()].filter((course) => course.creditsEstimated).map((course) => ({
@@ -404,6 +484,7 @@
       completedCourseCodes: [...completed].sort(),
       lockedPlacements,
       prerequisitePathsByCode,
+      enforceablePrerequisitePathsByCode,
       unresolvedRequirements,
       confirmedCredits: Number.isFinite(Number(input.confirmedCredits)) ? Math.max(0, Number(input.confirmedCredits)) : 0,
       issues,

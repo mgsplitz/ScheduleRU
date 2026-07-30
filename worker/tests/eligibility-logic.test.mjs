@@ -168,6 +168,29 @@ test("catalog prerequisite paths preserve OR alternatives instead of flattening 
   ]);
 });
 
+test("New Brunswick prerequisite paths exclude Newark and Camden alternatives", () => {
+  const paths = [
+    ["21:640:113", "21:640:114"],
+    ["01:640:112"],
+    ["50:640:113", "50:640:114"],
+    ["01:640:115"],
+  ];
+
+  assert.deepEqual(logic.campusRelevantPrerequisitePaths({
+    courseCode: "01:640:151",
+    paths,
+  }), [
+    ["01:640:112"],
+    ["01:640:115"],
+  ]);
+  assert.deepEqual(logic.campusRelevantPrerequisitePaths({
+    courseCode: "50:640:151",
+    paths,
+  }), [
+    ["50:640:113", "50:640:114"],
+  ]);
+});
+
 test("course-title conjunctions do not become prerequisite operators", () => {
   const parsed = logic.parseCatalogPrerequisitePaths(
     "(01:220:320 INTERMEDIATE MICROECONOMIC ANALYSIS and 01:220:321 INTERMEDIATE MACROECONOMIC ANALYSIS and 01:220:322 ECONOMETRICS and 01:640:136 CALCULUS II FOR THE LIFE AND SOCIAL SCIENCES) OR (01:220:320 INTERMEDIATE MICROECONOMIC ANALYSIS and 01:220:321 INTERMEDIATE MACROECONOMIC ANALYSIS and 01:220:322 ECONOMETRICS and 01:640:152 CALCULUS II FOR MATHEMATICAL AND PHYSICAL SCIENCES)"

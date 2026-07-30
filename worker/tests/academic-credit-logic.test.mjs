@@ -40,6 +40,37 @@ test("reviewed alternatives close transitively across every loaded requirement t
   assert.deepEqual([...result].sort(), ["01:198:111", "01:198:170", "33:136:370"]);
 });
 
+test("planned course entries expose reviewed equivalents without duplicating credits", () => {
+  const result = logic.expandedPlannedCourseEntries({
+    entries: [{
+      id: "scheduled:intro-cs",
+      course_code: "01:198:111",
+      credits: 4,
+      year: 1,
+      sem: "fall",
+    }],
+    requirementTrees: [
+      tree({
+        businessComputer: {
+          code: "01:198:170",
+          alternatives: [{ code: "01:198:111" }],
+        },
+      }),
+    ],
+  });
+
+  assert.deepEqual(result.map((entry) => ({
+    course_code: entry.course_code,
+    credits: entry.credits,
+    year: entry.year,
+    sem: entry.sem,
+  })), [
+    { course_code: "01:198:111", credits: 4, year: 1, sem: "fall" },
+    { course_code: "01:198:170", credits: 0, year: 1, sem: "fall" },
+  ]);
+  assert.equal(result.reduce((total, entry) => total + entry.credits, 0), 4);
+});
+
 test("an alternative satisfies only its canonical reviewed requirement", () => {
   const result = logic.satisfiedCourseCodes({
     confirmedCourseCodes: ["01:960:211"],

@@ -240,6 +240,9 @@ test("completed-course onboarding searches the full catalog and only adds verifi
   assert.match(html, /ScheduleRUCourseInteractionLogic\.rankOnboardingCourseMatches\(/);
   assert.match(html, /ScheduleRUCourseInteractionLogic\.verifiedOnboardingCourse\(/);
   assert.match(html, /id="recordCourseSearchStatus"/);
+  assert.match(html, /id="recordCourseSearchResults"[^>]*role="listbox"/);
+  assert.match(html, /data-record-course-option=/);
+  assert.doesNotMatch(html, /<datalist id="recordCourseOptions"/);
   assert.doesNotMatch(
     html,
     /function onboardingCourseRecord\([\s\S]*?return requirement\|\|catalog\|\|courseRecordFromId\(value\)/
@@ -272,6 +275,7 @@ test("requirement picker, placeholders, and AP prerequisite credit use their sys
   assert.match(html, /candidateSelectionContext:placeholder\.candidateSelectionContext/);
   assert.match(html, /ScheduleRUAcademicCredit\.normalizeCourseCode\(value\)/);
   assert.match(html, /\.\.\.confirmedAcademicCourseCodes\(\)/);
+  assert.match(html, /ScheduleRUAcademicCredit\.expandedPlannedCourseEntries\(/);
 });
 
 test("Core placeholder choices open a labeled Courses catalog filter instead of a no-op modal path", () => {
@@ -279,7 +283,10 @@ test("Core placeholder choices open a labeled Courses catalog filter instead of 
   assert.match(html, /function openCorePlaceholderCourseBrowser\(/);
   assert.match(html, /kind:"course_codes"/);
   assert.match(html, /setTopLevelPage\("courses"\);loadBackendCourses\(\)/);
-  assert.match(html, /placeholderDestination\(\{[\s\S]*?sourceType:placeholder\.sourceType/);
+  assert.match(html, /placeholderDestination\(\{[\s\S]*?sourceType:placeholderSourceType/);
+  assert.match(html, /function planPlaceholderSourceType\(/);
+  assert.match(html, /ST\.coreRequirementTree\?\.groups\?\.\[placeholder\?\.requirementGroupId\]/);
+  assert.match(html, /await loadCoreCurriculum\(\);[\s\S]*?placeholderSourceType=planPlaceholderSourceType\(placeholder\)/);
   assert.match(html, /if\(destination==="course_catalog"\)\{openCorePlaceholderCourseBrowser\(placeholder,group\);return;\}/);
   assert.match(html, /Choosing for <b>/);
   assert.match(html, /ST\.backendRequirementFilter=null/);

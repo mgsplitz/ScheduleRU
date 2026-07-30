@@ -90,8 +90,12 @@
       .filter(Boolean));
 
     const prerequisitePathsByCode = {};
-    Object.keys(input.prerequisitePathsByCode || {}).map(courseCode).filter(Boolean).sort().forEach((code) => {
-      prerequisitePathsByCode[code] = normalizedPaths(input.prerequisitePathsByCode[code]);
+    const planningPrerequisitePaths = input.enforceablePrerequisitePathsByCode
+      && typeof input.enforceablePrerequisitePathsByCode === "object"
+      ? input.enforceablePrerequisitePathsByCode
+      : input.prerequisitePathsByCode;
+    Object.keys(planningPrerequisitePaths || {}).map(courseCode).filter(Boolean).sort().forEach((code) => {
+      prerequisitePathsByCode[code] = normalizedPaths(planningPrerequisitePaths[code]);
     });
 
     const lockedPlacements = {};
@@ -116,7 +120,11 @@
         sourceProgram: stableText(requirement?.sourceProgram || requirement?.programId),
         requirementGroupId: stableText(requirement?.requirementGroupId || requirement?.groupId || requirement?.id),
         candidateSelectionContext: requirement?.candidateSelectionContext ?? requirement?.candidateContext ?? null,
-        prerequisitePaths: normalizedPaths(requirement?.prerequisitePaths),
+        prerequisitePaths: normalizedPaths(
+          Object.prototype.hasOwnProperty.call(requirement || {}, "enforceablePrerequisitePaths")
+            ? requirement.enforceablePrerequisitePaths
+            : requirement?.prerequisitePaths,
+        ),
       }))
       .sort((left, right) => left.sourceType.localeCompare(right.sourceType)
         || left.id.localeCompare(right.id)
@@ -842,7 +850,7 @@
       placeholders,
       issues,
       assumptions: [
-        "Reviewed and safely parsed prerequisite paths are enforced; unresolved eligibility remains visible as a warning.",
+        "Reviewed and selected-plan catalog prerequisite paths are enforced; unresolved catalog eligibility remains visible as a warning.",
         `Automatic planning uses a ${normalized.maxCredits}-credit hard cap per term.`,
         `Automatic planning uses a ${normalized.maxCoursesPerTerm}-course hard cap per term.`,
         `Automatic planning targets ${normalized.targetCredits} credits per term.`,

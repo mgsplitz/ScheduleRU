@@ -205,6 +205,21 @@
       .filter((path) => path.length));
   }
 
+  function rutgersCampusForCourseCode(courseCode) {
+    const unit = String(courseCode || "").slice(0, 2);
+    if (new Set(["21", "25", "26", "27", "28", "29"]).has(unit)) return "newark";
+    if (new Set(["50", "52", "53", "56", "57"]).has(unit)) return "camden";
+    return COURSE_CODE.test(String(courseCode || "")) ? "new_brunswick" : "";
+  }
+
+  function campusRelevantPrerequisitePaths({ courseCode, paths } = {}) {
+    const campus = rutgersCampusForCourseCode(courseCode);
+    const normalized = normalizePrerequisitePaths(paths);
+    if (!campus) return normalized;
+    return normalized.filter((path) =>
+      path.every((prerequisiteCode) => rutgersCampusForCourseCode(prerequisiteCode) === campus));
+  }
+
   function prerequisitePathsFromConditions(conditions) {
     const prerequisiteGroups = (Array.isArray(conditions) ? conditions : [])
       .map(normalizeCondition)
@@ -337,6 +352,7 @@
     plannedCreditEntriesBefore,
     catalogCourseReferences,
     parseCatalogPrerequisitePaths,
+    campusRelevantPrerequisitePaths,
     prerequisitePathsFromConditions,
     evaluatePrerequisitePaths,
     evaluateEligibility,

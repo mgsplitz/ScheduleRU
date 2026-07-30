@@ -57,6 +57,33 @@
     return satisfied;
   }
 
+  function expandedPlannedCourseEntries({ entries = [], requirementTrees = [] } = {}) {
+    const expanded = [];
+    const seen = new Set();
+    for (const rawEntry of Array.isArray(entries) ? entries : []) {
+      const courseCode = normalizeCourseCode(rawEntry?.course_code);
+      if (!courseCode) continue;
+      const codes = [...satisfiedCourseCodes({
+        confirmedCourseCodes: [courseCode],
+        requirementTrees,
+      })].sort((left, right) => Number(left !== courseCode) - Number(right !== courseCode)
+        || left.localeCompare(right));
+      for (const code of codes) {
+        const key = `${code}:${Number(rawEntry?.year)}:${String(rawEntry?.sem || "")}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        expanded.push({
+          ...rawEntry,
+          id: code === courseCode ? rawEntry.id : `${rawEntry.id || `scheduled:${courseCode}`}:equivalent:${code}`,
+          course_code: code,
+          credits: code === courseCode ? Number(rawEntry?.credits) || 0 : 0,
+          equivalent_of_course_code: code === courseCode ? undefined : courseCode,
+        });
+      }
+    }
+    return expanded;
+  }
+
   function reachableCourseCodes(start, edges) {
     const reachable = new Set();
     const pending = [start];
@@ -93,6 +120,7 @@
 
   root.ScheduleRUAcademicCredit = {
     satisfiedCourseCodes,
+    expandedPlannedCourseEntries,
     redundantCanonicalCourseCodes,
     equivalencyEdges,
     normalizeCourseCode,
