@@ -212,6 +212,29 @@ test("rejects unsupported rules and invalid count semantics", () => {
   );
 });
 
+test("accepts every count-based rule used by reviewed requirements", () => {
+  for (const rule of [
+    "min_courses",
+    "max_courses",
+    "min_credits",
+    "max_credits",
+    "min_distinct_children",
+  ]) {
+    const value = validDefinition();
+    const group = (
+      value.requirement_groups as Array<Record<string, unknown>>
+    )[1]!;
+    group.rule = rule;
+    group.count = 2;
+
+    assert.equal(
+      validateProgramDefinition(value).ok,
+      true,
+      `${rule} should accept a positive integer count`,
+    );
+  }
+});
+
 test("rejects duplicate course codes inside one requirement group", () => {
   const value = validDefinition();
   const courses = (

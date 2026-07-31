@@ -9,7 +9,13 @@ import {
 
 const IDENTIFIER_RE = /^[a-z0-9][a-z0-9-]{2,119}$/;
 const COURSE_CODE_RE = /^\d{2}:\d{3}:\d{3}$/;
-const COUNT_RULES = new Set(["min_courses", "max_courses", "min_credits"]);
+const COUNT_RULES = new Set([
+  "min_courses",
+  "max_courses",
+  "min_credits",
+  "max_credits",
+  "min_distinct_children",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -476,4 +482,3 @@ export function assertProgramDefinition(value: unknown): ProgramDefinition {
     result.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; "),
   );
 }
-

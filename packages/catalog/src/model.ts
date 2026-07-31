@@ -18,6 +18,8 @@ export const REQUIREMENT_RULES = [
   "min_courses",
   "max_courses",
   "min_credits",
+  "max_credits",
+  "min_distinct_children",
 ] as const;
 
 export type ProgramType = (typeof PROGRAM_TYPES)[number];
@@ -145,4 +147,3 @@ export interface ValidationIssue {
 export type ValidationResult =
   | { ok: true; value: ProgramDefinition; issues: [] }
   | { ok: false; issues: ValidationIssue[] };
-
