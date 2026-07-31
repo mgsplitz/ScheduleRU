@@ -148,6 +148,12 @@ function adminEndpoint(api: URL, suffix = ""): URL {
   );
 }
 
+function snapshotManifestPath(output: string): string {
+  return output.endsWith(".jsonl")
+    ? `${output.slice(0, -".jsonl".length)}.manifest.json`
+    : `${output}.manifest.json`;
+}
+
 async function authenticatedJson(
   endpoint: URL,
   secret: string,
@@ -242,7 +248,7 @@ async function snapshotCatalog(
     });
     await writeFile(output, snapshot.jsonl);
     await writeFile(
-      `${output}.manifest.json`,
+      snapshotManifestPath(output),
       `${JSON.stringify(snapshot.manifest, null, 2)}\n`,
     );
   } catch (error) {

@@ -247,7 +247,7 @@ test("snapshot exports every reviewed definition without exposing the secret", a
   );
   const snapshot = await readFile(output, "utf8");
   const manifest = JSON.parse(
-    await readFile(`${output}.manifest.json`, "utf8"),
+    await readFile(output.replace(/\.jsonl$/, ".manifest.json"), "utf8"),
   );
   assert.equal(snapshot.split("\n").filter(Boolean).length, 1);
   assert.equal(manifest.definition_count, 1);
