@@ -2,9 +2,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 import {
+  parseCatalogSnapshot,
   serializeCatalogSnapshot,
+  type CatalogSnapshotManifest,
   validateProgramDefinition,
 } from "@scheduleru/catalog";
+import { roundTripDevelopmentCatalog } from "./parity.ts";
 
 export interface CatalogCliDependencies {
   environment: Record<string, string | undefined>;
@@ -26,6 +29,7 @@ function usage(stderr: (line: string) => void): number {
   stderr("usage: catalog validate <definition.json>");
   stderr("       catalog publish <definition.json> --api <development-api-url>");
   stderr("       catalog snapshot --api <development-api-url> --output <snapshot.jsonl>");
+  stderr("       catalog round-trip --api <development-api-url> --snapshot <snapshot.jsonl> --manifest <manifest.json> --report <report.json>");
   return 1;
 }
 
@@ -265,6 +269,65 @@ async function snapshotCatalog(
   return 0;
 }
 
+async function roundTripCatalog(
+  apiValue: string,
+  snapshotFile: string,
+  manifestFile: string,
+  reportFile: string,
+  dependencies: CatalogCliDependencies,
+): Promise<number> {
+  const secret = dependencies.environment.SCHEDULERU_ADMIN_SECRET;
+  if (!secret) {
+    dependencies.stderr(
+      "SCHEDULERU_ADMIN_SECRET must be set in the environment before round trip",
+    );
+    return 1;
+  }
+  const api = developmentApiUrl(apiValue);
+  if (!api) {
+    dependencies.stderr(
+      "round-trip requires an HTTPS development API target (or localhost for local testing)",
+    );
+    return 1;
+  }
+  let definitions;
+  try {
+    const jsonl = await readFile(snapshotFile, "utf8");
+    const manifest = JSON.parse(
+      await readFile(manifestFile, "utf8"),
+    ) as CatalogSnapshotManifest;
+    definitions = await parseCatalogSnapshot(jsonl, manifest);
+  } catch (error) {
+    const detail = error instanceof Error ? `: ${error.message}` : "";
+    dependencies.stderr(`could not read a valid catalog snapshot${detail}`);
+    return 1;
+  }
+  let report;
+  try {
+    report = await roundTripDevelopmentCatalog(
+      api,
+      definitions,
+      secret,
+      dependencies.fetch,
+    );
+    await writeFile(reportFile, `${JSON.stringify(report, null, 2)}\n`);
+  } catch (error) {
+    const detail = error instanceof Error ? `: ${error.message}` : "";
+    dependencies.stderr(`catalog round trip failed${detail}`);
+    return 1;
+  }
+  if (!report.ok) {
+    dependencies.stderr(
+      `catalog round trip found ${report.differences.length} public API differences`,
+    );
+    return 1;
+  }
+  dependencies.stdout(
+    `catalog round trip preserved public behavior for ${report.published_programs} programs`,
+  );
+  return 0;
+}
+
 export async function runCatalogCli(
   args: string[],
   overrides: Partial<CatalogCliDependencies> = {},
@@ -280,6 +343,26 @@ export async function runCatalogCli(
     && rest[2]
   ) {
     return snapshotCatalog(rest[0], rest[2], dependencies);
+  }
+  if (
+    command === "round-trip"
+    && file === "--api"
+    && rest.length === 7
+    && rest[1] === "--snapshot"
+    && rest[3] === "--manifest"
+    && rest[5] === "--report"
+    && rest[0]
+    && rest[2]
+    && rest[4]
+    && rest[6]
+  ) {
+    return roundTripCatalog(
+      rest[0],
+      rest[2],
+      rest[4],
+      rest[6],
+      dependencies,
+    );
   }
   if (!command || !file) return usage(dependencies.stderr);
   const loaded = await readDefinition(file, dependencies.stderr);

@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import test from "node:test";
 
+import { serializeCatalogSnapshot } from "@scheduleru/catalog";
 import { runCatalogCli } from "../src/cli.ts";
 
 const cliPath = new URL("../src/cli.ts", import.meta.url);
@@ -254,4 +255,81 @@ test("snapshot exports every reviewed definition without exposing the secret", a
   assert.deepEqual(manifest.program_ids, ["sasnb-example-minor"]);
   assert.doesNotMatch(`${snapshot}${JSON.stringify(manifest)}${messages.join("\n")}`, /snapshot-test-secret/);
   assert.match(messages.join("\n"), /snapshotted 1 reviewed catalog definition/);
+});
+
+test("round-trip validates a snapshot, republishes it, and writes a parity report", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "scheduleru-parity-"));
+  const snapshotFile = path.join(directory, "reviewed.jsonl");
+  const manifestFile = path.join(directory, "reviewed.manifest.json");
+  const reportFile = path.join(directory, "parity.json");
+  const snapshot = await serializeCatalogSnapshot([definition()], {
+    generated_at: 1785456000000,
+  });
+  await writeFile(snapshotFile, snapshot.jsonl);
+  await writeFile(manifestFile, JSON.stringify(snapshot.manifest));
+  const messages: string[] = [];
+  let published = false;
+
+  const code = await runCatalogCli(
+    [
+      "round-trip",
+      "--api",
+      "http://127.0.0.1:8787",
+      "--snapshot",
+      snapshotFile,
+      "--manifest",
+      manifestFile,
+      "--report",
+      reportFile,
+    ],
+    {
+      environment: { SCHEDULERU_ADMIN_SECRET: "round-trip-secret" },
+      fetch: async (input, init) => {
+        const received = new Request(input, init);
+        const pathName = new URL(received.url).pathname;
+        if (received.method === "PUT") {
+          assert.equal(
+            received.headers.get("Authorization"),
+            "Bearer round-trip-secret",
+          );
+          published = true;
+          return Response.json({ ok: true });
+        }
+        if (pathName === "/api/programs") {
+          return Response.json({
+            programs: [{
+              id: "sasnb-example-minor",
+              last_scraped_at: published ? 2 : 1,
+            }],
+          });
+        }
+        if (pathName === "/api/core-curricula") {
+          return Response.json({ curricula: [] });
+        }
+        if (pathName === "/api/requirements") {
+          return Response.json({ requirements: {} });
+        }
+        return Response.json({
+          program: {
+            id: "sasnb-example-minor",
+            last_scraped_at: published ? 2 : 1,
+          },
+          requirements: [],
+        });
+      },
+      stdout: (line) => messages.push(line),
+      stderr: (line) => messages.push(line),
+    },
+  );
+
+  assert.equal(code, 0);
+  assert.equal(published, true);
+  const report = JSON.parse(await readFile(reportFile, "utf8"));
+  assert.equal(report.ok, true);
+  assert.equal(report.published_programs, 1);
+  assert.doesNotMatch(
+    `${JSON.stringify(report)}${messages.join("\n")}`,
+    /round-trip-secret/,
+  );
+  assert.match(messages.join("\n"), /preserved public behavior for 1 programs/);
 });
