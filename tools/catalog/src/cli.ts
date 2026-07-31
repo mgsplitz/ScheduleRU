@@ -1,13 +1,17 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
-import { validateProgramDefinition } from "@scheduleru/catalog";
+import {
+  serializeCatalogSnapshot,
+  validateProgramDefinition,
+} from "@scheduleru/catalog";
 
 export interface CatalogCliDependencies {
   environment: Record<string, string | undefined>;
   fetch: typeof globalThis.fetch;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
+  now: () => number;
 }
 
 const defaultDependencies: CatalogCliDependencies = {
@@ -15,11 +19,13 @@ const defaultDependencies: CatalogCliDependencies = {
   fetch: globalThis.fetch,
   stdout: (line) => console.log(line),
   stderr: (line) => console.error(line),
+  now: Date.now,
 };
 
 function usage(stderr: (line: string) => void): number {
   stderr("usage: catalog validate <definition.json>");
   stderr("       catalog publish <definition.json> --api <development-api-url>");
+  stderr("       catalog snapshot --api <development-api-url> --output <snapshot.jsonl>");
   return 1;
 }
 
@@ -134,12 +140,141 @@ async function publishDefinition(
   return 0;
 }
 
+function adminEndpoint(api: URL, suffix = ""): URL {
+  const basePath = api.pathname === "/" ? "" : api.pathname;
+  return new URL(
+    `${basePath}/api/admin/catalog/program-definitions${suffix}`,
+    api.origin,
+  );
+}
+
+async function authenticatedJson(
+  endpoint: URL,
+  secret: string,
+  dependencies: CatalogCliDependencies,
+): Promise<{ ok: true; value: unknown } | { ok: false }> {
+  let response: Response;
+  try {
+    response = await dependencies.fetch(endpoint, {
+      headers: { Authorization: `Bearer ${secret}` },
+    });
+  } catch {
+    dependencies.stderr("catalog snapshot request failed");
+    return { ok: false };
+  }
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    value = null;
+  }
+  if (!response.ok) {
+    dependencies.stderr(`catalog snapshot failed: development API returned HTTP ${response.status}`);
+    return { ok: false };
+  }
+  return { ok: true, value };
+}
+
+async function snapshotCatalog(
+  apiValue: string,
+  output: string,
+  dependencies: CatalogCliDependencies,
+): Promise<number> {
+  const secret = dependencies.environment.SCHEDULERU_ADMIN_SECRET;
+  if (!secret) {
+    dependencies.stderr(
+      "SCHEDULERU_ADMIN_SECRET must be set in the environment before export",
+    );
+    return 1;
+  }
+  const api = developmentApiUrl(apiValue);
+  if (!api) {
+    dependencies.stderr(
+      "snapshot requires an HTTPS development API target (or localhost for local testing)",
+    );
+    return 1;
+  }
+  const inventory = await authenticatedJson(
+    adminEndpoint(api),
+    secret,
+    dependencies,
+  );
+  if (!inventory.ok) return 1;
+  const inventoryValue = inventory.value;
+  const programIds =
+    typeof inventoryValue === "object"
+    && inventoryValue !== null
+    && "program_ids" in inventoryValue
+    && Array.isArray((inventoryValue as { program_ids?: unknown }).program_ids)
+      ? (inventoryValue as { program_ids: unknown[] }).program_ids
+      : null;
+  if (
+    !programIds
+    || programIds.some((programId) => typeof programId !== "string")
+  ) {
+    dependencies.stderr("catalog snapshot failed: invalid reviewed-program inventory");
+    return 1;
+  }
+
+  const definitions: unknown[] = [];
+  for (const programId of programIds as string[]) {
+    const exported = await authenticatedJson(
+      adminEndpoint(api, `/${encodeURIComponent(programId)}`),
+      secret,
+      dependencies,
+    );
+    if (!exported.ok) return 1;
+    if (
+      typeof exported.value !== "object"
+      || exported.value === null
+      || !("definition" in exported.value)
+    ) {
+      dependencies.stderr(`catalog snapshot failed: invalid definition response for ${programId}`);
+      return 1;
+    }
+    definitions.push((exported.value as { definition: unknown }).definition);
+  }
+
+  let snapshot;
+  try {
+    snapshot = await serializeCatalogSnapshot(definitions, {
+      generated_at: dependencies.now(),
+    });
+    await writeFile(output, snapshot.jsonl);
+    await writeFile(
+      `${output}.manifest.json`,
+      `${JSON.stringify(snapshot.manifest, null, 2)}\n`,
+    );
+  } catch (error) {
+    const detail = error instanceof Error ? `: ${error.message}` : "";
+    dependencies.stderr(`could not write a valid catalog snapshot${detail}`);
+    return 1;
+  }
+  const noun = snapshot.manifest.definition_count === 1
+    ? "definition"
+    : "definitions";
+  dependencies.stdout(
+    `snapshotted ${snapshot.manifest.definition_count} reviewed catalog ${noun}`,
+  );
+  return 0;
+}
+
 export async function runCatalogCli(
   args: string[],
   overrides: Partial<CatalogCliDependencies> = {},
 ): Promise<number> {
   const dependencies = { ...defaultDependencies, ...overrides };
   const [command, file, ...rest] = args;
+  if (
+    command === "snapshot"
+    && file === "--api"
+    && rest.length === 3
+    && rest[1] === "--output"
+    && rest[0]
+    && rest[2]
+  ) {
+    return snapshotCatalog(rest[0], rest[2], dependencies);
+  }
   if (!command || !file) return usage(dependencies.stderr);
   const loaded = await readDefinition(file, dependencies.stderr);
   if (!loaded.ok) return 1;

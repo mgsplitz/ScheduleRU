@@ -114,6 +114,60 @@ test("requires the existing admin secret through a bearer header", async () => {
   assert.deepEqual(await body(response), { error: "unauthorized" });
 });
 
+test("exports reviewed definitions through development-only read routes", async () => {
+  const env = environment();
+  let exportedId = null;
+  const dependencies = {
+    listReviewedProgramIds: async (database) => {
+      assert.equal(database, env.DB);
+      return ["sasnb-example-minor"];
+    },
+    exportProgramDefinition: async (database, programId) => {
+      assert.equal(database, env.DB);
+      exportedId = programId;
+      return definition();
+    },
+  };
+
+  const listResponse = await handleCatalogAdminRequest(
+    request("/api/admin/catalog/program-definitions", {
+      headers: { Authorization: "Bearer test-secret" },
+    }),
+    env,
+    dependencies,
+  );
+  assert.equal(listResponse.status, 200);
+  assert.deepEqual(await body(listResponse), {
+    program_ids: ["sasnb-example-minor"],
+  });
+
+  const definitionResponse = await handleCatalogAdminRequest(
+    request("/api/admin/catalog/program-definitions/sasnb-example-minor", {
+      headers: { Authorization: "Bearer test-secret" },
+    }),
+    env,
+    dependencies,
+  );
+  assert.equal(definitionResponse.status, 200);
+  assert.deepEqual(await body(definitionResponse), { definition: definition() });
+  assert.equal(exportedId, "sasnb-example-minor");
+  assert.equal(env.DB.batches.length, 0);
+});
+
+test("blocks catalog exports outside the development Worker", async () => {
+  const response = await handleCatalogAdminRequest(
+    request("/api/admin/catalog/program-definitions", {
+      headers: { Authorization: "Bearer test-secret" },
+    }),
+    environment({ ENVIRONMENT: "production" }),
+  );
+
+  assert.equal(response.status, 409);
+  assert.deepEqual(await body(response), {
+    error: "catalog export is development-only",
+  });
+});
+
 test("validation returns path-addressed issues without writing", async () => {
   const env = environment();
   const value = definition();

@@ -1,4 +1,6 @@
 import {
+  exportProgramDefinition,
+  listReviewedProgramIds,
   publishProgramDefinition,
   validateProgramDefinition,
 } from "../../packages/catalog/src/index.ts";
@@ -38,12 +40,47 @@ export async function handleCatalogAdminRequest(
 ) {
   const url = new URL(request.url);
   const path = url.pathname;
-  if (path !== `${ROUTE_PREFIX}/validate` && !path.startsWith(`${ROUTE_PREFIX}/`)) {
+  if (
+    path !== ROUTE_PREFIX
+    && path !== `${ROUTE_PREFIX}/validate`
+    && !path.startsWith(`${ROUTE_PREFIX}/`)
+  ) {
     return null;
   }
 
   if (!hasBearerSecret(request, env)) {
     return json({ error: "unauthorized" }, 403);
+  }
+
+  if (request.method === "GET") {
+    if (env.ENVIRONMENT !== "development") {
+      return json({ error: "catalog export is development-only" }, 409);
+    }
+    try {
+      if (path === ROUTE_PREFIX) {
+        const programIds = await (
+          dependencies.listReviewedProgramIds || listReviewedProgramIds
+        )(env.DB);
+        return json({ program_ids: programIds });
+      }
+      const encodedProgramId = path.slice(`${ROUTE_PREFIX}/`.length);
+      if (!encodedProgramId || encodedProgramId === "validate") {
+        return json({ error: "not found" }, 404);
+      }
+      const programId = decodeURIComponent(encodedProgramId);
+      const definition = await (
+        dependencies.exportProgramDefinition || exportProgramDefinition
+      )(env.DB, programId);
+      return json({ definition });
+    } catch (error) {
+      if (
+        error instanceof Error
+        && error.message.startsWith("reviewed program not found:")
+      ) {
+        return json({ error: "reviewed program not found" }, 404);
+      }
+      return json({ error: "catalog export failed" }, 500);
+    }
   }
 
   const body = await requestJson(request);
@@ -85,4 +122,3 @@ export async function handleCatalogAdminRequest(
     return json({ error: "catalog publication failed" }, 500);
   }
 }
-

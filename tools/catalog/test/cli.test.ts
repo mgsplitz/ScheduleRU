@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -203,4 +203,55 @@ test("publish fails before network access when the secret is missing", async () 
 
   assert.equal(code, 1);
   assert.match(errors.join("\n"), /SCHEDULERU_ADMIN_SECRET/);
+});
+
+test("snapshot exports every reviewed definition without exposing the secret", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "scheduleru-snapshot-"));
+  const output = path.join(directory, "reviewed.jsonl");
+  const messages: string[] = [];
+  const requests: Request[] = [];
+
+  const code = await runCatalogCli(
+    [
+      "snapshot",
+      "--api",
+      "http://127.0.0.1:8787",
+      "--output",
+      output,
+    ],
+    {
+      environment: { SCHEDULERU_ADMIN_SECRET: "snapshot-test-secret" },
+      fetch: async (input, init) => {
+        const received = new Request(input, init);
+        requests.push(received);
+        const pathName = new URL(received.url).pathname;
+        if (pathName.endsWith("/program-definitions")) {
+          return Response.json({ program_ids: ["sasnb-example-minor"] });
+        }
+        return Response.json({ definition: definition() });
+      },
+      stdout: (line) => messages.push(line),
+      stderr: (line) => messages.push(line),
+      now: () => 1785456000000,
+    },
+  );
+
+  assert.equal(code, 0);
+  assert.equal(requests.length, 2);
+  assert.equal(
+    requests.every(
+      (received) =>
+        received.headers.get("Authorization") === "Bearer snapshot-test-secret",
+    ),
+    true,
+  );
+  const snapshot = await readFile(output, "utf8");
+  const manifest = JSON.parse(
+    await readFile(`${output}.manifest.json`, "utf8"),
+  );
+  assert.equal(snapshot.split("\n").filter(Boolean).length, 1);
+  assert.equal(manifest.definition_count, 1);
+  assert.deepEqual(manifest.program_ids, ["sasnb-example-minor"]);
+  assert.doesNotMatch(`${snapshot}${JSON.stringify(manifest)}${messages.join("\n")}`, /snapshot-test-secret/);
+  assert.match(messages.join("\n"), /snapshotted 1 reviewed catalog definition/);
 });
