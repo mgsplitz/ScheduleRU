@@ -1,4 +1,5 @@
 export * from "./model.ts";
+export * from "./publisher.ts";
 export {
   assertProgramDefinition,
   validateProgramDefinition,
