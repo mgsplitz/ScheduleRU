@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "test": "npm run test:catalog && npm run test:legacy",
-    "test:catalog": "node --test packages/catalog/test/*.test.ts",
+    "test:catalog": "node --test packages/catalog/test/*.test.ts tools/catalog/test/*.test.ts",
     "test:legacy": "node --test worker/tests/*.test.mjs",
     "typecheck": "tsc -b packages/catalog tools/catalog",
     "catalog": "node tools/catalog/src/cli.ts"

@@ -4,3 +4,5 @@ worker/admin-secret.txt
 .worktrees/
 .superpowers/
 worker/.wrangler/
+node_modules/
+*.tsbuildinfo
