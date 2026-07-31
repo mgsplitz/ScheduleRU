@@ -29,6 +29,86 @@
  * depend on guessing exact class names, but there will be edge cases.
  */
 
+import { evaluateProgramSelection, publicEligibilityRule } from "./program-selection-policy.js";
+import { requirementEvidenceComplete } from "./requirement-evidence.js";
+import { publicSchoolProfile } from "./school-profiles.js";
+import { importProgramDirectory } from "./program-directory-import.js";
+import {
+  discoverNestedMajorRequirementPage,
+  discoverProfileRequirementPage,
+  extractRequirementDraftCandidate,
+  importProgramRequirementSource,
+} from "./program-requirement-import.js";
+
+function normalizedCatalogText(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function normalizedDegreeType(value) {
+  return String(value || "").toUpperCase().replace(/[^A-Z]/g, "");
+}
+
+function reviewedProgramMatchesCatalog(reviewed, catalog) {
+  if (!reviewed || !catalog || reviewed.type !== catalog.type) return false;
+  if (reviewed.id === catalog.id) return true;
+  const catalogDegree = normalizedDegreeType(catalog.degree_type);
+  const reviewedDegree = normalizedDegreeType(reviewed.degree_type);
+  const degreesMatch = !catalogDegree || !reviewedDegree
+    || catalogDegree === reviewedDegree
+    || catalogDegree.includes(reviewedDegree);
+  if (!degreesMatch) return false;
+  return reviewed.program_slug === catalog.program_slug
+    || normalizedCatalogText(reviewed.name) === normalizedCatalogText(catalog.name);
+}
+
+function reviewedProgramForCatalog(catalog, reviewedPrograms) {
+  return (reviewedPrograms || []).find((reviewed) => reviewedProgramMatchesCatalog(reviewed, catalog)) || null;
+}
+
+// An official catalog listing is sufficient to let a student identify a
+// program they intend to pursue; it is never sufficient to present a degree
+// audit. Reviewed records replace their catalog counterpart when available.
+export function publishedCatalogPrograms(catalogPrograms = [], reviewedPrograms = []) {
+  const seenReviewedIds = new Set();
+  const programs = (catalogPrograms || []).map((catalog) => {
+    const reviewed = reviewedProgramForCatalog(catalog, reviewedPrograms);
+    if (!reviewed) {
+      return {
+        ...catalog,
+        coverage_status: "catalog_listed",
+        requirements_available: false,
+        requirements_notice: "Catalog-listed program: its program-specific requirements are still being reviewed. Use the official program source and advising to confirm degree progress.",
+      };
+    }
+    seenReviewedIds.add(reviewed.id);
+    return {
+      ...reviewed,
+      // Preserve the catalog identity that this reviewed row replaces.  The
+      // browser uses it to upgrade a saved catalog-only selection on the
+      // next refresh, so students do not have to remove and re-add a program
+      // simply because its audited path has become available.
+      catalog_program_id: catalog.id,
+      coverage_status: "reviewed",
+      requirements_available: true,
+      requirements_notice: null,
+    };
+  });
+
+  for (const reviewed of reviewedPrograms) {
+    if (!seenReviewedIds.has(reviewed.id)) {
+      programs.push({
+        ...reviewed,
+        coverage_status: "reviewed",
+        requirements_available: true,
+        requirements_notice: null,
+      });
+    }
+  }
+  return programs.sort((a, b) => a.name.localeCompare(b.name)
+    || a.type.localeCompare(b.type)
+    || String(a.degree_type || "").localeCompare(String(b.degree_type || "")));
+}
+
 /* ============================================================
    CONFIG
    ============================================================ */
@@ -53,12 +133,14 @@ const FETCH_HEADERS = {
 // the SAS Undergraduate site. This is deliberately a source URL plus a
 // parser, not a hard-coded list of courses: the current catalog can change
 // which courses carry each Core code, and a refresh should pick that up.
-const RBS_CORE_SOURCE_URL = "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core?id=106&layout=blog&view=category";
-const RBS_CORE_PROGRAM_ID = "rbsnb-core-curriculum";
+// The module is not RBS-owned: reviewed schools link to it through
+// school_curriculum_modules.
+const RUTGERS_NB_CORE_SOURCE_URL = "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core?id=106&layout=blog&view=category";
+const RUTGERS_NB_CORE_PROGRAM_ID = "rutgers-nb-core-curriculum";
 
 // Rules are stable curricular structure. Course memberships are obtained at
 // scrape time from the official New Brunswick Core list above.
-const RBS_CORE_GROUPS = [
+const RUTGERS_NB_CORE_GROUPS = [
   { key: "contemporary", name: "Contemporary Challenges (2 courses)", rule: "all", children: [
     { key: "ccd", name: "Diversities and Social Inequalities [CCD]", rule: "min_courses", count: 1, tags: ["CCD"] },
     { key: "cco", name: "Our Common Future [CCO]", rule: "min_courses", count: 1, tags: ["CCO"] },
@@ -177,8 +259,559 @@ async function runD1Batches(env, statements, chunkSize = 100) {
   }
 }
 
+function isSafeCatalogSourceId(value) {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{2,119}$/.test(value);
+}
+
+function isSupportedCatalogDirectorySource(source) {
+  return source
+    && source.adapter === "html_program_directory_v1"
+    && typeof source.directory_url === "string"
+    && typeof source.profile_path === "string";
+}
+
+function ownerLabelsForCatalogSource(value) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((label) => typeof label === "string" && label.trim()).slice(0, 30)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveCatalogDirectoryEntries(env, source, entries, importToken) {
+  const now = Date.now();
+  const statements = entries.map((entry) => env.DB.prepare(
+    `INSERT INTO programs (
+       id, name, school_slug, program_slug, type, catalog_year, degree_type,
+       program_family_id, source_url, review_status, last_scraped_at,
+       catalog_source_id, catalog_listed_at, catalog_active
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+     ON CONFLICT(id) DO UPDATE SET
+       name = excluded.name,
+       school_slug = excluded.school_slug,
+       program_slug = excluded.program_slug,
+       type = excluded.type,
+       catalog_year = excluded.catalog_year,
+       degree_type = excluded.degree_type,
+       program_family_id = excluded.program_family_id,
+       source_url = excluded.source_url,
+       review_status = excluded.review_status,
+       last_scraped_at = excluded.last_scraped_at,
+       catalog_source_id = excluded.catalog_source_id,
+       catalog_listed_at = excluded.catalog_listed_at,
+       catalog_active = 1
+     WHERE programs.review_status = 'catalog_listed'`
+  ).bind(
+    entry.id, entry.name, entry.school_slug, entry.program_slug, entry.type,
+    entry.catalog_year, entry.degree_type, entry.program_family_id, entry.source_url,
+    entry.review_status, now, source.id, now,
+  ));
+  await runD1Batches(env, statements);
+  // Only after every current entry was safely stored do we retire programs
+  // missing from the latest official directory. A failed partial import never
+  // hides previously published programs.
+  await env.DB.prepare(
+    `UPDATE programs
+     SET catalog_active = 0
+     WHERE catalog_source_id = ?
+       AND review_status = 'catalog_listed'
+       AND catalog_listed_at < ?`
+  ).bind(source.id, now).run();
+  await env.DB.prepare(
+    `UPDATE program_catalog_sources
+     SET last_imported_at = ?, last_error = NULL,
+         import_token = NULL, import_started_at = NULL
+     WHERE id = ? AND import_token = ?`
+  ).bind(now, source.id, importToken).run();
+}
+
+async function importCatalogDirectorySource(env, sourceId) {
+  if (!isSafeCatalogSourceId(sourceId)) throw new Error("invalid catalog source id");
+  const source = await env.DB.prepare(
+    `SELECT id, school_slug, directory_url, profile_path, catalog_year,
+            source_title, adapter, owner_labels_json
+     FROM program_catalog_sources
+     WHERE id = ? AND enabled = 1`
+  ).bind(sourceId).first();
+  if (!source) throw new Error("unknown or disabled catalog source");
+  if (!isSupportedCatalogDirectorySource(source)) throw new Error("unsupported catalog directory adapter");
+
+  const { results: overrideRows } = await env.DB.prepare(
+    `SELECT program_slug, type, program_id
+     FROM program_catalog_identity_overrides
+     WHERE catalog_source_id = ?`
+  ).bind(source.id).all();
+  source.owner_labels = ownerLabelsForCatalogSource(source.owner_labels_json);
+  source.program_id_overrides = Object.fromEntries(
+    overrideRows
+      .filter((row) => isSafeCatalogSourceId(row.program_slug)
+        && (row.type === "major" || row.type === "minor")
+        && isSafeCatalogSourceId(row.program_id))
+      .map((row) => [`${row.program_slug}:${row.type}`, row.program_id]),
+  );
+
+  const startedAt = Date.now();
+  const importToken = crypto.randomUUID();
+  const lease = await env.DB.prepare(
+    `UPDATE program_catalog_sources
+     SET import_token = ?, import_started_at = ?
+     WHERE id = ?
+       AND (import_token IS NULL OR import_started_at < ?)`
+  ).bind(importToken, startedAt, source.id, startedAt - (10 * 60 * 1000)).run();
+  if ((lease.meta?.changes || 0) !== 1) {
+    return {
+      ok: false,
+      source_id: source.id,
+      error: "a catalog import for this source is already running",
+      status: 409,
+    };
+  }
+
+  let rawHtml = "";
+  try {
+    const result = await importProgramDirectory({
+      source,
+      fetchHtml: async (directoryUrl) => {
+        const response = await fetch(directoryUrl, { headers: FETCH_HEADERS });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        rawHtml = await response.text();
+        return rawHtml;
+      },
+      saveEntries: (entries) => saveCatalogDirectoryEntries(env, source, entries, importToken),
+    });
+    await logScrape(
+      env,
+      `catalog:${source.id}`,
+      "ok",
+      { groupsWritten: 0, coursesWritten: result.programs_imported, notesWritten: 0 },
+      `imported ${result.programs_imported} catalog-listed programs from ${source.directory_url}`,
+      rawHtml.slice(0, 1500),
+    );
+    return { ok: true, source_id: source.id, ...result };
+  } catch (err) {
+    await env.DB.prepare(
+      `UPDATE program_catalog_sources
+       SET last_error = ?, import_token = NULL, import_started_at = NULL
+       WHERE id = ? AND import_token = ?`
+    ).bind(String(err?.message || err), source.id, importToken).run();
+    await logScrape(env, `catalog:${source.id}`, "error", null, `catalog directory import failed: ${err.message}`, rawHtml.slice(0, 1500));
+    return { ok: false, source_id: source.id, error: err.message };
+  }
+}
+
+/* ============================================================
+   OFFICIAL REQUIREMENT-SOURCE SNAPSHOTS
+
+   The program directory is the authority for menu identities. These sources
+   are a separate, generic draft pipeline: they preserve each catalog path's
+   official profile page in D1 so source adapters can evolve without adding a
+   hand-written requirements file for every program. A snapshot is never an
+   audit and never changes a program's review status.
+   ============================================================ */
+
+function requirementSourceIdForProgram(programId) {
+  return `requirements-${programId}`;
+}
+
+function requirementDetailSourceIdForProgram(programId) {
+  return `detail-${programId}`;
+}
+
+function nestedRequirementDetailSourceIdForProgram(programId) {
+  return `nested-${programId}`;
+}
+
+function isSupportedRequirementImportSource(source) {
+  return source
+    && source.adapter === "html_requirement_source_v1"
+    && typeof source.source_url === "string"
+    && /^https:\/\//i.test(source.source_url);
+}
+
+async function registerRequirementSourcesForSchool(env, schoolSlug) {
+  if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
+  const { results } = await env.DB.prepare(
+    `SELECT id, name, school_slug, source_url
+     FROM programs
+     WHERE school_slug = ?
+       AND type = 'major'
+       AND review_status = 'catalog_listed'
+       AND catalog_active = 1
+       AND source_url LIKE 'https://%'
+     ORDER BY id`
+  ).bind(schoolSlug).all();
+  const programs = (results || []).filter((program) => isSafeProgramId(program.id));
+  await runD1Batches(env, programs.map((program) => env.DB.prepare(
+    `INSERT INTO program_requirement_import_sources (
+       id, program_id, school_slug, source_url, source_title, adapter, source_kind, enabled
+     ) VALUES (?,?,?,?,?,'html_requirement_source_v1','profile',1)
+     ON CONFLICT(program_id, source_url) DO UPDATE SET
+       school_slug = excluded.school_slug,
+       source_title = excluded.source_title,
+       source_kind = excluded.source_kind,
+       enabled = 1`
+  ).bind(
+    requirementSourceIdForProgram(program.id),
+    program.id,
+    program.school_slug,
+    program.source_url,
+    `${program.name} official program profile`,
+  )));
+  return { registered: programs.length };
+}
+
+async function pendingMajorProfileSources(env, schoolSlug, batchLimit) {
+  if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
+  const { results } = await env.DB.prepare(
+    `SELECT source.id, source.program_id, source.school_slug, source.source_url,
+            source.source_title, source.adapter
+     FROM program_requirement_import_sources source
+     INNER JOIN programs program ON program.id = source.program_id
+     WHERE source.school_slug = ?
+       AND source.source_kind = 'profile'
+       AND source.enabled = 1
+       AND source.last_error IS NULL
+       AND program.type = 'major'
+       AND program.review_status = 'catalog_listed'
+       AND program.catalog_active = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM program_requirement_import_sources detail
+         WHERE detail.program_id = source.program_id
+           AND detail.source_kind = 'requirements_page'
+       )
+     ORDER BY source.id
+     LIMIT ?`
+  ).bind(schoolSlug, batchLimit).all();
+  return results || [];
+}
+
+async function saveMajorRequirementSource(env, profileSource, detailSource) {
+  await env.DB.prepare(
+    `INSERT INTO program_requirement_import_sources (
+       id, program_id, school_slug, source_url, source_title, adapter, source_kind, enabled
+     ) VALUES (?,?,?,?,?,'html_requirement_source_v1','requirements_page',1)
+     ON CONFLICT(program_id, source_url) DO UPDATE SET
+       source_title = excluded.source_title,
+       source_kind = excluded.source_kind,
+       enabled = 1,
+       last_error = NULL`
+  ).bind(
+    requirementDetailSourceIdForProgram(profileSource.program_id),
+    profileSource.program_id,
+    profileSource.school_slug,
+    detailSource.source_url,
+    detailSource.source_title,
+  ).run();
+}
+
+async function discoverMajorRequirementSources(env, profileSources) {
+  const discovered = [];
+  for (const profileSource of profileSources) {
+    let rawHtml = "";
+    try {
+      const response = await fetch(profileSource.source_url, { headers: FETCH_HEADERS });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      rawHtml = await response.text();
+      const detailSource = discoverProfileRequirementPage(rawHtml, profileSource, "major");
+      if (!detailSource) throw new Error("profile has no official Major Web Page link");
+      await saveMajorRequirementSource(env, profileSource, detailSource);
+      await logScrape(
+        env,
+        `requirements-discovery:${profileSource.id}`,
+        "ok",
+        { groupsWritten: 0, coursesWritten: 0, notesWritten: 1 },
+        `saved official major requirements source ${detailSource.source_url}; no review status changed`,
+        rawHtml.slice(0, 1500),
+      );
+      discovered.push({ ok: true, source_id: profileSource.id, program_id: profileSource.program_id });
+    } catch (err) {
+      await env.DB.prepare(
+        `UPDATE program_requirement_import_sources SET last_error = ? WHERE id = ?`
+      ).bind(String(err?.message || err), profileSource.id).run();
+      await logScrape(
+        env,
+        `requirements-discovery:${profileSource.id}`,
+        "error",
+        null,
+        `requirements-source discovery failed: ${err.message}`,
+        rawHtml.slice(0, 1500),
+      );
+      discovered.push({ ok: false, source_id: profileSource.id, program_id: profileSource.program_id, error: err.message });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return discovered;
+}
+
+async function pendingNestedRequirementDetailSources(env, schoolSlug, batchLimit) {
+  if (schoolSlug !== "sasnb") throw new Error("nested requirement discovery currently supports school=sasnb majors only");
+  const { results } = await env.DB.prepare(
+    `SELECT source.id, source.program_id, source.school_slug, source.source_url,
+            source.source_title, source.adapter
+     FROM program_requirement_import_sources source
+     INNER JOIN program_requirement_draft_candidates candidate
+       ON candidate.source_id = source.id
+     INNER JOIN programs program ON program.id = source.program_id
+     WHERE source.school_slug = ?
+       AND source.id LIKE 'detail-%'
+       AND source.source_kind = 'requirements_page'
+       AND source.enabled = 1
+       AND program.type = 'major'
+       AND program.review_status = 'catalog_listed'
+       AND candidate.extractor_version = 1
+       AND json_array_length(candidate.candidate_json, '$.sections') = 0
+       AND NOT EXISTS (
+         SELECT 1 FROM program_requirement_source_discovery_attempts attempt
+         WHERE attempt.parent_source_id = source.id
+           AND attempt.discovery_kind = 'nested_major_requirements'
+       )
+     ORDER BY source.id
+     LIMIT ?`
+  ).bind(schoolSlug, batchLimit).all();
+  return results || [];
+}
+
+async function recordNestedRequirementDiscovery(env, source, status, discoveredUrl = null, note = null) {
+  await env.DB.prepare(
+    `INSERT INTO program_requirement_source_discovery_attempts (
+       parent_source_id, program_id, discovery_kind, status,
+       discovered_source_url, checked_at, note
+     ) VALUES (?,?,'nested_major_requirements',?,?,?,?)
+     ON CONFLICT(parent_source_id, discovery_kind) DO UPDATE SET
+       status = excluded.status,
+       discovered_source_url = excluded.discovered_source_url,
+       checked_at = excluded.checked_at,
+       note = excluded.note`
+  ).bind(source.id, source.program_id, status, discoveredUrl, Date.now(), note).run();
+}
+
+async function saveNestedRequirementDetailSource(env, parentSource, detailSource) {
+  await env.DB.prepare(
+    `INSERT INTO program_requirement_import_sources (
+       id, program_id, school_slug, source_url, source_title, adapter, source_kind, enabled
+     ) VALUES (?,?,?,?,?,'html_requirement_source_v1','requirements_page',1)
+     ON CONFLICT(id) DO UPDATE SET
+       source_url = excluded.source_url,
+       source_title = excluded.source_title,
+       source_kind = excluded.source_kind,
+       enabled = 1,
+       last_error = NULL`
+  ).bind(
+    nestedRequirementDetailSourceIdForProgram(parentSource.program_id),
+    parentSource.program_id,
+    parentSource.school_slug,
+    detailSource.source_url,
+    detailSource.source_title,
+  ).run();
+}
+
+async function discoverNestedRequirementDetailSources(env, parentSources) {
+  const discovered = [];
+  for (const source of parentSources) {
+    let rawHtml = "";
+    try {
+      const response = await fetch(source.source_url, { headers: FETCH_HEADERS });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      rawHtml = await response.text();
+      const detailSource = discoverNestedMajorRequirementPage(rawHtml, source);
+      if (!detailSource) {
+        await recordNestedRequirementDiscovery(env, source, "no_link", null, "no explicitly labelled Major Requirements link");
+        await logScrape(env, `requirements-detail-discovery:${source.id}`, "ok", { groupsWritten: 0, coursesWritten: 0, notesWritten: 1 }, "no explicit nested major-requirements link found; no audit changed", rawHtml.slice(0, 1500));
+        discovered.push({ ok: true, source_id: source.id, program_id: source.program_id, found: false });
+      } else {
+        await saveNestedRequirementDetailSource(env, source, detailSource);
+        await recordNestedRequirementDiscovery(env, source, "found", detailSource.source_url, "saved official detailed major requirements source");
+        await logScrape(env, `requirements-detail-discovery:${source.id}`, "ok", { groupsWritten: 0, coursesWritten: 0, notesWritten: 1 }, `saved official nested major requirements source ${detailSource.source_url}; no review status changed`, rawHtml.slice(0, 1500));
+        discovered.push({ ok: true, source_id: source.id, program_id: source.program_id, found: true });
+      }
+    } catch (err) {
+      await recordNestedRequirementDiscovery(env, source, "error", null, String(err?.message || err));
+      await logScrape(env, `requirements-detail-discovery:${source.id}`, "error", null, `nested requirements-source discovery failed: ${err.message}`, rawHtml.slice(0, 1500));
+      discovered.push({ ok: false, source_id: source.id, program_id: source.program_id, error: err.message });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return discovered;
+}
+
+async function saveProgramRequirementSnapshot(env, snapshot) {
+  const now = Date.now();
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO program_requirement_source_snapshots (
+       source_id, program_id, source_url, source_title, content_hash,
+       content_text, parsed_json, fetched_at
+     ) VALUES (?,?,?,?,?,?,?,?)`
+  ).bind(
+    snapshot.source_id,
+    snapshot.program_id,
+    snapshot.source_url,
+    snapshot.source_title,
+    snapshot.content_hash,
+    snapshot.content_text,
+    snapshot.parsed_json,
+    now,
+  ).run();
+  const changed = (inserted.meta?.changes || 0) === 1;
+  await env.DB.prepare(
+    `UPDATE program_requirement_import_sources
+     SET last_imported_at = ?, last_content_hash = ?, last_error = NULL
+     WHERE id = ?`
+  ).bind(now, snapshot.content_hash, snapshot.source_id).run();
+  return { changed };
+}
+
+async function importRequirementSource(env, sourceId) {
+  if (!isSafeCatalogSourceId(sourceId)) throw new Error("invalid requirement source id");
+  const source = await env.DB.prepare(
+    `SELECT id, program_id, school_slug, source_url, source_title, adapter
+     FROM program_requirement_import_sources
+     WHERE id = ? AND enabled = 1`
+  ).bind(sourceId).first();
+  if (!source) throw new Error("unknown or disabled requirement source");
+  if (!isSupportedRequirementImportSource(source)) throw new Error("unsupported requirement source adapter");
+  let rawHtml = "";
+  try {
+    const result = await importProgramRequirementSource({
+      source,
+      fetchHtml: async (sourceUrl) => {
+        const response = await fetch(sourceUrl, { headers: FETCH_HEADERS });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        rawHtml = await response.text();
+        return rawHtml;
+      },
+      saveSnapshot: (snapshot) => saveProgramRequirementSnapshot(env, snapshot),
+    });
+    await logScrape(
+      env,
+      `requirements:${source.id}`,
+      "ok",
+      { groupsWritten: 0, coursesWritten: result.courses_found, notesWritten: result.headings_found },
+      `${result.changed ? "saved" : "reused"} draft snapshot from ${source.source_url}; no review status changed`,
+      rawHtml.slice(0, 1500),
+    );
+    return { ok: true, ...result };
+  } catch (err) {
+    await env.DB.prepare(
+      `UPDATE program_requirement_import_sources SET last_error = ? WHERE id = ?`
+    ).bind(String(err?.message || err), source.id).run();
+    await logScrape(env, `requirements:${source.id}`, "error", null, `requirements-source import failed: ${err.message}`, rawHtml.slice(0, 1500));
+    return { ok: false, source_id: source.id, program_id: source.program_id, error: err.message };
+  }
+}
+
+function requirementSourceImportBatchLimit(value) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isSafeInteger(parsed)) return 20;
+  return Math.min(Math.max(parsed, 1), 25);
+}
+
+async function pendingRequirementSourceIds(env, schoolSlug, batchLimit) {
+  if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
+  const { results } = await env.DB.prepare(
+    `SELECT id FROM program_requirement_import_sources
+     WHERE school_slug = ?
+       AND enabled = 1
+       AND last_imported_at IS NULL
+       AND last_error IS NULL
+     ORDER BY id
+     LIMIT ?`
+  ).bind(schoolSlug, batchLimit).all();
+  return results || [];
+}
+
+async function importRequirementSourceBatch(env, sources) {
+  const imported = [];
+  for (const source of sources) {
+    imported.push(await importRequirementSource(env, source.id));
+    // Keep bulk source imports polite to Rutgers and within Worker limits.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return imported;
+}
+
+async function pendingRequirementCandidateSnapshots(env, schoolSlug, batchLimit) {
+  if (schoolSlug !== "sasnb") throw new Error("draft candidate extraction currently supports school=sasnb majors only");
+  const { results } = await env.DB.prepare(
+    `SELECT snapshot.source_id, snapshot.program_id, snapshot.source_url,
+            snapshot.content_hash, snapshot.content_text, snapshot.parsed_json
+     FROM program_requirement_source_snapshots snapshot
+     INNER JOIN program_requirement_import_sources source ON source.id = snapshot.source_id
+     INNER JOIN programs program ON program.id = snapshot.program_id
+     WHERE source.school_slug = ?
+       AND source.source_kind = 'requirements_page'
+       AND source.enabled = 1
+       AND program.type = 'major'
+       AND program.review_status = 'catalog_listed'
+       AND NOT EXISTS (
+         SELECT 1 FROM program_requirement_draft_candidates candidate
+         WHERE candidate.source_id = snapshot.source_id
+           AND candidate.content_hash = snapshot.content_hash
+           AND candidate.extractor_version = 1
+       )
+     ORDER BY snapshot.fetched_at, snapshot.id
+     LIMIT ?`
+  ).bind(schoolSlug, batchLimit).all();
+  return results || [];
+}
+
+async function saveRequirementDraftCandidate(env, snapshot) {
+  const candidate = extractRequirementDraftCandidate(snapshot);
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO program_requirement_draft_candidates (
+       source_id, program_id, source_url, content_hash, extractor_version,
+       candidate_json, created_at
+     ) VALUES (?,?,?,?,?,?,?)`
+  ).bind(
+    candidate.source_id,
+    candidate.program_id,
+    candidate.source_url,
+    candidate.content_hash,
+    candidate.extractor_version,
+    JSON.stringify(candidate),
+    Date.now(),
+  ).run();
+  return {
+    changed: (inserted.meta?.changes || 0) === 1,
+    sections_found: candidate.sections.length,
+    courses_found: candidate.sections.reduce((total, section) => total + section.course_codes.length, 0),
+  };
+}
+
+async function extractRequirementCandidateBatch(env, snapshots) {
+  const extracted = [];
+  for (const snapshot of snapshots) {
+    try {
+      const result = await saveRequirementDraftCandidate(env, snapshot);
+      await logScrape(
+        env,
+        `requirements-candidate:${snapshot.source_id}`,
+        "ok",
+        { groupsWritten: 0, coursesWritten: result.courses_found, notesWritten: result.sections_found },
+        `${result.changed ? "saved" : "reused"} generic source-section draft; no review status changed`,
+        snapshot.content_text.slice(0, 1500),
+      );
+      extracted.push({ ok: true, source_id: snapshot.source_id, program_id: snapshot.program_id, ...result });
+    } catch (err) {
+      await logScrape(
+        env,
+        `requirements-candidate:${snapshot.source_id}`,
+        "error",
+        null,
+        `requirements-candidate extraction failed: ${err.message}`,
+        String(snapshot.content_text || "").slice(0, 1500),
+      );
+      extracted.push({ ok: false, source_id: snapshot.source_id, program_id: snapshot.program_id, error: err.message });
+    }
+  }
+  return extracted;
+}
+
 async function scrapeCoreCurriculum(env, program) {
-  const source = program.source_url || RBS_CORE_SOURCE_URL;
+  const source = program.source_url || RUTGERS_NB_CORE_SOURCE_URL;
   const continuation = source.includes("?") ? `${source}&start=5` : `${source}?start=5`;
   let pages;
   try {
@@ -209,7 +842,7 @@ async function scrapeCoreCurriculum(env, program) {
     return { ok: false, error: "no Core course rows parsed" };
   }
 
-  const flatGroups = flattenCoreGroups(RBS_CORE_GROUPS);
+  const flatGroups = flattenCoreGroups(RUTGERS_NB_CORE_GROUPS);
   const statements = [
     env.DB.prepare(`DELETE FROM requirement_courses WHERE group_id IN (SELECT id FROM requirement_groups WHERE program_id = ? AND auto_generated = 1)`).bind(program.id),
     env.DB.prepare(`DELETE FROM requirement_groups WHERE program_id = ? AND auto_generated = 1`).bind(program.id),
@@ -653,6 +1286,18 @@ function parseBizTable(tableHtml, precedingHeading = "") {
       return { code: cm[0], title, credits: (creditCell.match(/[\d.]+/) || [""])[0] };
     });
     const note = noteCell;
+    // Some official RBS tables repeat a course in a major-specific section
+    // only to say it is already fulfilled by the Business Core. It is a
+    // cross-reference, not a second requirement or additional credit. Keep
+    // the source statement as reviewable prose but do not render a duplicate
+    // course card outside the Core.
+    if (
+      !/business core/i.test(section.name) &&
+      /\bfulfilled in (?:the )?business core requirements?\b/i.test(note)
+    ) {
+      section.prose.push(`${items.map((item) => `${item.code} ${item.title}`.trim()).join(" / ")}: ${note}`);
+      continue;
+    }
     if (items.length > 1) {
       section.orGroups.push(items.map((it) => ({ ...it, note })));
     } else {
@@ -661,6 +1306,8 @@ function parseBizTable(tableHtml, precedingHeading = "") {
   }
   return section.courseItems.length || section.orGroups.length ? section : null;
 }
+
+export { parseBizTable, groupAppliesToSelection, allocationForConditions };
 
 function isLegacyBizCurriculum(section) {
   // The app currently represents the active catalog path for a program.
@@ -908,7 +1555,138 @@ async function discoverPrograms(env, schoolSlug, indexPath) {
 /* ============================================================
    READ: nested requirement tree for one or more programs
    ============================================================ */
-async function getRequirementTree(env, programId) {
+function conditionProgramIds(condition) {
+  try {
+    const values = JSON.parse(condition?.condition_value_json || "[]");
+    return Array.isArray(values) ? new Set(values.filter(isSafeProgramId)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function allocationForConditions(conditions) {
+  let family = null;
+  let maxUses = null;
+  let hasAllocationCondition = false;
+  for (const condition of conditions || []) {
+    if (condition?.condition_type !== "allocation_family" && condition?.condition_type !== "max_uses") continue;
+    hasAllocationCondition = true;
+    let value;
+    try {
+      value = JSON.parse(condition.condition_value_json || "{}");
+    } catch {
+      return null;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    if (condition.condition_type === "allocation_family") {
+      const candidate = typeof value.allocation_family === "string" ? value.allocation_family.trim() : "";
+      if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(candidate) || (family && family !== candidate)) return null;
+      family = candidate;
+      continue;
+    }
+    const candidate = Number(value.max_uses);
+    if (!Number.isInteger(candidate) || candidate < 1 || (maxUses !== null && maxUses !== candidate)) return null;
+    maxUses = candidate;
+  }
+  return hasAllocationCondition && family && maxUses !== null
+    ? { allocation_family: family, max_uses: maxUses }
+    : null;
+}
+
+function groupAppliesToSelection(groupId, conditionsByGroup, selectedProgramIds) {
+  const selected = new Set((selectedProgramIds || []).filter(isSafeProgramId));
+  const conditions = conditionsByGroup[groupId] || [];
+  const hasAllocationCondition = conditions.some((condition) =>
+    condition?.condition_type === "allocation_family" || condition?.condition_type === "max_uses"
+  );
+  // A partial or malformed reviewed allocation must not silently lift a
+  // no-double-count rule. It remains invisible until the reviewed data has a
+  // complete family and positive usage cap.
+  if (hasAllocationCondition && !allocationForConditions(conditions)) return false;
+  for (const condition of conditions) {
+    if (condition.condition_type === "allocation_family" || condition.condition_type === "max_uses") continue;
+    const expected = conditionProgramIds(condition);
+    if (condition.condition_type === "selected_program_must_include_one_of") {
+      if (![...expected].some((id) => selected.has(id))) return false;
+      continue;
+    }
+    if (condition.condition_type === "selected_program_must_not_include_any") {
+      if ([...expected].some((id) => selected.has(id))) return false;
+      continue;
+    }
+    // An unrecognized condition must never expose a path that has not been
+    // deliberately implemented and tested.
+    return false;
+  }
+  return true;
+}
+
+const COURSE_ELIGIBILITY_CODE = /^\d{2}:\d{3}:\d{3}$/;
+// D1 accepts at most 100 bind variables per statement. The Core curriculum
+// contains more course rows than that, so lookup batches must not exceed it.
+const COURSE_ELIGIBILITY_BATCH_SIZE = 100;
+
+function reviewedCourseCodes(values) {
+  return [...new Set((values || [])
+    .map((value) => String(value || "").trim())
+    .filter((code) => COURSE_ELIGIBILITY_CODE.test(code)))];
+}
+
+async function getReviewedCourseEligibility(env, rawCodes) {
+  const codes = reviewedCourseCodes(rawCodes);
+  const output = {};
+  for (let offset = 0; offset < codes.length; offset += COURSE_ELIGIBILITY_BATCH_SIZE) {
+    const batch = codes.slice(offset, offset + COURSE_ELIGIBILITY_BATCH_SIZE);
+    const placeholders = batch.map(() => "?").join(",");
+    const [reviews, conditions] = await env.DB.batch([
+      env.DB.prepare(
+        `SELECT course_code, review_status, no_known_conditions, source_url, source_label, source_date
+         FROM course_eligibility_reviews
+         WHERE review_status = 'reviewed' AND course_code IN (${placeholders})`
+      ).bind(...batch),
+      env.DB.prepare(
+        `SELECT course_code, condition_key, condition_type, condition_value_json, review_status, source_url, source_label, source_date
+         FROM course_eligibility_conditions
+         WHERE review_status = 'reviewed' AND course_code IN (${placeholders})
+         ORDER BY course_code, condition_key`
+      ).bind(...batch),
+    ]);
+    for (const review of reviews.results || []) output[review.course_code] = { review, conditions: [] };
+    for (const condition of conditions.results || []) {
+      if (output[condition.course_code]) output[condition.course_code].conditions.push(condition);
+    }
+  }
+  return output;
+}
+
+async function programHasCompleteRequirementEvidence(env, program) {
+  if (Number(program?.requirement_evidence_required) !== 1) return true;
+  const [groupsResult, coursesResult, evidenceResult] = await env.DB.batch([
+    env.DB.prepare(
+      "SELECT id FROM requirement_groups WHERE program_id = ?"
+    ).bind(program.id),
+    env.DB.prepare(
+      `SELECT rc.group_id, rc.course_code
+       FROM requirement_courses rc
+       INNER JOIN requirement_groups g ON g.id = rc.group_id
+       WHERE g.program_id = ?`
+    ).bind(program.id),
+    env.DB.prepare(
+      `SELECT entity_key, entity_type, group_id, course_code, source_url,
+              source_title, source_catalog_year, accessed_at, reviewer_note, review_status
+       FROM program_requirement_evidence
+       WHERE program_id = ?`
+    ).bind(program.id),
+  ]);
+  return requirementEvidenceComplete({
+    required: true,
+    groups: groupsResult.results || [],
+    courses: coursesResult.results || [],
+    evidence: evidenceResult.results || [],
+  });
+}
+
+async function getRequirementTree(env, programId, selectedProgramIds = [programId]) {
   // A major can inherit one or more reusable requirement sets. For example,
   // every RBS-New Brunswick major links to the single RBS Foundational Core
   // (formerly Pre-Business) set. The set owns its own groups/course rows, so
@@ -926,7 +1704,42 @@ async function getRequirementTree(env, programId) {
      WHERE program_id IN (${placeholders})
      ORDER BY CASE WHEN program_id = ? THEN 1 ELSE 0 END, sort_order, id`
   ).bind(...ownerIds, programId).all();
-  const { results: courses } = await env.DB.prepare(
+  const groupIds = groups.map((group) => group.id);
+  const conditionsByGroup = {};
+  if (groupIds.length) {
+    const { results: conditions } = await env.DB.prepare(
+      `SELECT group_id, condition_type, condition_value_json
+       FROM requirement_group_conditions
+       WHERE review_status = 'reviewed'
+         AND group_id IN (${groupIds.map(() => "?").join(",")})`
+    ).bind(...groupIds).all();
+    for (const condition of conditions || []) (conditionsByGroup[condition.group_id] ||= []).push(condition);
+  }
+  const eligibleGroupIds = new Set(groups
+    .filter((group) => groupAppliesToSelection(group.id, conditionsByGroup, selectedProgramIds))
+    .map((group) => group.id));
+  const visibleGroups = groups.filter((group) => {
+    if (!eligibleGroupIds.has(group.id)) return false;
+    let parentId = group.parent_group_id;
+    while (parentId) {
+      if (!eligibleGroupIds.has(parentId)) return false;
+      parentId = groups.find((candidate) => candidate.id === parentId)?.parent_group_id || null;
+    }
+    return true;
+  });
+  const visibleGroupIds = visibleGroups.map((group) => group.id);
+  const selectorsByGroup = {};
+  if (visibleGroupIds.length) {
+    const { results: selectors } = await env.DB.prepare(
+      `SELECT group_id, selector_key, selector_json, source_url, source_label
+       FROM requirement_course_selectors
+       WHERE review_status = 'reviewed'
+         AND group_id IN (${visibleGroupIds.map(() => "?").join(",")})
+       ORDER BY group_id, selector_key`
+    ).bind(...visibleGroupIds).all();
+    for (const selector of selectors || []) (selectorsByGroup[selector.group_id] ||= []).push(selector);
+  }
+  const { results: courses } = visibleGroupIds.length ? await env.DB.prepare(
     `SELECT rc.*, g.program_id as owner_program_id, c.title as catalog_title, c.credits as catalog_credits,
             c.description as catalog_description, c.prereqs as catalog_prereqs,
             c.subject_notes as catalog_subject_notes,
@@ -938,8 +1751,9 @@ async function getRequirementTree(env, programId) {
      FROM requirement_courses rc
      INNER JOIN requirement_groups g ON g.id = rc.group_id
      LEFT JOIN courses c ON c.school || ':' || c.subject_code || ':' || c.course_number = rc.course_code
-     WHERE rc.group_id IN (SELECT id FROM requirement_groups WHERE program_id IN (${placeholders}))`
-  ).bind(...ownerIds).all();
+     WHERE rc.group_id IN (${visibleGroupIds.map(() => "?").join(",")})`
+  ).bind(...visibleGroupIds).all() : { results: [] };
+  const eligibilityByCode = await getReviewedCourseEligibility(env, courses.map((course) => course.course_code));
 
   // Alternatives are scoped to the requirement-set/program that owns the
   // course row. This lets Degree Navigator-only families be entered once as
@@ -959,16 +1773,78 @@ async function getRequirementTree(env, programId) {
   const byGroup = {};
   for (const c of courses) {
     c.alternatives = alternativesByRequirement[`${c.owner_program_id}::${c.course_code}`] || [];
+    c.eligibility = eligibilityByCode[c.course_code] || null;
     (byGroup[c.group_id] ||= []).push(c);
   }
+  const allocationsByGroup = Object.fromEntries(visibleGroups.map((group) => [
+    group.id,
+    allocationForConditions(conditionsByGroup[group.id]),
+  ]));
+  const familyMaxUses = new Map();
+  for (const allocation of Object.values(allocationsByGroup)) {
+    if (!allocation) continue;
+    const current = familyMaxUses.get(allocation.allocation_family);
+    familyMaxUses.set(allocation.allocation_family, current === undefined
+      ? allocation.max_uses
+      : Math.min(current, allocation.max_uses));
+  }
   const byId = {};
-  for (const g of groups) byId[g.id] = { ...g, courses: byGroup[g.id] || [], children: [] };
+  for (const g of visibleGroups) byId[g.id] = {
+    ...g,
+    allocation: allocationsByGroup[g.id] && {
+      ...allocationsByGroup[g.id],
+      max_uses: familyMaxUses.get(allocationsByGroup[g.id].allocation_family),
+    },
+    courses: byGroup[g.id] || [], course_selectors: selectorsByGroup[g.id] || [], children: [],
+  };
   const roots = [];
-  for (const g of groups) {
+  for (const g of visibleGroups) {
     if (g.parent_group_id && byId[g.parent_group_id]) byId[g.parent_group_id].children.push(byId[g.id]);
     else roots.push(byId[g.id]);
   }
   return roots;
+}
+
+async function getProgramSelectionPolicies(env, homeSchoolSlug) {
+  const [limitsResult, combinationsResult] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT * FROM program_selection_limits WHERE home_school_slug = ? ORDER BY program_type`
+    ).bind(homeSchoolSlug),
+    env.DB.prepare(
+      `SELECT * FROM program_combination_policies WHERE home_school_slug = ? ORDER BY policy_key`
+    ).bind(homeSchoolSlug),
+  ]);
+  return {
+    limits: limitsResult.results || [],
+    combination_policies: combinationsResult.results || [],
+  };
+}
+
+async function getProgramEligibilityRules(env, programIds) {
+  const ids = [...new Set((Array.isArray(programIds) ? programIds : []).filter(isSafeProgramId))];
+  if (!ids.length) return [];
+  const rows = [];
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    const batch = ids.slice(offset, offset + 100);
+    const { results } = await env.DB.prepare(
+      `SELECT rule_key, program_id, condition_type, condition_value_json,
+              decision, note, source_url
+       FROM program_eligibility_rules
+       WHERE review_status = 'reviewed'
+         AND program_id IN (${batch.map(() => "?").join(",")})
+       ORDER BY program_id, rule_key`
+    ).bind(...batch).all();
+    rows.push(...(results || []));
+  }
+  return rows.map(publicEligibilityRule);
+}
+
+function isSafeHomeSchoolSlug(value) {
+  return typeof value === "string" && /^[a-z0-9-]{2,80}$/.test(value);
+}
+
+function isSafeProgramId(value) {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,119}$/.test(value);
 }
 
 /* ============================================================
@@ -976,62 +1852,136 @@ async function getRequirementTree(env, programId) {
    ============================================================ */
 export async function handleProgramsApi(request, env, ctx, path, url, json, checkAdmin) {
   // ---- Public reads ----
+  // School profiles are the reviewed, data-backed source of Programs-modal
+  // wording and context. An unreviewed row is intentionally invisible here:
+  // adding a name alone must never make a school appear supported.
+  if (path === "/api/schools" && request.method === "GET") {
+    const { results } = await env.DB.prepare(
+      `SELECT slug, institution_slug, campus_slug, name, short_name,
+              catalog_year, configuration_json, source_url, source_title
+       FROM school_profiles
+       WHERE review_status = 'reviewed'
+       ORDER BY sort_order, name`
+    ).all();
+    return json({ schools: (results || []).map(publicSchoolProfile).filter((school) => school.slug) });
+  }
+
   if (path === "/api/programs" && request.method === "GET") {
     const school = url.searchParams.get("school");
     const type = url.searchParams.get("type");
-    // Public program lists intentionally exclude scraped data until a human
-    // has reviewed it. Admin routes below remain the review/debug path.
     // Shared sets and school-level Core curricula have their own public
-    // routes; neither is a student-selectable major/minor program.
-    let where = " WHERE review_status = 'reviewed' AND type NOT IN ('shared_requirement_set', 'core_curriculum')", binds = [];
+    // routes. A public program must have a reviewed, evidence-complete audit.
+    let where = ` WHERE type NOT IN ('shared_requirement_set', 'core_curriculum')
+                  AND review_status = 'reviewed'`, binds = [];
     if (school) { where += " AND school_slug = ?"; binds.push(school); }
     if (type) { where += " AND type = ?"; binds.push(type); }
     const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();
-    return json({ programs: results });
+    const reviewedPrograms = [];
+    for (const program of results || []) {
+      if (await programHasCompleteRequirementEvidence(env, program)) {
+        reviewedPrograms.push(program);
+      }
+    }
+    const programs = publishedCatalogPrograms([], reviewedPrograms);
+    const eligibilityRules = await getProgramEligibilityRules(env, reviewedPrograms.map((program) => program.id));
+    const rulesByProgram = {};
+    for (const rule of eligibilityRules) (rulesByProgram[rule.program_id] ||= []).push(rule);
+    return json({
+      programs: programs.map((program) => ({
+        ...program,
+        eligibility_rules: rulesByProgram[program.id] || [],
+      })),
+    });
   }
 
   if (path === "/api/core-curricula" && request.method === "GET") {
     const school = url.searchParams.get("school");
-    let where = " WHERE review_status = 'reviewed' AND type = 'core_curriculum'", binds = [];
-    if (school) { where += " AND school_slug = ?"; binds.push(school); }
-    const { results } = await env.DB.prepare(`SELECT * FROM programs${where} ORDER BY name`).bind(...binds).all();
+    let where = `WHERE link.review_status = 'reviewed'
+                   AND curriculum.review_status = 'reviewed'
+                   AND curriculum.type = 'core_curriculum'`, binds = [];
+    if (school) { where += " AND link.school_slug = ?"; binds.push(school); }
+    const { results } = await env.DB.prepare(
+      `SELECT curriculum.*, link.school_slug AS attached_school_slug,
+              link.module_type, link.source_url AS attachment_source_url
+       FROM school_curriculum_modules link
+       INNER JOIN programs curriculum ON curriculum.id = link.curriculum_program_id
+       ${where}
+       ORDER BY link.sort_order, curriculum.name`
+    ).bind(...binds).all();
     return json({ curricula: results });
   }
 
   if (path.match(/^\/api\/programs\/[^/]+\/requirements$/) && request.method === "GET") {
     const programId = decodeURIComponent(path.split("/")[3]);
-    // Treat unreviewed programs exactly like unknown ids to avoid exposing
-    // unreviewed requirements through the public endpoint.
     const program = await env.DB.prepare(
-      `SELECT * FROM programs WHERE id = ? AND review_status = 'reviewed'`
+      `SELECT * FROM programs
+       WHERE id = ?
+         AND review_status = 'reviewed'`
     ).bind(programId).first();
     if (!program) return json({ error: "not found" }, 404);
-    const tree = await getRequirementTree(env, programId);
-    return json({ program, requirements: tree });
+    if (!(await programHasCompleteRequirementEvidence(env, program))) return json({ error: "not found" }, 404);
+    const [tree, eligibilityRules] = await Promise.all([
+      getRequirementTree(env, programId),
+      getProgramEligibilityRules(env, [programId]),
+    ]);
+    return json({ program, requirements: tree, eligibility_rules: eligibilityRules });
   }
 
   if (path === "/api/requirements" && request.method === "GET") {
     const ids = (url.searchParams.get("programs") || "").split(",").map((s) => s.trim()).filter(Boolean);
-    if (!ids.length) return json({ error: "pass ?programs=id1,id2" }, 400);
+    if (!ids.length || ids.length > 25) return json({ error: "pass 1-25 valid program ids in ?programs=id1,id2" }, 400);
     const out = {};
-    const { results: reviewedPrograms } = await env.DB.prepare(
-      `SELECT id FROM programs WHERE review_status = 'reviewed' AND id IN (${ids.map(() => "?").join(",")})`
+    const { results: publicPrograms } = await env.DB.prepare(
+      `SELECT id, requirement_evidence_required, review_status
+       FROM programs
+       WHERE id IN (${ids.map(() => "?").join(",")})
+         AND review_status = 'reviewed'`
     ).bind(...ids).all();
-    const reviewedIds = new Set(reviewedPrograms.map((program) => program.id));
-    const visibleIds = ids.filter((id) => reviewedIds.has(id));
+    const visibleProgramIds = new Set();
+    for (const program of publicPrograms || []) {
+      if (await programHasCompleteRequirementEvidence(env, program)) {
+        visibleProgramIds.add(program.id);
+      }
+    }
+    const visibleIds = ids.filter((id) => visibleProgramIds.has(id));
 
-    // Silently omit unknown or unreviewed ids, keeping the response useful
-    // for any reviewed programs requested alongside them.
-    for (const id of visibleIds) out[id] = await getRequirementTree(env, id);
+    for (const id of visibleIds) out[id] = await getRequirementTree(env, id, visibleIds);
 
     let doubleCounts = [];
     if (visibleIds.length) {
       const { results } = await env.DB.prepare(
-        `SELECT * FROM double_count_rules WHERE program_a IN (${visibleIds.map(() => "?").join(",")}) OR program_b IN (${visibleIds.map(() => "?").join(",")})`
+        `SELECT * FROM double_count_rules
+         WHERE program_a IN (${visibleIds.map(() => "?").join(",")})
+           AND program_b IN (${visibleIds.map(() => "?").join(",")})`
       ).bind(...visibleIds, ...visibleIds).all();
       doubleCounts = results;
     }
-    return json({ requirements: out, double_count_rules: doubleCounts });
+    let doubleCountExceptions = [];
+    if (visibleIds.length) {
+      const { results } = await env.DB.prepare(
+        `SELECT * FROM double_count_exceptions
+         WHERE review_status = 'reviewed'
+           AND program_a IN (${visibleIds.map(() => "?").join(",")})
+           AND program_b IN (${visibleIds.map(() => "?").join(",")})`
+      ).bind(...visibleIds, ...visibleIds).all();
+      doubleCountExceptions = results || [];
+    }
+    const eligibilityRules = await getProgramEligibilityRules(env, visibleIds);
+    return json({
+      requirements: out,
+      catalog_listed_program_ids: [],
+      double_count_rules: doubleCounts,
+      double_count_exceptions: doubleCountExceptions,
+      eligibility_rules: eligibilityRules,
+    });
+  }
+
+  if (path === "/api/course-eligibility" && request.method === "GET") {
+    const codes = reviewedCourseCodes((url.searchParams.get("codes") || "").split(","));
+    if (!codes.length || codes.length > 25) {
+      return json({ error: "pass up to 25 valid course codes in ?codes=" }, 400);
+    }
+    return json({ eligibility: await getReviewedCourseEligibility(env, codes) });
   }
 
   // School-scoped double-count caps (e.g. "RBS majors may share at most 1
@@ -1047,9 +1997,201 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     return json({ policies: results });
   }
 
+  // Program selection is governed by a student's home school, program type,
+  // and occasionally by a specific cross-school combination. This read route
+  // lets the UI show the currently reviewed limits without copying policy
+  // numbers into index.html.
+  if (path === "/api/program-selection-policies" && request.method === "GET") {
+    const homeSchoolSlug = url.searchParams.get("home_school") || "";
+    if (!isSafeHomeSchoolSlug(homeSchoolSlug)) {
+      return json({ error: "pass a valid ?home_school=..." }, 400);
+    }
+    return json({ home_school_slug: homeSchoolSlug, ...(await getProgramSelectionPolicies(env, homeSchoolSlug)) });
+  }
+
+  // Stateless validation before the browser saves a selection. It reads only
+  // reviewed, evidence-complete programs and contains no student data or
+  // admin secret.
+  if (path === "/api/program-selection-check" && request.method === "POST") {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "body must be JSON" }, 400);
+    }
+    const homeSchoolSlug = body?.home_school;
+    const programIds = Array.isArray(body?.program_ids) ? body.program_ids : null;
+    if (!isSafeHomeSchoolSlug(homeSchoolSlug)) {
+      return json({ error: "body.home_school must be a valid school slug" }, 400);
+    }
+    if (!programIds || programIds.length > 20 || programIds.some((id) => !isSafeProgramId(id))) {
+      return json({ error: "body.program_ids must contain up to 20 valid program ids" }, 400);
+    }
+    const ids = [...new Set(programIds)];
+    let programs = [];
+    if (ids.length) {
+      const { results } = await env.DB.prepare(
+        `SELECT id, name, school_slug, program_slug, type, degree_type,
+                program_family_id, requirement_evidence_required, review_status,
+                catalog_active
+         FROM programs
+         WHERE type NOT IN ('shared_requirement_set', 'core_curriculum')
+           AND review_status = 'reviewed'
+           AND id IN (${ids.map(() => "?").join(",")})`
+      ).bind(...ids).all();
+      for (const program of results || []) {
+        if (await programHasCompleteRequirementEvidence(env, program)) {
+          programs.push(program);
+        }
+      }
+    }
+    const [policyData, eligibilityRules] = await Promise.all([
+      getProgramSelectionPolicies(env, homeSchoolSlug),
+      getProgramEligibilityRules(env, programs.filter((program) => program.review_status === "reviewed").map((program) => program.id)),
+    ]);
+    return json(evaluateProgramSelection({
+      homeSchoolSlug,
+      selectedProgramIds: ids,
+      programs,
+      limits: policyData.limits,
+      combinationPolicies: policyData.combination_policies,
+      eligibilityRules,
+    }));
+  }
+
   // ---- Admin: everything below requires ?secret= ----
-  if (path.startsWith("/api/admin/") && (path.startsWith("/api/admin/programs") || path.startsWith("/api/admin/scrape") || path.startsWith("/api/admin/review") || path.startsWith("/api/admin/requirement"))) {
+  if (path.startsWith("/api/admin/") && (path.startsWith("/api/admin/programs") || path.startsWith("/api/admin/program-catalog") || path.startsWith("/api/admin/scrape") || path.startsWith("/api/admin/review") || path.startsWith("/api/admin/requirement"))) {
     if (!checkAdmin(url)) return json({ error: "bad secret" }, 403);
+
+    if (path === "/api/admin/program-catalog/import" && request.method === "POST") {
+      const sourceId = url.searchParams.get("source") || "";
+      if (!sourceId) return json({ error: "pass ?source=the-catalog-source-id" }, 400);
+      const result = await importCatalogDirectorySource(env, sourceId);
+      return json(result, result.ok ? 200 : (result.status || 502));
+    }
+
+    // Register the current catalog-listed paths as generic requirement-source
+    // imports. This stores source metadata in D1, not a static program list
+    // in the application, and it does not change any program's coverage tier.
+    if (path === "/api/admin/requirement-sources/register" && request.method === "POST") {
+      const school = url.searchParams.get("school") || "";
+      try {
+        return json({ ok: true, school, ...(await registerRequirementSourcesForSchool(env, school)) });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
+    }
+
+    // Profiles provide catalog identity; this discovers the department page
+    // explicitly labelled as the selected major's official requirements.
+    // It stores draft source metadata only and never publishes an audit.
+    if (path === "/api/admin/requirement-sources/discover" && request.method === "POST") {
+      const school = url.searchParams.get("school") || "";
+      try {
+        const registration = await registerRequirementSourcesForSchool(env, school);
+        if (!registration.registered) return json({ error: "no active SAS major profiles found for this school" }, 404);
+        const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
+        const profileSources = await pendingMajorProfileSources(env, school, batchLimit);
+        if (!profileSources.length) {
+          return json({ ok: true, mode: "complete", school, queued: 0, note: "Every eligible SAS major profile has a discovered requirements source or a recorded discovery error." });
+        }
+        ctx.waitUntil(discoverMajorRequirementSources(env, profileSources));
+        return json({ ok: true, mode: "background", school, queued: profileSources.length, note: "Discovering official major requirement sources only; no program was automatically marked reviewed." });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
+    }
+
+    // Some official department pages are major overviews. This performs one
+    // bounded, explicitly-labelled link lookup and stores another draft
+    // source when available; it never changes an audit or review status.
+    if (path === "/api/admin/requirement-sources/discover-details" && request.method === "POST") {
+      const school = url.searchParams.get("school") || "";
+      try {
+        const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
+        const parentSources = await pendingNestedRequirementDetailSources(env, school, batchLimit);
+        if (!parentSources.length) {
+          return json({ ok: true, mode: "complete", school, queued: 0, note: "Every eligible SAS major overview source has a recorded nested-link result; no program was automatically marked reviewed." });
+        }
+        ctx.waitUntil(discoverNestedRequirementDetailSources(env, parentSources));
+        return json({ ok: true, mode: "background", school, queued: parentSources.length, note: "Discovering explicitly labelled official major-requirements links only; no audit or review status changes." });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
+    }
+
+    if (path === "/api/admin/requirement-sources" && request.method === "GET") {
+      const school = url.searchParams.get("school") || "";
+      if (!isSafeHomeSchoolSlug(school)) return json({ error: "pass a valid ?school=..." }, 400);
+      const { results } = await env.DB.prepare(
+        `SELECT source.id, source.program_id, source.source_url, source.source_title,
+                source.adapter, source.source_kind, source.enabled, source.last_imported_at,
+                source.last_content_hash, source.last_error,
+                (SELECT COUNT(*) FROM program_requirement_source_snapshots snapshot
+                 WHERE snapshot.source_id = source.id) AS snapshot_count
+         FROM program_requirement_import_sources source
+         WHERE source.school_slug = ?
+         ORDER BY source.program_id`
+      ).bind(school).all();
+      return json({ school, sources: results || [] });
+    }
+
+    // One source runs synchronously for a fast inspection. School batches
+    // run in the background and only create/reuse draft snapshots; the
+    // public catalog remains selectable throughout and nothing is published.
+    if (path === "/api/admin/requirement-sources/import" && request.method === "POST") {
+      const sourceId = url.searchParams.get("source") || "";
+      const school = url.searchParams.get("school") || "";
+      if (sourceId) {
+        const result = await importRequirementSource(env, sourceId);
+        return json(result, result.ok ? 200 : 502);
+      }
+      try {
+        const registration = await registerRequirementSourcesForSchool(env, school);
+        if (!registration.registered) return json({ error: "no active catalog sources found for this school" }, 404);
+        const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
+        const sources = await pendingRequirementSourceIds(env, school, batchLimit);
+        if (!sources.length) {
+          return json({ ok: true, mode: "complete", school, sources: registration.registered, queued: 0, note: "All eligible sources have draft snapshots; no program was automatically marked reviewed." });
+        }
+        ctx.waitUntil(importRequirementSourceBatch(env, sources));
+        return json({ ok: true, mode: "background", school, sources: registration.registered, queued: sources.length, note: "Draft source snapshots only; no program was automatically marked reviewed." });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
+    }
+
+    // This is a source-structure draft, not an audit generator. It only
+    // records course-bearing sections for a reviewer to interpret later.
+    if (path === "/api/admin/requirement-candidates/extract" && request.method === "POST") {
+      const school = url.searchParams.get("school") || "";
+      try {
+        const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
+        const snapshots = await pendingRequirementCandidateSnapshots(env, school, batchLimit);
+        if (!snapshots.length) {
+          return json({ ok: true, mode: "complete", school, queued: 0, note: "Every snapshotted SAS major source has a generic draft candidate; no program was automatically marked reviewed." });
+        }
+        ctx.waitUntil(extractRequirementCandidateBatch(env, snapshots));
+        return json({ ok: true, mode: "background", school, queued: snapshots.length, note: "Extracting draft source sections only; no degree audit or review status changes." });
+      } catch (err) {
+        return json({ error: err.message }, 400);
+      }
+    }
+
+    if (path === "/api/admin/requirement-candidates" && request.method === "GET") {
+      const school = url.searchParams.get("school") || "";
+      if (school !== "sasnb") return json({ error: "draft candidate extraction currently supports ?school=sasnb majors only" }, 400);
+      const { results } = await env.DB.prepare(
+        `SELECT candidate.id, candidate.source_id, candidate.program_id, candidate.source_url,
+                candidate.content_hash, candidate.extractor_version, candidate.candidate_json,
+                candidate.created_at
+         FROM program_requirement_draft_candidates candidate
+         INNER JOIN program_requirement_import_sources source ON source.id = candidate.source_id
+         WHERE source.school_slug = ?
+         ORDER BY candidate.program_id, candidate.created_at DESC`
+      ).bind(school).all();
+      return json({ school, candidates: results || [] });
+    }
 
     // Seed a program by hand — the reliable path, always works regardless
     // of whether index-page discovery finds anything for that school.
@@ -1058,11 +2200,19 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       const items = Array.isArray(body) ? body : [body];
       const stmts = items.map((p) =>
         env.DB.prepare(
-          `INSERT INTO programs (id, name, school_slug, program_slug, type, catalog_year, source_url)
-           VALUES (?,?,?,?,?,?,?)
+          `INSERT INTO programs (
+             id, name, school_slug, program_slug, type, catalog_year,
+             academic_program_code, degree_type, program_family_id, source_url
+           ) VALUES (?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(id) DO UPDATE SET name=excluded.name, school_slug=excluded.school_slug,
-             program_slug=excluded.program_slug, type=excluded.type, catalog_year=excluded.catalog_year`
-        ).bind(p.id, p.name, p.school_slug, p.program_slug, p.type, p.catalog_year || null, p.source_url || null)
+             program_slug=excluded.program_slug, type=excluded.type, catalog_year=excluded.catalog_year,
+             academic_program_code=excluded.academic_program_code, degree_type=excluded.degree_type,
+             program_family_id=excluded.program_family_id, source_url=excluded.source_url`
+        ).bind(
+          p.id, p.name, p.school_slug, p.program_slug, p.type, p.catalog_year || null,
+          p.academic_program_code || null, p.degree_type || null, p.program_family_id || null,
+          p.source_url || null
+        )
       );
       await env.DB.batch(stmts);
       return json({ ok: true, seeded: items.length });
@@ -1077,22 +2227,23 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       return json(result);
     }
 
-    // Scrape one program (?program=id) or every program that hasn't been
-    // scraped yet / is due for a refresh (no query param).
-    // Scrape one program from the OLD Coursedog catalog source (prose-heavy,
-    // no reliable elective lists — see the big comment above
-    // scrapeProgramFromBizSite). Kept for Business Core / required-course
-    // sections, which that source does parse fine.
+    // Scrape one non-RBS program (?program=id) or every eligible program
+    // (no query param) from Coursedog. RBS is deliberately excluded: its
+    // Coursedog pages have unreliable copied prose and incomplete electives.
+    // Use /api/admin/scrape-programs-biz for the supported RBS majors instead.
     if (path === "/api/admin/scrape-programs" && request.method === "POST") {
       const singleId = url.searchParams.get("program");
       let targets;
       if (singleId) {
         const p = await env.DB.prepare(`SELECT * FROM programs WHERE id = ?`).bind(singleId).first();
         if (!p) return json({ error: "unknown program id" }, 404);
+        if (p.school_slug === "rbsnb") {
+          return json({ error: "Coursedog is not an approved RBS requirements source; use /api/admin/scrape-programs-biz for a supported RBS major." }, 400);
+        }
         targets = [p];
       } else {
         const { results } = await env.DB.prepare(`SELECT * FROM programs`).all();
-        targets = results;
+        targets = results.filter((program) => program.school_slug !== "rbsnb");
       }
       const run = async () => {
         const results = [];
@@ -1137,7 +2288,7 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     // uses the public New Brunswick Core list and remains unreviewed until a
     // human explicitly marks the parsed result reviewed.
     if (path === "/api/admin/scrape-core-curriculum" && request.method === "POST") {
-      const programId = url.searchParams.get("program") || RBS_CORE_PROGRAM_ID;
+      const programId = url.searchParams.get("program") || RUTGERS_NB_CORE_PROGRAM_ID;
       const p = await env.DB.prepare(`SELECT * FROM programs WHERE id = ? AND type = 'core_curriculum'`).bind(programId).first();
       if (!p) return json({ error: "unknown Core Curriculum id" }, 404);
       const result = await scrapeCoreCurriculum(env, p);

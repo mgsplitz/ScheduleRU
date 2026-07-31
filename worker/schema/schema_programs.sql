@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS programs (
   program_slug TEXT NOT NULL,       -- catalog URL segment, e.g. "bait"
   type TEXT NOT NULL,               -- 'major' | 'minor' | 'concentration' | 'certificate'
   catalog_year TEXT,                -- e.g. "25-26", informational
+  academic_program_code TEXT,       -- official academic program code, e.g. '790'
+  degree_type TEXT,                 -- e.g. 'B.A.' or 'B.S.'; blank for minors/concentrations
+  program_family_id TEXT,           -- joins reviewed degree paths for one academic program
   source_url TEXT,
   review_status TEXT DEFAULT 'unreviewed',  -- 'unreviewed' | 'reviewed' | 'needs_fix'
   last_scraped_at INTEGER
@@ -34,13 +37,30 @@ CREATE TABLE IF NOT EXISTS requirement_groups (
   program_id TEXT NOT NULL REFERENCES programs(id),
   parent_group_id TEXT REFERENCES requirement_groups(id),
   name TEXT,                        -- e.g. "Business Core", "Law/Ethics (choose 1)"
-  rule TEXT NOT NULL,               -- 'all' | 'min_courses' | 'max_courses' | 'min_credits'
+  display_family TEXT,              -- optional shared display family, e.g. 'rbsnb-business-core'
+  display_priority INTEGER DEFAULT 0, -- higher reviewed variant replaces lower variants in one family
+  rule TEXT NOT NULL,               -- 'all' | 'one_of' | 'min_courses' | 'max_courses' | 'min_credits'
   count INTEGER,                    -- N for min/max_courses, credit count for min_credits
   sort_order INTEGER DEFAULT 0,
   auto_generated INTEGER DEFAULT 1  -- 1 = came from the scraper, 0 = you hand-added it
 );
 CREATE INDEX IF NOT EXISTS idx_reqgroups_program ON requirement_groups(program_id);
 CREATE INDEX IF NOT EXISTS idx_reqgroups_parent ON requirement_groups(parent_group_id);
+
+-- A reviewed group can apply only in a particular program combination. This
+-- keeps path-specific requirements in data (for example, a Finance-major
+-- path) instead of introducing a frontend exception for every school.
+CREATE TABLE IF NOT EXISTS requirement_group_conditions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id TEXT NOT NULL REFERENCES requirement_groups(id),
+  condition_type TEXT NOT NULL,     -- selected_program_must_include_one_of | selected_program_must_not_include_any | allocation_family | max_uses
+  condition_value_json TEXT NOT NULL, -- allocation JSON: {"allocation_family":"reviewed-family"} + {"max_uses":1}
+  note TEXT,
+  source_url TEXT,
+  review_status TEXT DEFAULT 'unreviewed',
+  UNIQUE(group_id, condition_type, condition_value_json)
+);
+CREATE INDEX IF NOT EXISTS idx_reqgroupconditions_group ON requirement_group_conditions(group_id);
 
 CREATE TABLE IF NOT EXISTS requirement_courses (
   group_id TEXT NOT NULL REFERENCES requirement_groups(id),
@@ -73,6 +93,23 @@ CREATE TABLE IF NOT EXISTS double_count_rules (
   note TEXT,
   PRIMARY KEY (program_a, program_b)
 );
+
+-- Narrow published exceptions to a school-wide double-count policy. Every
+-- exception names both programs and the exact course codes it permits, so a
+-- special case never silently opens the door to unrelated overlaps.
+CREATE TABLE IF NOT EXISTS double_count_exceptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  program_a TEXT NOT NULL REFERENCES programs(id),
+  program_b TEXT NOT NULL REFERENCES programs(id),
+  allowed_course_codes_json TEXT NOT NULL,
+  note TEXT,
+  source_url TEXT,
+  review_status TEXT DEFAULT 'unreviewed',
+  verified_at INTEGER,
+  UNIQUE(program_a, program_b)
+);
+CREATE INDEX IF NOT EXISTS idx_doublecountexceptions_program_a ON double_count_exceptions(program_a);
+CREATE INDEX IF NOT EXISTS idx_doublecountexceptions_program_b ON double_count_exceptions(program_b);
 
 -- Mirrors sync_log's role for the course sync — every scrape attempt logged
 -- with a raw text sample, so parsing failures are diagnosable via

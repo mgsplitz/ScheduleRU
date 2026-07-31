@@ -43,6 +43,7 @@
  */
 
 import { handleProgramsApi } from "./programs.js";
+import { handleScheduleAssistantRequest } from "./schedule-assistant.js";
 
 const RUTGERS_BASE = "https://sis.rutgers.edu/soc/api";
 const CORS_HEADERS = {
@@ -56,6 +57,96 @@ function json(data, status = 200) {
     status,
     headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
+}
+
+function activeTermConfiguration(env) {
+  const activeYear = Number(env.CURRENT_YEAR);
+  const activeTerm = String(env.CURRENT_TERM || "");
+  if (!Number.isInteger(activeYear) || activeYear < 2000 || activeYear > 2100
+    || !["0", "1", "7", "9"].includes(activeTerm)) return null;
+  const catalogStartYear = activeTerm === "9" ? activeYear : activeYear - 1;
+  return { activeYear, activeTerm, catalogYear: `${catalogStartYear}-${catalogStartYear + 1}` };
+}
+
+const COURSE_CODE_PATTERN = /^\d{2}:\d{3}:\d{3}$/;
+
+// The browser sends only selector shapes that came from a reviewed program
+// rule. Validate them again here so catalog filtering stays fail-closed and
+// can never turn query parameters into SQL syntax.
+function parseCourseSelectorFilter(rawValue) {
+  let raw;
+  try {
+    raw = JSON.parse(rawValue);
+  } catch (_) {
+    return null;
+  }
+  const values = Array.isArray(raw) ? raw : [raw];
+  if (!values.length || values.length > 12) return null;
+  const unique = (items, pattern, limit) => [...new Set((Array.isArray(items) ? items : [])
+    .map((item) => String(item || "").trim())
+    .filter((item) => pattern.test(item)))].slice(0, limit);
+  const selectors = [];
+  for (const value of values) {
+    if (!value || typeof value !== "object" || Array.isArray(value) || Number(value.version) !== 1) return null;
+    const exclude_course_codes = unique(value.exclude_course_codes, COURSE_CODE_PATTERN, 400);
+    if (value.kind === "course_codes") {
+      const include_course_codes = unique(value.include_course_codes, COURSE_CODE_PATTERN, 400);
+      if (!include_course_codes.length) return null;
+      selectors.push({ kind: "course_codes", include_course_codes, exclude_course_codes });
+      continue;
+    }
+    if (value.kind === "subject_level") {
+      const school_codes = unique(value.school_codes, /^\d{2}$/, 8);
+      const subject_codes = unique(value.subject_codes, /^\d{3}$/, 12);
+      const course_number_min = value.course_number_min === undefined ? 0 : Number(value.course_number_min);
+      const course_number_max = value.course_number_max === undefined ? 999 : Number(value.course_number_max);
+      const minimum_credits = value.minimum_credits === undefined ? 0 : Number(value.minimum_credits);
+      if (!school_codes.length || !subject_codes.length
+        || !Number.isInteger(course_number_min) || !Number.isInteger(course_number_max)
+        || course_number_min < 0 || course_number_max > 999 || course_number_min > course_number_max
+        || !Number.isFinite(minimum_credits) || minimum_credits < 0 || minimum_credits > 99) return null;
+      selectors.push({
+        kind: "subject_level", school_codes, subject_codes,
+        course_number_min, course_number_max, minimum_credits, exclude_course_codes,
+      });
+      continue;
+    }
+    return null;
+  }
+  return selectors;
+}
+
+function selectorWhereClause(selectors) {
+  const catalogCode = "c.school || ':' || c.subject_code || ':' || c.course_number";
+  const binds = [];
+  const placeholders = (values) => values.map(() => "?").join(",");
+  const clauses = selectors.map((selector) => {
+    if (selector.kind === "course_codes") {
+      const parts = [`${catalogCode} IN (SELECT value FROM json_each(?))`];
+      binds.push(JSON.stringify(selector.include_course_codes));
+      if (selector.exclude_course_codes.length) {
+        parts.push(`${catalogCode} NOT IN (SELECT value FROM json_each(?))`);
+        binds.push(JSON.stringify(selector.exclude_course_codes));
+      }
+      return `(${parts.join(" AND ")})`;
+    }
+    const parts = [
+      `c.school IN (${placeholders(selector.school_codes)})`,
+      `c.subject_code IN (${placeholders(selector.subject_codes)})`,
+      "CAST(c.course_number AS INTEGER) BETWEEN ? AND ?",
+    ];
+    binds.push(...selector.school_codes, ...selector.subject_codes, selector.course_number_min, selector.course_number_max);
+    if (selector.minimum_credits > 0) {
+      parts.push("CAST(c.credits AS REAL) >= ?");
+      binds.push(selector.minimum_credits);
+    }
+    if (selector.exclude_course_codes.length) {
+      parts.push(`${catalogCode} NOT IN (SELECT value FROM json_each(?))`);
+      binds.push(JSON.stringify(selector.exclude_course_codes));
+    }
+    return `(${parts.join(" AND ")})`;
+  });
+  return { sql: `(${clauses.join(" OR ")})`, binds };
 }
 
 /* ============================================================
@@ -319,9 +410,41 @@ async function handleApi(request, env, ctx) {
 
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
+  if (path === "/api/schedule-assistant/interpret") {
+    if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+    const response = await handleScheduleAssistantRequest(request, env);
+    for (const [header, value] of Object.entries(CORS_HEADERS)) response.headers.set(header, value);
+    return response;
+  }
+
+  if (path === "/api/config") {
+    const configuration = activeTermConfiguration(env);
+    if (!configuration) return json({ error: "invalid active term configuration" }, 500);
+    return json({ activeYear: configuration.activeYear, activeTerm: configuration.activeTerm });
+  }
+
+  if (path === "/api/ap-equivalencies") {
+    const configuration = activeTermConfiguration(env);
+    if (!configuration) return json({ error: "invalid active term configuration" }, 500);
+    try {
+      const { results } = await env.DB.prepare(
+        `SELECT id, exam_name, minimum_score, maximum_score, credits,
+                equivalent_course_codes_json, fulfills_requirement_ids_json,
+                catalog_year, campus, source_url, reviewed_at
+         FROM ap_equivalencies
+         WHERE review_status = 'reviewed' AND catalog_year = ? AND campus = ?
+         ORDER BY exam_name, minimum_score, id`
+      ).bind(configuration.catalogYear, "NB").all();
+      return json({ equivalencies: results });
+    } catch (_) {
+      return json({ error: "AP equivalencies unavailable" }, 503);
+    }
+  }
+
   if (path === "/api/courses") {
     const q = (url.searchParams.get("search") || "").trim();
     const subject = (url.searchParams.get("subject") || "").trim();
+    const selectorValue = url.searchParams.get("selector");
     const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100);
     const offset = Number(url.searchParams.get("offset") || 0);
 
@@ -352,8 +475,15 @@ async function handleApi(request, env, ctx) {
       where += ` AND (LOWER(id) LIKE ?${tokenClauses.length ? ` OR (${tokenClauses.join(" AND ")})` : ""})`;
       binds.splice(subject ? 1 : 0, 0, `%${q.toLowerCase()}%`);
     }
+    if (selectorValue !== null) {
+      const selectors = parseCourseSelectorFilter(selectorValue);
+      if (!selectors) return json({ error: "invalid course selector" }, 400);
+      const selector = selectorWhereClause(selectors);
+      where += ` AND ${selector.sql}`;
+      binds.push(...selector.binds);
+    }
 
-    const countRow = await env.DB.prepare(`SELECT COUNT(*) as n FROM courses${where}`).bind(...binds).first();
+    const countRow = await env.DB.prepare(`SELECT COUNT(*) as n FROM courses c${where}`).bind(...binds).first();
     const total = countRow ? countRow.n : 0;
 
     const sql = `SELECT c.*,
@@ -441,11 +571,14 @@ async function handleApi(request, env, ctx) {
         "POST /api/admin/sync-now?secret=...            (writes one cursor chunk)",
         "POST /api/admin/sync-now?secret=...&full=true  (background full resync)",
         "--- programs / degree requirements ---",
+        "GET /api/schools",
         "GET /api/programs?school=&type=",
         "GET /api/core-curricula?school=",
         "GET /api/programs/:id/requirements",
         "GET /api/requirements?programs=id1,id2",
         "GET /api/double-count-policies?school=",
+        "GET /api/program-selection-policies?home_school=",
+        "POST /api/program-selection-check               (body: {home_school, program_ids:[...]})",
         "POST /api/admin/programs/seed?secret=...            (body: {id,name,school_slug,program_slug,type,catalog_year} or an array)",
         "POST /api/admin/programs/discover?secret=...&school=&index_path=  (best-effort slug discovery)",
         "POST /api/admin/scrape-programs?secret=...[&program=id]",

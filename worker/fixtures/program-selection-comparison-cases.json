@@ -1,0 +1,140 @@
+{
+  "fixture_version": 1,
+  "purpose": "Anonymous, source-backed comparison cases for the program-selection rule engine. They are planning checks, not Degree Navigator records or student data.",
+  "reviewed_on": "2026-07-19",
+  "policy_snapshot": {
+    "home_school_slug": "rbsnb",
+    "limits": [
+      {
+        "home_school_slug": "rbsnb",
+        "program_type": "major",
+        "max_selected": 3,
+        "note": "RBS-New Brunswick students may declare up to three majors.",
+        "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures"
+      },
+      {
+        "home_school_slug": "rbsnb",
+        "program_type": "minor",
+        "max_selected": 3,
+        "note": "RBS-New Brunswick students may declare up to three minors.",
+        "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures"
+      },
+      {
+        "home_school_slug": "rbsnb",
+        "program_type": "concentration",
+        "max_selected": 1,
+        "note": "RBS-New Brunswick students may declare only one concentration.",
+        "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures"
+      }
+    ],
+    "combination_policies": [
+      {
+        "policy_key": "rbsnb-no-rbs-minors",
+        "home_school_slug": "rbsnb",
+        "program_a_school_slug": "rbsnb",
+        "program_a_type": "major",
+        "program_b_school_slug": "rbsnb",
+        "program_b_type": "minor",
+        "decision": "blocked",
+        "note": "RBS-New Brunswick students may declare minors only in non-RBS subject areas.",
+        "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures"
+      },
+      {
+        "policy_key": "rbsnb-no-soe-second-major",
+        "home_school_slug": "rbsnb",
+        "program_a_school_slug": "rbsnb",
+        "program_a_type": "major",
+        "program_b_school_slug": "soe",
+        "program_b_type": "major",
+        "decision": "blocked",
+        "note": "RBS-New Brunswick students may not double-major with a School of Engineering program.",
+        "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures"
+      }
+    ]
+  },
+  "programs": [
+    { "id": "rbsnb-accounting", "school_slug": "rbsnb", "type": "major" },
+    { "id": "rbsnb-bait", "school_slug": "rbsnb", "type": "major" },
+    { "id": "rbsnb-finance", "school_slug": "rbsnb", "type": "major" },
+    { "id": "rbsnb-marketing", "school_slug": "rbsnb", "type": "major" },
+    { "id": "rbsnb-leadership-management", "school_slug": "rbsnb", "type": "major" },
+    { "id": "sas-cs-minor", "school_slug": "sas", "type": "minor" },
+    { "id": "sas-economics-minor", "school_slug": "sas", "type": "minor" },
+    { "id": "sebs-environmental-policy-minor", "school_slug": "sebs", "type": "minor" },
+    { "id": "sas-history-minor", "school_slug": "sas", "type": "minor" },
+    { "id": "rbsnb-business-administration-minor", "school_slug": "rbsnb", "type": "minor" },
+    { "id": "rbsnb-finance-concentration", "school_slug": "rbsnb", "type": "concentration" },
+    { "id": "rbsnb-global-business-concentration", "school_slug": "rbsnb", "type": "concentration" },
+    { "id": "rbsnb-entrepreneurship-concentration", "school_slug": "rbsnb", "type": "concentration" },
+    { "id": "rbsnb-professional-selling-concentration", "school_slug": "rbsnb", "type": "concentration" },
+    { "id": "rbsnb-real-estate-concentration", "school_slug": "rbsnb", "type": "concentration" },
+    { "id": "soe-computer-engineering", "school_slug": "soe", "type": "major" }
+  ],
+  "cases": [
+    {
+      "id": "rbs-three-majors-allowed",
+      "selected_program_ids": ["rbsnb-accounting", "rbsnb-bait", "rbsnb-finance"],
+      "expected": { "allowed": true, "error_codes": [] }
+    },
+    {
+      "id": "rbs-fourth-major-blocked",
+      "selected_program_ids": ["rbsnb-accounting", "rbsnb-bait", "rbsnb-finance", "rbsnb-marketing"],
+      "expected": { "allowed": false, "error_codes": ["limit:rbsnb:major"] }
+    },
+    {
+      "id": "rbs-three-non-rbs-minors-allowed",
+      "selected_program_ids": ["rbsnb-bait", "sas-cs-minor", "sas-economics-minor", "sebs-environmental-policy-minor"],
+      "expected": { "allowed": true, "error_codes": [] }
+    },
+    {
+      "id": "rbs-fourth-minor-blocked",
+      "selected_program_ids": ["rbsnb-bait", "sas-cs-minor", "sas-economics-minor", "sebs-environmental-policy-minor", "sas-history-minor"],
+      "expected": { "allowed": false, "error_codes": ["limit:rbsnb:minor"] }
+    },
+    {
+      "id": "rbs-one-concentration-allowed",
+      "selected_program_ids": ["rbsnb-bait", "rbsnb-finance-concentration"],
+      "expected": { "allowed": true, "error_codes": [] }
+    },
+    {
+      "id": "rbs-second-concentration-blocked",
+      "selected_program_ids": ["rbsnb-bait", "rbsnb-finance-concentration", "rbsnb-global-business-concentration"],
+      "expected": { "allowed": false, "error_codes": ["limit:rbsnb:concentration"] }
+    },
+    {
+      "id": "rbs-minor-within-rbs-blocked",
+      "selected_program_ids": ["rbsnb-bait", "rbsnb-business-administration-minor"],
+      "expected": { "allowed": false, "error_codes": ["combination:rbsnb-no-rbs-minors"] }
+    },
+    {
+      "id": "rbs-engineering-second-major-blocked",
+      "selected_program_ids": ["rbsnb-bait", "soe-computer-engineering"],
+      "expected": { "allowed": false, "error_codes": ["combination:rbsnb-no-soe-second-major"] }
+    },
+    {
+      "id": "rbs-marketing-professional-selling-allowed",
+      "selected_program_ids": ["rbsnb-marketing", "rbsnb-professional-selling-concentration"],
+      "expected": { "allowed": true, "error_codes": [] }
+    },
+    {
+      "id": "rbs-finance-real-estate-allowed",
+      "selected_program_ids": ["rbsnb-finance", "rbsnb-real-estate-concentration"],
+      "expected": { "allowed": true, "error_codes": [] }
+    },
+    {
+      "id": "rbs-leadership-management-entrepreneurship-blocked",
+      "selected_program_ids": ["rbsnb-leadership-management", "rbsnb-entrepreneurship-concentration"],
+      "eligibility_rules": [
+        {
+          "rule_key": "rbsnb-entrepreneurship-concentration-no-lm",
+          "program_id": "rbsnb-entrepreneurship-concentration",
+          "condition_type": "selected_program_must_not_include_any",
+          "condition_value_json": "[\"rbsnb-leadership-management\"]",
+          "decision": "blocked",
+          "note": "Leadership and Management majors may not declare the Entrepreneurship concentration."
+        }
+      ],
+      "expected": { "allowed": false, "error_codes": ["eligibility:rbsnb-entrepreneurship-concentration-no-lm"] }
+    }
+  ]
+}
