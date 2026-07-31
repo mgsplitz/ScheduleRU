@@ -22,28 +22,43 @@ Program availability is determined by the reviewed records in the connected D1 d
 1. A Cloudflare Worker periodically downloads the full active-term catalog from the Rutgers Schedule of Classes API.
 2. The Worker writes courses, sections, and meetings to Cloudflare D1 in configurable chunks. It also serves reviewed programs, requirement trees, policies, AP equivalencies, and eligibility rules from the same database.
 3. The static frontend requests those public API records and stores student-entered state in `localStorage`.
-4. Plain JavaScript modules perform requirement allocation, eligibility checks, prerequisite ordering, four-year planning, conflict detection, and schedule ranking in the browser.
+4. Plain JavaScript compatibility modules currently perform requirement allocation, eligibility checks, prerequisite ordering, four-year planning, conflict detection, and schedule ranking in the browser.
 5. If the schedule assistant is configured, the Worker sends only the preference conversation and current preference set to the OpenAI Responses API. The browser—not the model—applies those preferences to verified schedule permutations.
 
 The section catalog is selected by the Worker's `CURRENT_YEAR` and `CURRENT_TERM` configuration. Those values must be updated when the active Rutgers registration term changes.
+
+The repository is undergoing an incremental modular migration. New catalog
+work uses the typed, program-neutral contract in `packages/catalog`; the
+existing frontend and Worker remain compatibility surfaces until each
+replacement passes parity checks. See
+[`docs/architecture/refactor-foundation.md`](docs/architecture/refactor-foundation.md).
 
 ## Technology
 
 | Layer | Technology | Purpose |
 | --- | --- | --- |
-| Frontend | HTML5, CSS, vanilla JavaScript | Single-page planner, catalog, onboarding, and scheduler UI |
+| Frontend | HTML5, CSS, compatibility JavaScript | Current single-page planner while React/Vite modules are migrated incrementally |
 | Client storage | Web Storage (`localStorage`) | Versioned guest plan, preferences, and backend URL override |
 | Backend | Cloudflare Workers | Public JSON API, scheduled catalog sync, admin/import routes, assistant proxy |
 | Database | Cloudflare D1 / SQLite | Catalog, sections, meetings, reviewed programs, rules, policies, and provenance |
 | Course source | Rutgers Schedule of Classes API | Active-term course and section data |
 | Assistant | OpenAI Responses API | Strictly structured schedule-preference translation; optional |
 | Hosting | Static hosting / Cloudflare Pages | Serves `index.html` and the root JavaScript modules |
-| Tests | Node.js built-in test runner | Unit, integration, schema, reviewed-data, and UI contract tests |
-| Operations | Wrangler CLI | Worker development, D1 migrations, secrets, cron configuration, and deployment |
+| Shared contracts | TypeScript | Program-neutral catalog validation and publication |
+| Tests | Node.js built-in test runner | Unit, integration, schema, reviewed-data, UI, and catalog contract tests |
+| Operations | Pinned Wrangler CLI | Worker development, D1 migrations, secrets, cron configuration, and deployment |
 
 ## Repository layout
 
 ```text
+package.json                       npm workspace, verification, and catalog commands
+AGENTS.md                          Repository ownership and safety boundaries
+
+packages/catalog/                  Typed catalog contract, validation, and D1 publication
+tools/catalog/                     Catalog-only validation and development publication CLI
+docs/architecture/                 Maintained architecture and migration boundaries
+docs/catalog-contributor/          Narrow handoff for independent catalog work
+
 index.html                         Static UI and integration code
 course-selector-logic.js           Reviewed course-selector matching
 eligibility-logic.js               Eligibility and prerequisite evaluation
@@ -59,12 +74,15 @@ worker/src/schedule-assistant.js   OpenAI structured-output adapter
 worker/src/*-import.js             Program discovery/import helpers
 worker/schema/schema*.sql          Base and additive D1 schemas
 worker/schema/migrate*.sql         One-time migrations for existing databases
-worker/schema/review*.sql          Reviewed program/rule data
+worker/schema/review*.sql          Legacy reviewed data awaiting contract conversion
 worker/schema/seed*.sql            Draft or seed data; not automatically published
 worker/tests/*.test.mjs            Node test suite
 worker/wrangler.toml               Worker, D1, cron, term, and dev configuration
-docs/                              Design notes and implementation history
 ```
+
+Do not add new program-specific reviewed SQL. Validate and publish new catalog
+definitions through
+[`docs/catalog-contributor/README.md`](docs/catalog-contributor/README.md).
 
 ## Quick start: use the existing development backend
 
@@ -73,6 +91,14 @@ docs/                              Design notes and implementation history
 - A modern browser.
 - Python 3 or another static file server.
 - Node.js if you want to run the tests.
+
+Install the pinned development tools and run the full verification suite:
+
+```bash
+npm install
+npm test
+npm run typecheck
+```
 
 From the repository root, start a static server:
 
@@ -121,12 +147,13 @@ You only need this section if you are developing the API, using your own Cloudfl
 
 ### Prerequisites
 
-- Node.js and `npx`.
+- Node.js and the repository dependencies installed with `npm install`.
 - A Cloudflare account with Workers and D1 access.
 - Wrangler authentication (`npx wrangler login`).
 - An OpenAI API key only if the optional schedule assistant should work.
 
-The repository does not pin a Wrangler version. `npx wrangler ...` will use a locally cached CLI or download one on demand.
+The repository pins Wrangler in `package-lock.json`; `npx wrangler ...` uses
+that workspace version.
 
 ### Existing Cloudflare project
 

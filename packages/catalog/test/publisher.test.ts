@@ -240,3 +240,32 @@ test("does not report publication when the transactional batch fails", async () 
   );
   assert.equal(database.batches.length, 0);
 });
+
+test("large programs stay within free-tier query and D1 bind limits", async () => {
+  const value = definition();
+  const group = (
+    value.requirement_groups as Array<Record<string, unknown>>
+  )[0]!;
+  group.courses = Array.from({ length: 120 }, (_, index) => ({
+    code: `01:999:${String(100 + index).padStart(3, "0")}`,
+    title: `Example course ${index + 1}`,
+    credits: 3,
+    note: null,
+    evidence: {
+      source_id: "requirements",
+      reviewer_note: `Reviewed course ${index + 1}.`,
+      review_status: "reviewed",
+    },
+  }));
+  group.selectors = [];
+  const database = new RecordingDatabase();
+
+  await publishProgramDefinition(database, value, {
+    published_at: 1785456000000,
+  });
+
+  assert.ok(database.batches[0]!.length <= 50);
+  assert.ok(
+    database.batches[0]!.every((statement) => statement.params.length <= 100),
+  );
+});

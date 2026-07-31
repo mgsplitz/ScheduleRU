@@ -159,17 +159,46 @@ function programStatement(
   );
 }
 
+function insertRows(
+  database: CatalogDatabase,
+  table: string,
+  columns: string[],
+  rows: unknown[][],
+): CatalogPreparedStatement[] {
+  if (rows.length === 0) return [];
+  const rowsPerStatement = Math.max(1, Math.floor(100 / columns.length));
+  const statements: CatalogPreparedStatement[] = [];
+  for (let offset = 0; offset < rows.length; offset += rowsPerStatement) {
+    const chunk = rows.slice(offset, offset + rowsPerStatement);
+    const placeholders = chunk
+      .map(() => `(${columns.map(() => "?").join(", ")})`)
+      .join(", ");
+    statements.push(statement(
+      database,
+      `INSERT INTO ${table} (${columns.join(", ")}) VALUES ${placeholders}`,
+      ...chunk.flat(),
+    ));
+  }
+  return statements;
+}
+
 function sourceStatements(
   database: CatalogDatabase,
   definition: ProgramDefinition,
 ): CatalogPreparedStatement[] {
-  return definition.sources.map((source) =>
-    statement(
-      database,
-      `INSERT INTO program_sources (
-         program_id, source_url, source_title, source_catalog_year,
-         source_scope, accessed_at, note
-       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  return insertRows(
+    database,
+    "program_sources",
+    [
+      "program_id",
+      "source_url",
+      "source_title",
+      "source_catalog_year",
+      "source_scope",
+      "accessed_at",
+      "note",
+    ],
+    definition.sources.map((source) => [
       definition.program.id,
       source.url,
       source.title,
@@ -177,52 +206,58 @@ function sourceStatements(
       source.scope,
       source.accessed_at,
       source.note,
-    ));
-}
-
-function groupStatement(
-  database: CatalogDatabase,
-  programId: string,
-  group: RequirementGroupDefinition,
-): CatalogPreparedStatement {
-  return statement(
-    database,
-    `INSERT INTO requirement_groups (
-       id, program_id, parent_group_id, name, display_family,
-       display_priority, rule, count, sort_order, auto_generated
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-    group.id,
-    programId,
-    group.parent_group_id,
-    group.name,
-    group.display_family,
-    group.display_priority,
-    group.rule,
-    group.count,
-    group.sort_order,
+    ]),
   );
 }
 
-function evidenceStatement(
+function groupStatements(
   database: CatalogDatabase,
+  programId: string,
+  groups: RequirementGroupDefinition[],
+): CatalogPreparedStatement[] {
+  return insertRows(
+    database,
+    "requirement_groups",
+    [
+      "id",
+      "program_id",
+      "parent_group_id",
+      "name",
+      "display_family",
+      "display_priority",
+      "rule",
+      "count",
+      "sort_order",
+      "auto_generated",
+    ],
+    groups.map((group) => [
+      group.id,
+      programId,
+      group.parent_group_id,
+      group.name,
+      group.display_family,
+      group.display_priority,
+      group.rule,
+      group.count,
+      group.sort_order,
+      0,
+    ]),
+  );
+}
+
+function evidenceRow(
   definition: ProgramDefinition,
   sources: Map<string, ProgramSourceDefinition>,
   group: RequirementGroupDefinition,
   evidence: EvidenceDefinition,
   courseCode: string | null,
-): CatalogPreparedStatement {
+): unknown[] {
   const source = sourceForEvidence(sources, evidence);
   const entityType = courseCode ? "course" : "group";
   const entityKey = courseCode
     ? `course:${group.id}:${courseCode}`
     : `group:${group.id}`;
-  return statement(
-    database,
-    `INSERT INTO program_requirement_evidence (
-       entity_key, program_id, entity_type, group_id, course_code,
-       source_url, source_title, source_catalog_year, accessed_at,
-       reviewer_note, review_status
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  return [
     entityKey,
     definition.program.id,
     entityType,
@@ -234,53 +269,52 @@ function evidenceStatement(
     source.accessed_at,
     evidence.reviewer_note,
     evidence.review_status,
-  );
+  ];
 }
 
-function groupContentStatements(
-  database: CatalogDatabase,
+interface GroupContentRows {
+  courses: unknown[][];
+  selectors: unknown[][];
+  conditions: unknown[][];
+  evidence: unknown[][];
+}
+
+function groupContentRows(
   definition: ProgramDefinition,
   sources: Map<string, ProgramSourceDefinition>,
-  group: RequirementGroupDefinition,
-): CatalogPreparedStatement[] {
-  const statements: CatalogPreparedStatement[] = [];
-  for (const course of group.courses) {
-    statements.push(
-      statement(
-        database,
-        `INSERT INTO requirement_courses (
-           group_id, course_code, note, source_title, source_credits
-         ) VALUES (?, ?, ?, ?, ?)`,
+  groups: RequirementGroupDefinition[],
+): GroupContentRows {
+  const rows: GroupContentRows = {
+    courses: [],
+    selectors: [],
+    conditions: [],
+    evidence: [],
+  };
+  for (const group of groups) {
+    for (const course of group.courses) {
+      rows.courses.push([
         group.id,
         course.code,
         course.note,
         course.title,
         course.credits === null ? null : String(course.credits),
-      ),
-    );
-    if (course.evidence) {
-      statements.push(
-        evidenceStatement(
-          database,
+      ]);
+      if (course.evidence) {
+        rows.evidence.push(
+          evidenceRow(
           definition,
           sources,
           group,
           course.evidence,
           course.code,
-        ),
-      );
+          ),
+        );
+      }
     }
-  }
-  for (const selector of group.selectors) {
-    const source = sources.get(selector.source_id);
-    if (!source) throw new TypeError(`unknown selector source: ${selector.source_id}`);
-    statements.push(
-      statement(
-        database,
-        `INSERT INTO requirement_course_selectors (
-           group_id, selector_key, selector_json, source_url, source_label,
-           review_status, reviewed_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    for (const selector of group.selectors) {
+      const source = sources.get(selector.source_id);
+      if (!source) throw new TypeError(`unknown selector source: ${selector.source_id}`);
+      rows.selectors.push([
         group.id,
         selector.key,
         JSON.stringify(selector.selector),
@@ -288,41 +322,92 @@ function groupContentStatements(
         selector.source_label,
         selector.review_status,
         selector.reviewed_at,
-      ),
-    );
-  }
-  for (const condition of group.conditions) {
-    const source = sources.get(condition.source_id);
-    if (!source) throw new TypeError(`unknown condition source: ${condition.source_id}`);
-    statements.push(
-      statement(
-        database,
-        `INSERT INTO requirement_group_conditions (
-           group_id, condition_type, condition_value_json, note,
-           source_url, review_status
-         ) VALUES (?, ?, ?, ?, ?, ?)`,
+      ]);
+    }
+    for (const condition of group.conditions) {
+      const source = sources.get(condition.source_id);
+      if (!source) throw new TypeError(`unknown condition source: ${condition.source_id}`);
+      rows.conditions.push([
         group.id,
         condition.type,
         JSON.stringify(condition.value),
         condition.note,
         source.url,
         condition.review_status,
-      ),
-    );
-  }
-  if (group.evidence) {
-    statements.push(
-      evidenceStatement(
-        database,
+      ]);
+    }
+    if (group.evidence) {
+      rows.evidence.push(
+        evidenceRow(
         definition,
         sources,
         group,
         group.evidence,
         null,
-      ),
-    );
+        ),
+      );
+    }
   }
-  return statements;
+  return rows;
+}
+
+function groupContentStatements(
+  database: CatalogDatabase,
+  rows: GroupContentRows,
+): CatalogPreparedStatement[] {
+  return [
+    ...insertRows(
+      database,
+      "requirement_courses",
+      ["group_id", "course_code", "note", "source_title", "source_credits"],
+      rows.courses,
+    ),
+    ...insertRows(
+      database,
+      "requirement_course_selectors",
+      [
+        "group_id",
+        "selector_key",
+        "selector_json",
+        "source_url",
+        "source_label",
+        "review_status",
+        "reviewed_at",
+      ],
+      rows.selectors,
+    ),
+    ...insertRows(
+      database,
+      "requirement_group_conditions",
+      [
+        "group_id",
+        "condition_type",
+        "condition_value_json",
+        "note",
+        "source_url",
+        "review_status",
+      ],
+      rows.conditions,
+    ),
+    ...insertRows(
+      database,
+      "program_requirement_evidence",
+      [
+        "entity_key",
+        "program_id",
+        "entity_type",
+        "group_id",
+        "course_code",
+        "source_url",
+        "source_title",
+        "source_catalog_year",
+        "accessed_at",
+        "reviewer_note",
+        "review_status",
+      ],
+      rows.evidence,
+    ),
+  ];
 }
 
 function eligibilityStatements(
@@ -330,15 +415,10 @@ function eligibilityStatements(
   definition: ProgramDefinition,
   sources: Map<string, ProgramSourceDefinition>,
 ): CatalogPreparedStatement[] {
-  return definition.eligibility_rules.map((rule) => {
+  const rows = definition.eligibility_rules.map((rule) => {
     const source = sources.get(rule.source_id);
     if (!source) throw new TypeError(`unknown eligibility source: ${rule.source_id}`);
-    return statement(
-      database,
-      `INSERT INTO program_eligibility_rules (
-         rule_key, program_id, condition_type, condition_value_json,
-         decision, note, source_url, review_status, verified_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    return [
       rule.key,
       definition.program.id,
       rule.condition_type,
@@ -348,8 +428,24 @@ function eligibilityStatements(
       source.url,
       rule.review_status,
       rule.verified_at,
-    );
+    ];
   });
+  return insertRows(
+    database,
+    "program_eligibility_rules",
+    [
+      "rule_key",
+      "program_id",
+      "condition_type",
+      "condition_value_json",
+      "decision",
+      "note",
+      "source_url",
+      "review_status",
+      "verified_at",
+    ],
+    rows,
+  );
 }
 
 function successfulBatchResult(value: unknown): boolean {
@@ -379,13 +475,10 @@ export async function publishProgramDefinition(
     ...deleteStatements(database, definition.program.id),
     programStatement(database, definition, options.published_at),
     ...sourceStatements(database, definition),
+    ...groupStatements(database, definition.program.id, groups),
   ];
-  for (const group of groups) {
-    statements.push(groupStatement(database, definition.program.id, group));
-    statements.push(
-      ...groupContentStatements(database, definition, sources, group),
-    );
-  }
+  const contentRows = groupContentRows(definition, sources, groups);
+  statements.push(...groupContentStatements(database, contentRows));
   statements.push(...eligibilityStatements(database, definition, sources));
 
   const batchResult = await database.batch(statements);
@@ -415,4 +508,3 @@ export async function publishProgramDefinition(
     published_at: options.published_at,
   };
 }
-
