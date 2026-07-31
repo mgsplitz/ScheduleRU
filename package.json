@@ -1,0 +1,23 @@
+{
+  "name": "scheduleru",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "test": "npm run test:legacy",
+    "test:legacy": "node --test worker/tests/*.test.mjs",
+    "typecheck": "tsc -b packages/catalog tools/catalog",
+    "catalog": "node tools/catalog/src/cli.ts"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
