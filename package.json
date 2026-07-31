@@ -9,7 +9,8 @@
     "tools/*"
   ],
   "scripts": {
-    "test": "npm run test:legacy",
+    "test": "npm run test:catalog && npm run test:legacy",
+    "test:catalog": "node --test packages/catalog/test/*.test.ts",
     "test:legacy": "node --test worker/tests/*.test.mjs",
     "typecheck": "tsc -b packages/catalog tools/catalog",
     "catalog": "node tools/catalog/src/cli.ts"
@@ -18,6 +19,7 @@
     "node": ">=22.18"
   },
   "devDependencies": {
+    "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
   }
 }

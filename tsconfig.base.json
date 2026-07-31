@@ -8,6 +8,9 @@
     "allowImportingTsExtensions": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
+    "types": [
+      "node"
+    ],
     "useUnknownInCatchVariables": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
