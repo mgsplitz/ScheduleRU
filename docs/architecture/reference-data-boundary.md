@@ -40,3 +40,10 @@ export/restore boundary before their remaining seed SQL can be removed.
 5. Extract the separate ingestion backlog, then remove the remaining mixed
    review/seed SQL files once all owned datasets have recovery coverage.
 
+## Completed checkpoint
+
+The reviewed development bundle has been exported, digest-verified, restored,
+and compared across the affected public APIs. Content inserts were removed
+from the school-profile, curriculum-module, and program-selection structural
+schema files. Mixed review SQL remains until the ingestion-backlog boundary is
+implemented.

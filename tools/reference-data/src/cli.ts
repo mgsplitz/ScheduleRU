@@ -7,6 +7,7 @@ import {
   validateReferenceDataBundle,
   type ReferenceDataSnapshotManifest,
 } from "@scheduleru/reference-data";
+import { roundTripReferenceData } from "./parity.ts";
 
 export interface ReferenceDataCliDependencies {
   environment: Record<string, string | undefined>;
@@ -28,6 +29,7 @@ function usage(stderr: (line: string) => void): number {
   stderr("usage: reference-data validate <bundle.json>");
   stderr("       reference-data snapshot --api <development-api-url> --output <snapshot.json>");
   stderr("       reference-data restore --api <development-api-url> --snapshot <snapshot.json> --manifest <manifest.json>");
+  stderr("       reference-data round-trip --api <development-api-url> --snapshot <snapshot.json> --manifest <manifest.json> --report <report.json>");
   return 1;
 }
 
@@ -222,12 +224,66 @@ async function restore(
   return 0;
 }
 
+async function roundTrip(
+  apiValue: string,
+  snapshotFile: string,
+  manifestFile: string,
+  reportFile: string,
+  dependencies: ReferenceDataCliDependencies,
+): Promise<number> {
+  const target = apiAndSecret(apiValue, dependencies);
+  if (!target) return 1;
+  const loaded = await loadSnapshot(
+    snapshotFile,
+    manifestFile,
+    dependencies.stderr,
+  );
+  if (!loaded.ok) return 1;
+  try {
+    const report = await roundTripReferenceData(
+      target.api,
+      loaded.bundle,
+      target.secret,
+      dependencies.fetch,
+    );
+    await writeFile(reportFile, `${JSON.stringify(report, null, 2)}\n`);
+    if (!report.ok) {
+      dependencies.stderr(
+        `reference-data round trip found ${report.differences.length} public API differences`,
+      );
+      return 1;
+    }
+    dependencies.stdout(
+      `reference-data round trip preserved public behavior for ${report.restored_rows} rows`,
+    );
+    return 0;
+  } catch (error) {
+    const detail = error instanceof Error ? `: ${error.message}` : "";
+    dependencies.stderr(`reference-data round trip failed${detail}`);
+    return 1;
+  }
+}
+
 export async function runReferenceDataCli(
   args: string[],
   overrides: Partial<ReferenceDataCliDependencies> = {},
 ): Promise<number> {
   const dependencies = { ...defaults, ...overrides };
   const [command, first, ...rest] = args;
+  if (
+    command === "round-trip"
+    && first === "--api"
+    && rest.length === 7
+    && rest[1] === "--snapshot"
+    && rest[3] === "--manifest"
+    && rest[5] === "--report"
+    && rest[0]
+    && rest[2]
+    && rest[4]
+    && rest[6]
+  ) {
+    return roundTrip(rest[0], rest[2], rest[4], rest[6], dependencies);
+  }
   if (
     command === "snapshot"
     && first === "--api"

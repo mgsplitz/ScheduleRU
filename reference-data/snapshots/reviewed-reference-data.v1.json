@@ -1,0 +1,300 @@
+{
+  "contract_version": 1,
+  "double_count_exceptions": [
+    {
+      "allowed_course_codes": [
+        "33:390:435"
+      ],
+      "note": "For Finance majors, 33:390:435 Real Estate Finance and Mortgage-Backed Securities counts both as the Real Estate concentration requirement and as a Finance-major elective. No other Real Estate concentration course is included in this exception.",
+      "program_a": "rbsnb-finance",
+      "program_b": "rbsnb-real-estate-concentration",
+      "review_status": "reviewed",
+      "source_url": "https://newbrunswick-undergrad-25-26.catalogs.rutgers.edu/pages/UJZs3d8utgfwF9wxIaoR",
+      "verified_at": 1784470101000
+    },
+    {
+      "allowed_course_codes": [
+        "33:620:350",
+        "33:630:368",
+        "33:630:369",
+        "33:630:370",
+        "33:630:401",
+        "33:630:485"
+      ],
+      "note": "Marketing majors may declare Professional Selling. Its two required courses and one approved elective count as Marketing-major electives; this is the published exception to the normal RBS no-overlap rule.",
+      "program_a": "rbsnb-marketing",
+      "program_b": "rbsnb-professional-selling-concentration",
+      "review_status": "reviewed",
+      "source_url": "https://newbrunswick-undergrad-25-26.catalogs.rutgers.edu/pages/xCxv7911FeYjTcoZJR3X",
+      "verified_at": 1784470101000
+    }
+  ],
+  "double_count_rules": [],
+  "program_combination_policies": [
+    {
+      "decision": "blocked",
+      "home_school_slug": "rbsnb",
+      "note": "RBS-New Brunswick students may declare minors only in non-RBS subject areas; RBS Business Administration and Entrepreneurship minors are not permitted.",
+      "policy_key": "rbsnb-no-rbs-minors",
+      "program_a_id": null,
+      "program_a_school_slug": "rbsnb",
+      "program_a_type": "major",
+      "program_b_id": null,
+      "program_b_school_slug": "rbsnb",
+      "program_b_type": "minor",
+      "same_program_family": false,
+      "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures",
+      "verified_at": 1784444123000
+    },
+    {
+      "decision": "blocked",
+      "home_school_slug": "rbsnb",
+      "note": "RBS-New Brunswick students may not double-major with a School of Engineering program because professional-school students must be enrolled in that school to select its major.",
+      "policy_key": "rbsnb-no-soe-second-major",
+      "program_a_id": null,
+      "program_a_school_slug": "rbsnb",
+      "program_a_type": "major",
+      "program_b_id": null,
+      "program_b_school_slug": "soe",
+      "program_b_type": "major",
+      "same_program_family": false,
+      "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures",
+      "verified_at": 1784444123000
+    },
+    {
+      "decision": "blocked",
+      "home_school_slug": "sasnb",
+      "note": "Criminal Justice (202) majors may not minor in Criminology (204).",
+      "policy_key": "sasnb-criminal-justice-major-no-criminology-minor",
+      "program_a_id": "sasnb-criminal-justice-major",
+      "program_a_school_slug": null,
+      "program_a_type": null,
+      "program_b_id": "sasnb-criminology-minor",
+      "program_b_school_slug": null,
+      "program_b_type": null,
+      "same_program_family": false,
+      "source_url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/criminology",
+      "verified_at": 1784548043000
+    },
+    {
+      "decision": "blocked",
+      "home_school_slug": "sasnb",
+      "note": "Economics (220) majors may not minor in Quantitative Economics (221).",
+      "policy_key": "sasnb-economics-major-no-quantitative-economics-minor",
+      "program_a_id": "sasnb-economics-major",
+      "program_a_school_slug": null,
+      "program_a_type": null,
+      "program_b_id": "sasnb-quantitative-economics-minor",
+      "program_b_school_slug": null,
+      "program_b_type": null,
+      "same_program_family": false,
+      "source_url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/economics",
+      "verified_at": 1784521482000
+    },
+    {
+      "decision": "blocked",
+      "home_school_slug": "sasnb",
+      "note": "Government and Business minors may not double minor in Political Science.",
+      "policy_key": "sasnb-government-business-no-political-science",
+      "program_a_id": "sasnb-government-business-minor",
+      "program_a_school_slug": null,
+      "program_a_type": null,
+      "program_b_id": "sasnb-political-science-minor",
+      "program_b_school_slug": null,
+      "program_b_type": null,
+      "same_program_family": false,
+      "source_url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/government-and-business",
+      "verified_at": 1784550699000
+    },
+    {
+      "decision": "blocked",
+      "home_school_slug": "sasnb",
+      "note": "SAS students may not select a major and minor from the same academic program.",
+      "policy_key": "sasnb-no-major-minor-same-program-family",
+      "program_a_id": null,
+      "program_a_school_slug": "sasnb",
+      "program_a_type": "major",
+      "program_b_id": null,
+      "program_b_school_slug": "sasnb",
+      "program_b_type": "minor",
+      "same_program_family": true,
+      "source_url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-restrictions",
+      "verified_at": 1784521482000
+    },
+    {
+      "decision": "blocked",
+      "home_school_slug": "sasnb",
+      "note": "Sociology (920) majors may not minor in Health and Society (502).",
+      "policy_key": "sasnb-sociology-major-no-health-and-society-minor",
+      "program_a_id": "sasnb-sociology-ba",
+      "program_a_school_slug": null,
+      "program_a_type": null,
+      "program_b_id": "sasnb-health-and-society-minor",
+      "program_b_school_slug": null,
+      "program_b_type": null,
+      "same_program_family": false,
+      "source_url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/sociology",
+      "verified_at": 1784550273000
+    }
+  ],
+  "program_selection_limits": [
+    {
+      "home_school_slug": "rbsnb",
+      "max_selected": 1,
+      "note": "RBS-New Brunswick students may declare only one concentration.",
+      "program_type": "concentration",
+      "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures",
+      "verified_at": 1784444123000
+    },
+    {
+      "home_school_slug": "rbsnb",
+      "max_selected": 3,
+      "note": "RBS-New Brunswick students may declare up to three majors.",
+      "program_type": "major",
+      "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures",
+      "verified_at": 1784444123000
+    },
+    {
+      "home_school_slug": "rbsnb",
+      "max_selected": 3,
+      "note": "RBS-New Brunswick students may declare up to three minors. RBS minors themselves are not permitted; see the reviewed combination policy below.",
+      "program_type": "minor",
+      "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures",
+      "verified_at": 1784444123000
+    }
+  ],
+  "requirement_course_equivalencies": [
+    {
+      "equivalent_course_code": "01:198:111",
+      "note": "Introduction to Computer Science satisfies the RBS Computer Applications for Business foundational requirement.",
+      "program_id": "rbsnb-core-curriculum",
+      "requirement_course_code": "01:198:170",
+      "review_status": "reviewed",
+      "source_label": "User-confirmed Degree Navigator behavior, 2026-07-27"
+    },
+    {
+      "equivalent_course_code": "01:198:111",
+      "note": "Introduction to Computer Science satisfies the RBS Computer Applications for Business foundational requirement.",
+      "program_id": "rbsnb-foundational-core",
+      "requirement_course_code": "01:198:170",
+      "review_status": "reviewed",
+      "source_label": "User-confirmed Degree Navigator behavior, 2026-07-27"
+    },
+    {
+      "equivalent_course_code": "01:960:211",
+      "note": "Statistics I is an accepted RBS statistics-foundation substitute; AP Statistics awards Statistics I.",
+      "program_id": "rbsnb-core-curriculum",
+      "requirement_course_code": "01:960:285",
+      "review_status": "reviewed",
+      "source_label": "Rutgers Business School transfer guidance and SAS AP table, reviewed 2026-07-27"
+    },
+    {
+      "equivalent_course_code": "01:960:211",
+      "note": "Statistics I is an accepted RBS statistics-foundation substitute; AP Statistics awards Statistics I.",
+      "program_id": "rbsnb-foundational-core",
+      "requirement_course_code": "01:960:285",
+      "review_status": "reviewed",
+      "source_label": "Rutgers Business School transfer guidance and SAS AP table, reviewed 2026-07-27"
+    }
+  ],
+  "school_curriculum_modules": [
+    {
+      "curriculum_program_id": "rutgers-nb-core-curriculum",
+      "module_type": "core_curriculum",
+      "review_status": "reviewed",
+      "reviewed_at": 1784491583000,
+      "school_slug": "rbsnb",
+      "sort_order": 10,
+      "source_url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core/about-sas-core"
+    },
+    {
+      "curriculum_program_id": "rutgers-nb-core-curriculum",
+      "module_type": "core_curriculum",
+      "review_status": "reviewed",
+      "reviewed_at": 1784521482000,
+      "school_slug": "sasnb",
+      "sort_order": 10,
+      "source_url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core/about-sas-core"
+    }
+  ],
+  "school_profiles": [
+    {
+      "campus_slug": "new-brunswick",
+      "catalog_year": "25-26",
+      "configuration": {
+        "advising_label": "RBS advising",
+        "core_fallback_label": "RBS Core Curriculum",
+        "core_intro": "RBS requires a minimum of 27 Core credits. Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed Core goals. One course is used once within each Core family, while Rutgers permits it to satisfy goals in different families. Click any course for details.",
+        "default_program_id": "rbsnb-bait",
+        "program_type_sections": [
+          {
+            "label": "Certificates",
+            "singular": "Certificate",
+            "type": "certificate"
+          },
+          {
+            "label": "Concentrations",
+            "singular": "Concentration",
+            "type": "concentration"
+          },
+          {
+            "label": "Majors",
+            "singular": "Major",
+            "type": "major"
+          },
+          {
+            "label": "Minors",
+            "singular": "Minor",
+            "type": "minor"
+          }
+        ],
+        "shared_requirement_reference_types": [
+          "major"
+        ]
+      },
+      "institution_slug": "rutgers",
+      "name": "Rutgers Business School - New Brunswick",
+      "review_status": "reviewed",
+      "reviewed_at": 1784490337000,
+      "short_name": "RBS New Brunswick",
+      "slug": "rbsnb",
+      "sort_order": 10,
+      "source_title": "Rutgers-New Brunswick Undergraduate Catalog, 2025-2026",
+      "source_url": "https://newbrunswick-undergrad-25-26.catalogs.rutgers.edu/"
+    },
+    {
+      "campus_slug": "new-brunswick",
+      "catalog_year": "Current official SAS pages (reviewed 2026-07-20)",
+      "configuration": {
+        "advising_label": "SAS and Economics advising",
+        "core_fallback_label": "SAS Core Curriculum",
+        "core_intro": "The Rutgers-New Brunswick Core Curriculum is shared by SAS. Course planning progress is informational; confirm grade, residency, declaration, and transfer decisions with SAS advising.",
+        "default_program_id": "sasnb-economics-major",
+        "program_type_sections": [
+          {
+            "label": "Majors",
+            "singular": "Major",
+            "type": "major"
+          },
+          {
+            "label": "Minors",
+            "singular": "Minor",
+            "type": "minor"
+          }
+        ],
+        "shared_requirement_reference_types": [
+          "major"
+        ]
+      },
+      "institution_slug": "rutgers",
+      "name": "School of Arts and Sciences - New Brunswick",
+      "review_status": "reviewed",
+      "reviewed_at": 1784521482000,
+      "short_name": "SAS New Brunswick",
+      "slug": "sasnb",
+      "sort_order": 20,
+      "source_title": "SAS Majors and Minors",
+      "source_url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/list-of-majors-and-minors"
+    }
+  ]
+}

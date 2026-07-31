@@ -27,34 +27,5 @@ CREATE TABLE IF NOT EXISTS school_profiles (
 CREATE INDEX IF NOT EXISTS idx_school_profiles_visible
   ON school_profiles(review_status, sort_order, name);
 
--- This is intentionally the sole visible school until another school's
--- curriculum, program set, and selection policies are independently reviewed.
-INSERT INTO school_profiles (
-  slug, institution_slug, campus_slug, name, short_name, catalog_year,
-  configuration_json, source_url, source_title, review_status, reviewed_at, sort_order
-) VALUES (
-  'rbsnb',
-  'rutgers',
-  'new-brunswick',
-  'Rutgers Business School - New Brunswick',
-  'RBS New Brunswick',
-  '25-26',
-  '{"default_program_id":"rbsnb-bait","advising_label":"RBS advising","shared_requirement_reference_types":["major"],"core_fallback_label":"RBS Core Curriculum","core_intro":"RBS requires a minimum of 27 Core credits. Completed, scheduled, and eligible AP-equivalent courses are allocated automatically to maximize completed Core goals. One course is used once within each Core family, while Rutgers permits it to satisfy goals in different families. Click any course for details.","program_type_sections":[{"type":"major","label":"Majors","singular":"Major"},{"type":"minor","label":"Minors","singular":"Minor"},{"type":"concentration","label":"Concentrations","singular":"Concentration"},{"type":"certificate","label":"Certificates","singular":"Certificate"}]}',
-  'https://newbrunswick-undergrad-25-26.catalogs.rutgers.edu/',
-  'Rutgers-New Brunswick Undergraduate Catalog, 2025-2026',
-  'reviewed',
-  CAST(strftime('%s', 'now') AS INTEGER) * 1000,
-  10
-)
-ON CONFLICT(slug) DO UPDATE SET
-  institution_slug = excluded.institution_slug,
-  campus_slug = excluded.campus_slug,
-  name = excluded.name,
-  short_name = excluded.short_name,
-  catalog_year = excluded.catalog_year,
-  configuration_json = excluded.configuration_json,
-  source_url = excluded.source_url,
-  source_title = excluded.source_title,
-  review_status = excluded.review_status,
-  reviewed_at = excluded.reviewed_at,
-  sort_order = excluded.sort_order;
+-- Reviewed rows are restored from
+-- reference-data/snapshots/reviewed-reference-data.v1.json.
