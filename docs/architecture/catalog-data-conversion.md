@@ -85,3 +85,23 @@ behavior. It compares:
 
 Any mismatch blocks SQL removal.
 
+## 2026-07-31 checkpoint
+
+All 49 reviewed development programs now validate, export, snapshot, restore,
+and round-trip through the generic boundary. Public API parity is recorded in
+`catalog-data-parity.md`.
+
+Program SQL removal is intentionally deferred to the next dataset checkpoint.
+Several legacy review files combine program definitions with data outside the
+program contract:
+
+- program-combination policies;
+- school profiles and curriculum attachments;
+- double-count exceptions;
+- requirement equivalencies;
+- unresolved source notes.
+
+Deleting only the program statements from those mixed files would leave an
+unreproducible partial migration. The next extraction must give each remaining
+dataset its own validated snapshot and restore boundary. Until then, legacy
+files are rollback inputs only; new catalog work must use definitions.

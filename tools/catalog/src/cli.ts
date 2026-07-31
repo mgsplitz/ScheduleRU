@@ -7,7 +7,10 @@ import {
   type CatalogSnapshotManifest,
   validateProgramDefinition,
 } from "@scheduleru/catalog";
-import { roundTripDevelopmentCatalog } from "./parity.ts";
+import {
+  publishDevelopmentCatalog,
+  roundTripDevelopmentCatalog,
+} from "./parity.ts";
 
 export interface CatalogCliDependencies {
   environment: Record<string, string | undefined>;
@@ -30,6 +33,7 @@ function usage(stderr: (line: string) => void): number {
   stderr("       catalog publish <definition.json> --api <development-api-url>");
   stderr("       catalog snapshot --api <development-api-url> --output <snapshot.jsonl>");
   stderr("       catalog round-trip --api <development-api-url> --snapshot <snapshot.jsonl> --manifest <manifest.json> --report <report.json>");
+  stderr("       catalog restore --api <development-api-url> --snapshot <snapshot.jsonl> --manifest <manifest.json>");
   return 1;
 }
 
@@ -328,6 +332,69 @@ async function roundTripCatalog(
   return 0;
 }
 
+async function loadSnapshot(
+  snapshotFile: string,
+  manifestFile: string,
+  stderr: (line: string) => void,
+) {
+  try {
+    const jsonl = await readFile(snapshotFile, "utf8");
+    const manifest = JSON.parse(
+      await readFile(manifestFile, "utf8"),
+    ) as CatalogSnapshotManifest;
+    return {
+      ok: true as const,
+      definitions: await parseCatalogSnapshot(jsonl, manifest),
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? `: ${error.message}` : "";
+    stderr(`could not read a valid catalog snapshot${detail}`);
+    return { ok: false as const };
+  }
+}
+
+async function restoreCatalog(
+  apiValue: string,
+  snapshotFile: string,
+  manifestFile: string,
+  dependencies: CatalogCliDependencies,
+): Promise<number> {
+  const secret = dependencies.environment.SCHEDULERU_ADMIN_SECRET;
+  if (!secret) {
+    dependencies.stderr(
+      "SCHEDULERU_ADMIN_SECRET must be set in the environment before restore",
+    );
+    return 1;
+  }
+  const api = developmentApiUrl(apiValue);
+  if (!api) {
+    dependencies.stderr(
+      "restore requires an HTTPS development API target (or localhost for local testing)",
+    );
+    return 1;
+  }
+  const snapshot = await loadSnapshot(
+    snapshotFile,
+    manifestFile,
+    dependencies.stderr,
+  );
+  if (!snapshot.ok) return 1;
+  try {
+    const count = await publishDevelopmentCatalog(
+      api,
+      snapshot.definitions,
+      secret,
+      dependencies.fetch,
+    );
+    dependencies.stdout(`restored ${count} reviewed catalog definitions`);
+    return 0;
+  } catch (error) {
+    const detail = error instanceof Error ? `: ${error.message}` : "";
+    dependencies.stderr(`catalog restore failed${detail}`);
+    return 1;
+  }
+}
+
 export async function runCatalogCli(
   args: string[],
   overrides: Partial<CatalogCliDependencies> = {},
@@ -363,6 +430,18 @@ export async function runCatalogCli(
       rest[6],
       dependencies,
     );
+  }
+  if (
+    command === "restore"
+    && file === "--api"
+    && rest.length === 5
+    && rest[1] === "--snapshot"
+    && rest[3] === "--manifest"
+    && rest[0]
+    && rest[2]
+    && rest[4]
+  ) {
+    return restoreCatalog(rest[0], rest[2], rest[4], dependencies);
   }
   if (!command || !file) return usage(dependencies.stderr);
   const loaded = await readDefinition(file, dependencies.stderr);

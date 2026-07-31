@@ -236,6 +236,20 @@ export async function roundTripDevelopmentCatalog(
   );
   const programIds = ordered.map((definition) => definition.program.id);
   const before = await captureCatalogApi(api, programIds, fetcher);
+  await publishDevelopmentCatalog(api, ordered, secret, fetcher);
+  const after = await captureCatalogApi(api, programIds, fetcher);
+  return compareCatalogCaptures(before, after, ordered.length);
+}
+
+export async function publishDevelopmentCatalog(
+  api: URL,
+  definitions: ProgramDefinition[],
+  secret: string,
+  fetcher: typeof globalThis.fetch,
+): Promise<number> {
+  const ordered = [...definitions].sort(
+    (left, right) => left.program.id.localeCompare(right.program.id),
+  );
   for (const definition of ordered) {
     const path = `/api/admin/catalog/program-definitions/${encodeURIComponent(definition.program.id)}`;
     const response = await fetcher(endpoint(api, path), {
@@ -248,6 +262,5 @@ export async function roundTripDevelopmentCatalog(
     });
     await responseJson(response, `publish ${definition.program.id}`);
   }
-  const after = await captureCatalogApi(api, programIds, fetcher);
-  return compareCatalogCaptures(before, after, ordered.length);
+  return ordered.length;
 }

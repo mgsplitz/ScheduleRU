@@ -333,3 +333,47 @@ test("round-trip validates a snapshot, republishes it, and writes a parity repor
   );
   assert.match(messages.join("\n"), /preserved public behavior for 1 programs/);
 });
+
+test("restore validates the entire snapshot before publishing definitions", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "scheduleru-restore-"));
+  const snapshotFile = path.join(directory, "reviewed.jsonl");
+  const manifestFile = path.join(directory, "reviewed.manifest.json");
+  const snapshot = await serializeCatalogSnapshot([definition()], {
+    generated_at: 1785456000000,
+  });
+  await writeFile(snapshotFile, snapshot.jsonl);
+  await writeFile(manifestFile, JSON.stringify(snapshot.manifest));
+  const messages: string[] = [];
+  const requests: Request[] = [];
+
+  const code = await runCatalogCli(
+    [
+      "restore",
+      "--api",
+      "http://127.0.0.1:8787",
+      "--snapshot",
+      snapshotFile,
+      "--manifest",
+      manifestFile,
+    ],
+    {
+      environment: { SCHEDULERU_ADMIN_SECRET: "restore-secret" },
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        return Response.json({ ok: true });
+      },
+      stdout: (line) => messages.push(line),
+      stderr: (line) => messages.push(line),
+    },
+  );
+
+  assert.equal(code, 0);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]!.method, "PUT");
+  assert.equal(
+    requests[0]!.headers.get("Authorization"),
+    "Bearer restore-secret",
+  );
+  assert.doesNotMatch(messages.join("\n"), /restore-secret/);
+  assert.match(messages.join("\n"), /restored 1 reviewed catalog definitions/);
+});

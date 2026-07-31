@@ -79,12 +79,37 @@ weakening the contract for one program.
 The supported requirement rules are:
 
 - `all` and `one_of`, with `count: null`;
-- `min_courses`, `max_courses`, and `min_credits`, with a positive integer
-  `count`.
+- `min_courses`, `max_courses`, `min_credits`, `max_credits`, and
+  `min_distinct_children`, with a positive integer `count`.
 
 Course selectors are generic finite course-code lists or bounded
 school/subject/level ranges. If an official rule cannot be represented without
 guessing, stop and record the exact source language as a blocker.
+
+## Reviewed snapshot and recovery
+
+Export every reviewed definition from development:
+
+```bash
+SCHEDULERU_ADMIN_SECRET="<development secret>" \
+  npm run catalog -- snapshot \
+  --api https://<development-worker-host> \
+  --output catalog/snapshots/reviewed-programs.v1.jsonl
+```
+
+The command writes a matching `.manifest.json` with the program inventory and
+SHA-256 digest. Restore validates the entire snapshot and digest before the
+first publication:
+
+```bash
+SCHEDULERU_ADMIN_SECRET="<development secret>" \
+  npm run catalog -- restore \
+  --api https://<development-worker-host> \
+  --snapshot catalog/snapshots/reviewed-programs.v1.jsonl \
+  --manifest catalog/snapshots/reviewed-programs.v1.manifest.json
+```
+
+Both commands reject production API targets.
 
 ## Review handoff
 
