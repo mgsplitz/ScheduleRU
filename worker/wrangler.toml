@@ -17,6 +17,7 @@ database_name = "rutgers_courses"
 database_id = "d2faadfd-d361-46a9-a4eb-ae380b295748"   # printed by `wrangler d1 create`
 
 [vars]
+ENVIRONMENT = "production"
 CURRENT_YEAR = "2026"
 CURRENT_TERM = "9"          # 0=Winter 1=Spring 7=Summer 9=Fall
 # Optional non-secret override for the server-side preference translator.
@@ -51,6 +52,7 @@ database_name = "rutgers_courses_dev"
 database_id = "566147eb-e368-4293-a65a-41429e44a3cf"
 
 [env.dev.vars]
+ENVIRONMENT = "development"
 CURRENT_YEAR = "2026"
 CURRENT_TERM = "9"
 SCHEDULE_ASSISTANT_MODEL = "gpt-4o-mini"

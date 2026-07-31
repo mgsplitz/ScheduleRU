@@ -44,12 +44,13 @@
 
 import { handleProgramsApi } from "./programs.js";
 import { handleScheduleAssistantRequest } from "./schedule-assistant.js";
+import { handleCatalogAdminRequest } from "./catalog-admin.js";
 
 const RUTGERS_BASE = "https://sis.rutgers.edu/soc/api";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
 };
 
 function json(data, status = 200) {
@@ -416,6 +417,9 @@ async function handleApi(request, env, ctx) {
     for (const [header, value] of Object.entries(CORS_HEADERS)) response.headers.set(header, value);
     return response;
   }
+
+  const catalogAdminResult = await handleCatalogAdminRequest(request, env);
+  if (catalogAdminResult) return catalogAdminResult;
 
   if (path === "/api/config") {
     const configuration = activeTermConfiguration(env);
