@@ -215,15 +215,24 @@ class DefinitionValidator {
     if (selector.version !== 1) {
       this.issue(`${path}.selector.version`, "invalid_selector", "must be version 1");
     }
-    this.string(selector.label, `${path}.selector.label`);
+    if (selector.label !== undefined) {
+      this.string(selector.label, `${path}.selector.label`);
+    }
     if (selector.kind === "course_codes") {
-      if (!Array.isArray(selector.course_codes) || selector.course_codes.length === 0) {
-        this.issue(`${path}.selector.course_codes`, "invalid_selector", "must contain course codes");
+      if (
+        !Array.isArray(selector.include_course_codes)
+        || selector.include_course_codes.length === 0
+      ) {
+        this.issue(
+          `${path}.selector.include_course_codes`,
+          "invalid_selector",
+          "must contain course codes",
+        );
       } else {
-        selector.course_codes.forEach((code, index) => {
+        selector.include_course_codes.forEach((code, index) => {
           if (typeof code !== "string" || !COURSE_CODE_RE.test(code)) {
             this.issue(
-              `${path}.selector.course_codes[${index}]`,
+              `${path}.selector.include_course_codes[${index}]`,
               "invalid_course_code",
               "must use NN:NNN:NNN",
             );

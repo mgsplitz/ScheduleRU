@@ -235,6 +235,21 @@ test("accepts every count-based rule used by reviewed requirements", () => {
   }
 });
 
+test("accepts reviewed curriculum modules and selectors with generated labels", () => {
+  for (const type of ["core_curriculum", "shared_requirement_set"]) {
+    const value = validDefinition();
+    (value.program as Record<string, unknown>).type = type;
+    const selector = (
+      (
+        value.requirement_groups as Array<Record<string, unknown>>
+      )[1]!.selectors as Array<Record<string, unknown>>
+    )[0]!.selector as Record<string, unknown>;
+    delete selector.label;
+
+    assert.equal(validateProgramDefinition(value).ok, true);
+  }
+});
+
 test("rejects duplicate course codes inside one requirement group", () => {
   const value = validDefinition();
   const courses = (

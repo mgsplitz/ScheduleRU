@@ -68,7 +68,7 @@ function definition(): Record<string, unknown> {
             selector: {
               version: 1,
               kind: "course_codes",
-              course_codes: ["01:999:101"],
+              include_course_codes: ["01:999:101"],
               label: "Required introduction",
             },
           },

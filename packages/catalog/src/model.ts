@@ -3,6 +3,8 @@ export const PROGRAM_TYPES = [
   "minor",
   "concentration",
   "certificate",
+  "core_curriculum",
+  "shared_requirement_set",
 ] as const;
 
 export const REVIEW_STATUSES = [
@@ -74,15 +76,16 @@ export interface SubjectLevelSelector {
   course_number_max: number;
   minimum_credits?: number;
   exclude_course_codes?: string[];
-  label: string;
+  label?: string;
 }
 
 export interface FiniteListSelector {
   version: 1;
   kind: "course_codes";
-  course_codes: string[];
+  include_course_codes: string[];
   minimum_credits?: number;
-  label: string;
+  exclude_course_codes?: string[];
+  label?: string;
 }
 
 export type CourseSelector = SubjectLevelSelector | FiniteListSelector;

@@ -1,4 +1,5 @@
 import {
+  CatalogExportValidationError,
   exportProgramDefinition,
   listReviewedProgramIds,
   publishProgramDefinition,
@@ -73,6 +74,9 @@ export async function handleCatalogAdminRequest(
       )(env.DB, programId);
       return json({ definition });
     } catch (error) {
+      if (error instanceof CatalogExportValidationError) {
+        return json({ issues: error.issues }, 422);
+      }
       if (
         error instanceof Error
         && error.message.startsWith("reviewed program not found:")

@@ -8,6 +8,7 @@ import type {
   RequirementCourseDefinition,
   RequirementGroupDefinition,
   RequirementRule,
+  ValidationIssue,
 } from "./model.ts";
 import { validateProgramDefinition } from "./validation.ts";
 
@@ -21,6 +22,20 @@ export interface CatalogReadPreparedStatement {
 
 export interface CatalogReadDatabase {
   prepare(sql: string): CatalogReadPreparedStatement;
+}
+
+export class CatalogExportValidationError extends TypeError {
+  readonly issues: ValidationIssue[];
+
+  constructor(issues: ValidationIssue[]) {
+    super(
+      issues
+        .map((issue) => `${issue.path} [${issue.code}]: ${issue.message}`)
+        .join("; "),
+    );
+    this.name = "CatalogExportValidationError";
+    this.issues = issues;
+  }
 }
 
 interface SourceSeed {
@@ -449,11 +464,7 @@ export async function exportProgramDefinition(
   };
   const result = validateProgramDefinition(definition);
   if (!result.ok) {
-    throw new TypeError(
-      result.issues
-        .map((issue) => `${issue.path} [${issue.code}]: ${issue.message}`)
-        .join("; "),
-    );
+    throw new CatalogExportValidationError(result.issues);
   }
   return result.value;
 }

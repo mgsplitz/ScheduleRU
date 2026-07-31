@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { CatalogExportValidationError } from "../../packages/catalog/src/index.ts";
 import { handleCatalogAdminRequest } from "../src/catalog-admin.js";
 
 function definition() {
@@ -166,6 +167,28 @@ test("blocks catalog exports outside the development Worker", async () => {
   assert.deepEqual(await body(response), {
     error: "catalog export is development-only",
   });
+});
+
+test("returns structured development diagnostics for invalid exported rows", async () => {
+  const issue = {
+    path: "requirement_groups[0].count",
+    code: "invalid_rule_count",
+    message: "must be a positive integer for this rule",
+  };
+  const response = await handleCatalogAdminRequest(
+    request("/api/admin/catalog/program-definitions/sasnb-example-minor", {
+      headers: { Authorization: "Bearer test-secret" },
+    }),
+    environment(),
+    {
+      exportProgramDefinition: async () => {
+        throw new CatalogExportValidationError([issue]);
+      },
+    },
+  );
+
+  assert.equal(response.status, 422);
+  assert.deepEqual(await body(response), { issues: [issue] });
 });
 
 test("validation returns path-addressed issues without writing", async () => {
