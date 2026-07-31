@@ -9,10 +9,11 @@
     "tools/*"
   ],
   "scripts": {
-    "test": "npm run test:catalog && npm run test:legacy",
+    "test": "npm run test:data && npm run test:legacy",
+    "test:data": "node --test packages/catalog/test/*.test.ts tools/catalog/test/*.test.ts packages/reference-data/test/*.test.ts",
     "test:catalog": "node --test packages/catalog/test/*.test.ts tools/catalog/test/*.test.ts",
     "test:legacy": "node --test worker/tests/*.test.mjs",
-    "typecheck": "tsc -b packages/catalog tools/catalog",
+    "typecheck": "tsc -b packages/catalog packages/reference-data tools/catalog",
     "catalog": "node tools/catalog/src/cli.ts"
   },
   "engines": {
