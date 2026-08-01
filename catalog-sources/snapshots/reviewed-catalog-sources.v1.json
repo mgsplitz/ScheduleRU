@@ -1,0 +1,31 @@
+{
+  "contract_version": 1,
+  "sources": [
+    {
+      "adapter": "html_program_directory_v1",
+      "catalog_year": "Official SAS directory",
+      "directory_url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/list-of-majors-and-minors",
+      "enabled": true,
+      "id": "sasnb-official-directory",
+      "identity_overrides": [
+        {
+          "program_id": "sasnb-criminal-justice-major",
+          "program_slug": "criminal-justice",
+          "type": "major"
+        },
+        {
+          "program_id": "sasnb-health-and-society-minor",
+          "program_slug": "health-and-society",
+          "type": "minor"
+        }
+      ],
+      "owner_labels": [
+        "SAS",
+        "SAS/ SC&I"
+      ],
+      "profile_path": "/majors-and-core-curriculum/major/major-minor-details/",
+      "school_slug": "sasnb",
+      "source_title": "SAS Majors and Minors"
+    }
+  ]
+}

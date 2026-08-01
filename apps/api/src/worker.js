@@ -49,6 +49,7 @@ import {
 import {
   handleCatalogAdminRequest,
   handleCatalogIngestionAdminRequest,
+  handleCatalogSourcesAdminRequest,
   handleReferenceDataAdminRequest,
 } from "./index.js";
 
@@ -430,6 +431,10 @@ async function handleApi(request, env, ctx) {
   const referenceDataAdminResult =
     await handleReferenceDataAdminRequest(request, env);
   if (referenceDataAdminResult) return referenceDataAdminResult;
+
+  const catalogSourcesAdminResult =
+    await handleCatalogSourcesAdminRequest(request, env);
+  if (catalogSourcesAdminResult) return catalogSourcesAdminResult;
 
   const catalogIngestionAdminResult =
     await handleCatalogIngestionAdminRequest(request, env);

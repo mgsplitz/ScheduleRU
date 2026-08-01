@@ -5,3 +5,6 @@ export {
 export {
   handleReferenceDataAdminRequest,
 } from "./reference-data-admin.js";
+export {
+  handleCatalogSourcesAdminRequest,
+} from "./catalog-sources-admin.js";
