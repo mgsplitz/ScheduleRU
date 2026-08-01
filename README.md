@@ -84,8 +84,7 @@ worker/src/worker.js               Temporary compatibility export for older tool
 worker/src/programs.js             Program, requirement, policy, and admin APIs
 worker/src/schedule-assistant.js   OpenAI structured-output adapter
 worker/src/*-import.js             Program discovery/import helpers
-worker/schema/schema*.sql          Base and additive D1 schemas
-worker/schema/migrate*.sql         One-time migrations for existing databases
+migrations/                        Structural D1 schemas and compatibility migrations
 worker/tests/*.test.mjs            Node test suite
 worker/wrangler.toml               Worker, D1, cron, term, and dev configuration
 ```
@@ -191,19 +190,19 @@ npx wrangler d1 create rutgers_courses_dev
 Initialize the catalog tables:
 
 ```bash
-npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=schema/schema.sql
+npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=../migrations/schema.sql
 ```
 
 Initialize the base program/requirement tables:
 
 ```bash
-npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=schema/schema_programs.sql
+npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=../migrations/schema_programs.sql
 ```
 
 Create the structural AP-equivalency table in development:
 
 ```bash
-npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=schema/schema_ap_equivalencies.sql
+npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=../migrations/schema_ap_equivalencies.sql
 ```
 
 AP choices require both the structural table and the validated reference-data
@@ -232,18 +231,18 @@ approval-only. Do not run either until the production change has been
 explicitly approved:
 
 ```bash
-npx wrangler d1 execute rutgers_courses --remote --file=schema/schema_ap_equivalencies.sql
+npx wrangler d1 execute rutgers_courses --remote --file=../migrations/schema_ap_equivalencies.sql
 ```
 
 The data publication must use the separately approved production operations
 process; the contributor CLI intentionally refuses production targets.
 
-Important: the repository currently has no consolidated migration runner. The
-planner data model was built through additive `schema_*.sql` and
-`migrate_*.sql` files. Their headers state their dependencies and whether they
-are safe to rerun. A new database needs those structural schemas in dependency
-order, followed by validated catalog and reference-data restoration. Do not
-blindly execute every SQL file: some are one-time `ALTER TABLE` migrations.
+The structural inventory and new-database order are maintained in
+[`migrations/README.md`](migrations/README.md). Do not blindly execute every SQL
+file: compatibility migrations using `ALTER TABLE` are one-time operations for
+older databases. After structure is ready, restore validated catalog,
+reference-data, and catalog-source snapshots through their contributor
+commands.
 
 At minimum, `schema.sql` is required for the course catalog API. The planner's program, Core, eligibility, policy, and AP features require their corresponding schemas and reviewed records.
 

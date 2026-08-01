@@ -4,7 +4,7 @@ import test from "node:test";
 
 const [schema, snapshot] = await Promise.all([
   readFile(
-    new URL("../schema/schema_double_count_policies.sql", import.meta.url),
+    new URL("../../migrations/schema_double_count_policies.sql", import.meta.url),
     "utf8",
   ),
   readFile(

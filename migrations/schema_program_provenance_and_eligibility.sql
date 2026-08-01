@@ -8,7 +8,7 @@
 --
 -- Apply to one environment at a time. For development:
 --   npx.cmd wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/schema_program_provenance_and_eligibility.sql
+--     --file=../migrations/schema_program_provenance_and_eligibility.sql
 
 CREATE TABLE IF NOT EXISTS program_sources (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

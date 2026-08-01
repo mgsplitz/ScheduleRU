@@ -7,7 +7,7 @@
 -- when it is not offered this term.
 --
 -- Run once against the hosted database:
---   wrangler d1 execute rutgers_courses --remote --file=schema_requirement_course_metadata.sql
+--   wrangler d1 execute rutgers_courses --remote --file=../migrations/schema_requirement_course_metadata.sql
 
 ALTER TABLE requirement_courses ADD COLUMN source_title TEXT;
 ALTER TABLE requirement_courses ADD COLUMN source_credits TEXT;

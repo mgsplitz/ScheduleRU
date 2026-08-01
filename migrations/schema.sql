@@ -1,5 +1,5 @@
 -- Rutgers course catalog — D1 schema (v2)
--- Run with: wrangler d1 execute rutgers_courses --file=schema.sql --remote
+-- Run with: wrangler d1 execute rutgers_courses --file=../migrations/schema.sql --remote
 --
 -- CHANGED FROM v1:
 --   - tracked_subjects is GONE. Rutgers' courses.json ignores the subject

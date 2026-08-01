@@ -5,7 +5,7 @@
 -- program data, rather than hardcoding course-specific behavior in the UI.
 --
 -- Run once against the hosted database:
---   wrangler d1 execute rutgers_courses --remote --file=schema_requirement_course_equivalencies.sql
+--   wrangler d1 execute rutgers_courses --remote --file=../migrations/schema_requirement_course_equivalencies.sql
 
 CREATE TABLE IF NOT EXISTS requirement_course_equivalencies (
   program_id TEXT NOT NULL REFERENCES programs(id),

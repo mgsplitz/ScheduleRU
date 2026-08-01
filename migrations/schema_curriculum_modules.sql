@@ -8,7 +8,7 @@
 --
 -- Apply to one environment at a time. For development:
 --   npx.cmd wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/schema_curriculum_modules.sql
+--     --file=../migrations/schema_curriculum_modules.sql
 --
 -- Catalog programs are restored from the catalog snapshot. School attachments
 -- are restored from the reference-data snapshot.

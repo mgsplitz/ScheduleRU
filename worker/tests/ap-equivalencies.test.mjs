@@ -21,7 +21,7 @@ function database(rows) {
 
 test("AP equivalency schema is structural and reviewed rows are portable", async () => {
   const [schema, snapshot] = await Promise.all([
-    readFile(new URL("../schema/schema_ap_equivalencies.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../migrations/schema_ap_equivalencies.sql", import.meta.url), "utf8"),
     readFile(
       new URL("../../reference-data/snapshots/reviewed-reference-data.v1.json", import.meta.url),
       "utf8",
@@ -45,10 +45,10 @@ test("AP equivalency schema is structural and reviewed rows are portable", async
 test("AP runbook is dev-first, snapshot-backed, and smoke-testable", async () => {
   const [readme, schema] = await Promise.all([
     readFile(new URL("../../README.md", import.meta.url), "utf8"),
-    readFile(new URL("../schema/schema_ap_equivalencies.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../migrations/schema_ap_equivalencies.sql", import.meta.url), "utf8"),
   ]);
 
-  assert.match(readme, /npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=schema\/schema_ap_equivalencies\.sql/);
+  assert.match(readme, /npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=\.\.\/migrations\/schema_ap_equivalencies\.sql/);
   assert.match(readme, /npm run reference-data -- restore/);
   assert.match(readme, /reviewed-reference-data\.v1\.json/);
   assert.match(readme, /approval-only/);

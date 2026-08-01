@@ -8,7 +8,7 @@
 --
 -- Development command:
 --   npx.cmd wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/migrate_program_academic_metadata.sql
+--     --file=../migrations/migrate_program_academic_metadata.sql
 
 ALTER TABLE programs ADD COLUMN academic_program_code TEXT;
 ALTER TABLE programs ADD COLUMN degree_type TEXT;

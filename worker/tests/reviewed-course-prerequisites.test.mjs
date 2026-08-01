@@ -9,7 +9,7 @@ const snapshot = JSON.parse(await readFile(
   ),
   "utf8",
 ));
-const schemaFiles = await readdir(new URL("../schema/", import.meta.url));
+const schemaFiles = await readdir(new URL("../../migrations/", import.meta.url));
 
 function review(courseCode) {
   return snapshot.course_eligibility_reviews.find(

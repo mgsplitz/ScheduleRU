@@ -8,7 +8,7 @@
 -- into every major.
 --
 -- Run once against the hosted database:
---   wrangler d1 execute rutgers_courses --remote --file=schema_shared_requirement_sets.sql
+--   wrangler d1 execute rutgers_courses --remote --file=../migrations/schema_shared_requirement_sets.sql
 
 CREATE TABLE IF NOT EXISTS program_requirement_sets (
   program_id TEXT NOT NULL REFERENCES programs(id),
