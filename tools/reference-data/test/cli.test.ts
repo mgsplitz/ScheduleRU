@@ -17,6 +17,7 @@ function bundle() {
     program_selection_limits: [],
     program_combination_policies: [],
     double_count_rules: [],
+    double_count_policies: [],
     double_count_exceptions: [],
     requirement_course_equivalencies: [],
     ap_equivalencies: [],

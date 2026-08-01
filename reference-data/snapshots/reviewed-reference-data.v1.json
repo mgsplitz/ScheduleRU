@@ -758,6 +758,24 @@
       "verified_at": 1784470101000
     }
   ],
+  "double_count_policies": [
+    {
+      "max_shared_courses": 0,
+      "note": "No course may ever be double-counted between an RBS major and an RBS concentration. Concentration courses must be entirely on top of the major's required courses.",
+      "school_slug": "rbsnb",
+      "scope": "major_concentration",
+      "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/policies-procedures",
+      "verified_at": 1784392629000
+    },
+    {
+      "max_shared_courses": 1,
+      "note": "Students with 2+ RBS majors may double-count exactly ONE course, ONE TIME, across their entire Bachelor's degree. This is a per-student cap across all their RBS majors combined -- not one course per pair of majors.",
+      "school_slug": "rbsnb",
+      "scope": "major_major",
+      "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/seniors",
+      "verified_at": 1784392629000
+    }
+  ],
   "double_count_rules": [],
   "program_combination_policies": [
     {

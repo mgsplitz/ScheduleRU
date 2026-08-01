@@ -270,6 +270,33 @@ class Validator {
     });
 
     this.array(
+      value.double_count_policies,
+      "double_count_policies",
+      (row, path) => {
+        const school = this.identifier(row.school_slug, `${path}.school_slug`)
+          ? String(row.school_slug)
+          : "";
+        const scope = String(row.scope);
+        if (!["major_major", "major_concentration"].includes(scope)) {
+          this.issue(
+            `${path}.scope`,
+            "invalid_scope",
+            "must be major_major or major_concentration",
+          );
+        }
+        if (row.max_shared_courses !== null) {
+          this.integer(row.max_shared_courses, `${path}.max_shared_courses`);
+        }
+        this.string(row.note, `${path}.note`);
+        this.sourceUrl(row.source_url, `${path}.source_url`);
+        this.timestamp(row.verified_at, `${path}.verified_at`);
+        return school && ["major_major", "major_concentration"].includes(scope)
+          ? `${school}:${scope}`
+          : null;
+      },
+    );
+
+    this.array(
       value.double_count_exceptions,
       "double_count_exceptions",
       (row, path) => {

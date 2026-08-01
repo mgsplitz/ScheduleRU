@@ -3,6 +3,7 @@ import type {
   CourseEligibilityCondition,
   CourseEligibilityReview,
   DoubleCountException,
+  DoubleCountPolicy,
   DoubleCountRule,
   ProgramCombinationPolicy,
   ProgramSelectionLimit,
@@ -88,6 +89,7 @@ export async function exportReferenceDataBundle(
     limitRows,
     policyRows,
     doubleCountRuleRows,
+    doubleCountPolicyRows,
     doubleCountExceptionRows,
     equivalencyRows,
     apEquivalencyRows,
@@ -135,6 +137,14 @@ export async function exportReferenceDataBundle(
        SELECT program_a, program_b, max_shared_credits, note
        FROM double_count_rules
        ORDER BY program_a, program_b`,
+    ),
+    allRows(
+      database,
+      `/* reference-data-export:double-count-policies */
+       SELECT school_slug, scope, max_shared_courses, note, source_url,
+              verified_at
+       FROM double_count_policies
+       ORDER BY school_slug, scope`,
     ),
     allRows(
       database,
@@ -236,6 +246,15 @@ export async function exportReferenceDataBundle(
     max_shared_credits: nullableNumber(row.max_shared_credits),
     note: nullableString(row.note),
   }));
+  const doubleCountPolicies: DoubleCountPolicy[] =
+    doubleCountPolicyRows.map((row) => ({
+      school_slug: stringValue(row.school_slug),
+      scope: stringValue(row.scope) as DoubleCountPolicy["scope"],
+      max_shared_courses: nullableNumber(row.max_shared_courses),
+      note: stringValue(row.note),
+      source_url: stringValue(row.source_url),
+      verified_at: integerValue(row.verified_at),
+    }));
   const doubleCountExceptions: DoubleCountException[] =
     doubleCountExceptionRows.map((row, index) => ({
       program_a: stringValue(row.program_a),
@@ -317,6 +336,7 @@ export async function exportReferenceDataBundle(
     program_selection_limits: limits,
     program_combination_policies: policies,
     double_count_rules: doubleCountRules,
+    double_count_policies: doubleCountPolicies,
     double_count_exceptions: doubleCountExceptions,
     requirement_course_equivalencies: equivalencies,
     ap_equivalencies: apEquivalencies,

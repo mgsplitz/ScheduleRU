@@ -50,6 +50,23 @@ test("rejects duplicate natural keys and malformed course codes", () => {
   assert.ok(result.issues.some(({ code }) => code === "invalid_course_code"));
 });
 
+test("validates school-wide double-count policy scopes and caps", () => {
+  const value = bundle();
+  const rows = value.double_count_policies as Array<Record<string, unknown>>;
+  rows[0]!.scope = "invented_scope";
+  rows[0]!.max_shared_courses = -1;
+  const result = validateReferenceDataBundle(value);
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.deepEqual(
+    result.issues.map(({ path }) => path),
+    [
+      "double_count_policies[0].scope",
+      "double_count_policies[0].max_shared_courses",
+    ],
+  );
+});
+
 test("validates reviewed course eligibility facts and condition values", () => {
   const value = bundle();
   const reviews =

@@ -100,6 +100,14 @@ function rows(): Record<string, Row[]> {
       max_shared_credits: 6,
       note: "Six shared credits.",
     }],
+    "double-count-policies": [{
+      school_slug: "example-school",
+      scope: "major_major",
+      max_shared_courses: 1,
+      note: "One shared course is permitted.",
+      source_url: "https://example.rutgers.edu/overlap",
+      verified_at: 1785456000000,
+    }],
     "double-count-exceptions": [{
       program_a: "example-major",
       program_b: "other-minor",
@@ -185,6 +193,7 @@ test("exports all cross-program datasets and decodes stored JSON", async () => {
     "selection-limits",
     "combination-policies",
     "double-count-rules",
+    "double-count-policies",
     "double-count-exceptions",
     "equivalencies",
     "ap-equivalencies",

@@ -48,8 +48,8 @@ reference data.
 
 The original seven-dataset development bundle was exported, digest-verified,
 restored, and compared across the affected public APIs. The portable snapshot
-now covers ten reference datasets and 64 rows, including reviewed course
-eligibility and 37 reviewed AP score bands. Its local digest and contract are
+now covers eleven reference datasets and 66 rows, including reviewed course
+eligibility, 37 reviewed AP score bands, and school-wide overlap caps. Its local digest and contract are
 verified. AP output is included in parity capture. A fresh development round
 trip must be recorded after deploying the expanded development-only admin
 endpoint; until then no parity report is kept beside the newer snapshot.

@@ -7,11 +7,12 @@
     "program_selection_limits": 3,
     "program_combination_policies": 7,
     "double_count_rules": 0,
+    "double_count_policies": 2,
     "double_count_exceptions": 2,
     "requirement_course_equivalencies": 4,
     "ap_equivalencies": 37,
     "course_eligibility_reviews": 3,
     "course_eligibility_conditions": 4
   },
-  "sha256": "0f7285deb03aa7095f50b68fd5cc26fd3ca9c5e8ade4f42611b8918b2b6f6e1e"
+  "sha256": "03aaa5bca20130c3c65cb868639fb8f16ec79b360bcc0d543fda38e90c58fa12"
 }

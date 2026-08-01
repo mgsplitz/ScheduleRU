@@ -17,6 +17,7 @@ export interface ReferenceDataPublishResult {
     program_selection_limits: number;
     program_combination_policies: number;
     double_count_rules: number;
+    double_count_policies: number;
     double_count_exceptions: number;
     requirement_course_equivalencies: number;
     ap_equivalencies: number;
@@ -51,6 +52,7 @@ export async function publishReferenceDataBundle(
     statement(database, "DELETE FROM ap_equivalencies"),
     statement(database, "DELETE FROM requirement_course_equivalencies"),
     statement(database, "DELETE FROM double_count_exceptions"),
+    statement(database, "DELETE FROM double_count_policies"),
     statement(database, "DELETE FROM double_count_rules"),
     statement(database, "DELETE FROM program_combination_policies"),
     statement(database, "DELETE FROM program_selection_limits"),
@@ -144,6 +146,20 @@ export async function publishReferenceDataBundle(
       row.program_b,
       row.max_shared_credits,
       row.note,
+    ));
+  }
+  for (const row of ordered(bundle.double_count_policies)) {
+    statements.push(statement(
+      database,
+      `INSERT INTO double_count_policies (
+         school_slug, scope, max_shared_courses, note, source_url, verified_at
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
+      row.school_slug,
+      row.scope,
+      row.max_shared_courses,
+      row.note,
+      row.source_url,
+      row.verified_at,
     ));
   }
   for (const row of ordered(bundle.double_count_exceptions)) {
@@ -246,6 +262,7 @@ export async function publishReferenceDataBundle(
       program_selection_limits: bundle.program_selection_limits.length,
       program_combination_policies: bundle.program_combination_policies.length,
       double_count_rules: bundle.double_count_rules.length,
+      double_count_policies: bundle.double_count_policies.length,
       double_count_exceptions: bundle.double_count_exceptions.length,
       requirement_course_equivalencies:
         bundle.requirement_course_equivalencies.length,

@@ -57,6 +57,7 @@ test("replaces every managed dataset in one ordered batch", async () => {
     program_selection_limits: 1,
     program_combination_policies: 1,
     double_count_rules: 1,
+    double_count_policies: 1,
     double_count_exceptions: 1,
     requirement_course_equivalencies: 1,
     ap_equivalencies: 1,
@@ -71,6 +72,7 @@ test("replaces every managed dataset in one ordered batch", async () => {
       < sql.findIndex((value) => value.includes("DELETE FROM school_profiles")),
   );
   assert.match(sql.join("\n"), /INSERT INTO requirement_course_equivalencies/);
+  assert.match(sql.join("\n"), /INSERT INTO double_count_policies/);
   assert.match(sql.join("\n"), /INSERT INTO ap_equivalencies/);
   assert.match(sql.join("\n"), /INSERT INTO course_eligibility_reviews/);
   assert.match(sql.join("\n"), /INSERT INTO course_eligibility_conditions/);

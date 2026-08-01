@@ -67,6 +67,15 @@ export interface DoubleCountRule {
   note: string | null;
 }
 
+export interface DoubleCountPolicy {
+  school_slug: string;
+  scope: "major_major" | "major_concentration";
+  max_shared_courses: number | null;
+  note: string;
+  source_url: string;
+  verified_at: number;
+}
+
 export interface DoubleCountException {
   program_a: string;
   program_b: string;
@@ -140,6 +149,7 @@ export interface ReferenceDataBundle {
   program_selection_limits: ProgramSelectionLimit[];
   program_combination_policies: ProgramCombinationPolicy[];
   double_count_rules: DoubleCountRule[];
+  double_count_policies: DoubleCountPolicy[];
   double_count_exceptions: DoubleCountException[];
   requirement_course_equivalencies: RequirementCourseEquivalency[];
   ap_equivalencies: ApEquivalency[];
