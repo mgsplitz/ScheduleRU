@@ -8,6 +8,9 @@ import {
 
 const IDENTIFIER_RE = /^[a-z0-9][a-z0-9-]{1,119}$/;
 const COURSE_CODE_RE = /^\d{2}:\d{3}:\d{3}$/;
+const REQUIREMENT_ID_RE = /^\d{8}$/;
+const CAMPUS_CODE_RE = /^[A-Z]{2,10}$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const COURSE_ELIGIBILITY_STATUSES = ["draft", "reviewed", "stale"];
 const COURSE_ELIGIBILITY_CONDITION_TYPES = [
   "prerequisite_course",
@@ -51,6 +54,22 @@ class Validator {
   integer(value: unknown, path: string, minimum = 0): value is number {
     if (Number.isInteger(value) && Number(value) >= minimum) return true;
     this.issue(path, "invalid_integer", `must be an integer of at least ${minimum}`);
+    return false;
+  }
+
+  number(value: unknown, path: string, minimum = 0): value is number {
+    if (typeof value === "number" && Number.isFinite(value) && value >= minimum) {
+      return true;
+    }
+    this.issue(path, "invalid_number", `must be a number of at least ${minimum}`);
+    return false;
+  }
+
+  score(value: unknown, path: string): value is number {
+    if (Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 5) {
+      return true;
+    }
+    this.issue(path, "invalid_score", "must be an integer from 1 through 5");
     return false;
   }
 
@@ -326,6 +345,95 @@ class Validator {
           : null;
       },
     );
+
+    this.array(value.ap_equivalencies, "ap_equivalencies", (row, path) => {
+      const id = this.identifier(row.id, `${path}.id`) ? String(row.id) : "";
+      this.string(row.exam_name, `${path}.exam_name`);
+      const minimumValid = this.score(row.minimum_score, `${path}.minimum_score`);
+      const maximumValid = this.score(row.maximum_score, `${path}.maximum_score`);
+      if (
+        minimumValid
+        && maximumValid
+        && Number(row.maximum_score) < Number(row.minimum_score)
+      ) {
+        this.issue(
+          `${path}.maximum_score`,
+          "invalid_score_range",
+          "must be greater than or equal to minimum_score",
+        );
+      }
+      this.number(row.credits, `${path}.credits`);
+      if (!Array.isArray(row.equivalent_course_codes)) {
+        this.issue(
+          `${path}.equivalent_course_codes`,
+          "invalid_array",
+          "must be an array",
+        );
+      } else {
+        row.equivalent_course_codes.forEach((code, index) => {
+          if (typeof code !== "string" || !COURSE_CODE_RE.test(code)) {
+            this.issue(
+              `${path}.equivalent_course_codes[${index}]`,
+              "invalid_course_code",
+              "must use NN:NNN:NNN",
+            );
+          }
+        });
+      }
+      if (!Array.isArray(row.fulfills_requirement_ids)) {
+        this.issue(
+          `${path}.fulfills_requirement_ids`,
+          "invalid_array",
+          "must be an array",
+        );
+      } else {
+        row.fulfills_requirement_ids.forEach((requirementId, index) => {
+          if (
+            typeof requirementId !== "string"
+            || !REQUIREMENT_ID_RE.test(requirementId)
+          ) {
+            this.issue(
+              `${path}.fulfills_requirement_ids[${index}]`,
+              "invalid_requirement_id",
+              "must use the compact eight-digit Rutgers requirement ID",
+            );
+          }
+        });
+      }
+      const catalogYear = this.string(row.catalog_year, `${path}.catalog_year`)
+        ? String(row.catalog_year)
+        : "";
+      const campus =
+        typeof row.campus === "string" && CAMPUS_CODE_RE.test(row.campus)
+          ? row.campus
+          : "";
+      if (!campus) {
+        this.issue(
+          `${path}.campus`,
+          "invalid_campus",
+          "must be an uppercase campus code",
+        );
+      }
+      this.sourceUrl(row.source_url, `${path}.source_url`);
+      if (!["draft", "reviewed", "retired"].includes(String(row.review_status))) {
+        this.issue(
+          `${path}.review_status`,
+          "invalid_review_status",
+          "must be draft, reviewed, or retired",
+        );
+      }
+      if (
+        row.reviewed_at !== null
+        && (typeof row.reviewed_at !== "string" || !ISO_DATE_RE.test(row.reviewed_at))
+      ) {
+        this.issue(
+          `${path}.reviewed_at`,
+          "invalid_date",
+          "must be an ISO date or null",
+        );
+      }
+      return id && catalogYear && campus ? `${id}:${catalogYear}:${campus}` : null;
+    });
 
     const noConditionCourses = new Set<string>();
     this.array(

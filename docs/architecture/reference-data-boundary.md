@@ -14,6 +14,7 @@ The bundle owns:
 - pairwise program-combination policies;
 - program overlap rules and reviewed exceptions; and
 - reviewed requirement-course equivalencies;
+- reviewed AP score bands and course/requirement equivalencies;
 - reviewed course-eligibility decisions; and
 - source-backed prerequisite and corequisite conditions.
 
@@ -40,15 +41,15 @@ reference data.
    destructive development round trip.
 4. Remove content inserts from structural schema files.
 5. Extract the separate ingestion backlog and remove its seed SQL.
-6. Move reviewed course-eligibility facts into the same portable boundary and
-   remove the final content SQL files.
+6. Move reviewed course-eligibility and AP-equivalency facts into the same
+   portable boundary and remove their content SQL.
 
 ## Completed checkpoint
 
 The original seven-dataset development bundle was exported, digest-verified,
 restored, and compared across the affected public APIs. The portable snapshot
-now covers all nine reference datasets, including three course reviews and
-four conditions. Its local digest and contract are verified. A fresh
-development round trip must be recorded after deploying the expanded
-development-only admin endpoint; until then no parity report is kept beside
-the newer snapshot.
+now covers ten reference datasets and 64 rows, including reviewed course
+eligibility and 37 reviewed AP score bands. Its local digest and contract are
+verified. AP output is included in parity capture. A fresh development round
+trip must be recorded after deploying the expanded development-only admin
+endpoint; until then no parity report is kept beside the newer snapshot.

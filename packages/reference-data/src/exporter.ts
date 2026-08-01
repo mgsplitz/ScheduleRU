@@ -1,4 +1,5 @@
 import type {
+  ApEquivalency,
   CourseEligibilityCondition,
   CourseEligibilityReview,
   DoubleCountException,
@@ -89,6 +90,7 @@ export async function exportReferenceDataBundle(
     doubleCountRuleRows,
     doubleCountExceptionRows,
     equivalencyRows,
+    apEquivalencyRows,
     courseEligibilityReviewRows,
     courseEligibilityConditionRows,
   ] = await Promise.all([
@@ -149,6 +151,15 @@ export async function exportReferenceDataBundle(
               note, source_label, review_status
        FROM requirement_course_equivalencies
       ORDER BY program_id, requirement_course_code, equivalent_course_code`,
+    ),
+    allRows(
+      database,
+      `/* reference-data-export:ap-equivalencies */
+       SELECT id, exam_name, minimum_score, maximum_score, credits,
+              equivalent_course_codes_json, fulfills_requirement_ids_json,
+              catalog_year, campus, source_url, review_status, reviewed_at
+       FROM ap_equivalencies
+       ORDER BY id, catalog_year, campus`,
     ),
     allRows(
       database,
@@ -248,6 +259,28 @@ export async function exportReferenceDataBundle(
       review_status: stringValue(row.review_status) as RequirementCourseEquivalency["review_status"],
     }),
   );
+  const apEquivalencies: ApEquivalency[] = apEquivalencyRows.map(
+    (row, index) => ({
+      id: stringValue(row.id),
+      exam_name: stringValue(row.exam_name),
+      minimum_score: integerValue(row.minimum_score),
+      maximum_score: integerValue(row.maximum_score),
+      credits: Number(row.credits),
+      equivalent_course_codes: parseJson(
+        row.equivalent_course_codes_json,
+        `ap_equivalencies[${index}].equivalent_course_codes_json`,
+      ) as string[],
+      fulfills_requirement_ids: parseJson(
+        row.fulfills_requirement_ids_json,
+        `ap_equivalencies[${index}].fulfills_requirement_ids_json`,
+      ) as string[],
+      catalog_year: stringValue(row.catalog_year),
+      campus: stringValue(row.campus),
+      source_url: stringValue(row.source_url),
+      review_status: stringValue(row.review_status) as ApEquivalency["review_status"],
+      reviewed_at: nullableString(row.reviewed_at),
+    }),
+  );
   const courseEligibilityReviews: CourseEligibilityReview[] =
     courseEligibilityReviewRows.map((row) => ({
       course_code: stringValue(row.course_code),
@@ -286,6 +319,7 @@ export async function exportReferenceDataBundle(
     double_count_rules: doubleCountRules,
     double_count_exceptions: doubleCountExceptions,
     requirement_course_equivalencies: equivalencies,
+    ap_equivalencies: apEquivalencies,
     course_eligibility_reviews: courseEligibilityReviews,
     course_eligibility_conditions: courseEligibilityConditions,
   };

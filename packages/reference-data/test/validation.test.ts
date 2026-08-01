@@ -71,3 +71,24 @@ test("validates reviewed course eligibility facts and condition values", () => {
     ],
   );
 });
+
+test("validates AP score bands and decoded equivalency arrays", () => {
+  const value = bundle();
+  const rows = value.ap_equivalencies as Array<Record<string, unknown>>;
+  rows[0]!.minimum_score = 6;
+  rows[0]!.maximum_score = 0;
+  rows[0]!.equivalent_course_codes = ["bad-code"];
+  rows[0]!.fulfills_requirement_ids = ["bad-id"];
+  const result = validateReferenceDataBundle(value);
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.deepEqual(
+    result.issues.map(({ path }) => path),
+    [
+      "ap_equivalencies[0].minimum_score",
+      "ap_equivalencies[0].maximum_score",
+      "ap_equivalencies[0].equivalent_course_codes[0]",
+      "ap_equivalencies[0].fulfills_requirement_ids[0]",
+    ],
+  );
+});

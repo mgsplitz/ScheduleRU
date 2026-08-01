@@ -197,13 +197,25 @@ Initialize the base program/requirement tables:
 npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=schema/schema_programs.sql
 ```
 
-Apply the reviewed AP-equivalency migration to development before deploying the Worker or frontend:
+Create the structural AP-equivalency table in development:
 
 ```bash
 npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=schema/schema_ap_equivalencies.sql
 ```
 
-Until this migration is applied, onboarding has no reviewed AP equivalency choices to offer. The script uses `CREATE TABLE IF NOT EXISTS` and an `ON CONFLICT ... DO UPDATE` upsert, so it can refresh its reviewed rows safely.
+AP choices require both the structural table and the validated reference-data
+snapshot. After deploying the development Worker, restore the reviewed bundle:
+
+```bash
+SCHEDULERU_ADMIN_SECRET="<development secret>" \
+  npm run reference-data -- restore \
+  --api https://<development-worker-host> \
+  --snapshot reference-data/snapshots/reviewed-reference-data.v1.json \
+  --manifest reference-data/snapshots/reviewed-reference-data.v1.manifest.json
+```
+
+The restore validates the complete bundle before replacing its managed
+datasets in one D1 batch. It rejects production API targets.
 
 After deploying the development Worker, smoke-test that route with the real development URL:
 
@@ -212,11 +224,16 @@ DEV_WORKER_URL="https://rutgers-course-sync-dev.<your-workers-subdomain>.workers
 curl --fail --silent --show-error "$DEV_WORKER_URL/api/ap-equivalencies"
 ```
 
-The equivalent production migration is approval-only. Do not run it until the production change has been explicitly approved:
+The equivalent production schema and reference-data publication are
+approval-only. Do not run either until the production change has been
+explicitly approved:
 
 ```bash
 npx wrangler d1 execute rutgers_courses --remote --file=schema/schema_ap_equivalencies.sql
 ```
+
+The data publication must use the separately approved production operations
+process; the contributor CLI intentionally refuses production targets.
 
 Important: the repository currently has no consolidated migration runner. The
 planner data model was built through additive `schema_*.sql` and
@@ -367,7 +384,9 @@ Hostname-based backend selection is implemented in `index.html`. `localhost` and
 - **Programs or requirements do not load:** verify the program-related
   structural schemas and validated catalog snapshot were restored to the same
   D1 database, then inspect the failing API response.
-- **No AP choices appear:** verify `schema_ap_equivalencies.sql` was applied and that its reviewed rows match the catalog year derived from `CURRENT_YEAR` and `CURRENT_TERM`.
+- **No AP choices appear:** verify the AP table exists, the validated
+  reference-data snapshot was restored, and its reviewed rows match the
+  catalog year derived from `CURRENT_YEAR` and `CURRENT_TERM`.
 - **The semester scheduler has no sections:** verify the requested courses exist for the configured active year/term and that the catalog sync has completed.
 - **The schedule assistant fails:** verify `OPENAI_API_KEY`, `SCHEDULE_ASSISTANT_MODEL`, API access/quota, and the Worker logs. The planner and scheduler do not require the assistant.
 - **Local changes appear to use the wrong API:** check the Course Catalog connection bar and the origin-specific backend URL saved in `localStorage`.

@@ -1,4 +1,631 @@
 {
+  "ap_equivalencies": [
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 10,
+      "equivalent_course_codes": [
+        "01:119:115",
+        "01:119:116",
+        "01:119:117"
+      ],
+      "exam_name": "Biology",
+      "fulfills_requirement_ids": [],
+      "id": "ap-bio",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:014:103"
+      ],
+      "exam_name": "African American Studies",
+      "fulfills_requirement_ids": [],
+      "id": "ap-afam",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:198:110"
+      ],
+      "exam_name": "Computer Science A",
+      "fulfills_requirement_ids": [],
+      "id": "ap-csa4",
+      "maximum_score": 4,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:198:110"
+      ],
+      "exam_name": "Computer Science: Principles",
+      "fulfills_requirement_ids": [],
+      "id": "ap-csp",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:220:102"
+      ],
+      "exam_name": "Economics — Micro",
+      "fulfills_requirement_ids": [
+        "01220102"
+      ],
+      "id": "ap-micro",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:220:103"
+      ],
+      "exam_name": "Economics — Macro",
+      "fulfills_requirement_ids": [
+        "01220103"
+      ],
+      "id": "ap-macro",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:355:101"
+      ],
+      "exam_name": "English Language & Composition",
+      "fulfills_requirement_ids": [
+        "01355101"
+      ],
+      "id": "ap-engcomp",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:355:101"
+      ],
+      "exam_name": "English Literature & Composition",
+      "fulfills_requirement_ids": [
+        "01355101"
+      ],
+      "id": "ap-englit",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:420:210"
+      ],
+      "exam_name": "French Language",
+      "fulfills_requirement_ids": [],
+      "id": "ap-french",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:450:103"
+      ],
+      "exam_name": "Human Geography",
+      "fulfills_requirement_ids": [],
+      "id": "ap-humgeo",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:506:101"
+      ],
+      "exam_name": "World History",
+      "fulfills_requirement_ids": [],
+      "id": "ap-world",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:510:102"
+      ],
+      "exam_name": "European History",
+      "fulfills_requirement_ids": [],
+      "id": "ap-euro",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:512:103"
+      ],
+      "exam_name": "United States History",
+      "fulfills_requirement_ids": [],
+      "id": "ap-ushist",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:790:103"
+      ],
+      "exam_name": "Government & Politics: Comparative",
+      "fulfills_requirement_ids": [],
+      "id": "ap-govcomp",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:790:104"
+      ],
+      "exam_name": "Government & Politics: U.S.",
+      "fulfills_requirement_ids": [
+        "01790101"
+      ],
+      "id": "ap-govus",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:830:101"
+      ],
+      "exam_name": "Psychology",
+      "fulfills_requirement_ids": [
+        "01830101"
+      ],
+      "id": "ap-psych",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:940:203"
+      ],
+      "exam_name": "Spanish Language",
+      "fulfills_requirement_ids": [],
+      "id": "ap-spanish",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:940:215"
+      ],
+      "exam_name": "Spanish Literature",
+      "fulfills_requirement_ids": [],
+      "id": "ap-spanlit",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "01:960:211"
+      ],
+      "exam_name": "Statistics",
+      "fulfills_requirement_ids": [
+        "01960285"
+      ],
+      "id": "ap-stat",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "07:700:103"
+      ],
+      "exam_name": "Music Theory",
+      "fulfills_requirement_ids": [
+        "07700103"
+      ],
+      "id": "ap-music",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 3,
+      "equivalent_course_codes": [
+        "11:375:101"
+      ],
+      "exam_name": "Environmental Science",
+      "fulfills_requirement_ids": [],
+      "id": "ap-envsci",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:165:102"
+      ],
+      "exam_name": "Chinese Language and Culture",
+      "fulfills_requirement_ids": [],
+      "id": "ap-chinese",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:198:111"
+      ],
+      "exam_name": "Computer Science A",
+      "fulfills_requirement_ids": [],
+      "id": "ap-csa5",
+      "maximum_score": 5,
+      "minimum_score": 5,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:560:131"
+      ],
+      "exam_name": "Italian Language & Culture",
+      "fulfills_requirement_ids": [],
+      "id": "ap-it4",
+      "maximum_score": 4,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:565:102"
+      ],
+      "exam_name": "Japanese Language & Culture",
+      "fulfills_requirement_ids": [],
+      "id": "ap-jp",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:640:115"
+      ],
+      "exam_name": "Precalculus",
+      "fulfills_requirement_ids": [],
+      "id": "ap-precalc",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:640:151"
+      ],
+      "exam_name": "Calculus AB",
+      "fulfills_requirement_ids": [
+        "01640135"
+      ],
+      "id": "ap-calcab",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:750:203",
+        "01:750:205"
+      ],
+      "exam_name": "Physics 1",
+      "fulfills_requirement_ids": [],
+      "id": "ap-phys1",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:750:203",
+        "01:750:205"
+      ],
+      "exam_name": "Physics C: Mechanics",
+      "fulfills_requirement_ids": [],
+      "id": "ap-physcm",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:750:204",
+        "01:750:206"
+      ],
+      "exam_name": "Physics 2",
+      "fulfills_requirement_ids": [],
+      "id": "ap-phys2",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 4,
+      "equivalent_course_codes": [
+        "01:750:204",
+        "01:750:206"
+      ],
+      "exam_name": "Physics C: E&M",
+      "fulfills_requirement_ids": [],
+      "id": "ap-physce",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 5,
+      "equivalent_course_codes": [
+        "01:160:161",
+        "01:160:171"
+      ],
+      "exam_name": "Chemistry",
+      "fulfills_requirement_ids": [],
+      "id": "ap-chem4",
+      "maximum_score": 4,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 6,
+      "equivalent_course_codes": [
+        "01:082:105",
+        "01:082:106"
+      ],
+      "exam_name": "Art History",
+      "fulfills_requirement_ids": [],
+      "id": "ap-arthist",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 6,
+      "equivalent_course_codes": [
+        "01:470:131",
+        "01:470:132"
+      ],
+      "exam_name": "German Language",
+      "fulfills_requirement_ids": [],
+      "id": "ap-german",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 8,
+      "equivalent_course_codes": [
+        "01:560:131",
+        "01:560:132"
+      ],
+      "exam_name": "Italian Language & Culture",
+      "fulfills_requirement_ids": [],
+      "id": "ap-it5",
+      "maximum_score": 5,
+      "minimum_score": 5,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 8,
+      "equivalent_course_codes": [
+        "01:640:151",
+        "01:640:152"
+      ],
+      "exam_name": "Calculus BC",
+      "fulfills_requirement_ids": [
+        "01640135"
+      ],
+      "id": "ap-calcbc",
+      "maximum_score": 5,
+      "minimum_score": 4,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    },
+    {
+      "campus": "NB",
+      "catalog_year": "2026-2027",
+      "credits": 9,
+      "equivalent_course_codes": [
+        "01:160:161",
+        "01:160:162",
+        "01:160:171"
+      ],
+      "exam_name": "Chemistry",
+      "fulfills_requirement_ids": [],
+      "id": "ap-chem5",
+      "maximum_score": 5,
+      "minimum_score": 5,
+      "review_status": "reviewed",
+      "reviewed_at": "2026-07-21",
+      "source_url": "https://sasundergrad.rutgers.edu/index.php?option=com_content&view=article&id=1178"
+    }
+  ],
   "contract_version": 1,
   "course_eligibility_conditions": [
     {

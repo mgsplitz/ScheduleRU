@@ -117,6 +117,20 @@ function rows(): Record<string, Row[]> {
       source_label: "Degree Navigator",
       review_status: "reviewed",
     }],
+    "ap-equivalencies": [{
+      id: "ap-example",
+      exam_name: "Example Studies",
+      minimum_score: 4,
+      maximum_score: 5,
+      credits: 3,
+      equivalent_course_codes_json: "[\"01:999:101\"]",
+      fulfills_requirement_ids_json: "[\"01999101\"]",
+      catalog_year: "2026-2027",
+      campus: "NB",
+      source_url: "https://example.rutgers.edu/ap-credit",
+      review_status: "reviewed",
+      reviewed_at: "2026-08-01",
+    }],
     "course-eligibility-reviews": [{
       course_code: "01:999:201",
       campus_slug: "new-brunswick",
@@ -157,6 +171,9 @@ test("exports all cross-program datasets and decodes stored JSON", async () => {
     value.double_count_exceptions[0]!.allowed_course_codes,
     ["01:999:301"],
   );
+  assert.deepEqual(value.ap_equivalencies[0]!.equivalent_course_codes, [
+    "01:999:101",
+  ]);
   assert.equal(value.course_eligibility_reviews[0]!.no_known_conditions, false);
   assert.deepEqual(
     value.course_eligibility_conditions[0]!.condition_value,
@@ -170,6 +187,7 @@ test("exports all cross-program datasets and decodes stored JSON", async () => {
     "double-count-rules",
     "double-count-exceptions",
     "equivalencies",
+    "ap-equivalencies",
     "course-eligibility-reviews",
     "course-eligibility-conditions",
   ]);

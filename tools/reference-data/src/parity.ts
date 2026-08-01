@@ -4,6 +4,7 @@ export interface ReferenceDataApiCapture {
   schools: unknown;
   programs: unknown;
   core_curricula: unknown;
+  ap_equivalencies: unknown;
   selection_policies: Record<string, unknown>;
   individual_requirements: Record<string, unknown>;
   batch_requirements: unknown[];
@@ -138,13 +139,15 @@ export async function captureReferenceDataApi(
   api: URL,
   fetcher: typeof globalThis.fetch,
 ): Promise<ReferenceDataApiCapture> {
-  const [schools, programs, coreCurricula] = await Promise.all([
+  const [schools, programs, coreCurricula, apEquivalencies] = await Promise.all([
     fetcher(endpoint(api, "/api/schools"))
       .then((response) => jsonResponse(response, "/api/schools")),
     fetcher(endpoint(api, "/api/programs"))
       .then((response) => jsonResponse(response, "/api/programs")),
     fetcher(endpoint(api, "/api/core-curricula"))
       .then((response) => jsonResponse(response, "/api/core-curricula")),
+    fetcher(endpoint(api, "/api/ap-equivalencies"))
+      .then((response) => jsonResponse(response, "/api/ap-equivalencies")),
   ]);
   const schoolSlugs = arrayField(schools, "schools")
     .map((school) => String(school.slug || ""))
@@ -177,6 +180,7 @@ export async function captureReferenceDataApi(
     schools,
     programs,
     core_curricula: coreCurricula,
+    ap_equivalencies: apEquivalencies,
     selection_policies: Object.fromEntries(
       schoolSlugs.map((slug, index) => [slug, policyValues[index]]),
     ),

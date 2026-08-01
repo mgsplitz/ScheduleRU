@@ -11,6 +11,7 @@ function capture(id: number): ReferenceDataApiCapture {
     schools: { schools: [] },
     programs: { programs: [] },
     core_curricula: { curricula: [] },
+    ap_equivalencies: { equivalencies: [{ id: "ap-example", credits: 3 }] },
     selection_policies: {},
     individual_requirements: {},
     batch_requirements: [{
@@ -39,4 +40,20 @@ test("ignores only the internal overlap-exception row id", async () => {
   const failed = await compareReferenceDataCaptures(capture(1), changed, 1);
   assert.equal(failed.ok, false);
   assert.ok(failed.differences.length > 0);
+});
+
+test("AP equivalency changes are part of public API parity", async () => {
+  const before = capture(1);
+  const after = capture(1);
+  after.ap_equivalencies = {
+    equivalencies: [{ id: "ap-example", credits: 4 }],
+  };
+
+  const report = await compareReferenceDataCaptures(before, after, 1);
+  assert.equal(report.ok, false);
+  assert.ok(
+    report.differences.some((difference) =>
+      difference.includes("ap_equivalencies")
+    ),
+  );
 });

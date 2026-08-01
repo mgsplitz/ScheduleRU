@@ -61,7 +61,8 @@ the environment.
 
 ## Current recovery proof
 
-The version-1 snapshot contains 27 rows across nine datasets. The snapshot is
+The version-1 snapshot contains 64 rows across ten datasets, including the
+reviewed AP equivalency catalog. The snapshot is
 contract-validated and digest-protected. The earlier seven-dataset parity
 report was removed when eligibility data entered the contract so it cannot be
 mistaken for proof of the expanded snapshot. After the development Worker is

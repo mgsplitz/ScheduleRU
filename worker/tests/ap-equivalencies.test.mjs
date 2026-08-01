@@ -19,33 +19,45 @@ function database(rows) {
   };
 }
 
-test("AP equivalency migration keeps reviewed score-specific catalog rows in one table", async () => {
-  const schema = await readFile(new URL("../schema/schema_ap_equivalencies.sql", import.meta.url), "utf8");
+test("AP equivalency schema is structural and reviewed rows are portable", async () => {
+  const [schema, snapshot] = await Promise.all([
+    readFile(new URL("../schema/schema_ap_equivalencies.sql", import.meta.url), "utf8"),
+    readFile(
+      new URL("../../reference-data/snapshots/reviewed-reference-data.v1.json", import.meta.url),
+      "utf8",
+    ).then(JSON.parse),
+  ]);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS ap_equivalencies/);
   assert.match(schema, /CHECK \(minimum_score BETWEEN 1 AND 5\)/);
   assert.match(schema, /CHECK \(review_status IN \('draft','reviewed','retired'\)\)/);
   assert.match(schema, /PRIMARY KEY \(id, catalog_year, campus\)/);
-  assert.match(schema, /ON CONFLICT\(id, catalog_year, campus\) DO UPDATE SET/);
-  assert.doesNotMatch(schema, /INSERT OR IGNORE/);
-  assert.match(schema, /ap-chem4/);
-  assert.match(schema, /ap-chem5/);
-  assert.match(schema, /ap-csa4/);
-  assert.match(schema, /ap-csa5/);
+  assert.doesNotMatch(schema, /\b(?:INSERT|UPDATE|DELETE|REPLACE)\b/);
+  assert.equal(snapshot.ap_equivalencies.length, 37);
+  assert.deepEqual(
+    snapshot.ap_equivalencies
+      .filter(({ id }) => ["ap-chem4", "ap-chem5", "ap-csa4", "ap-csa5"].includes(id))
+      .map(({ id }) => id)
+      .sort(),
+    ["ap-chem4", "ap-chem5", "ap-csa4", "ap-csa5"].sort(),
+  );
 });
 
-test("AP migration runbook is dev-first, idempotent, and smoke-testable", async () => {
+test("AP runbook is dev-first, snapshot-backed, and smoke-testable", async () => {
   const [readme, schema] = await Promise.all([
     readFile(new URL("../../README.md", import.meta.url), "utf8"),
     readFile(new URL("../schema/schema_ap_equivalencies.sql", import.meta.url), "utf8"),
   ]);
 
   assert.match(readme, /npx wrangler d1 execute rutgers_courses_dev --env dev --remote --file=schema\/schema_ap_equivalencies\.sql/);
-  assert.match(readme, /npx wrangler d1 execute rutgers_courses --remote --file=schema\/schema_ap_equivalencies\.sql/);
+  assert.match(readme, /npm run reference-data -- restore/);
+  assert.match(readme, /reviewed-reference-data\.v1\.json/);
   assert.match(readme, /approval-only/);
-  assert.match(readme, /before deploying the Worker or frontend/);
-  assert.match(readme, /Until this migration is applied, onboarding has no reviewed AP equivalency choices to offer/);
+  assert.match(
+    readme,
+    /structural AP-equivalency table[\s\S]*validated reference-data\s+snapshot/,
+  );
   assert.match(readme, /curl --fail --silent --show-error "\$DEV_WORKER_URL\/api\/ap-equivalencies"/);
-  assert.match(schema, /ON CONFLICT\(id, catalog_year, campus\) DO UPDATE SET/);
+  assert.doesNotMatch(schema, /\bINSERT INTO ap_equivalencies\b/);
 });
 
 test("configuration and AP routes use Worker configuration and reviewed D1 rows", async () => {
