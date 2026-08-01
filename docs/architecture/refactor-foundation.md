@@ -55,7 +55,9 @@ The current root frontend and `worker/` remain compatibility surfaces until
 their replacements have passed parity checks. New domain behavior must be
 implemented behind the target package boundaries.
 
-The deterministic browser modules now live under `packages/planner`,
+The root HTML shell now contains semantic markup and ordered asset references;
+its stylesheet and application controllers live under `apps/web`. The
+deterministic browser modules live under `packages/planner`,
 `packages/requirements`, and `packages/scheduling`. Presentation-only
 decisions live under `apps/web`. The root `*-logic.js` files contain imports
 only, while the production HTML shell loads the canonical paths directly.
@@ -115,8 +117,8 @@ not changed.
 
 ## Next application milestones
 
-1. Extract the remaining inline CSS and application controller from the
-   4,067-line root HTML shell into `apps/web`.
+1. Split the extracted planner and guided-setup controllers into smaller
+   state, API, rendering, and feature controllers behind contract tests.
 2. Split the 2,375-line compatibility program router into `apps/api` route and
    Cloudflare-storage modules.
 3. Add explicit module APIs to the newly relocated planner, requirements, and

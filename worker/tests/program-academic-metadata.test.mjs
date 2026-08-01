@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import { webApplicationSource as frontend } from "./helpers/web-source.mjs";
 
 const baseSchema = await readFile(new URL("../../migrations/schema_programs.sql", import.meta.url), "utf8");
 const migration = await readFile(new URL("../../migrations/migrate_program_academic_metadata.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
-const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
 
 test("new program databases support official code, degree type, and reviewed program family", () => {
   assert.match(baseSchema, /academic_program_code TEXT/);

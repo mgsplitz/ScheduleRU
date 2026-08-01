@@ -71,8 +71,9 @@ docs/architecture/                 Maintained architecture and migration boundar
 docs/README.md                     Documentation index
 docs/catalog-contributor/          Narrow handoff for independent catalog work
 
-index.html                         Compatibility HTML shell and app controller
-apps/web/src/                      Browser presentation decisions
+index.html                         Semantic compatibility shell and asset order
+apps/web/styles/                   Browser presentation
+apps/web/src/                      Browser controllers and presentation decisions
 packages/planner/src/              Eligibility, inputs, state, and four-year plan
 packages/requirements/src/         Progress, allocation, selectors, equivalencies
 packages/scheduling/src/           Semester preference filtering and ranking

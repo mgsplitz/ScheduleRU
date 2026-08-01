@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { webApplicationSource as frontend } from "./helpers/web-source.mjs";
 
 const schema = await readFile(new URL("../../migrations/schema_course_eligibility_conditions.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
@@ -19,7 +20,6 @@ test("course eligibility lookups stay within D1's 100-variable query limit", () 
 });
 
 test("the browser migrates v1 state and evaluates the selected target term", async () => {
-  const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
   assert.match(
     frontend,
     /<script src="packages\/planner\/src\/eligibility-logic\.js"><\/script>/,
