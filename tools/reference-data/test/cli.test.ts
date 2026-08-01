@@ -19,6 +19,7 @@ function bundle() {
     double_count_rules: [],
     double_count_exceptions: [],
     requirement_course_equivalencies: [],
+    ap_equivalencies: [],
     course_eligibility_reviews: [],
     course_eligibility_conditions: [],
   };
