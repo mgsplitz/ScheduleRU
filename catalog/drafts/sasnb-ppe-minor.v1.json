@@ -1,0 +1,198 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-ppe-minor",
+    "name": "Philosophy, Politics, and Economics (PPE)",
+    "school_slug": "sasnb",
+    "program_slug": "philosophy-politics-economics-ppe",
+    "type": "minor",
+    "catalog_year": "Current official page (catalog year not stated)",
+    "academic_program_code": "792",
+    "degree_type": null,
+    "program_family_id": "sasnb-ppe-792",
+    "source_url": "https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://philosophy.rutgers.edu/minor-in-philosophy-politics-and-economics",
+      "title": "Minor in Philosophy, Politics, and Economics (PPE)",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1785500000000,
+      "note": "Current department page; no catalog-year boundary stated."
+    },
+    {
+      "id": "source-002",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/philosophy-politics-and-economics-ppe",
+      "title": "Philosophy, Politics, and Economics (PPE)",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1785500000000,
+      "note": "Current SAS profile; no catalog-year boundary stated."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-ppe-philosophy",
+      "parent_group_id": null,
+      "name": "Philosophy component; incomplete because the source allows case-by-case courses.",
+      "rule": "min_courses",
+      "count": 3,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:730:107","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:249","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:250","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:251","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:255","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:330","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:341","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:342","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:343","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:345","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:347","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:358","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:371","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:441","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:442","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:445","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:450","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:459","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:730:470","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {
+        "source_id": "source-001",
+        "reviewer_note": "Current source transcription; case-by-case options remain unresolved.",
+        "review_status": "unreviewed"
+      }
+    },
+    {
+      "id": "sasnb-ppe-political-theory",
+      "parent_group_id": null,
+      "name": "One Political Theory course.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:790:101","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:365","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:371","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:372","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:373","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:374","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:375","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:376","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:472","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:473","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:477","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {
+        "source_id": "source-001",
+        "reviewer_note": "Current source transcription; review pending.",
+        "review_status": "unreviewed"
+      }
+    },
+    {
+      "id": "sasnb-ppe-political-policy",
+      "parent_group_id": null,
+      "name": "Two Policy or Group Relations courses.",
+      "rule": "min_courses",
+      "count": 2,
+      "sort_order": 30,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:790:305","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:318","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:319","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:320","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:322","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:323","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:330","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:333","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:334","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:335","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:338","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:350","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:355","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:358","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:360","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:363","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:364","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:386","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:401","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:790:404","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {
+        "source_id": "source-001",
+        "reviewer_note": "Current source transcription; review pending.",
+        "review_status": "unreviewed"
+      }
+    },
+    {
+      "id": "sasnb-ppe-economics-foundations",
+      "parent_group_id": null,
+      "name": "Both Economics introductions.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 40,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:220:102","title":"Introduction to Microeconomics","credits":3,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:103","title":"Introduction to Macroeconomics","credits":3,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {
+        "source_id": "source-001",
+        "reviewer_note": "Current source transcription; review pending.",
+        "review_status": "unreviewed"
+      }
+    },
+    {
+      "id": "sasnb-ppe-economics-elective",
+      "parent_group_id": null,
+      "name": "One listed Economics elective.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 50,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:220:120","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:327","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:331","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:390","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:395","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:402","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:417","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:432","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:460","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:463","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}},
+        {"code":"01:220:482","title":null,"credits":null,"note":null,"evidence":{"source_id":"source-001","reviewer_note":"Current source transcription; review pending.","review_status":"unreviewed"}}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {
+        "source_id": "source-001",
+        "reviewer_note": "Current source transcription; review pending.",
+        "review_status": "unreviewed"
+      }
+    }
+  ],
+  "eligibility_rules": []
+}

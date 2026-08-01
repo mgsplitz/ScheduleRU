@@ -1,15 +1,6 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 import { programDefinition, requirementGroup } from "./helpers/catalog-snapshot.mjs";
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const seed = fs.readFileSync(
-  path.join(here, "..", "schema", "seed_rbs_areas_of_study_draft.sql"),
-  "utf8"
-);
 
 test("reviewed requirement metadata preserves Global Business titles outside the current term catalog", () => {
   const elective = requirementGroup(
@@ -25,8 +16,8 @@ test("reviewed requirement metadata preserves Global Business titles outside the
   ]) {
     assert.equal(titles.get(code), title);
   }
-  assert.doesNotMatch(seed, /'22:620:320'/);
-  assert.match(seed, /'33:620:320'/);
+  assert.equal(titles.has("22:620:320"), false);
+  assert.equal(titles.has("33:620:320"), true);
 });
 
 test("every formerly repaired reviewed group now owns durable course titles", () => {

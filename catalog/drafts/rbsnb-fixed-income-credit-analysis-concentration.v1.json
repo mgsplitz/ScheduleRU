@@ -1,0 +1,177 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "rbsnb-fixed-income-credit-analysis-concentration",
+    "name": "Fixed Income and Credit Analysis",
+    "school_slug": "rbsnb",
+    "program_slug": "fixed-income-credit-analysis-concentration",
+    "type": "concentration",
+    "catalog_year": "Current official page (catalog year not stated)",
+    "academic_program_code": null,
+    "degree_type": null,
+    "program_family_id": null,
+    "source_url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/fixed-income-credit-analysis-concentration",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/fixed-income-credit-analysis-concentration",
+      "title": "RBS New Brunswick Fixed Income and Credit Analysis Concentration",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1785500000000,
+      "note": "Official page; catalog year is not stated. The additional Finance elective remains unresolved."
+    },
+    {
+      "id": "source-002",
+      "url": "https://myrbs.business.rutgers.edu/undergraduate-new-brunswick/concentrations",
+      "title": "RBS New Brunswick Concentrations",
+      "catalog_year": null,
+      "scope": "program_eligibility",
+      "accessed_at": 1785500000000,
+      "note": "Current landing page identifies this concentration as available only to Finance majors."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "rbsnb-fixed-income-credit-analysis-concentration-required",
+      "parent_group_id": null,
+      "name": "Required courses",
+      "rule": "all",
+      "count": null,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {
+          "code": "33:390:380",
+          "title": "Investment Analysis",
+          "credits": 3,
+          "note": null,
+          "evidence": {
+            "source_id": "source-001",
+            "reviewer_note": "Transcribed from the current official detail page; independent review remains pending.",
+            "review_status": "unreviewed"
+          }
+        },
+        {
+          "code": "33:390:385",
+          "title": null,
+          "credits": 3,
+          "note": "Prerequisite: 33:390:400.",
+          "evidence": {
+            "source_id": "source-001",
+            "reviewer_note": "Transcribed from the current official detail page; independent review remains pending.",
+            "review_status": "unreviewed"
+          }
+        },
+        {
+          "code": "33:390:400",
+          "title": "Corporate Finance",
+          "credits": 3,
+          "note": null,
+          "evidence": {
+            "source_id": "source-001",
+            "reviewer_note": "Transcribed from the current official detail page; independent review remains pending.",
+            "review_status": "unreviewed"
+          }
+        },
+        {
+          "code": "33:390:420",
+          "title": "Derivatives",
+          "credits": 3,
+          "note": "Prerequisite: 33:390:380.",
+          "evidence": {
+            "source_id": "source-001",
+            "reviewer_note": "Transcribed from the current official detail page; independent review remains pending.",
+            "review_status": "unreviewed"
+          }
+        },
+        {
+          "code": "33:390:490",
+          "title": null,
+          "credits": 3,
+          "note": "Prerequisite: 33:390:380.",
+          "evidence": {
+            "source_id": "source-001",
+            "reviewer_note": "Transcribed from the current official detail page; independent review remains pending.",
+            "review_status": "unreviewed"
+          }
+        },
+        {
+          "code": "33:390:491",
+          "title": null,
+          "credits": 3,
+          "note": "Prerequisite: 33:390:380.",
+          "evidence": {
+            "source_id": "source-001",
+            "reviewer_note": "Transcribed from the current official detail page; independent review remains pending.",
+            "review_status": "unreviewed"
+          }
+        }
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {
+        "source_id": "source-001",
+        "reviewer_note": "Current source transcription; independent review remains pending.",
+        "review_status": "unreviewed"
+      }
+    },
+    {
+      "id": "rbsnb-fixed-income-credit-analysis-concentration-elective",
+      "parent_group_id": null,
+      "name": "One additional approved Finance elective",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {
+        "source_id": "source-001",
+        "reviewer_note": "The source requires an additional Finance elective but does not enumerate the approved list.",
+        "review_status": "unreviewed"
+      }
+    }
+  ],
+  "eligibility_rules": [
+    {
+      "key": "rbsnb-fixed-income-credit-analysis-concentration-rbs-only",
+      "condition_type": "home_school_must_be_one_of",
+      "condition_value": ["rbsnb"],
+      "decision": "blocked",
+      "note": "This concentration is listed by RBS New Brunswick for its undergraduate students.",
+      "source_id": "source-002",
+      "review_status": "unreviewed",
+      "verified_at": 0
+    },
+    {
+      "key": "rbsnb-fixed-income-credit-analysis-finance-only",
+      "condition_type": "selected_program_must_include_one_of",
+      "condition_value": ["rbsnb-finance"],
+      "decision": "blocked",
+      "note": "The current RBS concentrations page describes Fixed Income and Credit Analysis as for Finance majors only.",
+      "source_id": "source-002",
+      "review_status": "unreviewed",
+      "verified_at": 0
+    },
+    {
+      "key": "rbsnb-fixed-income-credit-analysis-grade",
+      "condition_type": "minimum_course_grade",
+      "condition_value": {
+        "course_code": "33:390:300",
+        "minimum_grade": "B"
+      },
+      "decision": "requires_approval",
+      "note": "A B or better in Financial Management is required to declare.",
+      "source_id": "source-001",
+      "review_status": "unreviewed",
+      "verified_at": 0
+    }
+  ]
+}

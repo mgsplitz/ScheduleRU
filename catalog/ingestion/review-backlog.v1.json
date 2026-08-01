@@ -234,6 +234,36 @@
       "section_name": "Supply Chain Major Special Notes",
       "raw_text": "Students with more than one Business School major may only double count one RBS course between those majors.",
       "resolved": false
+    },
+    {
+      "program_id": "sasnb-ppe-minor",
+      "section_name": "Ambiguous course notation",
+      "raw_text": "01:730:105/106 appears as slash notation on the current department page. This draft does not infer whether it represents one course, two courses, or a choice.",
+      "resolved": false
+    },
+    {
+      "program_id": "sasnb-ppe-minor",
+      "section_name": "Case-by-case Philosophy approvals",
+      "raw_text": "The current department page permits other Philosophy courses on a case-by-case basis. No automatic mapping is available from this source.",
+      "resolved": false
+    },
+    {
+      "program_id": "sasnb-ppe-minor",
+      "section_name": "Cross-listed courses",
+      "raw_text": "The current department page states that courses that are cross listed may be used to satisfy only one requirement, without a course map.",
+      "resolved": false
+    },
+    {
+      "program_id": "sasnb-ppe-minor",
+      "section_name": "Grade requirement",
+      "raw_text": "The current department page requires a grade of C or better for all minor courses.",
+      "resolved": false
+    },
+    {
+      "program_id": "sasnb-ppe-minor",
+      "section_name": "Rutgers-New Brunswick residency",
+      "raw_text": "The current department page permits only one course (three credits) in each field from outside Rutgers University-New Brunswick.",
+      "resolved": false
     }
   ]
 }
