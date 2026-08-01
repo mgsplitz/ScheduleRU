@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import { programApiSource as programs } from "./helpers/program-api-source.mjs";
 
 const referenceData = JSON.parse(await readFile(
   new URL("../../reference-data/snapshots/reviewed-reference-data.v1.json", import.meta.url),
@@ -10,8 +11,6 @@ const catalog = (await readFile(
   new URL("../../catalog/snapshots/reviewed-programs.v1.jsonl", import.meta.url),
   "utf8",
 )).trim().split("\n").map(JSON.parse);
-const programs = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
-
 test("the shared Rutgers-New Brunswick Core is canonical and attached to RBS through reviewed data", () => {
   const core = catalog.find(({ program }) =>
     program.id === "rutgers-nb-core-curriculum"

@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
+import { programApiSource as worker } from "./helpers/program-api-source.mjs";
 
 function routeBlock(start, end) {
   const startIndex = worker.indexOf(start);
@@ -13,7 +11,10 @@ function routeBlock(start, end) {
 }
 
 test("public program routes hide reviewed programs with incomplete requirement evidence", () => {
-  assert.match(worker, /import\s+\{\s*requirementEvidenceComplete\s*\}\s+from\s+"\.\/requirement-evidence\.js"/);
+  assert.match(
+    worker,
+    /import\s+\{\s*requirementEvidenceComplete,?\s*\}\s+from\s+"\.\.\/\.\.\/\.\.\/worker\/src\/requirement-evidence\.js"/,
+  );
   assert.match(worker, /async function programHasCompleteRequirementEvidence\(env, program\)/);
   assert.match(worker, /requirementEvidenceComplete\(\{\s*required:\s*true,/);
 

@@ -8,3 +8,6 @@ export {
 export {
   handleCatalogSourcesAdminRequest,
 } from "./catalog-sources-admin.js";
+export {
+  handleProgramsApi,
+} from "./programs.js";
