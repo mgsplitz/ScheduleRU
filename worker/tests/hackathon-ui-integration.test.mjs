@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import vm from "node:vm";
+import { webApplicationSource } from "./helpers/web-source.mjs";
 
-const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+const html = webApplicationSource;
 
 function functionSource(name) {
   const marker = `function ${name}(`;
@@ -40,7 +40,7 @@ function plannerTermsFor(academicPosition) {
 }
 
 test("hackathon UI wires the approved modules and removes hard-coded future builders", () => {
-  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const html = webApplicationSource;
   assert.match(html, /planner-state-logic\.js/);
   assert.match(html, /four-year-planner-logic\.js/);
   assert.match(html, /schedule-preference-logic\.js/);
@@ -59,7 +59,7 @@ test("localhost uses the development Worker instead of the production API", () =
 });
 
 test("hackathon UI persists accepted programs, serializes program applies, and keeps the onboarding accessible", () => {
-  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const html = webApplicationSource;
   assert.match(html, /primaryProgramId:ST\.primaryProgramId/);
   assert.match(html, /secondaryProgramId:ST\.secondaryProgramId/);
   assert.match(html, /ST\.programApplyPending/);
@@ -70,7 +70,7 @@ test("hackathon UI persists accepted programs, serializes program applies, and k
 });
 
 test("assistant projections retain Rutgers day and open-section semantics", () => {
-  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const html = webApplicationSource;
   assert.match(html, /function normalizeAssistantMeeting\(/);
   assert.match(html, /dayIndex\(meeting\?\.day_of_week\)/);
   assert.match(html, /open_status===true\|\|open_status===1\|\|open_status==="1"/);
@@ -81,7 +81,7 @@ test("assistant projections retain Rutgers day and open-section semantics", () =
 });
 
 test("planner generation derives concrete inputs from immutable program and Core trees", () => {
-  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const html = webApplicationSource;
   assert.match(
     html,
     /<script src="packages\/planner\/src\/planner-input-logic\.js"><\/script>/,
@@ -98,7 +98,7 @@ test("planner generation derives concrete inputs from immutable program and Core
 });
 
 test("program roles, grouped Issues, and closed sections have explicit UI contracts", () => {
-  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const html = webApplicationSource;
   assert.match(html, /id="programOv"[^>]*aria-hidden/);
   assert.match(html, /id="programOv"[\s\S]*?role="dialog"[\s\S]*?aria-modal="true"/);
   assert.match(html, /#programOv\{z-index:65;\}/);
@@ -415,7 +415,7 @@ test("home-school transaction restores the accepted context and discards stale c
 });
 
 test("desktop polish keeps semantic overlays and visual workflow hooks", () => {
-  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const html = webApplicationSource;
   assert.match(html, /id="onboarding"[^>]*role="dialog"[^>]*aria-modal="true"/);
   assert.match(html, /id="programOv"[\s\S]*?role="dialog"[\s\S]*?aria-modal="true"/);
   assert.match(html, /id="appModal"[\s\S]*?role="dialog"[\s\S]*?aria-modal="true"/);
@@ -430,14 +430,14 @@ test("desktop polish keeps semantic overlays and visual workflow hooks", () => {
 });
 
 test("desktop polish uses contrast-safe focus rings on light and dark surfaces", () => {
-  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const html = webApplicationSource;
   assert.match(html, /:focus-visible\{outline:3px solid #7b0022;outline-offset:3px;\}/);
   assert.match(html, /\.topbar :focus-visible,[\s\S]*?outline-color:#fff;/);
   assert.match(html, /\.choice-btn:not\(\.secondary\):focus-visible,[\s\S]*?box-shadow:0 0 0 3px #7b0022;/);
 });
 
 test("semester schedule-builder buttons are restricted to the active registration term", () => {
-  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const html = webApplicationSource;
   assert.match(html, /ScheduleRUPlannerUI\.canOpenSemesterBuilder/);
   assert.match(html, /plus\.hidden=!builderAvailable;plus\.disabled=!builderAvailable/);
   assert.match(html, /\.sem-plus\[hidden\]\{display:none;\}/);

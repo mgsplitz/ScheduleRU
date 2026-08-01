@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { webApplicationSource as indexHtml } from "./helpers/web-source.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const indexHtml = await readFile(resolve(here, "../../index.html"), "utf8");
 
 test("requirement notices use the API's structured advisory wording", () => {
   assert.match(indexHtml, /rule\.advisory_message\s*\|\|\s*rule\.note/);

@@ -1,9 +1,12 @@
 # ScheduleRU Web
 
-Browser presentation decisions and integration code live here. The production
-HTML shell remains at the repository root during the compatibility migration,
-but it loads these canonical web modules and the domain packages directly.
+Browser presentation decisions and integration code live here. The root HTML
+file is now a compatibility shell containing semantic markup and ordered
+script/style references only.
 
-The next web checkpoint will extract the inline CSS and application controller
-from `index.html`; new browser logic should be added under this app instead of
-the repository root.
+`styles/app.css` owns the current desktop presentation.
+`src/planner-controller.js` owns the compatibility planner and schedule-builder
+integration, while `src/guided-setup-controller.js` owns onboarding, program
+selection, modal, and plan-preview orchestration. Smaller domain decisions
+remain in their named modules; new browser logic must not return to
+`index.html`.

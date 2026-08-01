@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import { webApplicationSource as frontend } from "./helpers/web-source.mjs";
 
 const schema = await readFile(new URL("../../migrations/schema_requirement_course_selectors.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
@@ -8,7 +9,6 @@ const catalogWorker = await readFile(
   new URL("../../apps/api/src/worker.js", import.meta.url),
   "utf8",
 );
-const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
 
 test("reviewed selector rows are stored with an audited source and returned with their group", () => {
   assert.match(schema, /CREATE TABLE IF NOT EXISTS requirement_course_selectors/);
