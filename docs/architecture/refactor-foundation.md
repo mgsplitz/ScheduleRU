@@ -17,6 +17,9 @@ source-import helpers now live under `apps/api/src/programs`, so the canonical
 API app no longer imports backward from `worker/src`. The bounded OpenAI
 schedule-preference adapter also lives in `apps/api`, while deterministic
 preference normalization and ranking remain in `packages/scheduling`.
+Anonymous program and requirement endpoints are separated from contributor
+mutations in `apps/api/src/programs/public-routes.js` and receive their
+services explicitly from the compatibility controller.
 
 ## Goals
 
@@ -122,7 +125,7 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Split the program controller's route families from Cloudflare storage
+2. Split the remaining contributor route family from Cloudflare storage
    adapters, retaining the `worker/src` compatibility exports until callers
    have migrated.
 3. Add explicit module APIs to the newly relocated planner, requirements, and

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { programApiSource as worker } from "./helpers/program-api-source.mjs";
+
+const publicProgramRoutes = await readFile(
+  new URL("../../apps/api/src/programs/public-routes.js", import.meta.url),
+  "utf8",
+);
 
 test("the public program API reads catalog-listed programs from D1 rather than a source manifest", async () => {
   assert.doesNotMatch(worker, /sas-catalog-manifest/);
@@ -27,9 +33,8 @@ test("program eligibility lookups batch ids so a full catalog cannot exceed D1's
 });
 
 test("public program and requirement routes hide catalog-only records", async () => {
-  const publicRoutes = worker.slice(
-    worker.indexOf('if (path === "/api/programs"'),
-    worker.indexOf("// ---- Admin: everything below requires ?secret= ----"),
+  const publicRoutes = publicProgramRoutes.slice(
+    publicProgramRoutes.indexOf('if (path === "/api/programs"'),
   );
 
   assert.match(publicRoutes, /review_status = 'reviewed'/);
