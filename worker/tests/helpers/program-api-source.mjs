@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 
-export const programApiSource = await readFile(
-  new URL("../../../apps/api/src/programs.js", import.meta.url),
-  "utf8",
-);
+const sources = await Promise.all([
+  "../../../apps/api/src/programs/public-routes.js",
+  "../../../apps/api/src/programs.js",
+].map((path) => readFile(new URL(path, import.meta.url), "utf8")));
+
+export const programApiSource = sources.join("\n");

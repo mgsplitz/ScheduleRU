@@ -8,6 +8,8 @@ Cloudflare-facing request controllers.
 - `src/worker.js` is the canonical Worker entrypoint used by Wrangler.
 - `src/programs.js` is the canonical program, requirement, policy, and
   contributor API controller.
+- `src/programs/public-routes.js` owns anonymous program reads, requirement
+  reads, course eligibility, and program-selection validation.
 - `src/programs/` owns the controller's pure policy/evidence helpers,
   response presentation, and conservative source-import adapters.
 - `src/schedule-assistant.js` owns the bounded OpenAI request adapter; the
