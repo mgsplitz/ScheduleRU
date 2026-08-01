@@ -1,0 +1,239 @@
+{
+  "contract_version": 1,
+  "review_notes": [
+    {
+      "program_id": "rbsnb-accounting",
+      "section_name": "Accounting Major Special Notes",
+      "raw_text": "If you major in Accounting as your first, second or third major, you are required to take 33:010:458 Accounting Information System and 33:140:320 Business Law I. You will not earn credit for taking 33:136:370 Management Information System. You can earn credit towards graduation if you take 33:522:334 Business Ethics but it will not fulfill a major requirement.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-accounting",
+      "section_name": "Accounting Major Special Notes",
+      "raw_text": "Starting in Summer 2024, 33:390:310 Financial Management for Finance majors will not be offered. All RBS students will take 33:390:300 Financial Management regardless of major. A grade of B or higher will be required in 33:390:300 to declare the finance major or finance concentration and to take any additional courses in the finance department.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-accounting",
+      "section_name": "Accounting Major Special Notes",
+      "raw_text": "Students with more than one Business School major may only double count one RBS course between those majors.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-accounting",
+      "section_name": "Required Accounting Courses",
+      "raw_text": "33:010:458 Accounting Information Systems is fulfilled in Business Core requirements; it is shown once in Business Core and is not an additional required-major course or extra three credits.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-bait",
+      "section_name": "BAIT Major Special Notes",
+      "raw_text": "If you major in Accounting as your first, second or third major, you are required to take 33:010:458 Accounting Information System and 33:140:320 Business Law I. You will not earn credit for taking 33:136:370 Management Information System. You can earn credit towards graduation if you take 33:522:334 Business Ethics but it will not fulfill a major requirement.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-bait",
+      "section_name": "BAIT Major Special Notes",
+      "raw_text": "Starting in Summer 2024, 33:390:310 Financial Management for Finance majors will not be offered. All RBS students will take 33:390:300 Financial Management regardless of major. A grade of B or higher will be required in 33:390:300 to declare the finance major or finance concentration and to take any additional courses in the finance department.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-bait",
+      "section_name": "BAIT Major Special Notes",
+      "raw_text": "Students with more than one Business School major may only double count one RBS course between those majors.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-bait",
+      "section_name": "BAIT Major Special Notes",
+      "raw_text": "Students with multiple prior programming courses may petition to replace Foundations of Business Programming (33:136:388) with an additional MIS elective (136) from the list of elective courses; contact the Management Science and Information Systems department for details.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-bait",
+      "section_name": "RBS Core Courses",
+      "raw_text": "*01:640:151 or 01:640:130 also acceptable as a Calc I pre-req.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-business-administration-minor",
+      "section_name": "Formal admission",
+      "raw_text": "Requires application/admission, good academic standing with GPA 2.0+, pre-calculus completion or placement, and Statistics I or one listed approved substitute. The minor page also limits transfer-course use.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-business-analytics-concentration",
+      "section_name": "Formal declaration",
+      "raw_text": "RBS-New Brunswick students only; BAIT majors may not declare this concentration; RBS-NB Undergraduate Programs Office contact is required to enroll in the courses.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-entrepreneurship-concentration",
+      "section_name": "Formal declaration",
+      "raw_text": "The current 2025-26 RBS catalog says Leadership and Management majors may not declare the Entrepreneurship concentration. The earlier generic management-major sentence is superseded by this named restriction.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-entrepreneurship-minor",
+      "section_name": "Formal admission",
+      "raw_text": "For non-RBS students; the page says students may not double minor in Business Administration and Entrepreneurship.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-finance-concentration",
+      "section_name": "Formal declaration",
+      "raw_text": "Finance majors may not declare this concentration. A B or better in 33:390:300 is required to declare and take additional finance-department courses.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-finance",
+      "section_name": "Finance Major Special Notes",
+      "raw_text": "If you major in Accounting as your first, second or third major, you are required to take 33:010:458 Accounting Information System and 33:140:320 Business Law I. You will not earn credit for taking 33:136:370 Management Information System. You can earn credit towards graduation if you take 33:522:334 Business Ethics but it will not fulfill a major requirement.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-finance",
+      "section_name": "Finance Major Special Notes",
+      "raw_text": "Starting in Summer 2024, 33:390:310 Financial Management for Finance majors will not be offered. All RBS students will take 33:390:300 Financial Management regardless of major. A grade of B or higher will be required in 33:390:300 to declare the finance major or finance concentration and to take any additional courses in the finance department.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-finance",
+      "section_name": "Finance Major Special Notes",
+      "raw_text": "Students with more than one Business School major may only double count one RBS course between those majors.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-finance",
+      "section_name": "RBS Core Courses",
+      "raw_text": "*01:640:151 or 01:640:130 also acceptable as a Calc I pre-req.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-fixed-income-credit-analysis-concentration",
+      "section_name": "Finance elective",
+      "raw_text": "The current 2025-26 RBS catalog confirms that only Finance majors may declare this concentration and that it becomes part of the Finance major program, but it still does not enumerate the approved additional Finance elective or its overlap treatment. The program remains unreviewed until RBS publishes or confirms those details.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-global-business-concentration",
+      "section_name": "Formal declaration",
+      "raw_text": "Leadership and Management majors may not declare this concentration.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-leadership-management",
+      "section_name": "Leadership and Management Major Special Notes",
+      "raw_text": "If you major in Accounting as your first, second or third major, you are required to take 33:010:458 Accounting Information System and 33:140:320 Business Law I. You will not earn credit for taking 33:136:370 Management Information System. You can earn credit towards graduation if you take 33:522:334 Business Ethics but it will not fulfill a major requirement.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-leadership-management",
+      "section_name": "Leadership and Management Major Special Notes",
+      "raw_text": "Starting in Summer 2024, 33:390:310 Financial Management for Finance majors will not be offered. All RBS students will take 33:390:300 Financial Management regardless of major. A grade of B or higher will be required in 33:390:300 to declare the finance major or finance concentration and to take any additional courses in the finance department.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-leadership-management",
+      "section_name": "Leadership and Management Major Special Notes",
+      "raw_text": "Students with more than one Business School major may only double count one RBS course between those majors.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-leadership-management",
+      "section_name": "RBS Core Courses",
+      "raw_text": "*01:640:151 or 01:640:130 also acceptable as a Calc I pre-req.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-leadership-skills-concentration",
+      "section_name": "Formal declaration",
+      "raw_text": "Leadership and Management majors may not declare this concentration.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-leadership-skills-concentration",
+      "section_name": "Three-course rule",
+      "raw_text": "Take 33:620:410 plus two electives, including at least one of 33:620:362 or 33:620:350. The reviewed requirement tree models this total-plus-subset rule. 33:620:320 and 33:620:430 require 33:620:301; 33:620:330 requires 33:620:301 plus junior or senior standing.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-management-information-systems-concentration",
+      "section_name": "Formal declaration",
+      "raw_text": "RBS-New Brunswick students only; BAIT majors may not declare this concentration; RBS-NB Undergraduate Programs Office contact is required to enroll in the courses.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-marketing",
+      "section_name": "Marketing Major Special Notes",
+      "raw_text": "If you major in Accounting as your first, second or third major, you are required to take 33:010:458 Accounting Information System and 33:140:320 Business Law I. You will not earn credit for taking 33:136:370 Management Information System. You can earn credit towards graduation if you take 33:522:334 Business Ethics but it will not fulfill a major requirement.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-marketing",
+      "section_name": "Marketing Major Special Notes",
+      "raw_text": "Starting in Summer 2024, 33:390:310 Financial Management for Finance majors will not be offered. All RBS students will take 33:390:300 Financial Management regardless of major. A grade of B or higher will be required in 33:390:300 to declare the finance major or finance concentration and to take any additional courses in the finance department.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-marketing",
+      "section_name": "Marketing Major Special Notes",
+      "raw_text": "Students with more than one Business School major may only double count one RBS course between those majors.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-marketing",
+      "section_name": "RBS Core Courses",
+      "raw_text": "*01:640:151 or 01:640:130 also acceptable as a Calc I pre-req.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-professional-selling-concentration",
+      "section_name": "Overlap policy",
+      "raw_text": "The current 2025-26 RBS catalog permits Marketing majors to declare Professional Selling and says its listed concentration courses count as Marketing-major electives. The reviewed course-specific exception records the six published course options.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-real-estate-concentration",
+      "section_name": "Path logic",
+      "raw_text": "The current 2025-26 RBS catalog supplies a Finance-major path and an other-RBS-major path. Both use 33:390:300 as the prerequisite for the path finance course. The reviewed data selects the correct path from the chosen major and permits only 33:390:435 to overlap with the Finance major.",
+      "resolved": true
+    },
+    {
+      "program_id": "rbsnb-supply-chain-management",
+      "section_name": "New Policy on Supply Chain Electives",
+      "raw_text": "For students who entered RBS-NB Fall 2024 or later, at least 2 of your 3 major electives in Supply Chain must come from the 799/Supply Chain major code.  No more than 1 major elective may come from other departments that offer a few acceptable Supply Chain electives, i.e., Marketing and Management.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-supply-chain-management",
+      "section_name": "RBS Core Courses",
+      "raw_text": "*01:640:151 or 01:640:130 also acceptable as a Calc I pre-req.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-supply-chain-management",
+      "section_name": "Supply Chain Major Special Notes",
+      "raw_text": "If you major in Accounting as your first, second or third major, you are required to take 33:010:458 Accounting Information System and 33:140:320 Business Law I. You will not earn credit for taking 33:136:370 Management Information System. You can earn credit towards graduation if you take 33:522:334 Business Ethics but it will not fulfill a major requirement.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-supply-chain-management",
+      "section_name": "Supply Chain Major Special Notes",
+      "raw_text": "Starting in Summer 2024, 33:390:310 Financial Management for Finance majors will not be offered. All RBS students will take 33:390:300 Financial Management regardless of major. A grade of B or higher will be required in 33:390:300 to declare the finance major or finance concentration and to take any additional courses in the finance department.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-supply-chain-management",
+      "section_name": "Supply Chain Major Special Notes",
+      "raw_text": "Students may only take one experiential learning course towards their SCM required courses from among these three categories: SCM Industry Client Projects, Internship in Supply Chain Management, and Co-op in Supply Chain Management. Co-op in Supply Chain Management and Internship in Supply Chain Management for SCM required credits are by application only through the Supply Chain department. If you choose to take Co-op in Supply Chain as your one SCM required course, you will be registered for both 799:421 (SCM Co-op) for SCM credit and 011:482 (Special Topics in Admin Studies) for general elective credit.",
+      "resolved": false
+    },
+    {
+      "program_id": "rbsnb-supply-chain-management",
+      "section_name": "Supply Chain Major Special Notes",
+      "raw_text": "Students with more than one Business School major may only double count one RBS course between those majors.",
+      "resolved": false
+    }
+  ]
+}
