@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFile } from "node:fs/promises";
+import { programApiSource as worker } from "./helpers/program-api-source.mjs";
 import { webApplicationSource as frontend } from "./helpers/web-source.mjs";
-
-const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
 
 test("reviewed allocation conditions are returned to the browser as group allocation data", () => {
   assert.match(worker, /allocationsByGroup/);

@@ -4,12 +4,11 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { evaluateProgramSelection, publicEligibilityRule } from "../src/program-selection-policy.js";
+import { programApiSource as worker } from "./helpers/program-api-source.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, "../fixtures/program-selection-comparison-cases.json");
 const fixture = JSON.parse(await readFile(fixturePath, "utf8"));
-const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
-
 for (const comparisonCase of fixture.cases) {
   test(comparisonCase.id, () => {
     const result = evaluateProgramSelection({

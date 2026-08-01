@@ -10,10 +10,11 @@ The application migration remains incremental so production behavior stays
 available while compatibility modules are replaced.
 
 The first application boundary is now concrete: Wrangler targets
-`apps/api/src/worker.js`, and the catalog contributor controllers live beside
-that entrypoint. Legacy `worker/src` paths are thin compatibility exports or
-explicitly documented dependencies, so route callers can migrate without a
-flag day.
+`apps/api/src/worker.js`; the program API and catalog contributor controllers
+live beside that entrypoint. Legacy `worker/src` entrypoint and program paths
+are thin compatibility exports. The remaining import and policy helpers are
+explicitly documented compatibility dependencies, so callers can migrate
+without a flag day.
 
 ## Goals
 
@@ -119,8 +120,8 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Split the 2,375-line compatibility program router into `apps/api` route and
-   Cloudflare-storage modules.
+2. Move the program controller's remaining compatibility helpers into
+   `apps/api`, then split its route families from Cloudflare storage adapters.
 3. Add explicit module APIs to the newly relocated planner, requirements, and
    scheduling packages, then retire their root compatibility imports.
 4. Add an ordered structural migration runner, then retire compatibility files

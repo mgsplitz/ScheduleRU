@@ -25,11 +25,11 @@ CURRENT_TERM = "9"          # 0=Winter 1=Spring 7=Summer 9=Fall
 SCHEDULE_ASSISTANT_MODEL = "gpt-4o-mini"
 COURSES_PER_RUN = "400"     # courses written per cron run (~4,400 total courses / 400 ≈ 11 runs ≈ ~2.75hrs for a full pass at 15min cron)
 
-# Catalog subdomain for the compatibility requirements adapter
-# (worker/src/programs.js).
+# Catalog subdomain for the requirements adapter
+# (apps/api/src/programs.js).
 # Rutgers/Coursedog publish a new subdomain per catalog year, e.g.
 # "newbrunswick-undergrad-25-26" -> "newbrunswick-undergrad-26-27" next
-# fall. Bump this once a year rather than editing programs.js.
+# fall. Bump this once a year rather than editing application code.
 CATALOG_SUBDOMAIN = "newbrunswick-undergrad-25-26"
 
 # Development is an entirely separate Worker and D1 database. Deploy it with

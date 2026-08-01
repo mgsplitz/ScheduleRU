@@ -42,7 +42,7 @@
  * GET /api/sync-log if anything looks off after deploying.
  */
 
-import { handleProgramsApi } from "../../../worker/src/programs.js";
+import { handleProgramsApi } from "./programs.js";
 import {
   handleScheduleAssistantRequest,
 } from "../../../worker/src/schedule-assistant.js";

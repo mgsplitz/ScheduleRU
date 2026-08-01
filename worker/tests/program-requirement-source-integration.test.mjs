@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { programApiSource as worker } from "./helpers/program-api-source.mjs";
 
 test("the Worker can register and bulk-import source drafts without publishing requirements", async () => {
-  const [schema, worker] = await Promise.all([
-    readFile(new URL("../../migrations/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
-    readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
-  ]);
+  const schema = await readFile(
+    new URL("../../migrations/schema_program_requirement_imports.sql", import.meta.url),
+    "utf8",
+  );
 
   assert.match(schema, /CREATE TABLE IF NOT EXISTS program_requirement_import_sources/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS program_requirement_source_snapshots/);
@@ -18,18 +19,15 @@ test("the Worker can register and bulk-import source drafts without publishing r
 });
 
 test("school source imports queue a bounded batch of not-yet-snapshotted sources", async () => {
-  const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
-
   assert.match(worker, /last_imported_at IS NULL/);
   assert.match(worker, /ORDER BY id\s+LIMIT \?/);
   assert.match(worker, /batchLimit/);
 });
 
 test("major discovery stores typed detail sources without publishing audits", async () => {
-  const [schema, migration, worker] = await Promise.all([
+  const [schema, migration] = await Promise.all([
     readFile(new URL("../../migrations/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
     readFile(new URL("../../migrations/migrate_requirement_import_source_kinds.sql", import.meta.url), "utf8"),
-    readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
   ]);
 
   assert.match(schema, /source_kind TEXT NOT NULL DEFAULT 'profile'/);
@@ -40,10 +38,9 @@ test("major discovery stores typed detail sources without publishing audits", as
 });
 
 test("the Worker stores generic draft candidates separately from reviewed requirement audits", async () => {
-  const [schema, migration, worker] = await Promise.all([
+  const [schema, migration] = await Promise.all([
     readFile(new URL("../../migrations/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
     readFile(new URL("../../migrations/migrate_requirement_draft_candidates.sql", import.meta.url), "utf8"),
-    readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
   ]);
 
   assert.match(schema, /CREATE TABLE IF NOT EXISTS program_requirement_draft_candidates/);
@@ -55,10 +52,9 @@ test("the Worker stores generic draft candidates separately from reviewed requir
 });
 
 test("the Worker can record one generic second-level major-requirements lookup per overview source", async () => {
-  const [schema, migration, worker] = await Promise.all([
+  const [schema, migration] = await Promise.all([
     readFile(new URL("../../migrations/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
     readFile(new URL("../../migrations/migrate_requirement_source_discovery_attempts.sql", import.meta.url), "utf8"),
-    readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
   ]);
 
   assert.match(schema, /CREATE TABLE IF NOT EXISTS program_requirement_source_discovery_attempts/);
