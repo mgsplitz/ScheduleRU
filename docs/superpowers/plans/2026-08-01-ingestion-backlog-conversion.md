@@ -2,6 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Completed and fast-forwarded to `dev` on 2026-08-01. The two
+temporary draft seeds referenced below were subsequently converted by
+`2026-08-01-draft-catalog-conversion.md`.
+
 **Goal:** Preserve mutable catalog-review notes outside legacy SQL, move reviewed-program tests to the canonical catalog snapshot, and remove redundant reviewed SQL without migrating incomplete drafts prematurely.
 
 **Architecture:** `packages/catalog-ingestion` owns only mutable review workflow state. Reviewed program definitions remain in `packages/catalog`; shared school and policy configuration remains in `packages/reference-data`. Snapshot-backed tests load definitions through one helper so a program-data change touches its definition and tests, not application code or SQL.

@@ -12,8 +12,10 @@ engine, Worker routes, or structural migrations.
   `PUT /api/admin/catalog/program-definitions/:programId`
 - Production publication: intentionally unavailable through this endpoint
 
-Legacy program-specific SQL remains temporarily while existing data is
-converted and compared. Do not add another program-specific SQL file.
+Reviewed and draft program content is fully outside structural SQL. Reviewed
+definitions are recoverable from `catalog/snapshots`; incomplete definitions
+live in `catalog/drafts`; unresolved review prose lives in
+`catalog/ingestion/review-backlog.v1.json`.
 
 ## Allowed work
 
@@ -25,6 +27,10 @@ A catalog-only task may:
 - publish the definition to the development Worker;
 - verify the resulting public program and requirement API responses;
 - report ambiguous or unsupported requirements.
+
+An incomplete definition must remain `unreviewed` or `needs_fix` under
+`catalog/drafts`. Publishing that file to development does not make it public;
+public routes continue to require reviewed evidence.
 
 It may not:
 
@@ -85,6 +91,20 @@ The supported requirement rules are:
 Course selectors are generic finite course-code lists or bounded
 school/subject/level ranges. If an official rule cannot be represented without
 guessing, stop and record the exact source language as a blocker.
+
+## Draft and review-backlog workflow
+
+Validate a draft with the same program-neutral command:
+
+```bash
+npm run catalog -- validate catalog/drafts/<program>.v1.json
+```
+
+Draft files must not duplicate a program already present in the reviewed
+snapshot. Put unresolved source wording in the review-backlog contract and
+validate or restore it through `npm run catalog-ingestion`. The backlog is
+portable workflow state; it must not contain duplicate course trees or
+program-specific executable logic.
 
 ## Reviewed snapshot and recovery
 

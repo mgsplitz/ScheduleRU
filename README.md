@@ -55,7 +55,15 @@ package.json                       npm workspace, verification, and catalog comm
 AGENTS.md                          Repository ownership and safety boundaries
 
 packages/catalog/                  Typed catalog contract, validation, and D1 publication
+packages/reference-data/           School configuration and cross-program policy contract
+packages/catalog-ingestion/        Mutable review-note workflow contract
 tools/catalog/                     Catalog-only validation and development publication CLI
+tools/reference-data/              Reference-data snapshot, restore, and parity CLI
+tools/catalog-ingestion/            Review-backlog snapshot, restore, and parity CLI
+catalog/snapshots/                 Canonical reviewed program definitions and parity manifests
+catalog/drafts/                    Validated, non-public program definitions awaiting review
+catalog/ingestion/                 Portable review backlog and parity manifests
+reference-data/snapshots/          Canonical reviewed shared policy/configuration data
 docs/architecture/                 Maintained architecture and migration boundaries
 docs/catalog-contributor/          Narrow handoff for independent catalog work
 
@@ -74,13 +82,11 @@ worker/src/schedule-assistant.js   OpenAI structured-output adapter
 worker/src/*-import.js             Program discovery/import helpers
 worker/schema/schema*.sql          Base and additive D1 schemas
 worker/schema/migrate*.sql         One-time migrations for existing databases
-worker/schema/review*.sql          Legacy reviewed data awaiting contract conversion
-worker/schema/seed*.sql            Draft or seed data; not automatically published
 worker/tests/*.test.mjs            Node test suite
 worker/wrangler.toml               Worker, D1, cron, term, and dev configuration
 ```
 
-Do not add new program-specific reviewed SQL. Validate and publish new catalog
+Catalog content is not stored in structural SQL. Validate and publish program
 definitions through
 [`docs/catalog-contributor/README.md`](docs/catalog-contributor/README.md).
 
@@ -211,7 +217,12 @@ The equivalent production migration is approval-only. Do not run it until the pr
 npx wrangler d1 execute rutgers_courses --remote --file=schema/schema_ap_equivalencies.sql
 ```
 
-Important: the repository currently has no consolidated migration runner. The full planner data model was built through additive `schema_*.sql` and `migrate_*.sql` files, and the reviewed catalog was built through `review_*.sql` files. Their headers state their dependencies and whether they are safe to rerun. A new database needs the relevant additive schemas in dependency order before selected reviewed-data scripts are applied. Do not blindly execute every SQL file: some are one-time `ALTER TABLE` migrations, and `seed_*.sql` files may contain unpublished draft data.
+Important: the repository currently has no consolidated migration runner. The
+planner data model was built through additive `schema_*.sql` and
+`migrate_*.sql` files. Their headers state their dependencies and whether they
+are safe to rerun. A new database needs those structural schemas in dependency
+order, followed by validated catalog and reference-data restoration. Do not
+blindly execute every SQL file: some are one-time `ALTER TABLE` migrations.
 
 At minimum, `schema.sql` is required for the course catalog API. The planner's program, Core, eligibility, policy, and AP features require their corresponding schemas and reviewed records.
 
@@ -300,7 +311,10 @@ node --test worker/tests/*.test.mjs
 git diff --check
 ```
 
-The tests use Node's built-in test runner and require no package installation or network access. They cover deterministic logic, Worker request handlers, schema contracts, reviewed SQL data, frontend integration hooks, and planner regressions.
+The tests use Node's built-in test runner and require no network access. They
+cover deterministic logic, Worker request handlers, schema contracts, portable
+catalog/reference-data snapshots, frontend integration hooks, and planner
+regressions.
 
 To run one file:
 
@@ -349,7 +363,9 @@ Hostname-based backend selection is implemented in `index.html`. `localhost` and
 ## Troubleshooting
 
 - **The catalog is empty:** open `<backend-url>/api/sync-status`. A new database needs `schema.sql` and an initial catalog sync.
-- **Programs or requirements do not load:** verify the program-related schemas and reviewed SQL records exist in the same D1 database, then inspect the failing API response.
+- **Programs or requirements do not load:** verify the program-related
+  structural schemas and validated catalog snapshot were restored to the same
+  D1 database, then inspect the failing API response.
 - **No AP choices appear:** verify `schema_ap_equivalencies.sql` was applied and that its reviewed rows match the catalog year derived from `CURRENT_YEAR` and `CURRENT_TERM`.
 - **The semester scheduler has no sections:** verify the requested courses exist for the configured active year/term and that the catalog sync has completed.
 - **The schedule assistant fails:** verify `OPENAI_API_KEY`, `SCHEDULE_ASSISTANT_MODEL`, API access/quota, and the Worker logs. The planner and scheduler do not require the assistant.

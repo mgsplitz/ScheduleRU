@@ -2,9 +2,11 @@
 
 ## Status
 
-Approved on 2026-07-31. This document defines the target boundaries and the
-first migration milestone. The migration is incremental: production behavior
-must remain available while legacy modules are replaced.
+Approved on 2026-07-31 and updated on 2026-08-01. The data-boundary milestone
+is complete: reviewed programs, shared reference data, non-public drafts, and
+review workflow notes are portable contracts with exact development parity.
+The application migration remains incremental so production behavior stays
+available while compatibility modules are replaced.
 
 ## Goals
 
@@ -77,7 +79,7 @@ transaction. It replaces one program version atomically, leaving unrelated
 programs untouched. Replaying an identical definition produces the same
 database state.
 
-## First milestone
+## Completed data foundation
 
 The first milestone creates:
 
@@ -89,10 +91,25 @@ The first milestone creates:
 6. ownership and contributor documentation;
 7. compatibility tests proving the existing 333-test baseline remains green.
 
-It does not move the current UI, rewrite the planner, delete legacy SQL, alter
-production data, or deploy to production. Legacy reviewed SQL is removed only
-after every definition has been exported, validated, imported into development,
-and compared through the public requirements API.
+The reviewed catalog now contains 49 validated definitions. Shared school and
+cross-program data is owned by `packages/reference-data`; mutable review notes
+are owned by `packages/catalog-ingestion`; incomplete definitions are validated
+under `catalog/drafts`. Content-bearing reviewed and draft program SQL has been
+removed after development publication and parity checks. Production data was
+not changed.
+
+## Next application milestones
+
+1. Move the 4,067-line root frontend into `apps/web` behind browser-state and
+   HTTP adapters.
+2. Split the 2,375-line compatibility program router into `apps/api` route and
+   Cloudflare-storage modules.
+3. Move root deterministic planner, requirements, and scheduling modules into
+   their named packages while retaining compatibility exports.
+4. Convert the remaining reviewed course-eligibility content into a portable
+   contract, leaving `worker/schema` structural-only.
+5. Add an ordered structural migration runner, then retire compatibility files
+   only after contract and public-behavior parity.
 
 ## Verification gates
 
@@ -104,4 +121,3 @@ and compared through the public requirements API.
 - The Worker route rejects unauthorized and production publication attempts.
 - Repository formatting and type-checking pass.
 - No secret value or program-specific rule is added to application code.
-
