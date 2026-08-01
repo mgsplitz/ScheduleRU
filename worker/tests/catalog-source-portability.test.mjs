@@ -30,8 +30,8 @@ test("reviewed catalog-source configuration is digest-checked portable data", as
 
 test("catalog-source structural migrations contain no source content", async () => {
   for (const path of [
-    "worker/schema/schema_program_catalog_imports.sql",
-    "worker/schema/migrate_program_catalog_source_ownership.sql",
+    "migrations/schema_program_catalog_imports.sql",
+    "migrations/migrate_program_catalog_source_ownership.sql",
   ]) {
     const sql = await readFile(new URL(path, ROOT), "utf8");
     assert.doesNotMatch(sql, /\b(?:INSERT|UPDATE|DELETE)\b/i, path);

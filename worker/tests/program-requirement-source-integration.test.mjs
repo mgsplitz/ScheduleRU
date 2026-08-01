@@ -4,7 +4,7 @@ import test from "node:test";
 
 test("the Worker can register and bulk-import source drafts without publishing requirements", async () => {
   const [schema, worker] = await Promise.all([
-    readFile(new URL("../schema/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../migrations/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
   ]);
 
@@ -27,8 +27,8 @@ test("school source imports queue a bounded batch of not-yet-snapshotted sources
 
 test("major discovery stores typed detail sources without publishing audits", async () => {
   const [schema, migration, worker] = await Promise.all([
-    readFile(new URL("../schema/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
-    readFile(new URL("../schema/migrate_requirement_import_source_kinds.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../migrations/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../migrations/migrate_requirement_import_source_kinds.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
   ]);
 
@@ -41,8 +41,8 @@ test("major discovery stores typed detail sources without publishing audits", as
 
 test("the Worker stores generic draft candidates separately from reviewed requirement audits", async () => {
   const [schema, migration, worker] = await Promise.all([
-    readFile(new URL("../schema/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
-    readFile(new URL("../schema/migrate_requirement_draft_candidates.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../migrations/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../migrations/migrate_requirement_draft_candidates.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
   ]);
 
@@ -56,8 +56,8 @@ test("the Worker stores generic draft candidates separately from reviewed requir
 
 test("the Worker can record one generic second-level major-requirements lookup per overview source", async () => {
   const [schema, migration, worker] = await Promise.all([
-    readFile(new URL("../schema/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
-    readFile(new URL("../schema/migrate_requirement_source_discovery_attempts.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../migrations/schema_program_requirement_imports.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../migrations/migrate_requirement_source_discovery_attempts.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/programs.js", import.meta.url), "utf8"),
   ]);
 

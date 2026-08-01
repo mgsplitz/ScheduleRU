@@ -2,7 +2,7 @@
 --
 -- Apply before any reviewed program data that uses these tables:
 --   npx.cmd wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/schema_requirement_context_and_overlap_exceptions.sql
+--     --file=../migrations/schema_requirement_context_and_overlap_exceptions.sql
 
 CREATE TABLE IF NOT EXISTS requirement_group_conditions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

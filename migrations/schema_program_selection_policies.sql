@@ -2,7 +2,7 @@
 --
 -- Run against the intended environment only, for example:
 --   npx wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/schema_program_selection_policies.sql
+--     --file=../migrations/schema_program_selection_policies.sql
 --
 -- WHY THIS IS SEPARATE FROM double_count_policies:
 -- Double-count policies govern whether one COURSE can satisfy two programs.

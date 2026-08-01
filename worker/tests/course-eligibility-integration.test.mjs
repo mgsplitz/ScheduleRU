@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const schema = await readFile(new URL("../schema/schema_course_eligibility_conditions.sql", import.meta.url), "utf8");
+const schema = await readFile(new URL("../../migrations/schema_course_eligibility_conditions.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
 
 test("eligibility facts are source-backed and review-gated", () => {

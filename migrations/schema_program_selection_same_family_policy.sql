@@ -6,7 +6,7 @@
 --
 -- Apply to one environment at a time. For development:
 --   npx wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/schema_program_selection_same_family_policy.sql
+--     --file=../migrations/schema_program_selection_same_family_policy.sql
 
 ALTER TABLE program_combination_policies ADD COLUMN same_program_family INTEGER NOT NULL DEFAULT 0
   CHECK (same_program_family IN (0, 1));

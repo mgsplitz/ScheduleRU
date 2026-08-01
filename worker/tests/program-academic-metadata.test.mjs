@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-const baseSchema = await readFile(new URL("../schema/schema_programs.sql", import.meta.url), "utf8");
-const migration = await readFile(new URL("../schema/migrate_program_academic_metadata.sql", import.meta.url), "utf8");
+const baseSchema = await readFile(new URL("../../migrations/schema_programs.sql", import.meta.url), "utf8");
+const migration = await readFile(new URL("../../migrations/migrate_program_academic_metadata.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
 const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
 

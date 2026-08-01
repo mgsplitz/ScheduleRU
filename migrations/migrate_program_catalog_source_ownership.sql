@@ -1,7 +1,7 @@
 -- Directory ownership and identity overrides for source-backed program imports.
 -- Apply after schema_program_catalog_imports.sql:
 --   npx wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/migrate_program_catalog_source_ownership.sql
+--     --file=../migrations/migrate_program_catalog_source_ownership.sql
 
 -- The official SAS directory also lists programs owned by partner schools.
 -- A source declares its allowed owner labels in data, so imports cannot

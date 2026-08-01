@@ -6,7 +6,7 @@
 --
 -- For development:
 --   npx wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/schema_program_requirement_evidence.sql
+--     --file=../migrations/schema_program_requirement_evidence.sql
 
 ALTER TABLE programs ADD COLUMN requirement_evidence_required INTEGER NOT NULL DEFAULT 0
   CHECK (requirement_evidence_required IN (0, 1));

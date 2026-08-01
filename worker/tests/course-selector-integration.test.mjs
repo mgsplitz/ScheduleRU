@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-const schema = await readFile(new URL("../schema/schema_requirement_course_selectors.sql", import.meta.url), "utf8");
+const schema = await readFile(new URL("../../migrations/schema_requirement_course_selectors.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
 const catalogWorker = await readFile(
   new URL("../../apps/api/src/worker.js", import.meta.url),

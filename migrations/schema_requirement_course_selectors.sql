@@ -8,7 +8,7 @@
 --
 -- Development command:
 --   npx.cmd wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/schema_requirement_course_selectors.sql
+--     --file=../migrations/schema_requirement_course_selectors.sql
 
 CREATE TABLE IF NOT EXISTS requirement_course_selectors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

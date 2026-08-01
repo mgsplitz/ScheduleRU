@@ -3,7 +3,7 @@
 -- instance needed. This just adds tables so the requirements side can JOIN
 -- against `courses` (e.g. "does this course id satisfy this requirement row").
 --
--- Run with: wrangler d1 execute rutgers_courses --file=schema_programs.sql --remote
+-- Run with: wrangler d1 execute rutgers_courses --file=../migrations/schema_programs.sql --remote
 --
 -- SOURCE OF THIS DATA: unlike courses.json (a real Rutgers API), there is no
 -- public requirements API. This data is scraped from the public Coursedog-

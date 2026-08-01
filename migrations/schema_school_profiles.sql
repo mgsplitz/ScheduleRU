@@ -7,7 +7,7 @@
 --
 -- Apply to one environment at a time. For development:
 --   npx.cmd wrangler d1 execute rutgers_courses_dev --env dev --remote \
---     --file=schema/schema_school_profiles.sql
+--     --file=../migrations/schema_school_profiles.sql
 
 CREATE TABLE IF NOT EXISTS school_profiles (
   slug TEXT PRIMARY KEY,              -- matches programs.school_slug, e.g. rbsnb
