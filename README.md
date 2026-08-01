@@ -76,7 +76,9 @@ planner-state-logic.js             Versioned local state and migrations
 requirement-group-logic.js         Requirement progress and course allocation
 schedule-preference-logic.js       Deterministic preference filtering/ranking
 
-worker/src/worker.js               Worker entry point, catalog sync, catalog API
+apps/api/src/worker.js             Canonical Worker entry point and HTTP routing
+apps/api/src/*-admin.js            Development-only catalog data controllers
+worker/src/worker.js               Temporary compatibility export for older tools
 worker/src/programs.js             Program, requirement, policy, and admin APIs
 worker/src/schedule-assistant.js   OpenAI structured-output adapter
 worker/src/*-import.js             Program discovery/import helpers

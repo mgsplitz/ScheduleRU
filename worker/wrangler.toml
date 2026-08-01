@@ -1,5 +1,5 @@
 name = "rutgers-course-sync"
-main = "src/worker.js"
+main = "../apps/api/src/worker.js"
 compatibility_date = "2024-11-01"
 
 # Every run now does ONE full-catalog fetch (Rutgers ignores subject filters
@@ -25,7 +25,8 @@ CURRENT_TERM = "9"          # 0=Winter 1=Spring 7=Summer 9=Fall
 SCHEDULE_ASSISTANT_MODEL = "gpt-4o-mini"
 COURSES_PER_RUN = "400"     # courses written per cron run (~4,400 total courses / 400 ≈ 11 runs ≈ ~2.75hrs for a full pass at 15min cron)
 
-# Catalog subdomain for the degree-requirements scraper (src/programs.js).
+# Catalog subdomain for the compatibility requirements adapter
+# (worker/src/programs.js).
 # Rutgers/Coursedog publish a new subdomain per catalog year, e.g.
 # "newbrunswick-undergrad-25-26" -> "newbrunswick-undergrad-26-27" next
 # fall. Bump this once a year rather than editing programs.js.
@@ -68,5 +69,5 @@ CATALOG_SUBDOMAIN = "newbrunswick-undergrad-25-26"
 #   wrangler secret put ADMIN_SECRET
 #   (paste the existing secret securely when prompted)
 #
-# worker.js/programs.js both read it as env.ADMIN_SECRET either way, so no
+# The API entrypoint and compatibility modules read it as env.ADMIN_SECRET, so no
 # code change is needed here. ADMIN_SECRET must never be assigned in this file.

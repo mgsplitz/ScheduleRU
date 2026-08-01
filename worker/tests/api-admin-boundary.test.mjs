@@ -1,0 +1,49 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+import {
+  handleCatalogAdminRequest as canonicalCatalogAdmin,
+  handleCatalogIngestionAdminRequest as canonicalCatalogIngestionAdmin,
+  handleReferenceDataAdminRequest as canonicalReferenceDataAdmin,
+} from "../../apps/api/src/index.js";
+import {
+  handleCatalogAdminRequest as compatibleCatalogAdmin,
+} from "../src/catalog-admin.js";
+import {
+  handleCatalogIngestionAdminRequest as compatibleCatalogIngestionAdmin,
+} from "../src/catalog-ingestion-admin.js";
+import {
+  handleReferenceDataAdminRequest as compatibleReferenceDataAdmin,
+} from "../src/reference-data-admin.js";
+import canonicalWorker from "../../apps/api/src/worker.js";
+import compatibleWorker from "../src/worker.js";
+
+const canonicalWorkerSource = await readFile(
+  new URL("../../apps/api/src/worker.js", import.meta.url),
+  "utf8",
+);
+const compatibilitySource = await readFile(
+  new URL("../src/worker.js", import.meta.url),
+  "utf8",
+);
+const wranglerConfiguration = await readFile(
+  new URL("../wrangler.toml", import.meta.url),
+  "utf8",
+);
+
+test("apps/api owns the canonical development admin controllers", () => {
+  assert.equal(compatibleCatalogAdmin, canonicalCatalogAdmin);
+  assert.equal(compatibleCatalogIngestionAdmin, canonicalCatalogIngestionAdmin);
+  assert.equal(compatibleReferenceDataAdmin, canonicalReferenceDataAdmin);
+});
+
+test("apps/api owns the Worker entrypoint and the legacy path is compatible", () => {
+  assert.equal(compatibleWorker, canonicalWorker);
+  assert.match(canonicalWorkerSource, /from "\.\/index\.js"/);
+  assert.match(
+    compatibilitySource,
+    /export \{ default \} from "\.\.\/\.\.\/apps\/api\/src\/worker\.js"/,
+  );
+  assert.match(wranglerConfiguration, /main = "\.\.\/apps\/api\/src\/worker\.js"/);
+});

@@ -4,7 +4,10 @@ import { readFile } from "node:fs/promises";
 
 const schema = await readFile(new URL("../schema/schema_requirement_course_selectors.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/programs.js", import.meta.url), "utf8");
-const catalogWorker = await readFile(new URL("../src/worker.js", import.meta.url), "utf8");
+const catalogWorker = await readFile(
+  new URL("../../apps/api/src/worker.js", import.meta.url),
+  "utf8",
+);
 const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
 
 test("reviewed selector rows are stored with an audited source and returned with their group", () => {

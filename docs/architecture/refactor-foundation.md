@@ -8,6 +8,12 @@ review workflow notes are portable contracts with exact development parity.
 The application migration remains incremental so production behavior stays
 available while compatibility modules are replaced.
 
+The first application boundary is now concrete: Wrangler targets
+`apps/api/src/worker.js`, and the catalog contributor controllers live beside
+that entrypoint. Legacy `worker/src` paths are thin compatibility exports or
+explicitly documented dependencies, so route callers can migrate without a
+flag day.
+
 ## Goals
 
 - Make frontend, API, planning, requirements, scheduling, and catalog work

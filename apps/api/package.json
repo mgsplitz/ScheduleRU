@@ -1,0 +1,18 @@
+{
+  "name": "@scheduleru/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./worker": "./src/worker.js"
+  },
+  "dependencies": {
+    "@scheduleru/catalog": "0.1.0",
+    "@scheduleru/catalog-ingestion": "0.1.0",
+    "@scheduleru/reference-data": "0.1.0"
+  },
+  "scripts": {
+    "test": "node --test ../../worker/tests/api-admin-boundary.test.mjs ../../worker/tests/catalog-admin.test.mjs ../../worker/tests/catalog-ingestion-admin.test.mjs ../../worker/tests/reference-data-admin.test.mjs"
+  }
+}
