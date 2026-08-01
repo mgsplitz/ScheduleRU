@@ -11,3 +11,6 @@ export {
 export {
   handleProgramsApi,
 } from "./programs.js";
+export {
+  handleScheduleAssistantRequest,
+} from "./schedule-assistant.js";

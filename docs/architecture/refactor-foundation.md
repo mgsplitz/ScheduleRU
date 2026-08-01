@@ -14,7 +14,9 @@ The first application boundary is now concrete: Wrangler targets
 live beside that entrypoint. Legacy `worker/src` entrypoint and program paths
 are thin compatibility exports. Program policy, evidence, presentation, and
 source-import helpers now live under `apps/api/src/programs`, so the canonical
-API app no longer imports backward from `worker/src`.
+API app no longer imports backward from `worker/src`. The bounded OpenAI
+schedule-preference adapter also lives in `apps/api`, while deterministic
+preference normalization and ranking remain in `packages/scheduling`.
 
 ## Goals
 
