@@ -1,0 +1,12 @@
+{
+  "name": "@scheduleru/scheduling",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./preferences": "./src/schedule-preference-logic.js"
+  },
+  "scripts": {
+    "test": "node --test ../../worker/tests/schedule-preference-logic.test.mjs"
+  }
+}

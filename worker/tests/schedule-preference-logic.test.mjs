@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 
-const moduleUrl = new URL("../../schedule-preference-logic.js", import.meta.url);
+const moduleUrl = new URL(
+  "../../packages/scheduling/src/schedule-preference-logic.js",
+  import.meta.url,
+);
 const source = fs.existsSync(moduleUrl) ? fs.readFileSync(moduleUrl, "utf8") : "";
 const context = { globalThis: {} };
 vm.runInNewContext(source, context);

@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 
-const moduleUrl = new URL("../../planner-state-logic.js", import.meta.url);
+const moduleUrl = new URL(
+  "../../packages/planner/src/planner-state-logic.js",
+  import.meta.url,
+);
 const context = { globalThis: {} };
 if (fs.existsSync(moduleUrl)) {
   vm.runInNewContext(fs.readFileSync(moduleUrl, "utf8"), context);

@@ -20,7 +20,10 @@ test("course eligibility lookups stay within D1's 100-variable query limit", () 
 
 test("the browser migrates v1 state and evaluates the selected target term", async () => {
   const frontend = await readFile(new URL("../../index.html", import.meta.url), "utf8");
-  assert.match(frontend, /<script src="eligibility-logic\.js"><\/script>/);
+  assert.match(
+    frontend,
+    /<script src="packages\/planner\/src\/eligibility-logic\.js"><\/script>/,
+  );
   assert.match(frontend, /const PLANNER_STATE_VERSION=3/);
   assert.match(frontend, /\[1,2,PLANNER_STATE_VERSION,4\]\.includes\(saved\.version\)/);
   assert.match(frontend, /CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic\.STATE_VERSION/);

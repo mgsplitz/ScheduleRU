@@ -4,15 +4,30 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 const context = { globalThis: {} };
-const eligibilityUrl = new URL("../../eligibility-logic.js", import.meta.url);
+const eligibilityUrl = new URL(
+  "../../packages/planner/src/eligibility-logic.js",
+  import.meta.url,
+);
 vm.runInNewContext(fs.readFileSync(eligibilityUrl, "utf8"), context);
-const selectorUrl = new URL("../../course-selector-logic.js", import.meta.url);
+const selectorUrl = new URL(
+  "../../packages/requirements/src/course-selector-logic.js",
+  import.meta.url,
+);
 vm.runInNewContext(fs.readFileSync(selectorUrl, "utf8"), context);
-const academicCreditUrl = new URL("../../academic-credit-logic.js", import.meta.url);
+const academicCreditUrl = new URL(
+  "../../packages/requirements/src/academic-credit-logic.js",
+  import.meta.url,
+);
 vm.runInNewContext(fs.readFileSync(academicCreditUrl, "utf8"), context);
-const moduleUrl = new URL("../../planner-input-logic.js", import.meta.url);
+const moduleUrl = new URL(
+  "../../packages/planner/src/planner-input-logic.js",
+  import.meta.url,
+);
 if (fs.existsSync(moduleUrl)) vm.runInNewContext(fs.readFileSync(moduleUrl, "utf8"), context);
-const plannerUrl = new URL("../../four-year-planner-logic.js", import.meta.url);
+const plannerUrl = new URL(
+  "../../packages/planner/src/four-year-planner-logic.js",
+  import.meta.url,
+);
 vm.runInNewContext(fs.readFileSync(plannerUrl, "utf8"), context);
 const logic = context.globalThis.ScheduleRUPlannerInput;
 const planner = context.globalThis.ScheduleRUFourYearPlanner;

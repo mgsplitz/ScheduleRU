@@ -67,14 +67,12 @@ reference-data/snapshots/          Canonical reviewed shared policy/configuratio
 docs/architecture/                 Maintained architecture and migration boundaries
 docs/catalog-contributor/          Narrow handoff for independent catalog work
 
-index.html                         Static UI and integration code
-course-selector-logic.js           Reviewed course-selector matching
-eligibility-logic.js               Eligibility and prerequisite evaluation
-four-year-planner-logic.js         Deterministic eight-term planner
-planner-input-logic.js             Normalizes requirement data for planning
-planner-state-logic.js             Versioned local state and migrations
-requirement-group-logic.js         Requirement progress and course allocation
-schedule-preference-logic.js       Deterministic preference filtering/ranking
+index.html                         Compatibility HTML shell and app controller
+apps/web/src/                      Browser presentation decisions
+packages/planner/src/              Eligibility, inputs, state, and four-year plan
+packages/requirements/src/         Progress, allocation, selectors, equivalencies
+packages/scheduling/src/           Semester preference filtering and ranking
+*-logic.js                         Temporary root compatibility imports
 
 apps/api/src/worker.js             Canonical Worker entry point and HTTP routing
 apps/api/src/*-admin.js            Development-only catalog data controllers
@@ -339,16 +337,16 @@ The frontend is static. A deployment must include:
 
 ```text
 index.html
-course-selector-logic.js
-eligibility-logic.js
-four-year-planner-logic.js
-planner-input-logic.js
-planner-state-logic.js
-requirement-group-logic.js
-schedule-preference-logic.js
+apps/web/src/*.js
+packages/planner/src/*.js
+packages/requirements/src/*.js
+packages/scheduling/src/*.js
 ```
 
-Deploy only those public assets to a static host or Cloudflare Pages. Do not publish `worker/`, local Wrangler state, SQL files, admin credentials, or other repository internals as website assets.
+Deploy those public assets to a static host or Cloudflare Pages. The root
+compatibility imports are retained for tests and older local links but are not
+loaded by `index.html`. Do not publish `worker/`, local Wrangler state, SQL
+files, admin credentials, or other repository internals as website assets.
 
 Hostname-based backend selection is implemented in `index.html`. `localhost` and development `*.scheduleru-9fb.pages.dev` hosts use the development Worker; other hostnames default to the production Worker unless the user sets a browser-local override in the Course Catalog connection bar.
 

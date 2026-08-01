@@ -1,4 +1,4 @@
-import "../../schedule-preference-logic.js";
+import "../../packages/scheduling/src/schedule-preference-logic.js";
 
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARACTERS = 1_000;

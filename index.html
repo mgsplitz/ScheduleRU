@@ -602,17 +602,17 @@ button,input,select,textarea{font:inherit;}
   <div class="assistant-compose"><textarea id="assistantInput" placeholder="Try: no classes before 10, and keep Friday light"></textarea><div><button class="choice-btn secondary" id="assistantUndo">Undo</button> <button class="choice-btn secondary" id="assistantClear">Clear</button> <button class="choice-btn" id="assistantSend">Send</button></div></div>
 </aside>
 
-<script src="requirement-group-logic.js"></script>
-<script src="course-selector-logic.js"></script>
-<script src="course-interaction-logic.js"></script>
-<script src="program-picker-logic.js"></script>
-<script src="eligibility-logic.js"></script>
-<script src="academic-credit-logic.js"></script>
-<script src="planner-input-logic.js"></script>
-<script src="planner-state-logic.js"></script>
-<script src="four-year-planner-logic.js"></script>
-<script src="schedule-preference-logic.js"></script>
-<script src="planner-ui-logic.js"></script>
+<script src="packages/requirements/src/requirement-group-logic.js"></script>
+<script src="packages/requirements/src/course-selector-logic.js"></script>
+<script src="apps/web/src/course-interaction-logic.js"></script>
+<script src="apps/web/src/program-picker-logic.js"></script>
+<script src="packages/planner/src/eligibility-logic.js"></script>
+<script src="packages/requirements/src/academic-credit-logic.js"></script>
+<script src="packages/planner/src/planner-input-logic.js"></script>
+<script src="packages/planner/src/planner-state-logic.js"></script>
+<script src="packages/planner/src/four-year-planner-logic.js"></script>
+<script src="packages/scheduling/src/schedule-preference-logic.js"></script>
+<script src="apps/web/src/planner-ui-logic.js"></script>
 <script>
 /* AP equivalencies are loaded from the reviewed Worker endpoint. */
 let AP = [];

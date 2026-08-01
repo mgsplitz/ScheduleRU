@@ -4,8 +4,17 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 const context = { globalThis: {} };
-for (const file of ["eligibility-logic.js", "academic-credit-logic.js", "planner-input-logic.js", "four-year-planner-logic.js", "planner-state-logic.js"]) {
-  vm.runInNewContext(fs.readFileSync(new URL(`../../${file}`, import.meta.url), "utf8"), context);
+for (const file of [
+  "packages/planner/src/eligibility-logic.js",
+  "packages/requirements/src/academic-credit-logic.js",
+  "packages/planner/src/planner-input-logic.js",
+  "packages/planner/src/four-year-planner-logic.js",
+  "packages/planner/src/planner-state-logic.js",
+]) {
+  vm.runInNewContext(
+    fs.readFileSync(new URL(`../../${file}`, import.meta.url), "utf8"),
+    context,
+  );
 }
 const { ScheduleRUPlannerInput: adapter, ScheduleRUFourYearPlanner: engine, ScheduleRUPlannerStateLogic: stateLogic } = context.globalThis;
 

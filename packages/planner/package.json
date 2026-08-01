@@ -1,0 +1,15 @@
+{
+  "name": "@scheduleru/planner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./eligibility": "./src/eligibility-logic.js",
+    "./four-year": "./src/four-year-planner-logic.js",
+    "./input": "./src/planner-input-logic.js",
+    "./state": "./src/planner-state-logic.js"
+  },
+  "scripts": {
+    "test": "node --test ../../worker/tests/eligibility-logic.test.mjs ../../worker/tests/four-year-planner-logic.test.mjs ../../worker/tests/planner-input-logic.test.mjs ../../worker/tests/planner-state-logic.test.mjs"
+  }
+}

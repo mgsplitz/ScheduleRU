@@ -1,0 +1,14 @@
+{
+  "name": "@scheduleru/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./course-interactions": "./src/course-interaction-logic.js",
+    "./planner-ui": "./src/planner-ui-logic.js",
+    "./program-picker": "./src/program-picker-logic.js"
+  },
+  "scripts": {
+    "test": "node --test ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-picker-logic.test.mjs"
+  }
+}

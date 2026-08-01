@@ -29,7 +29,7 @@ flag day.
 
 ```text
 apps/
-  web/                     React/Vite frontend
+  web/                     Browser presentation and integration
   api/                     Cloudflare Worker
 packages/
   academic-model/          Shared academic identifiers and types
@@ -51,6 +51,11 @@ docs/
 The current root frontend and `worker/` remain compatibility surfaces until
 their replacements have passed parity checks. New domain behavior must be
 implemented behind the target package boundaries.
+
+The deterministic browser modules now live under `packages/planner`,
+`packages/requirements`, and `packages/scheduling`. Presentation-only
+decisions live under `apps/web`. The root `*-logic.js` files contain imports
+only, while the production HTML shell loads the canonical paths directly.
 
 ## Dependency rules
 
@@ -106,15 +111,13 @@ not changed.
 
 ## Next application milestones
 
-1. Move the 4,067-line root frontend into `apps/web` behind browser-state and
-   HTTP adapters.
+1. Extract the remaining inline CSS and application controller from the
+   4,067-line root HTML shell into `apps/web`.
 2. Split the 2,375-line compatibility program router into `apps/api` route and
    Cloudflare-storage modules.
-3. Move root deterministic planner, requirements, and scheduling modules into
-   their named packages while retaining compatibility exports.
-4. Convert the remaining reviewed course-eligibility content into a portable
-   contract, leaving `worker/schema` structural-only.
-5. Add an ordered structural migration runner, then retire compatibility files
+3. Add explicit module APIs to the newly relocated planner, requirements, and
+   scheduling packages, then retire their root compatibility imports.
+4. Add an ordered structural migration runner, then retire compatibility files
    only after contract and public-behavior parity.
 
 ## Verification gates

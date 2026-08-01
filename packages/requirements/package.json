@@ -1,0 +1,14 @@
+{
+  "name": "@scheduleru/requirements",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./academic-credit": "./src/academic-credit-logic.js",
+    "./course-selector": "./src/course-selector-logic.js",
+    "./groups": "./src/requirement-group-logic.js"
+  },
+  "scripts": {
+    "test": "node --test ../../worker/tests/academic-credit-logic.test.mjs ../../worker/tests/course-selector-logic.test.mjs ../../worker/tests/requirement-group-logic.test.mjs"
+  }
+}

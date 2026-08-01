@@ -20,7 +20,10 @@ test("reviewed selector rows are stored with an audited source and returned with
 });
 
 test("the browser loads selector matching and uses schedule/completed records for group application", () => {
-  assert.match(frontend, /<script src="course-selector-logic\.js"><\/script>/);
+  assert.match(
+    frontend,
+    /<script src="packages\/requirements\/src\/course-selector-logic\.js"><\/script>/,
+  );
   assert.match(frontend, /function groupAppliedCourseIds\(g\)/);
   assert.match(frontend, /plannedOrCompletedCourseRecords\(g\?\.id\)/);
   assert.match(frontend, /appliedCourseIds:groupAppliedCourseIds/);

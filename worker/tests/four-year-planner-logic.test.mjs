@@ -5,7 +5,13 @@ import vm from "node:vm";
 
 let logic;
 try {
-  const source = fs.readFileSync(new URL("../../four-year-planner-logic.js", import.meta.url), "utf8");
+  const source = fs.readFileSync(
+    new URL(
+      "../../packages/planner/src/four-year-planner-logic.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
   const context = { globalThis: {} };
   vm.runInNewContext(source, context);
   logic = context.globalThis.ScheduleRUFourYearPlanner;

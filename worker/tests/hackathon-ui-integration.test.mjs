@@ -82,7 +82,10 @@ test("assistant projections retain Rutgers day and open-section semantics", () =
 
 test("planner generation derives concrete inputs from immutable program and Core trees", () => {
   const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
-  assert.match(html, /<script src="planner-input-logic\.js"><\/script>/);
+  assert.match(
+    html,
+    /<script src="packages\/planner\/src\/planner-input-logic\.js"><\/script>/,
+  );
   assert.match(html, /ScheduleRUPlannerInput\.buildPlannerInput\(/);
   assert.match(html, /function plannerTermsFromAcademicPosition\(/);
   assert.match(html, /ST\.academicPosition\?\.startingSemester/);
@@ -112,7 +115,10 @@ test("program roles, grouped Issues, and closed sections have explicit UI contra
 });
 
 test("program onboarding has no silent BAIT default and rerenders every draft mutation", () => {
-  assert.match(html, /<script src="program-picker-logic\.js"><\/script>/);
+  assert.match(
+    html,
+    /<script src="apps\/web\/src\/program-picker-logic\.js"><\/script>/,
+  );
   assert.match(html, /ScheduleRUProgramPickerLogic\.initialProgramIds\(/);
   assert.match(html, /function loadHomeSchoolCandidate\([\s\S]*?ScheduleRUProgramPickerLogic\.initialProgramIds\(/);
   assert.doesNotMatch(html, /const initial=availablePrograms\.find\(program=>program\.id===schoolContext\.defaultProgramId/);
