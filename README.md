@@ -65,6 +65,7 @@ catalog/drafts/                    Validated, non-public program definitions awa
 catalog/ingestion/                 Portable review backlog and parity manifests
 reference-data/snapshots/          Canonical reviewed shared policy/configuration data
 docs/architecture/                 Maintained architecture and migration boundaries
+docs/README.md                     Documentation index
 docs/catalog-contributor/          Narrow handoff for independent catalog work
 
 index.html                         Compatibility HTML shell and app controller
