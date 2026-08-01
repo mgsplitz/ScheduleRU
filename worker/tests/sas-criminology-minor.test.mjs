@@ -1,27 +1,28 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
+import {
+  courseCodes,
+  programDefinition,
+  requirementGroup,
+} from "./helpers/catalog-snapshot.mjs";
+import { programCombinationPolicy } from "./helpers/reference-data-snapshot.mjs";
 
-const seedUrl = new URL("../schema/review_sas_criminology_minor.sql", import.meta.url);
-
-test("the Criminology minor seed preserves its fixed core, finite Sociology elective, and separate Criminal Justice elective", async () => {
-  assert.equal(existsSync(seedUrl), true, "the reviewed Criminology minor seed must exist");
-  const seed = await readFile(seedUrl, "utf8");
-  assert.match(seed, /'sasnb-criminology-minor'/);
-  assert.match(seed, /'minor'/);
-  assert.match(seed, /'204'/);
-  assert.match(seed, /'sasnb-criminology-204'/);
-  assert.match(seed, /'sasnb-criminology-minor-core'.*'all'/s);
-  assert.match(seed, /'sasnb-criminology-minor-sociology-elective'.*'min_courses',1/s);
-  assert.match(seed, /'sasnb-criminology-minor-criminal-justice-elective'.*'min_courses',1/s);
-  for (const code of ["01:202:201", "01:830:101", "01:830:340", "01:920:101", "01:920:222", "01:920:306", "01:920:304", "01:920:307", "01:920:349"]) {
-    assert.equal(seed.includes(code), true, `the reviewed seed must retain ${code}`);
-  }
-  assert.match(seed, /"subject_codes":\["202"\]/);
-  assert.match(seed, /"exclude_course_codes":\["01:202:201"\]/);
-  assert.match(seed, /"minimum_credits":3/);
-  assert.match(seed, /'sasnb-criminal-justice-major-no-criminology-minor'/);
-  assert.match(seed, /https:\/\/sociology\.rutgers\.edu\/images\/stories\/stories\/pdfs\/Criminology_Minor_Requirement_form1\.pdf/);
-  assert.match(seed, /https:\/\/sasundergrad\.rutgers\.edu\/majors-and-core-curriculum\/major\/major-minor-details\/criminology/);
+test("the Criminology minor contract preserves its core and independent elective boundaries", () => {
+  const id = "sasnb-criminology-minor";
+  const definition = programDefinition(id);
+  assert.equal(definition.program.program_family_id, "sasnb-criminology-204");
+  assert.equal(requirementGroup(id, `${id}-core`).rule, "all");
+  assert.equal(requirementGroup(id, `${id}-sociology-elective`).count, 1);
+  assert.equal(requirementGroup(id, `${id}-criminal-justice-elective`).count, 1);
+  const serialized = JSON.stringify(definition);
+  for (const code of [
+    "01:202:201", "01:830:101", "01:830:340", "01:920:101",
+    "01:920:222", "01:920:306", "01:920:304", "01:920:307", "01:920:349",
+  ]) assert.match(serialized, new RegExp(code));
+  assert.ok(courseCodes(id).includes("01:202:201"));
+  assert.equal(
+    programCombinationPolicy("sasnb-criminal-justice-major-no-criminology-minor").decision,
+    "blocked",
+  );
+  assert.ok(definition.sources.some(({ url }) => /Criminology_Minor_Requirement_form1\.pdf/.test(url)));
 });

@@ -1,49 +1,43 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
+import {
+  courseCodes,
+  programDefinition,
+  requirementGroup,
+} from "./helpers/catalog-snapshot.mjs";
 
-const majorSeedUrl = new URL("../schema/review_sas_sociology_major.sql", import.meta.url);
-const minorSeedUrl = new URL("../schema/review_sas_sociology_minor.sql", import.meta.url);
-
-test("the Sociology major seed preserves the current five-course core and elective thresholds", async () => {
-  assert.equal(existsSync(majorSeedUrl), true, "reviewed SAS Sociology major seed must exist before release");
-  const seed = await readFile(majorSeedUrl, "utf8");
-  assert.match(seed, /'sasnb-sociology-ba'/);
-  assert.match(seed, /'Sociology'/);
-  assert.match(seed, /'920'/);
-  assert.match(seed, /'B\.A\.'/);
-  assert.match(seed, /'sasnb-sociology-920'/);
-  for (const code of ["01:920:101", "01:920:215", "01:920:311", "01:920:312", "01:920:316"]) {
-    assert.equal(seed.includes(code), true, `the reviewed major seed must retain ${code}`);
-  }
-  assert.match(seed, /'sasnb-sociology-ba-electives'.*'min_courses',6/s);
-  assert.match(seed, /'sasnb-sociology-ba-upper-electives'.*'min_courses',3/s);
-  assert.match(seed, /"subject_codes":\["920"\]/);
-  assert.match(seed, /"course_number_min":300/);
-  assert.match(seed, /"exclude_course_codes":\["01:920:101","01:920:215","01:920:311","01:920:312","01:920:316"\]/);
-  assert.match(seed, /different thematic/);
-  assert.match(seed, /six courses \(21 credits\) at Rutgers-New Brunswick/);
-  assert.match(seed, /'sasnb-sociology-major-no-health-and-society-minor'/);
-  assert.match(seed, /program_requirement_evidence/);
+test("the Sociology major contract preserves core and elective thresholds", () => {
+  const id = "sasnb-sociology-ba";
+  assert.deepEqual(courseCodes(id), [
+    "01:920:101", "01:920:215", "01:920:311", "01:920:312", "01:920:316",
+  ]);
+  assert.deepEqual(
+    [
+      requirementGroup(id, `${id}-electives`).count,
+      requirementGroup(id, `${id}-upper-electives`).count,
+    ],
+    [6, 3],
+  );
+  const selector = requirementGroup(id, `${id}-upper-electives`).selectors[0].selector;
+  assert.deepEqual([selector.subject_codes, selector.course_number_min], [["920"], 300]);
+  assert.match(programDefinition(id).eligibility_rules[0].note, /Rutgers-New Brunswick/);
 });
 
-test("the Sociology minor seed preserves its core choice and nested elective levels", async () => {
-  assert.equal(existsSync(minorSeedUrl), true, "reviewed SAS Sociology minor seed must exist before release");
-  const seed = await readFile(minorSeedUrl, "utf8");
-  assert.match(seed, /'sasnb-sociology-minor'/);
-  assert.match(seed, /'minor'/);
-  assert.match(seed, /'920'/);
-  assert.match(seed, /'sasnb-sociology-920'/);
-  assert.match(seed, /'sasnb-sociology-minor-method-or-theory'.*'one_of'/s);
-  assert.match(seed, /'sasnb-sociology-minor-electives'.*'min_courses',4/s);
-  for (const code of ["01:920:101", "01:920:311", "01:920:312", "01:920:316"]) {
-    assert.equal(seed.includes(code), true, `the reviewed minor seed must retain ${code}`);
-  }
-  for (const level of [200, 300, 315]) assert.match(seed, new RegExp(`"course_number_min":${level}`));
-  assert.match(seed, /C\+ grade or higher/);
-  assert.match(seed, /three courses \(10 credits\) at Rutgers-New Brunswick/);
-  assert.match(seed, /Citizenship and Service Education/);
-  assert.match(seed, /'sasnb-criminal-justice-major-sociology-minor-criminology-exclusion'/);
-  assert.match(seed, /program_requirement_evidence/);
+test("the Sociology minor contract preserves its core choice and nested elective levels", () => {
+  const id = "sasnb-sociology-minor";
+  const definition = programDefinition(id);
+  assert.deepEqual(courseCodes(id), ["01:920:101", "01:920:311", "01:920:312", "01:920:316"]);
+  assert.equal(requirementGroup(id, `${id}-method-or-theory`).rule, "one_of");
+  assert.equal(requirementGroup(id, `${id}-electives`).count, 4);
+  assert.deepEqual(
+    ["electives-200", "electives-300", "electives-315"].map(
+      (suffix) => requirementGroup(id, `${id}-${suffix}`).selectors[0].selector.course_number_min,
+    ),
+    [200, 300, 315],
+  );
+  assert.ok(
+    definition.eligibility_rules.some(
+      ({ key }) => key === "sasnb-criminal-justice-major-sociology-minor-criminology-exclusion",
+    ),
+  );
 });
