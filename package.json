@@ -10,12 +10,13 @@
   ],
   "scripts": {
     "test": "npm run test:data && npm run test:legacy",
-    "test:data": "node --test packages/catalog/test/*.test.ts tools/catalog/test/*.test.ts packages/reference-data/test/*.test.ts tools/reference-data/test/*.test.ts packages/catalog-ingestion/test/*.test.ts",
+    "test:data": "node --test packages/catalog/test/*.test.ts tools/catalog/test/*.test.ts packages/reference-data/test/*.test.ts tools/reference-data/test/*.test.ts packages/catalog-ingestion/test/*.test.ts tools/catalog-ingestion/test/*.test.ts",
     "test:catalog": "node --test packages/catalog/test/*.test.ts tools/catalog/test/*.test.ts",
     "test:legacy": "node --test worker/tests/*.test.mjs",
-    "typecheck": "tsc -b packages/catalog packages/reference-data packages/catalog-ingestion tools/catalog tools/reference-data",
+    "typecheck": "tsc -b packages/catalog packages/reference-data packages/catalog-ingestion tools/catalog tools/reference-data tools/catalog-ingestion",
     "catalog": "node tools/catalog/src/cli.ts",
-    "reference-data": "node tools/reference-data/src/cli.ts"
+    "reference-data": "node tools/reference-data/src/cli.ts",
+    "catalog-ingestion": "node tools/catalog-ingestion/src/cli.ts"
   },
   "engines": {
     "node": ">=22.18"

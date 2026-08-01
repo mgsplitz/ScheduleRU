@@ -46,6 +46,7 @@ import { handleProgramsApi } from "./programs.js";
 import { handleScheduleAssistantRequest } from "./schedule-assistant.js";
 import { handleCatalogAdminRequest } from "./catalog-admin.js";
 import { handleReferenceDataAdminRequest } from "./reference-data-admin.js";
+import { handleCatalogIngestionAdminRequest } from "./catalog-ingestion-admin.js";
 
 const RUTGERS_BASE = "https://sis.rutgers.edu/soc/api";
 const CORS_HEADERS = {
@@ -425,6 +426,10 @@ async function handleApi(request, env, ctx) {
   const referenceDataAdminResult =
     await handleReferenceDataAdminRequest(request, env);
   if (referenceDataAdminResult) return referenceDataAdminResult;
+
+  const catalogIngestionAdminResult =
+    await handleCatalogIngestionAdminRequest(request, env);
+  if (catalogIngestionAdminResult) return catalogIngestionAdminResult;
 
   if (path === "/api/config") {
     const configuration = activeTermConfiguration(env);
