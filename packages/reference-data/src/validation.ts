@@ -8,6 +8,13 @@ import {
 
 const IDENTIFIER_RE = /^[a-z0-9][a-z0-9-]{1,119}$/;
 const COURSE_CODE_RE = /^\d{2}:\d{3}:\d{3}$/;
+const COURSE_ELIGIBILITY_STATUSES = ["draft", "reviewed", "stale"];
+const COURSE_ELIGIBILITY_CONDITION_TYPES = [
+  "prerequisite_course",
+  "corequisite_course",
+  "minimum_prior_credits",
+  "minimum_plan_year",
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -317,6 +324,120 @@ class Validator {
         return program
           ? `${program}:${String(row.requirement_course_code)}:${String(row.equivalent_course_code)}`
           : null;
+      },
+    );
+
+    const noConditionCourses = new Set<string>();
+    this.array(
+      value.course_eligibility_reviews,
+      "course_eligibility_reviews",
+      (row, path) => {
+        const code =
+          typeof row.course_code === "string" && COURSE_CODE_RE.test(row.course_code)
+            ? row.course_code
+            : "";
+        if (!code) {
+          this.issue(`${path}.course_code`, "invalid_course_code", "must use NN:NNN:NNN");
+        }
+        this.identifier(row.campus_slug, `${path}.campus_slug`);
+        this.nullableString(row.catalog_year, `${path}.catalog_year`);
+        if (!COURSE_ELIGIBILITY_STATUSES.includes(String(row.review_status))) {
+          this.issue(`${path}.review_status`, "invalid_review_status", "must be draft, reviewed, or stale");
+        }
+        if (typeof row.no_known_conditions !== "boolean") {
+          this.issue(`${path}.no_known_conditions`, "invalid_boolean", "must be a boolean");
+        } else if (row.no_known_conditions && code) {
+          noConditionCourses.add(code);
+        }
+        this.sourceUrl(row.source_url, `${path}.source_url`);
+        this.string(row.source_label, `${path}.source_label`);
+        this.nullableString(row.source_date, `${path}.source_date`);
+        this.timestamp(row.reviewed_at, `${path}.reviewed_at`, true);
+        if (row.note !== null) this.string(row.note, `${path}.note`);
+        return code || null;
+      },
+    );
+
+    const reviewedCourses = new Set(
+      Array.isArray(value.course_eligibility_reviews)
+        ? value.course_eligibility_reviews
+          .filter(isRecord)
+          .map((row) => String(row.course_code))
+        : [],
+    );
+    this.array(
+      value.course_eligibility_conditions,
+      "course_eligibility_conditions",
+      (row, path) => {
+        const code =
+          typeof row.course_code === "string" && COURSE_CODE_RE.test(row.course_code)
+            ? row.course_code
+            : "";
+        if (!code) {
+          this.issue(`${path}.course_code`, "invalid_course_code", "must use NN:NNN:NNN");
+        } else if (!reviewedCourses.has(code)) {
+          this.issue(`${path}.course_code`, "missing_review", "must reference a course eligibility review");
+        } else if (noConditionCourses.has(code)) {
+          this.issue(path, "condition_conflict", "a no-known-conditions review cannot have conditions");
+        }
+        const conditionKey = this.identifier(
+          row.condition_key,
+          `${path}.condition_key`,
+        ) ? String(row.condition_key) : "";
+        const conditionType = String(row.condition_type);
+        if (!COURSE_ELIGIBILITY_CONDITION_TYPES.includes(conditionType)) {
+          this.issue(`${path}.condition_type`, "invalid_condition_type", "must be a supported eligibility condition");
+        }
+        if (!isRecord(row.condition_value)) {
+          this.issue(`${path}.condition_value`, "invalid_object", "must be a decoded JSON object");
+        } else if (
+          conditionType === "prerequisite_course"
+          || conditionType === "corequisite_course"
+        ) {
+          const codes = row.condition_value.any_of_course_codes;
+          if (
+            !Array.isArray(codes)
+            || codes.length === 0
+            || codes.some((item) => typeof item !== "string" || !COURSE_CODE_RE.test(item))
+          ) {
+            this.issue(
+              `${path}.condition_value.any_of_course_codes`,
+              "invalid_course_codes",
+              "must contain valid Rutgers course codes",
+            );
+          }
+        } else if (conditionType === "minimum_prior_credits") {
+          this.integer(
+            row.condition_value.minimum_credits,
+            `${path}.condition_value.minimum_credits`,
+            1,
+          );
+        } else if (conditionType === "minimum_plan_year") {
+          if (
+            !this.integer(
+              row.condition_value.minimum_year,
+              `${path}.condition_value.minimum_year`,
+              1,
+            )
+            || Number(row.condition_value.minimum_year) > 4
+          ) {
+            if (Number(row.condition_value.minimum_year) > 4) {
+              this.issue(
+                `${path}.condition_value.minimum_year`,
+                "invalid_plan_year",
+                "must not exceed year 4",
+              );
+            }
+          }
+        }
+        if (!COURSE_ELIGIBILITY_STATUSES.includes(String(row.review_status))) {
+          this.issue(`${path}.review_status`, "invalid_review_status", "must be draft, reviewed, or stale");
+        }
+        this.sourceUrl(row.source_url, `${path}.source_url`);
+        this.string(row.source_label, `${path}.source_label`);
+        this.nullableString(row.source_date, `${path}.source_date`);
+        this.timestamp(row.reviewed_at, `${path}.reviewed_at`, true);
+        return code && conditionKey ? `${code}:${conditionKey}` : null;
       },
     );
   }

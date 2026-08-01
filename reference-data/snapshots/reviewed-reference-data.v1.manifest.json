@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "generated_at": 1785533174452,
+  "generated_at": 1785609438339,
   "row_counts": {
     "school_profiles": 2,
     "school_curriculum_modules": 2,
@@ -8,7 +8,9 @@
     "program_combination_policies": 7,
     "double_count_rules": 0,
     "double_count_exceptions": 2,
-    "requirement_course_equivalencies": 4
+    "requirement_course_equivalencies": 4,
+    "course_eligibility_reviews": 3,
+    "course_eligibility_conditions": 4
   },
-  "sha256": "6e65830a0fa76dd4638dd03e088a774e2f138ee5e1cca080c52f8fc970e542e9"
+  "sha256": "5657d1b6d94a0e9b58e5a17bbe1618f1b27b7da8cd2021192aafc46d07a13923"
 }

@@ -86,6 +86,38 @@ export interface RequirementCourseEquivalency {
   review_status: "reviewed" | "needs_review";
 }
 
+export type CourseEligibilityReviewStatus = "draft" | "reviewed" | "stale";
+export type CourseEligibilityConditionType =
+  | "prerequisite_course"
+  | "corequisite_course"
+  | "minimum_prior_credits"
+  | "minimum_plan_year";
+
+export interface CourseEligibilityReview {
+  course_code: string;
+  campus_slug: string;
+  catalog_year: string | null;
+  review_status: CourseEligibilityReviewStatus;
+  no_known_conditions: boolean;
+  source_url: string;
+  source_label: string;
+  source_date: string | null;
+  reviewed_at: number | null;
+  note: string | null;
+}
+
+export interface CourseEligibilityCondition {
+  course_code: string;
+  condition_key: string;
+  condition_type: CourseEligibilityConditionType;
+  condition_value: Record<string, unknown>;
+  review_status: CourseEligibilityReviewStatus;
+  source_url: string;
+  source_label: string;
+  source_date: string | null;
+  reviewed_at: number | null;
+}
+
 export interface ReferenceDataBundle {
   contract_version: 1;
   school_profiles: SchoolProfile[];
@@ -95,6 +127,8 @@ export interface ReferenceDataBundle {
   double_count_rules: DoubleCountRule[];
   double_count_exceptions: DoubleCountException[];
   requirement_course_equivalencies: RequirementCourseEquivalency[];
+  course_eligibility_reviews: CourseEligibilityReview[];
+  course_eligibility_conditions: CourseEligibilityCondition[];
 }
 
 export interface ValidationIssue {

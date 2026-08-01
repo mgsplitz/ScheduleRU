@@ -117,6 +117,29 @@ function rows(): Record<string, Row[]> {
       source_label: "Degree Navigator",
       review_status: "reviewed",
     }],
+    "course-eligibility-reviews": [{
+      course_code: "01:999:201",
+      campus_slug: "new-brunswick",
+      catalog_year: "2026-2027",
+      review_status: "reviewed",
+      no_known_conditions: 0,
+      source_url: "https://example.rutgers.edu/course",
+      source_label: "Example course page",
+      source_date: "2026-08-01",
+      reviewed_at: 1785542400000,
+      note: "Reviewed course eligibility.",
+    }],
+    "course-eligibility-conditions": [{
+      course_code: "01:999:201",
+      condition_key: "intro-course",
+      condition_type: "prerequisite_course",
+      condition_value_json: "{\"any_of_course_codes\":[\"01:999:101\"]}",
+      review_status: "reviewed",
+      source_url: "https://example.rutgers.edu/course",
+      source_label: "Example course page",
+      source_date: "2026-08-01",
+      reviewed_at: 1785542400000,
+    }],
   };
 }
 
@@ -134,6 +157,11 @@ test("exports all cross-program datasets and decodes stored JSON", async () => {
     value.double_count_exceptions[0]!.allowed_course_codes,
     ["01:999:301"],
   );
+  assert.equal(value.course_eligibility_reviews[0]!.no_known_conditions, false);
+  assert.deepEqual(
+    value.course_eligibility_conditions[0]!.condition_value,
+    { any_of_course_codes: ["01:999:101"] },
+  );
   assert.deepEqual(database.calls, [
     "school-profiles",
     "curriculum-modules",
@@ -142,14 +170,17 @@ test("exports all cross-program datasets and decodes stored JSON", async () => {
     "double-count-rules",
     "double-count-exceptions",
     "equivalencies",
+    "course-eligibility-reviews",
+    "course-eligibility-conditions",
   ]);
 });
 
 test("fails closed when stored JSON is malformed", async () => {
   const value = rows();
   value["school-profiles"]![0]!.configuration_json = "{";
+  value["course-eligibility-conditions"]![0]!.condition_value_json = "{";
   await assert.rejects(
     exportReferenceDataBundle(new Database(value)),
-    /school_profiles\[0\]\.configuration_json/,
+    /configuration_json|condition_value_json/,
   );
 });

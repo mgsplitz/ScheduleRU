@@ -19,6 +19,8 @@ export interface ReferenceDataPublishResult {
     double_count_rules: number;
     double_count_exceptions: number;
     requirement_course_equivalencies: number;
+    course_eligibility_reviews: number;
+    course_eligibility_conditions: number;
   };
   statement_count: number;
 }
@@ -43,6 +45,8 @@ export async function publishReferenceDataBundle(
 ): Promise<ReferenceDataPublishResult> {
   const bundle = assertReferenceDataBundle(value);
   const statements: ReferenceDataPreparedStatement[] = [
+    statement(database, "DELETE FROM course_eligibility_conditions"),
+    statement(database, "DELETE FROM course_eligibility_reviews"),
     statement(database, "DELETE FROM requirement_course_equivalencies"),
     statement(database, "DELETE FROM double_count_exceptions"),
     statement(database, "DELETE FROM double_count_rules"),
@@ -171,6 +175,44 @@ export async function publishReferenceDataBundle(
       row.review_status,
     ));
   }
+  for (const row of ordered(bundle.course_eligibility_reviews)) {
+    statements.push(statement(
+      database,
+      `INSERT INTO course_eligibility_reviews (
+         course_code, campus_slug, catalog_year, review_status,
+         no_known_conditions, source_url, source_label, source_date,
+         reviewed_at, note
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      row.course_code,
+      row.campus_slug,
+      row.catalog_year,
+      row.review_status,
+      row.no_known_conditions ? 1 : 0,
+      row.source_url,
+      row.source_label,
+      row.source_date,
+      row.reviewed_at,
+      row.note,
+    ));
+  }
+  for (const row of ordered(bundle.course_eligibility_conditions)) {
+    statements.push(statement(
+      database,
+      `INSERT INTO course_eligibility_conditions (
+         course_code, condition_key, condition_type, condition_value_json,
+         review_status, source_url, source_label, source_date, reviewed_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      row.course_code,
+      row.condition_key,
+      row.condition_type,
+      JSON.stringify(row.condition_value),
+      row.review_status,
+      row.source_url,
+      row.source_label,
+      row.source_date,
+      row.reviewed_at,
+    ));
+  }
 
   await database.batch(statements);
   return {
@@ -183,6 +225,8 @@ export async function publishReferenceDataBundle(
       double_count_exceptions: bundle.double_count_exceptions.length,
       requirement_course_equivalencies:
         bundle.requirement_course_equivalencies.length,
+      course_eligibility_reviews: bundle.course_eligibility_reviews.length,
+      course_eligibility_conditions: bundle.course_eligibility_conditions.length,
     },
     statement_count: statements.length,
   };

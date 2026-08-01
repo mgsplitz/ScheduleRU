@@ -49,3 +49,25 @@ test("rejects duplicate natural keys and malformed course codes", () => {
   assert.ok(result.issues.some(({ code }) => code === "duplicate_key"));
   assert.ok(result.issues.some(({ code }) => code === "invalid_course_code"));
 });
+
+test("validates reviewed course eligibility facts and condition values", () => {
+  const value = bundle();
+  const reviews =
+    value.course_eligibility_reviews as Array<Record<string, unknown>>;
+  const conditions =
+    value.course_eligibility_conditions as Array<Record<string, unknown>>;
+  reviews[0]!.no_known_conditions = "false";
+  conditions[0]!.condition_type = "invented_rule";
+  conditions[0]!.condition_value = "{\"unsafe\":true}";
+  const result = validateReferenceDataBundle(value);
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.deepEqual(
+    result.issues.map(({ path }) => path),
+    [
+      "course_eligibility_reviews[0].no_known_conditions",
+      "course_eligibility_conditions[0].condition_type",
+      "course_eligibility_conditions[0].condition_value",
+    ],
+  );
+});

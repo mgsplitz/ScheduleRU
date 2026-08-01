@@ -1,4 +1,6 @@
 import type {
+  CourseEligibilityCondition,
+  CourseEligibilityReview,
   DoubleCountException,
   DoubleCountRule,
   ProgramCombinationPolicy,
@@ -87,6 +89,8 @@ export async function exportReferenceDataBundle(
     doubleCountRuleRows,
     doubleCountExceptionRows,
     equivalencyRows,
+    courseEligibilityReviewRows,
+    courseEligibilityConditionRows,
   ] = await Promise.all([
     allRows(
       database,
@@ -144,7 +148,25 @@ export async function exportReferenceDataBundle(
        SELECT program_id, requirement_course_code, equivalent_course_code,
               note, source_label, review_status
        FROM requirement_course_equivalencies
-       ORDER BY program_id, requirement_course_code, equivalent_course_code`,
+      ORDER BY program_id, requirement_course_code, equivalent_course_code`,
+    ),
+    allRows(
+      database,
+      `/* reference-data-export:course-eligibility-reviews */
+       SELECT course_code, campus_slug, catalog_year, review_status,
+              no_known_conditions, source_url, source_label, source_date,
+              reviewed_at, note
+       FROM course_eligibility_reviews
+       ORDER BY course_code`,
+    ),
+    allRows(
+      database,
+      `/* reference-data-export:course-eligibility-conditions */
+       SELECT course_code, condition_key, condition_type,
+              condition_value_json, review_status, source_url, source_label,
+              source_date, reviewed_at
+       FROM course_eligibility_conditions
+       ORDER BY course_code, condition_key`,
     ),
   ]);
 
@@ -226,6 +248,34 @@ export async function exportReferenceDataBundle(
       review_status: stringValue(row.review_status) as RequirementCourseEquivalency["review_status"],
     }),
   );
+  const courseEligibilityReviews: CourseEligibilityReview[] =
+    courseEligibilityReviewRows.map((row) => ({
+      course_code: stringValue(row.course_code),
+      campus_slug: stringValue(row.campus_slug),
+      catalog_year: nullableString(row.catalog_year),
+      review_status: stringValue(row.review_status) as CourseEligibilityReview["review_status"],
+      no_known_conditions: Number(row.no_known_conditions) === 1,
+      source_url: stringValue(row.source_url),
+      source_label: stringValue(row.source_label),
+      source_date: nullableString(row.source_date),
+      reviewed_at: nullableNumber(row.reviewed_at),
+      note: nullableString(row.note),
+    }));
+  const courseEligibilityConditions: CourseEligibilityCondition[] =
+    courseEligibilityConditionRows.map((row, index) => ({
+      course_code: stringValue(row.course_code),
+      condition_key: stringValue(row.condition_key),
+      condition_type: stringValue(row.condition_type) as CourseEligibilityCondition["condition_type"],
+      condition_value: parseJson(
+        row.condition_value_json,
+        `course_eligibility_conditions[${index}].condition_value_json`,
+      ) as Record<string, unknown>,
+      review_status: stringValue(row.review_status) as CourseEligibilityCondition["review_status"],
+      source_url: stringValue(row.source_url),
+      source_label: stringValue(row.source_label),
+      source_date: nullableString(row.source_date),
+      reviewed_at: nullableNumber(row.reviewed_at),
+    }));
 
   const value = {
     contract_version: 1,
@@ -236,6 +286,8 @@ export async function exportReferenceDataBundle(
     double_count_rules: doubleCountRules,
     double_count_exceptions: doubleCountExceptions,
     requirement_course_equivalencies: equivalencies,
+    course_eligibility_reviews: courseEligibilityReviews,
+    course_eligibility_conditions: courseEligibilityConditions,
   };
   const result = validateReferenceDataBundle(value);
   if (!result.ok) throw new ReferenceDataExportValidationError(result.issues);

@@ -70,5 +70,28 @@ export function bundle(): Record<string, unknown> {
       source_label: "Degree Navigator",
       review_status: "reviewed",
     }],
+    course_eligibility_reviews: [{
+      course_code: "01:999:201",
+      campus_slug: "new-brunswick",
+      catalog_year: "2026-2027",
+      review_status: "reviewed",
+      no_known_conditions: false,
+      source_url: "https://example.rutgers.edu/course",
+      source_label: "Example course page",
+      source_date: "2026-08-01",
+      reviewed_at: 1785542400000,
+      note: "Reviewed course eligibility.",
+    }],
+    course_eligibility_conditions: [{
+      course_code: "01:999:201",
+      condition_key: "intro-course",
+      condition_type: "prerequisite_course",
+      condition_value: { any_of_course_codes: ["01:999:101"] },
+      review_status: "reviewed",
+      source_url: "https://example.rutgers.edu/course",
+      source_label: "Example course page",
+      source_date: "2026-08-01",
+      reviewed_at: 1785542400000,
+    }],
   };
 }

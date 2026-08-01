@@ -14,9 +14,9 @@ requirement engine, program catalog definitions, or structural migrations.
 - Production export/publication: intentionally unavailable
 
 The bundle contains school profiles, curriculum-module attachments, selection
-limits, combination policies, overlap rules/exceptions, and reviewed
-requirement-course equivalencies. Transient `requirement_raw_notes` are not
-reference data.
+limits, combination policies, overlap rules/exceptions, reviewed
+requirement-course equivalencies, and reviewed course-eligibility conditions.
+Transient `requirement_raw_notes` are owned by the catalog-ingestion boundary.
 
 ## Commands
 
@@ -61,8 +61,10 @@ the environment.
 
 ## Current recovery proof
 
-The version-1 snapshot contains 20 rows across seven datasets. Its development
-round trip preserved the public API digest exactly. The parity report ignores
-only existing operational timestamps/flags and the internal autoincrement ID
-on overlap exceptions; every academic and policy field is compared.
-
+The version-1 snapshot contains 27 rows across nine datasets. The snapshot is
+contract-validated and digest-protected. The earlier seven-dataset parity
+report was removed when eligibility data entered the contract so it cannot be
+mistaken for proof of the expanded snapshot. After the development Worker is
+deployed, run the round-trip command above and commit the newly generated
+report. The comparison ignores only existing operational timestamps/flags and
+the internal autoincrement ID on overlap exceptions.

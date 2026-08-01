@@ -59,6 +59,8 @@ test("replaces every managed dataset in one ordered batch", async () => {
     double_count_rules: 1,
     double_count_exceptions: 1,
     requirement_course_equivalencies: 1,
+    course_eligibility_reviews: 1,
+    course_eligibility_conditions: 1,
   });
   const sql = database.batches[0]!.map(({ sql }) => sql);
   assert.ok(
@@ -68,6 +70,8 @@ test("replaces every managed dataset in one ordered batch", async () => {
       < sql.findIndex((value) => value.includes("DELETE FROM school_profiles")),
   );
   assert.match(sql.join("\n"), /INSERT INTO requirement_course_equivalencies/);
+  assert.match(sql.join("\n"), /INSERT INTO course_eligibility_reviews/);
+  assert.match(sql.join("\n"), /INSERT INTO course_eligibility_conditions/);
 });
 
 test("serializes JSON values once and produces idempotent statements", async () => {
@@ -83,6 +87,11 @@ test("serializes JSON values once and produces idempotent statements", async () 
   assert.ok(
     first.prepared.some(({ params }) =>
       params.includes("{\"default_program_id\":\"example-major\"}")
+    ),
+  );
+  assert.ok(
+    first.prepared.some(({ params }) =>
+      params.includes("{\"any_of_course_codes\":[\"01:999:101\"]}")
     ),
   );
 });

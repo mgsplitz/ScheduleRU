@@ -13,11 +13,13 @@ The bundle owns:
 - per-school program-selection limits;
 - pairwise program-combination policies;
 - program overlap rules and reviewed exceptions; and
-- reviewed requirement-course equivalencies.
+- reviewed requirement-course equivalencies;
+- reviewed course-eligibility decisions; and
+- source-backed prerequisite and corequisite conditions.
 
 `requirement_raw_notes` is deliberately excluded. Those rows are mutable
-ingestion backlog, not reviewed runtime reference data. They need a separate
-export/restore boundary before their remaining seed SQL can be removed.
+ingestion backlog owned by `packages/catalog-ingestion`, not reviewed runtime
+reference data.
 
 ## Contract properties
 
@@ -37,13 +39,16 @@ export/restore boundary before their remaining seed SQL can be removed.
 3. Snapshot the current development dataset and prove API parity across a
    destructive development round trip.
 4. Remove content inserts from structural schema files.
-5. Extract the separate ingestion backlog, then remove the remaining mixed
-   review/seed SQL files once all owned datasets have recovery coverage.
+5. Extract the separate ingestion backlog and remove its seed SQL.
+6. Move reviewed course-eligibility facts into the same portable boundary and
+   remove the final content SQL files.
 
 ## Completed checkpoint
 
-The reviewed development bundle has been exported, digest-verified, restored,
-and compared across the affected public APIs. Content inserts were removed
-from the school-profile, curriculum-module, and program-selection structural
-schema files. Mixed review SQL remains until the ingestion-backlog boundary is
-implemented.
+The original seven-dataset development bundle was exported, digest-verified,
+restored, and compared across the affected public APIs. The portable snapshot
+now covers all nine reference datasets, including three course reviews and
+four conditions. Its local digest and contract are verified. A fresh
+development round trip must be recorded after deploying the expanded
+development-only admin endpoint; until then no parity report is kept beside
+the newer snapshot.
