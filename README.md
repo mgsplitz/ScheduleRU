@@ -81,11 +81,12 @@ packages/scheduling/src/           Semester preference filtering and ranking
 
 apps/api/src/worker.js             Canonical Worker entry point and HTTP routing
 apps/api/src/programs.js           Canonical program and requirement API controller
+apps/api/src/programs/             Program policy, evidence, presentation, and import helpers
 apps/api/src/*-admin.js            Development-only catalog data controllers
 worker/src/worker.js               Temporary compatibility export for older tools
 worker/src/programs.js             Temporary compatibility export for older tools
 worker/src/schedule-assistant.js   OpenAI structured-output adapter
-worker/src/*-import.js             Program discovery/import helpers
+worker/src/program-*.js            Temporary compatibility exports for older tools
 migrations/                        Structural D1 schemas and compatibility migrations
 worker/tests/*.test.mjs            Node test suite
 worker/wrangler.toml               Worker, D1, cron, term, and dev configuration

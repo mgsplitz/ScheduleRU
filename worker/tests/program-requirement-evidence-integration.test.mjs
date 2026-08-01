@@ -13,7 +13,7 @@ function routeBlock(start, end) {
 test("public program routes hide reviewed programs with incomplete requirement evidence", () => {
   assert.match(
     worker,
-    /import\s+\{\s*requirementEvidenceComplete,?\s*\}\s+from\s+"\.\.\/\.\.\/\.\.\/worker\/src\/requirement-evidence\.js"/,
+    /import\s+\{\s*requirementEvidenceComplete,?\s*\}\s+from\s+"\.\/programs\/requirement-evidence\.js"/,
   );
   assert.match(worker, /async function programHasCompleteRequirementEvidence\(env, program\)/);
   assert.match(worker, /requirementEvidenceComplete\(\{\s*required:\s*true,/);
