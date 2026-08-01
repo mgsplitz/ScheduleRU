@@ -21,16 +21,5 @@ CREATE TABLE IF NOT EXISTS program_catalog_identity_overrides (
   PRIMARY KEY (catalog_source_id, program_slug, type)
 );
 
-UPDATE program_catalog_sources
-SET owner_labels_json = '["SAS","SAS/ SC&I"]'
-WHERE id = 'sasnb-official-directory';
-
--- These IDs are referenced by reviewed combination policies and must remain
--- stable for both the policies and existing saved program selections.
-INSERT INTO program_catalog_identity_overrides (
-  catalog_source_id, program_slug, type, program_id
-) VALUES
-  ('sasnb-official-directory', 'criminal-justice', 'major', 'sasnb-criminal-justice-major'),
-  ('sasnb-official-directory', 'health-and-society', 'minor', 'sasnb-health-and-society-minor')
-ON CONFLICT(catalog_source_id, program_slug, type) DO UPDATE SET
-  program_id = excluded.program_id;
+-- Owner labels and stable identity overrides are restored from the reviewed
+-- catalog-source snapshot after this structural migration is applied.

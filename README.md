@@ -57,13 +57,16 @@ AGENTS.md                          Repository ownership and safety boundaries
 packages/catalog/                  Typed catalog contract, validation, and D1 publication
 packages/reference-data/           School configuration and cross-program policy contract
 packages/catalog-ingestion/        Mutable review-note workflow contract
+packages/catalog-sources/          External program-directory configuration contract
 tools/catalog/                     Catalog-only validation and development publication CLI
 tools/reference-data/              Reference-data snapshot, restore, and parity CLI
 tools/catalog-ingestion/            Review-backlog snapshot, restore, and parity CLI
+tools/catalog-sources/              Source configuration snapshot and restore CLI
 catalog/snapshots/                 Canonical reviewed program definitions and parity manifests
 catalog/drafts/                    Validated, non-public program definitions awaiting review
 catalog/ingestion/                 Portable review backlog and parity manifests
 reference-data/snapshots/          Canonical reviewed shared policy/configuration data
+catalog-sources/snapshots/          Canonical reviewed directory-source configuration
 docs/architecture/                 Maintained architecture and migration boundaries
 docs/README.md                     Documentation index
 docs/catalog-contributor/          Narrow handoff for independent catalog work

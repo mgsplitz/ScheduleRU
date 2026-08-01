@@ -24,6 +24,8 @@ Their previous repository versions remain available in Git history.
   update a reviewed program definition.
 - [`reference-data-contributor/README.md`](reference-data-contributor/README.md)
   — maintain shared policy and configuration records.
+- [`catalog-sources/README.md`](catalog-sources/README.md) — maintain official
+  directory endpoints, adapters, owner labels, and stable identity overrides.
 - [`catalog-ingestion/README.md`](catalog-ingestion/README.md) — work with the
   non-public review backlog.
 - [`requirement-source-discovery.md`](requirement-source-discovery.md) — find

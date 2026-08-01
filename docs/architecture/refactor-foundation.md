@@ -3,8 +3,9 @@
 ## Status
 
 Approved on 2026-07-31 and updated on 2026-08-01. The data-boundary milestone
-is complete: reviewed programs, shared reference data, non-public drafts, and
-review workflow notes are portable contracts with exact development parity.
+is complete: reviewed programs, shared reference data, program-directory source
+configuration, non-public drafts, and review workflow notes are portable
+contracts with exact development parity.
 The application migration remains incremental so production behavior stays
 available while compatibility modules are replaced.
 
@@ -34,6 +35,7 @@ apps/
 packages/
   academic-model/          Shared academic identifiers and types
   catalog/                 Catalog definition contract and validation
+  catalog-sources/         Program-directory source configuration
   planner/                 Deterministic four-year planning
   requirements/            Requirement allocation and progress
   scheduling/              Semester schedule generation and preferences
@@ -41,6 +43,7 @@ packages/
   test-fixtures/           Shared deterministic fixtures
 tools/
   catalog/                 Catalog validation and publication CLI
+  catalog-sources/         Source-configuration validation and development restore
   database/                Ordered structural migration tooling
 docs/
   architecture/            Current architecture and decisions
@@ -103,8 +106,9 @@ The first milestone creates:
 7. compatibility tests proving the existing 333-test baseline remains green.
 
 The reviewed catalog now contains 49 validated definitions. Shared school and
-cross-program data is owned by `packages/reference-data`; mutable review notes
-are owned by `packages/catalog-ingestion`; incomplete definitions are validated
+cross-program data is owned by `packages/reference-data`; external directory
+configuration is owned by `packages/catalog-sources`; mutable review notes are
+owned by `packages/catalog-ingestion`; incomplete definitions are validated
 under `catalog/drafts`. Content-bearing reviewed and draft program SQL has been
 removed after development publication and parity checks. Production data was
 not changed.
