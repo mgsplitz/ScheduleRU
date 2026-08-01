@@ -22,6 +22,12 @@ import {
 } from "../src/programs.js";
 import canonicalWorker from "../../apps/api/src/worker.js";
 import compatibleWorker from "../src/worker.js";
+import {
+  handleScheduleAssistantRequest as canonicalScheduleAssistant,
+} from "../../apps/api/src/schedule-assistant.js";
+import {
+  handleScheduleAssistantRequest as compatibleScheduleAssistant,
+} from "../src/schedule-assistant.js";
 
 const canonicalWorkerSource = await readFile(
   new URL("../../apps/api/src/worker.js", import.meta.url),
@@ -37,6 +43,10 @@ const canonicalProgramsSource = await readFile(
 );
 const compatibleProgramsSource = await readFile(
   new URL("../src/programs.js", import.meta.url),
+  "utf8",
+);
+const compatibleScheduleAssistantSource = await readFile(
+  new URL("../src/schedule-assistant.js", import.meta.url),
   "utf8",
 );
 const wranglerConfiguration = await readFile(
@@ -58,12 +68,18 @@ test("apps/api owns the canonical development admin controllers", () => {
 
 test("apps/api owns the Worker entrypoint and the legacy path is compatible", () => {
   assert.equal(compatibleWorker, canonicalWorker);
+  assert.equal(compatibleScheduleAssistant, canonicalScheduleAssistant);
   assert.match(canonicalWorkerSource, /from "\.\/index\.js"/);
+  assert.match(canonicalWorkerSource, /from "\.\/schedule-assistant\.js"/);
   assert.match(
     compatibilitySource,
     /export \{ default \} from "\.\.\/\.\.\/apps\/api\/src\/worker\.js"/,
   );
   assert.match(wranglerConfiguration, /main = "\.\.\/apps\/api\/src\/worker\.js"/);
+  assert.equal(
+    compatibleScheduleAssistantSource,
+    'export * from "../../apps/api/src/schedule-assistant.js";\n',
+  );
 });
 
 test("the canonical program controller has no backward dependencies on worker/src", () => {

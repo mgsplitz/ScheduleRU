@@ -45,7 +45,7 @@
 import { handleProgramsApi } from "./programs.js";
 import {
   handleScheduleAssistantRequest,
-} from "../../../worker/src/schedule-assistant.js";
+} from "./schedule-assistant.js";
 import {
   handleCatalogAdminRequest,
   handleCatalogIngestionAdminRequest,
