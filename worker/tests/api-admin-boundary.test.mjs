@@ -65,3 +65,12 @@ test("apps/api owns the Worker entrypoint and the legacy path is compatible", ()
   );
   assert.match(wranglerConfiguration, /main = "\.\.\/apps\/api\/src\/worker\.js"/);
 });
+
+test("the canonical program controller has no backward dependencies on worker/src", () => {
+  assert.doesNotMatch(canonicalProgramsSource, /\.\.\/\.\.\/\.\.\/worker\/src\//);
+  assert.match(canonicalProgramsSource, /from "\.\/programs\/selection-policy\.js"/);
+  assert.match(canonicalProgramsSource, /from "\.\/programs\/requirement-evidence\.js"/);
+  assert.match(canonicalProgramsSource, /from "\.\/programs\/school-profile\.js"/);
+  assert.match(canonicalProgramsSource, /from "\.\/programs\/imports\/program-directory\.js"/);
+  assert.match(canonicalProgramsSource, /from "\.\/programs\/imports\/program-requirements\.js"/);
+});

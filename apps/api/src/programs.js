@@ -32,20 +32,20 @@
 import {
   evaluateProgramSelection,
   publicEligibilityRule,
-} from "../../../worker/src/program-selection-policy.js";
+} from "./programs/selection-policy.js";
 import {
   requirementEvidenceComplete,
-} from "../../../worker/src/requirement-evidence.js";
-import { publicSchoolProfile } from "../../../worker/src/school-profiles.js";
+} from "./programs/requirement-evidence.js";
+import { publicSchoolProfile } from "./programs/school-profile.js";
 import {
   importProgramDirectory,
-} from "../../../worker/src/program-directory-import.js";
+} from "./programs/imports/program-directory.js";
 import {
   discoverNestedMajorRequirementPage,
   discoverProfileRequirementPage,
   extractRequirementDraftCandidate,
   importProgramRequirementSource,
-} from "../../../worker/src/program-requirement-import.js";
+} from "./programs/imports/program-requirements.js";
 
 function normalizedCatalogText(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
