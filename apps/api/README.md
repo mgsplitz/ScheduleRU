@@ -18,6 +18,10 @@ Cloudflare-facing request controllers.
   repository and contains no D1 statements.
 - `src/programs/storage/admin-program-repository.js` owns D1 reads and writes
   performed directly by authenticated program contributor endpoints.
+- `src/programs/scrapers/html.js` provides the shared conservative HTML
+  normalization used by source adapters.
+- `src/programs/scrapers/business-school-parser.js` owns pure RBS table and
+  policy-note parsing. It can be tested without routing, network, or D1.
 - `src/programs/` owns the controller's pure policy/evidence helpers,
   response presentation, and conservative source-import adapters.
 - `src/schedule-assistant.js` owns the bounded OpenAI request adapter; the

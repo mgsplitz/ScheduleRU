@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { allocationForConditions, groupAppliesToSelection, parseBizTable } from "../src/programs.js";
+import {
+  extractBizProse,
+  parseBizPageText,
+  parseBizTable,
+} from "../../apps/api/src/programs/scrapers/business-school-parser.js";
+import { allocationForConditions, groupAppliesToSelection } from "../src/programs.js";
 
 test("a Business Core cross-reference is retained as source prose, not a duplicate major requirement", () => {
   const section = parseBizTable(`
@@ -26,6 +31,40 @@ test("a regular listed course remains a requirement", () => {
   `);
   assert.deepEqual(section.courseItems.map((item) => item.code), ["33:010:326"]);
   assert.equal(section.prose.length, 0);
+});
+
+test("RBS page parsing excludes explicitly legacy curriculum tables", () => {
+  const sections = parseBizPageText(`
+    <strong>Students admitted prior to Fall 2022</strong>
+    <table>
+      <tr><th>Course</th><th>Credits</th></tr>
+      <tr><td>33:010:101 Legacy Accounting</td><td>3</td></tr>
+    </table>
+    <strong>Current Curriculum</strong>
+    <table>
+      <tr><th>Course</th><th>Credits</th></tr>
+      <tr><td>33:010:272 Financial Accounting</td><td>3</td></tr>
+    </table>
+  `);
+
+  assert.equal(sections.length, 1);
+  assert.equal(sections[0].name, "Current Curriculum");
+  assert.deepEqual(sections[0].courseItems.map((course) => course.code), ["33:010:272"]);
+});
+
+test("RBS prose parsing keeps policy sentences and drops nearby link labels", () => {
+  const notes = extractBizProse(`
+    <strong>Finance Major Special Notes</strong>
+    <ul>
+      <li>Students must complete the stated prerequisite.</li>
+      <li>Finance Curriculum Guidesheet</li>
+    </ul>
+  `);
+
+  assert.deepEqual(notes, [{
+    section_name: "Finance Major Special Notes",
+    raw_text: "Students must complete the stated prerequisite.",
+  }]);
 });
 
 test("a reviewed requirement path follows the selected major rather than a frontend special case", () => {
