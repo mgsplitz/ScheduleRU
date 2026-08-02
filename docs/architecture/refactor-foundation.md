@@ -145,10 +145,11 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Extract the remaining academic scraping workflows from the compatibility
-   controller and give each a focused persistence adapter. Program-directory,
+2. Move the New Brunswick Core curriculum importer out of the compatibility
+   controller without relocating its embedded curriculum structure into
+   application code. Coursedog and approved RBS scraping, program-directory,
    requirement-source discovery, requirement-snapshot, and
-   requirement-candidate ingestion now live behind their own services and
+   requirement-candidate ingestion now live behind focused services and
    repositories. Retain the `worker/src` compatibility exports until callers
    have migrated.
 3. Add explicit module APIs to the newly relocated planner, requirements, and

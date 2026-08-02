@@ -214,7 +214,7 @@ export async function handleProgramAdminRoute({
     if (!schoolSlug || !indexPath) {
       return json({ error: "pass ?school=...&index_path=..." }, 400);
     }
-    return json(await discoverPrograms(env, schoolSlug, indexPath));
+    return json(await discoverPrograms(schoolSlug, indexPath));
   }
 
   if (path === "/api/admin/scrape-programs" && request.method === "POST") {
@@ -236,7 +236,7 @@ export async function handleProgramAdminRoute({
     const run = async () => {
       const results = [];
       for (const program of targets) {
-        results.push({ id: program.id, ...(await scrapeProgram(env, program)) });
+        results.push({ id: program.id, ...(await scrapeProgram(program)) });
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
       return results;
@@ -267,7 +267,7 @@ export async function handleProgramAdminRoute({
     }
     const program = await repository.findProgram(programId);
     if (!program) return json({ error: "unknown program id" }, 404);
-    const result = await scrapeProgramFromBizSite(env, program);
+    const result = await scrapeProgramFromBizSite(program);
     return json({ ok: result.ok, program: programId, ...result });
   }
 
