@@ -31,6 +31,8 @@ import and scraping services retain their own storage temporarily.
 The RBS source parser is independently testable under
 `apps/api/src/programs/scrapers/business-school-parser.js`, with shared HTML
 normalization in the adjacent `html.js` module.
+The generic Coursedog text parser is independently testable beside it and
+keeps prerequisite codes out of emitted requirement-course rows.
 
 ## Goals
 

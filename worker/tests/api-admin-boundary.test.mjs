@@ -113,6 +113,11 @@ test("the canonical program controller has no backward dependencies on worker/sr
     canonicalProgramsSource,
     /from "\.\/programs\/scrapers\/business-school-parser\.js"/,
   );
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/scrapers\/coursedog-program-parser\.js"/,
+  );
   assert.doesNotMatch(canonicalProgramsSource, /function parseBizTable/);
+  assert.doesNotMatch(canonicalProgramsSource, /function parseProgramText/);
   assert.doesNotMatch(adminProgramRoutesSource, /env\.DB/);
 });
