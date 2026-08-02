@@ -10,6 +10,8 @@ Cloudflare-facing request controllers.
   contributor API controller.
 - `src/programs/public-routes.js` owns anonymous program reads, requirement
   reads, course eligibility, and program-selection validation.
+- `src/programs/admin-routes.js` owns authenticated program import, review,
+  scraping, and requirement-contributor endpoints.
 - `src/programs/` owns the controller's pure policy/evidence helpers,
   response presentation, and conservative source-import adapters.
 - `src/schedule-assistant.js` owns the bounded OpenAI request adapter; the

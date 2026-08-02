@@ -20,6 +20,8 @@ preference normalization and ranking remain in `packages/scheduling`.
 Anonymous program and requirement endpoints are separated from contributor
 mutations in `apps/api/src/programs/public-routes.js` and receive their
 services explicitly from the compatibility controller.
+Authenticated program import, review, scraping, and requirement-contributor
+endpoints are likewise isolated in `apps/api/src/programs/admin-routes.js`.
 
 ## Goals
 
@@ -125,7 +127,7 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Split the remaining contributor route family from Cloudflare storage
+2. Move the program controller's D1 statements behind focused storage
    adapters, retaining the `worker/src` compatibility exports until callers
    have migrated.
 3. Add explicit module APIs to the newly relocated planner, requirements, and
