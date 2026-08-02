@@ -90,4 +90,6 @@ test("the canonical program controller has no backward dependencies on worker/sr
   assert.match(canonicalProgramsSource, /from "\.\/programs\/imports\/program-directory\.js"/);
   assert.match(canonicalProgramsSource, /from "\.\/programs\/imports\/program-requirements\.js"/);
   assert.match(canonicalProgramsSource, /from "\.\/programs\/public-routes\.js"/);
+  assert.match(canonicalProgramsSource, /from "\.\/programs\/admin-routes\.js"/);
+  assert.doesNotMatch(canonicalProgramsSource, /path === "\/api\/admin\/program-catalog\/import"/);
 });

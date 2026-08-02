@@ -38,7 +38,7 @@ test("public program routes hide reviewed programs with incomplete requirement e
 
   const selectionCheck = routeBlock(
     'if (path === "/api/program-selection-check" && request.method === "POST")',
-    '// ---- Admin: everything below requires ?secret= ----'
+    'export async function handleProgramAdminRoute'
   );
   assert.match(selectionCheck, /programHasCompleteRequirementEvidence\(env, program\)/);
 });
