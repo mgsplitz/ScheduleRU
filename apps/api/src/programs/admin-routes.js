@@ -55,7 +55,7 @@ export async function handleProgramAdminRoute({
       return json({
         ok: true,
         school,
-        ...(await registerRequirementSourcesForSchool(env, school)),
+        ...(await registerRequirementSourcesForSchool(school)),
       });
     } catch (error) {
       return json({ error: error.message }, 400);
@@ -65,12 +65,12 @@ export async function handleProgramAdminRoute({
   if (path === "/api/admin/requirement-sources/discover" && request.method === "POST") {
     const school = url.searchParams.get("school") || "";
     try {
-      const registration = await registerRequirementSourcesForSchool(env, school);
+      const registration = await registerRequirementSourcesForSchool(school);
       if (!registration.registered) {
         return json({ error: "no active SAS major profiles found for this school" }, 404);
       }
       const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
-      const profileSources = await pendingMajorProfileSources(env, school, batchLimit);
+      const profileSources = await pendingMajorProfileSources(school, batchLimit);
       if (!profileSources.length) {
         return json({
           ok: true,
@@ -80,7 +80,7 @@ export async function handleProgramAdminRoute({
           note: "Every eligible SAS major profile has a discovered requirements source or a recorded discovery error.",
         });
       }
-      ctx.waitUntil(discoverMajorRequirementSources(env, profileSources));
+      ctx.waitUntil(discoverMajorRequirementSources(profileSources));
       return json({
         ok: true,
         mode: "background",
@@ -97,7 +97,7 @@ export async function handleProgramAdminRoute({
     const school = url.searchParams.get("school") || "";
     try {
       const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
-      const parentSources = await pendingNestedRequirementDetailSources(env, school, batchLimit);
+      const parentSources = await pendingNestedRequirementDetailSources(school, batchLimit);
       if (!parentSources.length) {
         return json({
           ok: true,
@@ -107,7 +107,7 @@ export async function handleProgramAdminRoute({
           note: "Every eligible SAS major overview source has a recorded nested-link result; no program was automatically marked reviewed.",
         });
       }
-      ctx.waitUntil(discoverNestedRequirementDetailSources(env, parentSources));
+      ctx.waitUntil(discoverNestedRequirementDetailSources(parentSources));
       return json({
         ok: true,
         mode: "background",
@@ -134,7 +134,7 @@ export async function handleProgramAdminRoute({
       return json(result, result.ok ? 200 : 502);
     }
     try {
-      const registration = await registerRequirementSourcesForSchool(env, school);
+      const registration = await registerRequirementSourcesForSchool(school);
       if (!registration.registered) {
         return json({ error: "no active catalog sources found for this school" }, 404);
       }

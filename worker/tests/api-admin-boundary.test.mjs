@@ -60,6 +60,13 @@ const catalogDirectoryServiceSource = await readFile(
   ),
   "utf8",
 );
+const requirementDiscoveryServiceSource = await readFile(
+  new URL(
+    "../../apps/api/src/programs/services/requirement-discovery-service.js",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const compatibleScheduleAssistantSource = await readFile(
   new URL("../src/schedule-assistant.js", import.meta.url),
   "utf8",
@@ -106,7 +113,10 @@ test("the canonical program controller has no backward dependencies on worker/sr
     catalogDirectoryServiceSource,
     /from "\.\.\/imports\/program-directory\.js"/,
   );
-  assert.match(canonicalProgramsSource, /from "\.\/programs\/imports\/program-requirements\.js"/);
+  assert.match(
+    requirementDiscoveryServiceSource,
+    /from "\.\.\/imports\/program-requirements\.js"/,
+  );
   assert.match(canonicalProgramsSource, /from "\.\/programs\/public-routes\.js"/);
   assert.match(canonicalProgramsSource, /from "\.\/programs\/admin-routes\.js"/);
   assert.doesNotMatch(canonicalProgramsSource, /path === "\/api\/admin\/program-catalog\/import"/);
@@ -151,6 +161,14 @@ test("the canonical program controller has no backward dependencies on worker/sr
     canonicalProgramsSource,
     /from "\.\/programs\/storage\/requirement-candidate-repository\.js"/,
   );
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/services\/requirement-discovery-service\.js"/,
+  );
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/storage\/requirement-discovery-repository\.js"/,
+  );
   assert.doesNotMatch(canonicalProgramsSource, /function parseBizTable/);
   assert.doesNotMatch(canonicalProgramsSource, /function parseProgramText/);
   assert.doesNotMatch(canonicalProgramsSource, /function importCatalogDirectorySource/);
@@ -159,5 +177,8 @@ test("the canonical program controller has no backward dependencies on worker/sr
   assert.doesNotMatch(canonicalProgramsSource, /function saveProgramRequirementSnapshot/);
   assert.doesNotMatch(canonicalProgramsSource, /function extractRequirementCandidateBatch/);
   assert.doesNotMatch(canonicalProgramsSource, /function saveRequirementDraftCandidate/);
+  assert.doesNotMatch(canonicalProgramsSource, /function registerRequirementSourcesForSchool/);
+  assert.doesNotMatch(canonicalProgramsSource, /function discoverMajorRequirementSources/);
+  assert.doesNotMatch(canonicalProgramsSource, /function discoverNestedRequirementDetailSources/);
   assert.doesNotMatch(adminProgramRoutesSource, /env\.DB/);
 });
