@@ -18,6 +18,10 @@ Cloudflare-facing request controllers.
   repository and contains no D1 statements.
 - `src/programs/storage/admin-program-repository.js` owns D1 reads and writes
   performed directly by authenticated program contributor endpoints.
+- `src/programs/services/catalog-directory-import-service.js` coordinates
+  leased program-directory imports without depending on HTTP or D1.
+- `src/programs/storage/catalog-directory-repository.js` owns directory-source
+  leases, identity overrides, catalog listing publication, and failure state.
 - `src/programs/scrapers/html.js` provides the shared conservative HTML
   normalization used by source adapters.
 - `src/programs/scrapers/business-school-parser.js` owns pure RBS table and

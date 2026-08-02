@@ -33,6 +33,10 @@ The RBS source parser is independently testable under
 normalization in the adjacent `html.js` module.
 The generic Coursedog text parser is independently testable beside it and
 keeps prerequisite codes out of emitted requirement-course rows.
+Program-directory ingestion now runs through an independently tested service
+and repository. The service owns fetch/parse/import orchestration; the
+repository owns source leases, identity overrides, publication ordering, and
+failure cleanup.
 
 ## Goals
 
@@ -138,11 +142,12 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Extract the longer-running program import and scraping workflows from the
+2. Extract the remaining requirement-source and scraping workflows from the
    compatibility controller and give each workflow a focused persistence
-   adapter. Public and authenticated route-level D1 operations already live
-   behind their respective repositories. Retain the `worker/src`
-   compatibility exports until callers have migrated.
+   adapter. Program-directory ingestion and public/authenticated route-level
+   D1 operations already live behind their respective services and
+   repositories. Retain the `worker/src` compatibility exports until callers
+   have migrated.
 3. Add explicit module APIs to the newly relocated planner, requirements, and
    scheduling packages, then retire their root compatibility imports.
 4. Add an ordered structural migration runner, then retire compatibility files

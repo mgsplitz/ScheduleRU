@@ -38,9 +38,6 @@ import {
 } from "./programs/requirement-evidence.js";
 import { publicSchoolProfile } from "./programs/school-profile.js";
 import {
-  importProgramDirectory,
-} from "./programs/imports/program-directory.js";
-import {
   discoverNestedMajorRequirementPage,
   discoverProfileRequirementPage,
   extractRequirementDraftCandidate,
@@ -61,6 +58,12 @@ import {
   parseBizTable,
 } from "./programs/scrapers/business-school-parser.js";
 import { parseProgramText } from "./programs/scrapers/coursedog-program-parser.js";
+import {
+  createCatalogDirectoryImportService,
+} from "./programs/services/catalog-directory-import-service.js";
+import {
+  createCatalogDirectoryRepository,
+} from "./programs/storage/catalog-directory-repository.js";
 
 export { parseBizTable, groupAppliesToSelection, allocationForConditions };
 
@@ -250,146 +253,6 @@ async function runD1Batches(env, statements, chunkSize = 100) {
 
 function isSafeCatalogSourceId(value) {
   return typeof value === "string" && /^[a-z0-9][a-z0-9-]{2,119}$/.test(value);
-}
-
-function isSupportedCatalogDirectorySource(source) {
-  return source
-    && source.adapter === "html_program_directory_v1"
-    && typeof source.directory_url === "string"
-    && typeof source.profile_path === "string";
-}
-
-function ownerLabelsForCatalogSource(value) {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed)
-      ? parsed.filter((label) => typeof label === "string" && label.trim()).slice(0, 30)
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-async function saveCatalogDirectoryEntries(env, source, entries, importToken) {
-  const now = Date.now();
-  const statements = entries.map((entry) => env.DB.prepare(
-    `INSERT INTO programs (
-       id, name, school_slug, program_slug, type, catalog_year, degree_type,
-       program_family_id, source_url, review_status, last_scraped_at,
-       catalog_source_id, catalog_listed_at, catalog_active
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
-     ON CONFLICT(id) DO UPDATE SET
-       name = excluded.name,
-       school_slug = excluded.school_slug,
-       program_slug = excluded.program_slug,
-       type = excluded.type,
-       catalog_year = excluded.catalog_year,
-       degree_type = excluded.degree_type,
-       program_family_id = excluded.program_family_id,
-       source_url = excluded.source_url,
-       review_status = excluded.review_status,
-       last_scraped_at = excluded.last_scraped_at,
-       catalog_source_id = excluded.catalog_source_id,
-       catalog_listed_at = excluded.catalog_listed_at,
-       catalog_active = 1
-     WHERE programs.review_status = 'catalog_listed'`
-  ).bind(
-    entry.id, entry.name, entry.school_slug, entry.program_slug, entry.type,
-    entry.catalog_year, entry.degree_type, entry.program_family_id, entry.source_url,
-    entry.review_status, now, source.id, now,
-  ));
-  await runD1Batches(env, statements);
-  // Only after every current entry was safely stored do we retire programs
-  // missing from the latest official directory. A failed partial import never
-  // hides previously published programs.
-  await env.DB.prepare(
-    `UPDATE programs
-     SET catalog_active = 0
-     WHERE catalog_source_id = ?
-       AND review_status = 'catalog_listed'
-       AND catalog_listed_at < ?`
-  ).bind(source.id, now).run();
-  await env.DB.prepare(
-    `UPDATE program_catalog_sources
-     SET last_imported_at = ?, last_error = NULL,
-         import_token = NULL, import_started_at = NULL
-     WHERE id = ? AND import_token = ?`
-  ).bind(now, source.id, importToken).run();
-}
-
-async function importCatalogDirectorySource(env, sourceId) {
-  if (!isSafeCatalogSourceId(sourceId)) throw new Error("invalid catalog source id");
-  const source = await env.DB.prepare(
-    `SELECT id, school_slug, directory_url, profile_path, catalog_year,
-            source_title, adapter, owner_labels_json
-     FROM program_catalog_sources
-     WHERE id = ? AND enabled = 1`
-  ).bind(sourceId).first();
-  if (!source) throw new Error("unknown or disabled catalog source");
-  if (!isSupportedCatalogDirectorySource(source)) throw new Error("unsupported catalog directory adapter");
-
-  const { results: overrideRows } = await env.DB.prepare(
-    `SELECT program_slug, type, program_id
-     FROM program_catalog_identity_overrides
-     WHERE catalog_source_id = ?`
-  ).bind(source.id).all();
-  source.owner_labels = ownerLabelsForCatalogSource(source.owner_labels_json);
-  source.program_id_overrides = Object.fromEntries(
-    overrideRows
-      .filter((row) => isSafeCatalogSourceId(row.program_slug)
-        && (row.type === "major" || row.type === "minor")
-        && isSafeCatalogSourceId(row.program_id))
-      .map((row) => [`${row.program_slug}:${row.type}`, row.program_id]),
-  );
-
-  const startedAt = Date.now();
-  const importToken = crypto.randomUUID();
-  const lease = await env.DB.prepare(
-    `UPDATE program_catalog_sources
-     SET import_token = ?, import_started_at = ?
-     WHERE id = ?
-       AND (import_token IS NULL OR import_started_at < ?)`
-  ).bind(importToken, startedAt, source.id, startedAt - (10 * 60 * 1000)).run();
-  if ((lease.meta?.changes || 0) !== 1) {
-    return {
-      ok: false,
-      source_id: source.id,
-      error: "a catalog import for this source is already running",
-      status: 409,
-    };
-  }
-
-  let rawHtml = "";
-  try {
-    const result = await importProgramDirectory({
-      source,
-      fetchHtml: async (directoryUrl) => {
-        const response = await fetch(directoryUrl, { headers: FETCH_HEADERS });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        rawHtml = await response.text();
-        return rawHtml;
-      },
-      saveEntries: (entries) => saveCatalogDirectoryEntries(env, source, entries, importToken),
-    });
-    await logScrape(
-      env,
-      `catalog:${source.id}`,
-      "ok",
-      { groupsWritten: 0, coursesWritten: result.programs_imported, notesWritten: 0 },
-      `imported ${result.programs_imported} catalog-listed programs from ${source.directory_url}`,
-      rawHtml.slice(0, 1500),
-    );
-    return { ok: true, source_id: source.id, ...result };
-  } catch (err) {
-    await env.DB.prepare(
-      `UPDATE program_catalog_sources
-       SET last_error = ?, import_token = NULL, import_started_at = NULL
-       WHERE id = ? AND import_token = ?`
-    ).bind(String(err?.message || err), source.id, importToken).run();
-    await logScrape(env, `catalog:${source.id}`, "error", null, `catalog directory import failed: ${err.message}`, rawHtml.slice(0, 1500));
-    return { ok: false, source_id: source.id, error: err.message };
-  }
 }
 
 /* ============================================================
@@ -1443,6 +1306,10 @@ function isSafeProgramId(value) {
    ROUTES
    ============================================================ */
 export async function handleProgramsApi(request, env, ctx, path, url, json, checkAdmin) {
+  const catalogDirectoryImportService = createCatalogDirectoryImportService({
+    repository: createCatalogDirectoryRepository(env),
+    recordScrape: (...args) => logScrape(env, ...args),
+  });
   const publicResponse = await handlePublicProgramRoute({
     request,
     env,
@@ -1481,7 +1348,8 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       discoverPrograms,
       extractRequirementCandidateBatch,
       getRequirementTree,
-      importCatalogDirectorySource,
+      importCatalogDirectorySource: (sourceId) =>
+        catalogDirectoryImportService.importSource(sourceId),
       importRequirementSource,
       importRequirementSourceBatch,
       isSafeHomeSchoolSlug,
