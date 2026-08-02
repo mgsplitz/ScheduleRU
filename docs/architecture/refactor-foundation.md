@@ -145,11 +145,11 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Extract the remaining requirement discovery, candidate extraction, and
-   scraping workflows from the compatibility controller and give each a
-   focused persistence adapter. Program-directory and requirement-snapshot
-   ingestion already live behind their own services and repositories. Retain
-   the `worker/src` compatibility exports until callers have migrated.
+2. Extract the remaining requirement discovery and scraping workflows from
+   the compatibility controller and give each a focused persistence adapter.
+   Program-directory, requirement-snapshot, and requirement-candidate
+   ingestion now live behind their own services and repositories. Retain the
+   `worker/src` compatibility exports until callers have migrated.
 3. Add explicit module APIs to the newly relocated planner, requirements, and
    scheduling packages, then retire their root compatibility imports.
 4. Add an ordered structural migration runner, then retire compatibility files

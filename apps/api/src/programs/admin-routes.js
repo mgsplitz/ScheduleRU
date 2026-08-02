@@ -168,7 +168,7 @@ export async function handleProgramAdminRoute({
     const school = url.searchParams.get("school") || "";
     try {
       const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
-      const snapshots = await pendingRequirementCandidateSnapshots(env, school, batchLimit);
+      const snapshots = await pendingRequirementCandidateSnapshots(school, batchLimit);
       if (!snapshots.length) {
         return json({
           ok: true,
@@ -178,7 +178,7 @@ export async function handleProgramAdminRoute({
           note: "Every snapshotted SAS major source has a generic draft candidate; no program was automatically marked reviewed.",
         });
       }
-      ctx.waitUntil(extractRequirementCandidateBatch(env, snapshots));
+      ctx.waitUntil(extractRequirementCandidateBatch(snapshots));
       return json({
         ok: true,
         mode: "background",

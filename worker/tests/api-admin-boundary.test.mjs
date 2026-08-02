@@ -143,11 +143,21 @@ test("the canonical program controller has no backward dependencies on worker/sr
     canonicalProgramsSource,
     /from "\.\/programs\/storage\/requirement-import-repository\.js"/,
   );
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/services\/requirement-candidate-service\.js"/,
+  );
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/storage\/requirement-candidate-repository\.js"/,
+  );
   assert.doesNotMatch(canonicalProgramsSource, /function parseBizTable/);
   assert.doesNotMatch(canonicalProgramsSource, /function parseProgramText/);
   assert.doesNotMatch(canonicalProgramsSource, /function importCatalogDirectorySource/);
   assert.doesNotMatch(canonicalProgramsSource, /function saveCatalogDirectoryEntries/);
   assert.doesNotMatch(canonicalProgramsSource, /function importRequirementSource/);
   assert.doesNotMatch(canonicalProgramsSource, /function saveProgramRequirementSnapshot/);
+  assert.doesNotMatch(canonicalProgramsSource, /function extractRequirementCandidateBatch/);
+  assert.doesNotMatch(canonicalProgramsSource, /function saveRequirementDraftCandidate/);
   assert.doesNotMatch(adminProgramRoutesSource, /env\.DB/);
 });

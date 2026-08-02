@@ -40,7 +40,6 @@ import { publicSchoolProfile } from "./programs/school-profile.js";
 import {
   discoverNestedMajorRequirementPage,
   discoverProfileRequirementPage,
-  extractRequirementDraftCandidate,
 } from "./programs/imports/program-requirements.js";
 import { handlePublicProgramRoute } from "./programs/public-routes.js";
 import { handleProgramAdminRoute } from "./programs/admin-routes.js";
@@ -70,6 +69,12 @@ import {
 import {
   createRequirementImportRepository,
 } from "./programs/storage/requirement-import-repository.js";
+import {
+  createRequirementCandidateService,
+} from "./programs/services/requirement-candidate-service.js";
+import {
+  createRequirementCandidateRepository,
+} from "./programs/storage/requirement-candidate-repository.js";
 
 export { parseBizTable, groupAppliesToSelection, allocationForConditions };
 
@@ -483,83 +488,6 @@ async function discoverNestedRequirementDetailSources(env, parentSources) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return discovered;
-}
-
-async function pendingRequirementCandidateSnapshots(env, schoolSlug, batchLimit) {
-  if (schoolSlug !== "sasnb") throw new Error("draft candidate extraction currently supports school=sasnb majors only");
-  const { results } = await env.DB.prepare(
-    `SELECT snapshot.source_id, snapshot.program_id, snapshot.source_url,
-            snapshot.content_hash, snapshot.content_text, snapshot.parsed_json
-     FROM program_requirement_source_snapshots snapshot
-     INNER JOIN program_requirement_import_sources source ON source.id = snapshot.source_id
-     INNER JOIN programs program ON program.id = snapshot.program_id
-     WHERE source.school_slug = ?
-       AND source.source_kind = 'requirements_page'
-       AND source.enabled = 1
-       AND program.type = 'major'
-       AND program.review_status = 'catalog_listed'
-       AND NOT EXISTS (
-         SELECT 1 FROM program_requirement_draft_candidates candidate
-         WHERE candidate.source_id = snapshot.source_id
-           AND candidate.content_hash = snapshot.content_hash
-           AND candidate.extractor_version = 1
-       )
-     ORDER BY snapshot.fetched_at, snapshot.id
-     LIMIT ?`
-  ).bind(schoolSlug, batchLimit).all();
-  return results || [];
-}
-
-async function saveRequirementDraftCandidate(env, snapshot) {
-  const candidate = extractRequirementDraftCandidate(snapshot);
-  const inserted = await env.DB.prepare(
-    `INSERT OR IGNORE INTO program_requirement_draft_candidates (
-       source_id, program_id, source_url, content_hash, extractor_version,
-       candidate_json, created_at
-     ) VALUES (?,?,?,?,?,?,?)`
-  ).bind(
-    candidate.source_id,
-    candidate.program_id,
-    candidate.source_url,
-    candidate.content_hash,
-    candidate.extractor_version,
-    JSON.stringify(candidate),
-    Date.now(),
-  ).run();
-  return {
-    changed: (inserted.meta?.changes || 0) === 1,
-    sections_found: candidate.sections.length,
-    courses_found: candidate.sections.reduce((total, section) => total + section.course_codes.length, 0),
-  };
-}
-
-async function extractRequirementCandidateBatch(env, snapshots) {
-  const extracted = [];
-  for (const snapshot of snapshots) {
-    try {
-      const result = await saveRequirementDraftCandidate(env, snapshot);
-      await logScrape(
-        env,
-        `requirements-candidate:${snapshot.source_id}`,
-        "ok",
-        { groupsWritten: 0, coursesWritten: result.courses_found, notesWritten: result.sections_found },
-        `${result.changed ? "saved" : "reused"} generic source-section draft; no review status changed`,
-        snapshot.content_text.slice(0, 1500),
-      );
-      extracted.push({ ok: true, source_id: snapshot.source_id, program_id: snapshot.program_id, ...result });
-    } catch (err) {
-      await logScrape(
-        env,
-        `requirements-candidate:${snapshot.source_id}`,
-        "error",
-        null,
-        `requirements-candidate extraction failed: ${err.message}`,
-        String(snapshot.content_text || "").slice(0, 1500),
-      );
-      extracted.push({ ok: false, source_id: snapshot.source_id, program_id: snapshot.program_id, error: err.message });
-    }
-  }
-  return extracted;
 }
 
 async function scrapeCoreCurriculum(env, program) {
@@ -1214,6 +1142,10 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     repository: createRequirementImportRepository(env),
     recordScrape: (...args) => logScrape(env, ...args),
   });
+  const requirementCandidateService = createRequirementCandidateService({
+    repository: createRequirementCandidateRepository(env),
+    recordScrape: (...args) => logScrape(env, ...args),
+  });
   const publicResponse = await handlePublicProgramRoute({
     request,
     env,
@@ -1250,7 +1182,8 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       discoverMajorRequirementSources,
       discoverNestedRequirementDetailSources,
       discoverPrograms,
-      extractRequirementCandidateBatch,
+      extractRequirementCandidateBatch: (snapshots) =>
+        requirementCandidateService.extractBatch(snapshots),
       getRequirementTree,
       importCatalogDirectorySource: (sourceId) =>
         catalogDirectoryImportService.importSource(sourceId),
@@ -1261,7 +1194,8 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       isSafeHomeSchoolSlug,
       pendingMajorProfileSources,
       pendingNestedRequirementDetailSources,
-      pendingRequirementCandidateSnapshots,
+      pendingRequirementCandidateSnapshots: (schoolSlug, batchLimit) =>
+        requirementCandidateService.listPendingSnapshots(schoolSlug, batchLimit),
       pendingRequirementSourceIds: (schoolSlug, batchLimit) =>
         requirementImportService.listPendingSources(schoolSlug, batchLimit),
       registerRequirementSourcesForSchool,
