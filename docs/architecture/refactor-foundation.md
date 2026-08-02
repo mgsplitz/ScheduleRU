@@ -28,6 +28,9 @@ endpoints are likewise isolated in `apps/api/src/programs/admin-routes.js`.
 Their direct persistence operations live behind
 `apps/api/src/programs/storage/admin-program-repository.js`; longer-running
 import and scraping services retain their own storage temporarily.
+The RBS source parser is independently testable under
+`apps/api/src/programs/scrapers/business-school-parser.js`, with shared HTML
+normalization in the adjacent `html.js` module.
 
 ## Goals
 
