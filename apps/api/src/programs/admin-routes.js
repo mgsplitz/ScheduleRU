@@ -36,6 +36,7 @@ export async function handleProgramAdminRoute({
     pendingRequirementSourceIds,
     registerRequirementSourcesForSchool,
     requirementSourceImportBatchLimit,
+    repository,
     scrapeCoreCurriculum,
     scrapeProgram,
     scrapeProgramFromBizSite,
@@ -122,17 +123,7 @@ export async function handleProgramAdminRoute({
   if (path === "/api/admin/requirement-sources" && request.method === "GET") {
     const school = url.searchParams.get("school") || "";
     if (!isSafeHomeSchoolSlug(school)) return json({ error: "pass a valid ?school=..." }, 400);
-    const { results } = await env.DB.prepare(
-      `SELECT source.id, source.program_id, source.source_url, source.source_title,
-              source.adapter, source.source_kind, source.enabled, source.last_imported_at,
-              source.last_content_hash, source.last_error,
-              (SELECT COUNT(*) FROM program_requirement_source_snapshots snapshot
-               WHERE snapshot.source_id = source.id) AS snapshot_count
-       FROM program_requirement_import_sources source
-       WHERE source.school_slug = ?
-       ORDER BY source.program_id`,
-    ).bind(school).all();
-    return json({ school, sources: results || [] });
+    return json({ school, sources: await repository.listRequirementSources(school) });
   }
 
   if (path === "/api/admin/requirement-sources/import" && request.method === "POST") {
@@ -207,43 +198,13 @@ export async function handleProgramAdminRoute({
         error: "draft candidate extraction currently supports ?school=sasnb majors only",
       }, 400);
     }
-    const { results } = await env.DB.prepare(
-      `SELECT candidate.id, candidate.source_id, candidate.program_id, candidate.source_url,
-              candidate.content_hash, candidate.extractor_version, candidate.candidate_json,
-              candidate.created_at
-       FROM program_requirement_draft_candidates candidate
-       INNER JOIN program_requirement_import_sources source ON source.id = candidate.source_id
-       WHERE source.school_slug = ?
-       ORDER BY candidate.program_id, candidate.created_at DESC`,
-    ).bind(school).all();
-    return json({ school, candidates: results || [] });
+    return json({ school, candidates: await repository.listRequirementCandidates(school) });
   }
 
   if (path === "/api/admin/programs/seed" && request.method === "POST") {
     const body = await request.json();
     const items = Array.isArray(body) ? body : [body];
-    const statements = items.map((program) => env.DB.prepare(
-      `INSERT INTO programs (
-         id, name, school_slug, program_slug, type, catalog_year,
-         academic_program_code, degree_type, program_family_id, source_url
-       ) VALUES (?,?,?,?,?,?,?,?,?,?)
-       ON CONFLICT(id) DO UPDATE SET name=excluded.name, school_slug=excluded.school_slug,
-         program_slug=excluded.program_slug, type=excluded.type, catalog_year=excluded.catalog_year,
-         academic_program_code=excluded.academic_program_code, degree_type=excluded.degree_type,
-         program_family_id=excluded.program_family_id, source_url=excluded.source_url`,
-    ).bind(
-      program.id,
-      program.name,
-      program.school_slug,
-      program.program_slug,
-      program.type,
-      program.catalog_year || null,
-      program.academic_program_code || null,
-      program.degree_type || null,
-      program.program_family_id || null,
-      program.source_url || null,
-    ));
-    await env.DB.batch(statements);
+    await repository.seedPrograms(items);
     return json({ ok: true, seeded: items.length });
   }
 
@@ -260,9 +221,7 @@ export async function handleProgramAdminRoute({
     const singleId = url.searchParams.get("program");
     let targets;
     if (singleId) {
-      const program = await env.DB.prepare("SELECT * FROM programs WHERE id = ?")
-        .bind(singleId)
-        .first();
+      const program = await repository.findProgram(singleId);
       if (!program) return json({ error: "unknown program id" }, 404);
       if (program.school_slug === "rbsnb") {
         return json({
@@ -271,8 +230,8 @@ export async function handleProgramAdminRoute({
       }
       targets = [program];
     } else {
-      const { results } = await env.DB.prepare("SELECT * FROM programs").all();
-      targets = results.filter((program) => program.school_slug !== "rbsnb");
+      targets = (await repository.listPrograms())
+        .filter((program) => program.school_slug !== "rbsnb");
     }
     const run = async () => {
       const results = [];
@@ -296,10 +255,7 @@ export async function handleProgramAdminRoute({
 
   if (path === "/api/admin/scrape-log" && request.method === "GET") {
     const limit = Math.min(Number(url.searchParams.get("limit") || 30), 100);
-    const { results } = await env.DB.prepare(
-      "SELECT * FROM scrape_log ORDER BY id DESC LIMIT ?",
-    ).bind(limit).all();
-    return json({ log: results });
+    return json({ log: await repository.listScrapeLog(limit) });
   }
 
   if (path === "/api/admin/scrape-programs-biz" && request.method === "POST") {
@@ -309,9 +265,7 @@ export async function handleProgramAdminRoute({
         error: "pass ?program=id — this endpoint is single-program-only until you've checked its output once",
       }, 400);
     }
-    const program = await env.DB.prepare("SELECT * FROM programs WHERE id = ?")
-      .bind(programId)
-      .first();
+    const program = await repository.findProgram(programId);
     if (!program) return json({ error: "unknown program id" }, 404);
     const result = await scrapeProgramFromBizSite(env, program);
     return json({ ok: result.ok, program: programId, ...result });
@@ -319,24 +273,18 @@ export async function handleProgramAdminRoute({
 
   if (path === "/api/admin/scrape-core-curriculum" && request.method === "POST") {
     const programId = url.searchParams.get("program") || RUTGERS_NB_CORE_PROGRAM_ID;
-    const program = await env.DB.prepare(
-      "SELECT * FROM programs WHERE id = ? AND type = 'core_curriculum'",
-    ).bind(programId).first();
+    const program = await repository.findCoreCurriculum(programId);
     if (!program) return json({ error: "unknown Core Curriculum id" }, 404);
     const result = await scrapeCoreCurriculum(env, program);
     return json({ ok: result.ok, program: programId, ...result });
   }
 
   if (path === "/api/admin/review" && request.method === "GET") {
-    const { results: programs } = await env.DB.prepare(
-      "SELECT * FROM programs WHERE review_status != 'reviewed' OR id IN (SELECT DISTINCT program_id FROM requirement_raw_notes WHERE resolved = 0) ORDER BY name",
-    ).all();
+    const programs = await repository.listProgramsNeedingReview();
     const reviewQueue = [];
     for (const program of programs) {
       const requirements = await getRequirementTree(env, program.id);
-      const { results: notes } = await env.DB.prepare(
-        "SELECT * FROM requirement_raw_notes WHERE program_id = ? AND resolved = 0",
-      ).bind(program.id).all();
+      const notes = await repository.listUnresolvedRequirementNotes(program.id);
       reviewQueue.push({ program, requirements, unresolved_notes: notes });
     }
     return json({ review_queue: reviewQueue });
@@ -344,66 +292,35 @@ export async function handleProgramAdminRoute({
 
   if (path === "/api/admin/programs/review-status" && request.method === "POST") {
     const { program_id: programId, status } = await request.json();
-    await env.DB.prepare("UPDATE programs SET review_status = ? WHERE id = ?")
-      .bind(status, programId)
-      .run();
+    await repository.updateProgramReviewStatus(programId, status);
     return json({ ok: true });
   }
 
   if (path === "/api/admin/requirement-groups" && request.method === "POST") {
     const group = await request.json();
     const id = group.id || `${group.program_id}-manual-${Date.now()}`;
-    await env.DB.prepare(
-      `INSERT INTO requirement_groups (id, program_id, parent_group_id, name, rule, count, sort_order, auto_generated)
-       VALUES (?,?,?,?,?,?,?,0)
-       ON CONFLICT(id) DO UPDATE SET name=excluded.name, rule=excluded.rule,
-         count=excluded.count, parent_group_id=excluded.parent_group_id`,
-    ).bind(
-      id,
-      group.program_id,
-      group.parent_group_id || null,
-      group.name,
-      group.rule,
-      group.count ?? null,
-      group.sort_order ?? 0,
-    ).run();
-    if (Array.isArray(group.courses)) {
-      const statements = group.courses.map((code) => env.DB.prepare(
-        "INSERT OR REPLACE INTO requirement_courses (group_id, course_code, note) VALUES (?,?,?)",
-      ).bind(id, code, ""));
-      if (statements.length) await env.DB.batch(statements);
-    }
+    await repository.saveRequirementGroup(group, id);
     return json({ ok: true, id });
   }
 
   if (path.match(/^\/api\/admin\/requirement-notes\/\d+\/resolve$/) && request.method === "POST") {
     const noteId = Number(path.split("/")[4]);
-    await env.DB.prepare("UPDATE requirement_raw_notes SET resolved = 1 WHERE id = ?")
-      .bind(noteId)
-      .run();
+    await repository.resolveRequirementNote(noteId);
     return json({ ok: true });
   }
 
   if (path.match(/^\/api\/admin\/requirement-groups\/[^/]+$/) && request.method === "DELETE") {
     const groupId = decodeURIComponent(path.split("/")[4]);
-    const group = await env.DB.prepare("SELECT * FROM requirement_groups WHERE id = ?")
-      .bind(groupId)
-      .first();
+    const group = await repository.findRequirementGroup(groupId);
     if (!group) return json({ error: "not found" }, 404);
     if (group.auto_generated) {
       return json({
         error: "refusing to delete an auto_generated group — re-scrape the program instead, or edit it via POST if you really mean to hand-override it",
       }, 400);
     }
-    const { results: childIds } = await env.DB.prepare(
-      "SELECT id FROM requirement_groups WHERE parent_group_id = ?",
-    ).bind(groupId).all();
-    const allIds = [groupId, ...childIds.map((child) => child.id)];
-    const statements = allIds.flatMap((id) => [
-      env.DB.prepare("DELETE FROM requirement_courses WHERE group_id = ?").bind(id),
-      env.DB.prepare("DELETE FROM requirement_groups WHERE id = ?").bind(id),
-    ]);
-    await env.DB.batch(statements);
+    const childIds = await repository.listChildRequirementGroupIds(groupId);
+    const allIds = [groupId, ...childIds];
+    await repository.deleteRequirementGroups(allIds);
     return json({ ok: true, deleted: allIds });
   }
 

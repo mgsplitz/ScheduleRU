@@ -49,6 +49,10 @@ const publicProgramRoutesSource = await readFile(
   new URL("../../apps/api/src/programs/public-routes.js", import.meta.url),
   "utf8",
 );
+const adminProgramRoutesSource = await readFile(
+  new URL("../../apps/api/src/programs/admin-routes.js", import.meta.url),
+  "utf8",
+);
 const compatibleScheduleAssistantSource = await readFile(
   new URL("../src/schedule-assistant.js", import.meta.url),
   "utf8",
@@ -101,4 +105,9 @@ test("the canonical program controller has no backward dependencies on worker/sr
     /from "\.\/programs\/storage\/public-program-repository\.js"/,
   );
   assert.doesNotMatch(publicProgramRoutesSource, /env\.DB/);
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/storage\/admin-program-repository\.js"/,
+  );
+  assert.doesNotMatch(adminProgramRoutesSource, /env\.DB/);
 });

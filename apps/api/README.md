@@ -14,7 +14,10 @@ Cloudflare-facing request controllers.
 - `src/programs/storage/public-program-repository.js` owns D1 reads used by
   anonymous program endpoints and enforces reviewed-record visibility.
 - `src/programs/admin-routes.js` owns authenticated program import, review,
-  scraping, and requirement-contributor endpoints.
+  scraping, and requirement-contributor endpoints. It receives a contributor
+  repository and contains no D1 statements.
+- `src/programs/storage/admin-program-repository.js` owns D1 reads and writes
+  performed directly by authenticated program contributor endpoints.
 - `src/programs/` owns the controller's pure policy/evidence helpers,
   response presentation, and conservative source-import adapters.
 - `src/schedule-assistant.js` owns the bounded OpenAI request adapter; the

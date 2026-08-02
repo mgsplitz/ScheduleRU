@@ -25,6 +25,9 @@ the public HTTP controller depends on a repository contract instead of the
 Cloudflare database binding.
 Authenticated program import, review, scraping, and requirement-contributor
 endpoints are likewise isolated in `apps/api/src/programs/admin-routes.js`.
+Their direct persistence operations live behind
+`apps/api/src/programs/storage/admin-program-repository.js`; longer-running
+import and scraping services retain their own storage temporarily.
 
 ## Goals
 
@@ -130,10 +133,11 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Move the remaining authenticated program-controller D1 statements behind a
-   focused contributor storage adapter; anonymous program reads have already
-   moved behind the public repository. Retain the `worker/src` compatibility
-   exports until callers have migrated.
+2. Extract the longer-running program import and scraping workflows from the
+   compatibility controller and give each workflow a focused persistence
+   adapter. Public and authenticated route-level D1 operations already live
+   behind their respective repositories. Retain the `worker/src`
+   compatibility exports until callers have migrated.
 3. Add explicit module APIs to the newly relocated planner, requirements, and
    scheduling packages, then retire their root compatibility imports.
 4. Add an ordered structural migration runner, then retire compatibility files
