@@ -67,6 +67,13 @@ const requirementDiscoveryServiceSource = await readFile(
   ),
   "utf8",
 );
+const programScrapeServiceSource = await readFile(
+  new URL(
+    "../../apps/api/src/programs/services/program-scrape-service.js",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const compatibleScheduleAssistantSource = await readFile(
   new URL("../src/schedule-assistant.js", import.meta.url),
   "utf8",
@@ -134,8 +141,8 @@ test("the canonical program controller has no backward dependencies on worker/sr
     /from "\.\/programs\/scrapers\/business-school-parser\.js"/,
   );
   assert.match(
-    canonicalProgramsSource,
-    /from "\.\/programs\/scrapers\/coursedog-program-parser\.js"/,
+    programScrapeServiceSource,
+    /from "\.\.\/scrapers\/coursedog-program-parser\.js"/,
   );
   assert.match(
     canonicalProgramsSource,
@@ -169,6 +176,14 @@ test("the canonical program controller has no backward dependencies on worker/sr
     canonicalProgramsSource,
     /from "\.\/programs\/storage\/requirement-discovery-repository\.js"/,
   );
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/services\/program-scrape-service\.js"/,
+  );
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/storage\/program-scrape-repository\.js"/,
+  );
   assert.doesNotMatch(canonicalProgramsSource, /function parseBizTable/);
   assert.doesNotMatch(canonicalProgramsSource, /function parseProgramText/);
   assert.doesNotMatch(canonicalProgramsSource, /function importCatalogDirectorySource/);
@@ -180,5 +195,9 @@ test("the canonical program controller has no backward dependencies on worker/sr
   assert.doesNotMatch(canonicalProgramsSource, /function registerRequirementSourcesForSchool/);
   assert.doesNotMatch(canonicalProgramsSource, /function discoverMajorRequirementSources/);
   assert.doesNotMatch(canonicalProgramsSource, /function discoverNestedRequirementDetailSources/);
+  assert.doesNotMatch(canonicalProgramsSource, /function sectionsToStatements/);
+  assert.doesNotMatch(canonicalProgramsSource, /function scrapeProgram\(/);
+  assert.doesNotMatch(canonicalProgramsSource, /function scrapeProgramFromBizSite/);
+  assert.doesNotMatch(canonicalProgramsSource, /function discoverPrograms/);
   assert.doesNotMatch(adminProgramRoutesSource, /env\.DB/);
 });

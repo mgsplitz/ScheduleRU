@@ -22,7 +22,7 @@
  * HTML->text flattening and the course-line regex below were built from one
  * confirmed sample page (RBS/BAIT). Every scrape logs a raw text sample to
  * scrape_log — check GET /api/admin/scrape-log if a program comes back
- * with zero groups or looks wrong, and adjust parseProgramText() below.
+ * with zero groups or looks wrong, and adjust the isolated parser module.
  * Coursedog's actual markup may use different wrapper tags per school
  * (tables vs <p> vs <li>) — the flattener tries to be tag-agnostic (it just
  * looks for block boundaries and bold spans) specifically so it doesn't
@@ -47,11 +47,8 @@ import {
 } from "./programs/storage/admin-program-repository.js";
 import { htmlToFlatText } from "./programs/scrapers/html.js";
 import {
-  extractBizProse,
-  parseBizPageText,
   parseBizTable,
 } from "./programs/scrapers/business-school-parser.js";
-import { parseProgramText } from "./programs/scrapers/coursedog-program-parser.js";
 import {
   createCatalogDirectoryImportService,
 } from "./programs/services/catalog-directory-import-service.js";
@@ -77,6 +74,12 @@ import {
 import {
   createRequirementDiscoveryRepository,
 } from "./programs/storage/requirement-discovery-repository.js";
+import {
+  createProgramScrapeService,
+} from "./programs/services/program-scrape-service.js";
+import {
+  createProgramScrapeRepository,
+} from "./programs/storage/program-scrape-repository.js";
 
 export { parseBizTable, groupAppliesToSelection, allocationForConditions };
 
@@ -158,10 +161,6 @@ function catalogBase(env) {
   // catalog year publishes; override via CATALOG_SUBDOMAIN in wrangler.toml
   // rather than editing this file each year.
   return env.CATALOG_SUBDOMAIN || "newbrunswick-undergrad-25-26";
-}
-
-function programUrl(env, schoolSlug, programSlug) {
-  return `https://${catalogBase(env)}.catalogs.rutgers.edu/schools/${schoolSlug}/degree-requirements/programs-majors-minors/${programSlug}`;
 }
 
 const FETCH_HEADERS = {
@@ -334,101 +333,6 @@ async function scrapeCoreCurriculum(env, program) {
   return { ok: true, parsed_courses: coreCourses.length, ...counts };
 }
 
-/* ============================================================
-   sections -> DB rows
-   ============================================================ */
-function sectionsToStatements(env, program, sections) {
-  const stmts = [];
-  let groupCounter = 0;
-  let groupsWritten = 0, coursesWritten = 0, notesWritten = 0;
-
-  // Clear previous scrape's rows for this program so re-scraping doesn't
-  // duplicate/orphan groups. Manual (auto_generated=0) groups added by a
-  // human during review are preserved.
-  stmts.push(env.DB.prepare(`DELETE FROM requirement_courses WHERE group_id IN (SELECT id FROM requirement_groups WHERE program_id = ? AND auto_generated = 1)`).bind(program.id));
-  stmts.push(env.DB.prepare(`DELETE FROM requirement_groups WHERE program_id = ? AND auto_generated = 1`).bind(program.id));
-  stmts.push(env.DB.prepare(`DELETE FROM requirement_raw_notes WHERE program_id = ?`).bind(program.id));
-
-  for (const section of sections) {
-    groupCounter++;
-    const groupId = `${program.id}-g${groupCounter}`;
-    stmts.push(
-      env.DB.prepare(
-        `INSERT INTO requirement_groups (id, program_id, parent_group_id, name, rule, count, sort_order, auto_generated)
-         VALUES (?,?,?,?,?,?,?,1)`
-      ).bind(groupId, program.id, null, section.name, section.rule || "all", section.count ?? null, groupCounter)
-    );
-    groupsWritten++;
-
-    for (const item of section.courseItems) {
-      stmts.push(
-        env.DB.prepare(
-          `INSERT OR REPLACE INTO requirement_courses
-             (group_id, course_code, note, source_title, source_credits)
-           VALUES (?,?,?,?,?)`
-        ).bind(groupId, item.code, item.note || "", item.title || "", item.credits || "")
-      );
-      coursesWritten++;
-    }
-
-    let subgroupCounter = 0;
-    for (const subgroup of section.subgroups || []) {
-      subgroupCounter++;
-      const subgroupId = `${groupId}-sub${subgroupCounter}`;
-      stmts.push(
-        env.DB.prepare(
-          `INSERT INTO requirement_groups (id, program_id, parent_group_id, name, rule, count, sort_order, auto_generated)
-           VALUES (?,?,?,?,?,?,?,1)`
-        ).bind(subgroupId, program.id, groupId, subgroup.name, subgroup.rule || "all", subgroup.count ?? null, subgroupCounter)
-      );
-      groupsWritten++;
-      for (const item of subgroup.courseItems || []) {
-        stmts.push(
-          env.DB.prepare(
-            `INSERT OR REPLACE INTO requirement_courses
-               (group_id, course_code, note, source_title, source_credits)
-             VALUES (?,?,?,?,?)`
-          ).bind(subgroupId, item.code, item.note || "", item.title || "", item.credits || "")
-        );
-        coursesWritten++;
-      }
-    }
-
-    let orCounter = 0;
-    for (const orGroup of section.orGroups) {
-      orCounter++;
-      const orGroupId = `${groupId}-or${orCounter}`;
-      stmts.push(
-        env.DB.prepare(
-          `INSERT INTO requirement_groups (id, program_id, parent_group_id, name, rule, count, sort_order, auto_generated)
-           VALUES (?,?,?,?,?,?,?,1)`
-        ).bind(orGroupId, program.id, groupId, `Choose 1`, "min_courses", 1, orCounter)
-      );
-      groupsWritten++;
-      for (const item of orGroup) {
-        stmts.push(
-          env.DB.prepare(
-            `INSERT OR REPLACE INTO requirement_courses
-               (group_id, course_code, note, source_title, source_credits)
-             VALUES (?,?,?,?,?)`
-          ).bind(orGroupId, item.code, item.note || "", item.title || "", item.credits || "")
-        );
-        coursesWritten++;
-      }
-    }
-
-    for (const prose of section.prose) {
-      stmts.push(
-        env.DB.prepare(`INSERT INTO requirement_raw_notes (program_id, section_name, raw_text, resolved) VALUES (?,?,?,0)`)
-          .bind(program.id, section.name, prose)
-      );
-      notesWritten++;
-    }
-  }
-
-  return { stmts, groupsWritten, coursesWritten, notesWritten };
-}
-
 async function logScrape(env, programId, status, counts, message, rawSample) {
   await env.DB.prepare(
     `INSERT INTO scrape_log (program_id, status, groups_written, courses_written, notes_written, message, raw_sample, scraped_at)
@@ -437,176 +341,6 @@ async function logScrape(env, programId, status, counts, message, rawSample) {
     programId, status, counts?.groupsWritten ?? 0, counts?.coursesWritten ?? 0, counts?.notesWritten ?? 0,
     message, rawSample, Date.now()
   ).run();
-}
-
-/* ============================================================
-   SCRAPE one program
-   ============================================================ */
-async function scrapeProgram(env, program) {
-  const url = program.source_url || programUrl(env, program.school_slug, program.program_slug);
-  let html;
-  try {
-    const res = await fetch(url, { headers: FETCH_HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    html = await res.text();
-  } catch (err) {
-    await logScrape(env, program.id, "error", null, `fetch failed: ${err.message}`, "");
-    return { ok: false, error: err.message };
-  }
-
-  const flat = htmlToFlatText(html);
-  const sections = parseProgramText(flat, program.name);
-
-  if (!sections.length) {
-    await logScrape(env, program.id, "empty", null, "parsed zero sections — page structure may not match parseProgramText's assumptions", flat.slice(0, 1500));
-    return { ok: false, error: "no sections parsed" };
-  }
-
-  const { stmts, groupsWritten, coursesWritten, notesWritten } = sectionsToStatements(env, program, sections);
-  stmts.push(
-    env.DB.prepare(`UPDATE programs SET last_scraped_at = ?, review_status = 'unreviewed', source_url = ? WHERE id = ?`)
-      .bind(Date.now(), url, program.id)
-  );
-
-  try {
-    // D1 batches are capped in size; a single program's requirement set is
-    // small (dozens of statements) so one batch is safe, unlike the course
-    // sync which has to chunk across thousands of rows.
-    await env.DB.batch(stmts);
-  } catch (err) {
-    await logScrape(env, program.id, "error", { groupsWritten, coursesWritten, notesWritten }, `D1 write failed: ${err.message}`, flat.slice(0, 1500));
-    return { ok: false, error: err.message };
-  }
-
-  await logScrape(env, program.id, "ok", { groupsWritten, coursesWritten, notesWritten }, `scraped ${url}`, flat.slice(0, 1500));
-  return { ok: true, groupsWritten, coursesWritten, notesWritten };
-}
-
-/* ============================================================
-   SOURCE 2: www.business.rutgers.edu (clean HTML tables)
-   ============================================================
-   catalogs.rutgers.edu (Coursedog) is free-text prose for anything beyond
-   a program's required courses, and — confirmed by hand, see the chat that
-   led to this — some of that prose is straight-up copy-pasted between
-   majors' pages (a BAIT-page paragraph literally talks about "the Finance
-   department"). It never reliably had elective lists to scrape.
-   www.business.rutgers.edu (RBS's own marketing/advising site, NOT
-   Coursedog) publishes actual maintained HTML tables per major:
-     "RBS Core Courses"   -> a "Business Core" table, everyone required
-     "Required Courses"   -> a "Required <Major> Courses" table, all required
-     "Elective Courses"   -> one or two tables captioned literally
-                             "At least ONE course from the following
-                             electives" / "At most TWO courses from the
-                             following electives" — which map directly onto
-                             requirement_groups' min_courses/max_courses.
-   This is the real source of truth (and almost certainly where the old
-   hand-written v16 COURSES/GROUPS constants originally came from).
-   CONFIRM TABLE MARKUP AGAINST A REAL SCRAPE-LOG SAMPLE before trusting
-   this at scale: this was written from the *rendered* text of two pages
-   (bait, finance), not the literal raw HTML source, so the exact tag
-   soup (whether captions are <th colspan> vs a lone <td>, whether OR-pairs
-   sit in one <td> or two, etc.) is inferred, not confirmed byte-for-byte.
-   Run it for ONE program first (?program=rbsnb-bait) and check
-   GET /api/admin/scrape-log's raw_sample / groups_written before trusting
-   it for all six.
-*/
-const BIZ_SITE_BASE = "https://www.business.rutgers.edu/undergraduate-new-brunswick";
-// The slug on this site doesn't always match the Coursedog program_slug
-// (e.g. "bait" vs "business-analytics-information-technology") — confirmed
-// from this site's own "Areas of Study" nav menu, not guessed.
-const BIZ_SLUG_MAP = {
-  "rbsnb-bait": "business-analytics-information-technology",
-  "rbsnb-accounting": "accounting",
-  "rbsnb-finance": "finance",
-  "rbsnb-leadership-management": "leadership-management",
-  "rbsnb-marketing": "marketing",
-  "rbsnb-supply-chain-management": "supply-chain-management",
-};
-async function scrapeProgramFromBizSite(env, program) {
-  const slug = BIZ_SLUG_MAP[program.id];
-  if (!slug) {
-    return { ok: false, error: `no BIZ_SLUG_MAP entry for ${program.id} — add one before scraping this program from business.rutgers.edu` };
-  }
-  const url = `${BIZ_SITE_BASE}/${slug}`;
-  let html;
-  try {
-    const res = await fetch(url, { headers: FETCH_HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    html = await res.text();
-  } catch (err) {
-    await logScrape(env, program.id, "error", null, `biz-site fetch failed: ${err.message}`, "");
-    return { ok: false, error: err.message };
-  }
-
-  const sections = parseBizPageText(html);
-  if (!sections.length) {
-    await logScrape(env, program.id, "empty", null, "biz-site parse found zero usable tables — table markup may not match parseBizTable's assumptions, check raw_sample", html.slice(0, 2000));
-    return { ok: false, error: "no sections parsed from biz site" };
-  }
-
-  const { stmts, groupsWritten, coursesWritten, notesWritten: groupNotesWritten } = sectionsToStatements(env, program, sections);
-
-  // Raw prose notes (bullets/footnotes from outside any table) don't belong
-  // to a specific requirement_groups row the way section.prose does, so
-  // they're inserted directly. sectionsToStatements already queued a
-  // DELETE FROM requirement_raw_notes for this program above, so these
-  // inserts land on a clean slate, not on top of stale rows.
-  const prose = extractBizProse(html);
-  for (const note of prose) {
-    stmts.push(
-      env.DB.prepare(`INSERT INTO requirement_raw_notes (program_id, section_name, raw_text, resolved) VALUES (?,?,?,0)`)
-        .bind(program.id, note.section_name, note.raw_text)
-    );
-  }
-  const notesWritten = groupNotesWritten + prose.length;
-
-  stmts.push(
-    env.DB.prepare(`UPDATE programs SET last_scraped_at = ?, review_status = 'unreviewed', source_url = ? WHERE id = ?`)
-      .bind(Date.now(), url, program.id)
-  );
-
-  try {
-    await env.DB.batch(stmts);
-  } catch (err) {
-    await logScrape(env, program.id, "error", { groupsWritten, coursesWritten, notesWritten }, `biz-site D1 write failed: ${err.message}`, html.slice(0, 2000));
-    return { ok: false, error: err.message };
-  }
-
-  await logScrape(env, program.id, "ok", { groupsWritten, coursesWritten, notesWritten }, `scraped (biz site) ${url}`, html.slice(0, 2000));
-  return { ok: true, groupsWritten, coursesWritten, notesWritten };
-}
-
-/* ============================================================
-   DISCOVER program slugs from a school's index page (best effort)
-   ============================================================
-   This is the fragile half — index-page markup is more likely to vary by
-   school than the program pages themselves. If it comes back empty for a
-   school, don't fight it: use POST /api/admin/programs/seed to add that
-   school's programs by hand (you only need to do this once per school).
-*/
-async function discoverPrograms(env, schoolSlug, indexPath) {
-  const url = `https://${catalogBase(env)}.catalogs.rutgers.edu${indexPath}`;
-  let html;
-  try {
-    const res = await fetch(url, { headers: FETCH_HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    html = await res.text();
-  } catch (err) {
-    return { ok: false, error: err.message, found: [] };
-  }
-
-  const linkRe = /href="[^"]*\/schools\/([a-z0-9-]+)\/degree-requirements\/programs-majors-minors\/([a-z0-9-]+)"[^>]*>([^<]*)</gi;
-  const found = [];
-  const seen = new Set();
-  let m;
-  while ((m = linkRe.exec(html))) {
-    const [, foundSchool, programSlug, linkText] = m;
-    const key = `${foundSchool}:${programSlug}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    found.push({ school_slug: foundSchool, program_slug: programSlug, name: linkText.trim() || programSlug });
-  }
-  return { ok: true, found };
 }
 
 /* ============================================================
@@ -924,6 +658,11 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     repository: createRequirementDiscoveryRepository(env),
     recordScrape: (...args) => logScrape(env, ...args),
   });
+  const programScrapeService = createProgramScrapeService({
+    repository: createProgramScrapeRepository(env),
+    recordScrape: (...args) => logScrape(env, ...args),
+    catalogSubdomain: catalogBase(env),
+  });
   const publicResponse = await handlePublicProgramRoute({
     request,
     env,
@@ -961,7 +700,8 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
         requirementDiscoveryService.discoverProfiles(profileSources),
       discoverNestedRequirementDetailSources: (parentSources) =>
         requirementDiscoveryService.discoverNestedDetails(parentSources),
-      discoverPrograms,
+      discoverPrograms: (schoolSlug, indexPath) =>
+        programScrapeService.discoverPrograms(schoolSlug, indexPath),
       extractRequirementCandidateBatch: (snapshots) =>
         requirementCandidateService.extractBatch(snapshots),
       getRequirementTree,
@@ -984,8 +724,9 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
         requirementDiscoveryService.registerSchool(schoolSlug),
       requirementSourceImportBatchLimit,
       scrapeCoreCurriculum,
-      scrapeProgram,
-      scrapeProgramFromBizSite,
+      scrapeProgram: (program) => programScrapeService.scrapeCatalogProgram(program),
+      scrapeProgramFromBizSite: (program) =>
+        programScrapeService.scrapeBusinessProgram(program),
       repository: createAdminProgramRepository(env),
     },
   });

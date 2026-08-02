@@ -35,6 +35,10 @@ Cloudflare-facing request controllers.
   profile and nested official-source discovery with bounded polite waits.
 - `src/programs/storage/requirement-discovery-repository.js` owns profile
   registration, discovery queues, discovered sources, and attempt evidence.
+- `src/programs/services/program-scrape-service.js` coordinates legacy
+  Coursedog and approved RBS source fetches, parsing, and scrape outcomes.
+- `src/programs/storage/program-scrape-repository.js` atomically replaces
+  generated requirement rows without owning source parsing or HTTP behavior.
 - `src/programs/scrapers/html.js` provides the shared conservative HTML
   normalization used by source adapters.
 - `src/programs/scrapers/business-school-parser.js` owns pure RBS table and

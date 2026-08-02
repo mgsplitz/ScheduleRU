@@ -13,6 +13,8 @@ const sources = await Promise.all([
   "../../../apps/api/src/programs/storage/requirement-candidate-repository.js",
   "../../../apps/api/src/programs/services/requirement-discovery-service.js",
   "../../../apps/api/src/programs/storage/requirement-discovery-repository.js",
+  "../../../apps/api/src/programs/services/program-scrape-service.js",
+  "../../../apps/api/src/programs/storage/program-scrape-repository.js",
   "../../../apps/api/src/programs.js",
 ].map((path) => readFile(new URL(path, import.meta.url), "utf8")));
 
