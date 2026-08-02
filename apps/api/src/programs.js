@@ -37,10 +37,6 @@ import {
   requirementEvidenceComplete,
 } from "./programs/requirement-evidence.js";
 import { publicSchoolProfile } from "./programs/school-profile.js";
-import {
-  discoverNestedMajorRequirementPage,
-  discoverProfileRequirementPage,
-} from "./programs/imports/program-requirements.js";
 import { handlePublicProgramRoute } from "./programs/public-routes.js";
 import { handleProgramAdminRoute } from "./programs/admin-routes.js";
 import {
@@ -75,6 +71,12 @@ import {
 import {
   createRequirementCandidateRepository,
 } from "./programs/storage/requirement-candidate-repository.js";
+import {
+  createRequirementDiscoveryService,
+} from "./programs/services/requirement-discovery-service.js";
+import {
+  createRequirementDiscoveryRepository,
+} from "./programs/storage/requirement-discovery-repository.js";
 
 export { parseBizTable, groupAppliesToSelection, allocationForConditions };
 
@@ -260,234 +262,6 @@ async function runD1Batches(env, statements, chunkSize = 100) {
   for (let i = 0; i < statements.length; i += chunkSize) {
     await env.DB.batch(statements.slice(i, i + chunkSize));
   }
-}
-
-/* ============================================================
-   OFFICIAL REQUIREMENT-SOURCE SNAPSHOTS
-
-   The program directory is the authority for menu identities. These sources
-   are a separate, generic draft pipeline: they preserve each catalog path's
-   official profile page in D1 so source adapters can evolve without adding a
-   hand-written requirements file for every program. A snapshot is never an
-   audit and never changes a program's review status.
-   ============================================================ */
-
-function requirementSourceIdForProgram(programId) {
-  return `requirements-${programId}`;
-}
-
-function requirementDetailSourceIdForProgram(programId) {
-  return `detail-${programId}`;
-}
-
-function nestedRequirementDetailSourceIdForProgram(programId) {
-  return `nested-${programId}`;
-}
-
-async function registerRequirementSourcesForSchool(env, schoolSlug) {
-  if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
-  const { results } = await env.DB.prepare(
-    `SELECT id, name, school_slug, source_url
-     FROM programs
-     WHERE school_slug = ?
-       AND type = 'major'
-       AND review_status = 'catalog_listed'
-       AND catalog_active = 1
-       AND source_url LIKE 'https://%'
-     ORDER BY id`
-  ).bind(schoolSlug).all();
-  const programs = (results || []).filter((program) => isSafeProgramId(program.id));
-  await runD1Batches(env, programs.map((program) => env.DB.prepare(
-    `INSERT INTO program_requirement_import_sources (
-       id, program_id, school_slug, source_url, source_title, adapter, source_kind, enabled
-     ) VALUES (?,?,?,?,?,'html_requirement_source_v1','profile',1)
-     ON CONFLICT(program_id, source_url) DO UPDATE SET
-       school_slug = excluded.school_slug,
-       source_title = excluded.source_title,
-       source_kind = excluded.source_kind,
-       enabled = 1`
-  ).bind(
-    requirementSourceIdForProgram(program.id),
-    program.id,
-    program.school_slug,
-    program.source_url,
-    `${program.name} official program profile`,
-  )));
-  return { registered: programs.length };
-}
-
-async function pendingMajorProfileSources(env, schoolSlug, batchLimit) {
-  if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
-  const { results } = await env.DB.prepare(
-    `SELECT source.id, source.program_id, source.school_slug, source.source_url,
-            source.source_title, source.adapter
-     FROM program_requirement_import_sources source
-     INNER JOIN programs program ON program.id = source.program_id
-     WHERE source.school_slug = ?
-       AND source.source_kind = 'profile'
-       AND source.enabled = 1
-       AND source.last_error IS NULL
-       AND program.type = 'major'
-       AND program.review_status = 'catalog_listed'
-       AND program.catalog_active = 1
-       AND NOT EXISTS (
-         SELECT 1 FROM program_requirement_import_sources detail
-         WHERE detail.program_id = source.program_id
-           AND detail.source_kind = 'requirements_page'
-       )
-     ORDER BY source.id
-     LIMIT ?`
-  ).bind(schoolSlug, batchLimit).all();
-  return results || [];
-}
-
-async function saveMajorRequirementSource(env, profileSource, detailSource) {
-  await env.DB.prepare(
-    `INSERT INTO program_requirement_import_sources (
-       id, program_id, school_slug, source_url, source_title, adapter, source_kind, enabled
-     ) VALUES (?,?,?,?,?,'html_requirement_source_v1','requirements_page',1)
-     ON CONFLICT(program_id, source_url) DO UPDATE SET
-       source_title = excluded.source_title,
-       source_kind = excluded.source_kind,
-       enabled = 1,
-       last_error = NULL`
-  ).bind(
-    requirementDetailSourceIdForProgram(profileSource.program_id),
-    profileSource.program_id,
-    profileSource.school_slug,
-    detailSource.source_url,
-    detailSource.source_title,
-  ).run();
-}
-
-async function discoverMajorRequirementSources(env, profileSources) {
-  const discovered = [];
-  for (const profileSource of profileSources) {
-    let rawHtml = "";
-    try {
-      const response = await fetch(profileSource.source_url, { headers: FETCH_HEADERS });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      rawHtml = await response.text();
-      const detailSource = discoverProfileRequirementPage(rawHtml, profileSource, "major");
-      if (!detailSource) throw new Error("profile has no official Major Web Page link");
-      await saveMajorRequirementSource(env, profileSource, detailSource);
-      await logScrape(
-        env,
-        `requirements-discovery:${profileSource.id}`,
-        "ok",
-        { groupsWritten: 0, coursesWritten: 0, notesWritten: 1 },
-        `saved official major requirements source ${detailSource.source_url}; no review status changed`,
-        rawHtml.slice(0, 1500),
-      );
-      discovered.push({ ok: true, source_id: profileSource.id, program_id: profileSource.program_id });
-    } catch (err) {
-      await env.DB.prepare(
-        `UPDATE program_requirement_import_sources SET last_error = ? WHERE id = ?`
-      ).bind(String(err?.message || err), profileSource.id).run();
-      await logScrape(
-        env,
-        `requirements-discovery:${profileSource.id}`,
-        "error",
-        null,
-        `requirements-source discovery failed: ${err.message}`,
-        rawHtml.slice(0, 1500),
-      );
-      discovered.push({ ok: false, source_id: profileSource.id, program_id: profileSource.program_id, error: err.message });
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return discovered;
-}
-
-async function pendingNestedRequirementDetailSources(env, schoolSlug, batchLimit) {
-  if (schoolSlug !== "sasnb") throw new Error("nested requirement discovery currently supports school=sasnb majors only");
-  const { results } = await env.DB.prepare(
-    `SELECT source.id, source.program_id, source.school_slug, source.source_url,
-            source.source_title, source.adapter
-     FROM program_requirement_import_sources source
-     INNER JOIN program_requirement_draft_candidates candidate
-       ON candidate.source_id = source.id
-     INNER JOIN programs program ON program.id = source.program_id
-     WHERE source.school_slug = ?
-       AND source.id LIKE 'detail-%'
-       AND source.source_kind = 'requirements_page'
-       AND source.enabled = 1
-       AND program.type = 'major'
-       AND program.review_status = 'catalog_listed'
-       AND candidate.extractor_version = 1
-       AND json_array_length(candidate.candidate_json, '$.sections') = 0
-       AND NOT EXISTS (
-         SELECT 1 FROM program_requirement_source_discovery_attempts attempt
-         WHERE attempt.parent_source_id = source.id
-           AND attempt.discovery_kind = 'nested_major_requirements'
-       )
-     ORDER BY source.id
-     LIMIT ?`
-  ).bind(schoolSlug, batchLimit).all();
-  return results || [];
-}
-
-async function recordNestedRequirementDiscovery(env, source, status, discoveredUrl = null, note = null) {
-  await env.DB.prepare(
-    `INSERT INTO program_requirement_source_discovery_attempts (
-       parent_source_id, program_id, discovery_kind, status,
-       discovered_source_url, checked_at, note
-     ) VALUES (?,?,'nested_major_requirements',?,?,?,?)
-     ON CONFLICT(parent_source_id, discovery_kind) DO UPDATE SET
-       status = excluded.status,
-       discovered_source_url = excluded.discovered_source_url,
-       checked_at = excluded.checked_at,
-       note = excluded.note`
-  ).bind(source.id, source.program_id, status, discoveredUrl, Date.now(), note).run();
-}
-
-async function saveNestedRequirementDetailSource(env, parentSource, detailSource) {
-  await env.DB.prepare(
-    `INSERT INTO program_requirement_import_sources (
-       id, program_id, school_slug, source_url, source_title, adapter, source_kind, enabled
-     ) VALUES (?,?,?,?,?,'html_requirement_source_v1','requirements_page',1)
-     ON CONFLICT(id) DO UPDATE SET
-       source_url = excluded.source_url,
-       source_title = excluded.source_title,
-       source_kind = excluded.source_kind,
-       enabled = 1,
-       last_error = NULL`
-  ).bind(
-    nestedRequirementDetailSourceIdForProgram(parentSource.program_id),
-    parentSource.program_id,
-    parentSource.school_slug,
-    detailSource.source_url,
-    detailSource.source_title,
-  ).run();
-}
-
-async function discoverNestedRequirementDetailSources(env, parentSources) {
-  const discovered = [];
-  for (const source of parentSources) {
-    let rawHtml = "";
-    try {
-      const response = await fetch(source.source_url, { headers: FETCH_HEADERS });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      rawHtml = await response.text();
-      const detailSource = discoverNestedMajorRequirementPage(rawHtml, source);
-      if (!detailSource) {
-        await recordNestedRequirementDiscovery(env, source, "no_link", null, "no explicitly labelled Major Requirements link");
-        await logScrape(env, `requirements-detail-discovery:${source.id}`, "ok", { groupsWritten: 0, coursesWritten: 0, notesWritten: 1 }, "no explicit nested major-requirements link found; no audit changed", rawHtml.slice(0, 1500));
-        discovered.push({ ok: true, source_id: source.id, program_id: source.program_id, found: false });
-      } else {
-        await saveNestedRequirementDetailSource(env, source, detailSource);
-        await recordNestedRequirementDiscovery(env, source, "found", detailSource.source_url, "saved official detailed major requirements source");
-        await logScrape(env, `requirements-detail-discovery:${source.id}`, "ok", { groupsWritten: 0, coursesWritten: 0, notesWritten: 1 }, `saved official nested major requirements source ${detailSource.source_url}; no review status changed`, rawHtml.slice(0, 1500));
-        discovered.push({ ok: true, source_id: source.id, program_id: source.program_id, found: true });
-      }
-    } catch (err) {
-      await recordNestedRequirementDiscovery(env, source, "error", null, String(err?.message || err));
-      await logScrape(env, `requirements-detail-discovery:${source.id}`, "error", null, `nested requirements-source discovery failed: ${err.message}`, rawHtml.slice(0, 1500));
-      discovered.push({ ok: false, source_id: source.id, program_id: source.program_id, error: err.message });
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return discovered;
 }
 
 async function scrapeCoreCurriculum(env, program) {
@@ -1146,6 +920,10 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     repository: createRequirementCandidateRepository(env),
     recordScrape: (...args) => logScrape(env, ...args),
   });
+  const requirementDiscoveryService = createRequirementDiscoveryService({
+    repository: createRequirementDiscoveryRepository(env),
+    recordScrape: (...args) => logScrape(env, ...args),
+  });
   const publicResponse = await handlePublicProgramRoute({
     request,
     env,
@@ -1179,8 +957,10 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     checkAdmin,
     services: {
       RUTGERS_NB_CORE_PROGRAM_ID,
-      discoverMajorRequirementSources,
-      discoverNestedRequirementDetailSources,
+      discoverMajorRequirementSources: (profileSources) =>
+        requirementDiscoveryService.discoverProfiles(profileSources),
+      discoverNestedRequirementDetailSources: (parentSources) =>
+        requirementDiscoveryService.discoverNestedDetails(parentSources),
       discoverPrograms,
       extractRequirementCandidateBatch: (snapshots) =>
         requirementCandidateService.extractBatch(snapshots),
@@ -1192,13 +972,16 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       importRequirementSourceBatch: (sources) =>
         requirementImportService.importBatch(sources),
       isSafeHomeSchoolSlug,
-      pendingMajorProfileSources,
-      pendingNestedRequirementDetailSources,
+      pendingMajorProfileSources: (schoolSlug, batchLimit) =>
+        requirementDiscoveryService.listPendingProfiles(schoolSlug, batchLimit),
+      pendingNestedRequirementDetailSources: (schoolSlug, batchLimit) =>
+        requirementDiscoveryService.listPendingNestedDetails(schoolSlug, batchLimit),
       pendingRequirementCandidateSnapshots: (schoolSlug, batchLimit) =>
         requirementCandidateService.listPendingSnapshots(schoolSlug, batchLimit),
       pendingRequirementSourceIds: (schoolSlug, batchLimit) =>
         requirementImportService.listPendingSources(schoolSlug, batchLimit),
-      registerRequirementSourcesForSchool,
+      registerRequirementSourcesForSchool: (schoolSlug) =>
+        requirementDiscoveryService.registerSchool(schoolSlug),
       requirementSourceImportBatchLimit,
       scrapeCoreCurriculum,
       scrapeProgram,

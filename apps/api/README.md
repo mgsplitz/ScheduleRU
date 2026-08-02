@@ -31,6 +31,10 @@ Cloudflare-facing request controllers.
   degree rules or changing program review status.
 - `src/programs/storage/requirement-candidate-repository.js` owns the
   unprocessed snapshot queue and immutable candidate persistence.
+- `src/programs/services/requirement-discovery-service.js` coordinates
+  profile and nested official-source discovery with bounded polite waits.
+- `src/programs/storage/requirement-discovery-repository.js` owns profile
+  registration, discovery queues, discovered sources, and attempt evidence.
 - `src/programs/scrapers/html.js` provides the shared conservative HTML
   normalization used by source adapters.
 - `src/programs/scrapers/business-school-parser.js` owns pure RBS table and
