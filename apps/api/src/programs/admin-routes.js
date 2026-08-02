@@ -45,7 +45,7 @@ export async function handleProgramAdminRoute({
   if (path === "/api/admin/program-catalog/import" && request.method === "POST") {
     const sourceId = url.searchParams.get("source") || "";
     if (!sourceId) return json({ error: "pass ?source=the-catalog-source-id" }, 400);
-    const result = await importCatalogDirectorySource(env, sourceId);
+    const result = await importCatalogDirectorySource(sourceId);
     return json(result, result.ok ? 200 : (result.status || 502));
   }
 

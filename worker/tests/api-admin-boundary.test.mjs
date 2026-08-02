@@ -53,6 +53,13 @@ const adminProgramRoutesSource = await readFile(
   new URL("../../apps/api/src/programs/admin-routes.js", import.meta.url),
   "utf8",
 );
+const catalogDirectoryServiceSource = await readFile(
+  new URL(
+    "../../apps/api/src/programs/services/catalog-directory-import-service.js",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const compatibleScheduleAssistantSource = await readFile(
   new URL("../src/schedule-assistant.js", import.meta.url),
   "utf8",
@@ -95,7 +102,10 @@ test("the canonical program controller has no backward dependencies on worker/sr
   assert.match(canonicalProgramsSource, /from "\.\/programs\/selection-policy\.js"/);
   assert.match(canonicalProgramsSource, /from "\.\/programs\/requirement-evidence\.js"/);
   assert.match(canonicalProgramsSource, /from "\.\/programs\/school-profile\.js"/);
-  assert.match(canonicalProgramsSource, /from "\.\/programs\/imports\/program-directory\.js"/);
+  assert.match(
+    catalogDirectoryServiceSource,
+    /from "\.\.\/imports\/program-directory\.js"/,
+  );
   assert.match(canonicalProgramsSource, /from "\.\/programs\/imports\/program-requirements\.js"/);
   assert.match(canonicalProgramsSource, /from "\.\/programs\/public-routes\.js"/);
   assert.match(canonicalProgramsSource, /from "\.\/programs\/admin-routes\.js"/);
@@ -117,7 +127,17 @@ test("the canonical program controller has no backward dependencies on worker/sr
     canonicalProgramsSource,
     /from "\.\/programs\/scrapers\/coursedog-program-parser\.js"/,
   );
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/services\/catalog-directory-import-service\.js"/,
+  );
+  assert.match(
+    canonicalProgramsSource,
+    /from "\.\/programs\/storage\/catalog-directory-repository\.js"/,
+  );
   assert.doesNotMatch(canonicalProgramsSource, /function parseBizTable/);
   assert.doesNotMatch(canonicalProgramsSource, /function parseProgramText/);
+  assert.doesNotMatch(canonicalProgramsSource, /function importCatalogDirectorySource/);
+  assert.doesNotMatch(canonicalProgramsSource, /function saveCatalogDirectoryEntries/);
   assert.doesNotMatch(adminProgramRoutesSource, /env\.DB/);
 });
