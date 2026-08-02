@@ -26,6 +26,11 @@ Cloudflare-facing request controllers.
   polite requirement-source snapshot imports without publishing degree audits.
 - `src/programs/storage/requirement-import-repository.js` owns requirement
   source lookup, immutable snapshot persistence, pending queues, and errors.
+- `src/programs/services/requirement-candidate-service.js` turns immutable
+  source snapshots into reviewable section candidates without publishing
+  degree rules or changing program review status.
+- `src/programs/storage/requirement-candidate-repository.js` owns the
+  unprocessed snapshot queue and immutable candidate persistence.
 - `src/programs/scrapers/html.js` provides the shared conservative HTML
   normalization used by source adapters.
 - `src/programs/scrapers/business-school-parser.js` owns pure RBS table and
