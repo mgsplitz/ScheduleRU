@@ -9,7 +9,10 @@ Cloudflare-facing request controllers.
 - `src/programs.js` is the canonical program, requirement, policy, and
   contributor API controller.
 - `src/programs/public-routes.js` owns anonymous program reads, requirement
-  reads, course eligibility, and program-selection validation.
+  reads, course eligibility, and program-selection validation. It receives a
+  public repository and contains no D1 statements.
+- `src/programs/storage/public-program-repository.js` owns D1 reads used by
+  anonymous program endpoints and enforces reviewed-record visibility.
 - `src/programs/admin-routes.js` owns authenticated program import, review,
   scraping, and requirement-contributor endpoints.
 - `src/programs/` owns the controller's pure policy/evidence helpers,

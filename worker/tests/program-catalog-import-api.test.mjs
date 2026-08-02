@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { programApiSource as worker } from "./helpers/program-api-source.mjs";
 
+const publicProgramRepository = await readFile(
+  new URL("../../apps/api/src/programs/storage/public-program-repository.js", import.meta.url),
+  "utf8",
+);
 const publicProgramRoutes = await readFile(
   new URL("../../apps/api/src/programs/public-routes.js", import.meta.url),
   "utf8",
@@ -33,9 +37,7 @@ test("program eligibility lookups batch ids so a full catalog cannot exceed D1's
 });
 
 test("public program and requirement routes hide catalog-only records", async () => {
-  const publicRoutes = publicProgramRoutes.slice(
-    publicProgramRoutes.indexOf('if (path === "/api/programs"'),
-  );
+  const publicRoutes = `${publicProgramRoutes}\n${publicProgramRepository}`;
 
   assert.match(publicRoutes, /review_status = 'reviewed'/);
   assert.doesNotMatch(publicRoutes, /review_status = 'catalog_listed'/);

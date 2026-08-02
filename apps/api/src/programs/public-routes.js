@@ -18,41 +18,22 @@ export async function handlePublicProgramRoute({
     publicSchoolProfile,
     publishedCatalogPrograms,
     reviewedCourseCodes,
+    repository,
   } = services;
 
   if (path === "/api/schools" && request.method === "GET") {
-    const { results } = await env.DB.prepare(
-      `SELECT slug, institution_slug, campus_slug, name, short_name,
-              catalog_year, configuration_json, source_url, source_title
-       FROM school_profiles
-       WHERE review_status = 'reviewed'
-       ORDER BY sort_order, name`,
-    ).all();
     return json({
-      schools: (results || []).map(publicSchoolProfile).filter((school) => school.slug),
+      schools: (await repository.listReviewedSchools())
+        .map(publicSchoolProfile)
+        .filter((school) => school.slug),
     });
   }
 
   if (path === "/api/programs" && request.method === "GET") {
     const school = url.searchParams.get("school");
     const type = url.searchParams.get("type");
-    let where = ` WHERE type NOT IN ('shared_requirement_set', 'core_curriculum')
-                  AND review_status = 'reviewed'`;
-    const binds = [];
-    if (school) {
-      where += " AND school_slug = ?";
-      binds.push(school);
-    }
-    if (type) {
-      where += " AND type = ?";
-      binds.push(type);
-    }
-    const { results } = await env.DB
-      .prepare(`SELECT * FROM programs${where} ORDER BY name`)
-      .bind(...binds)
-      .all();
     const reviewedPrograms = [];
-    for (const program of results || []) {
+    for (const program of await repository.listReviewedPrograms({ school, type })) {
       if (await programHasCompleteRequirementEvidence(env, program)) {
         reviewedPrograms.push(program);
       }
@@ -76,32 +57,12 @@ export async function handlePublicProgramRoute({
 
   if (path === "/api/core-curricula" && request.method === "GET") {
     const school = url.searchParams.get("school");
-    let where = `WHERE link.review_status = 'reviewed'
-                   AND curriculum.review_status = 'reviewed'
-                   AND curriculum.type = 'core_curriculum'`;
-    const binds = [];
-    if (school) {
-      where += " AND link.school_slug = ?";
-      binds.push(school);
-    }
-    const { results } = await env.DB.prepare(
-      `SELECT curriculum.*, link.school_slug AS attached_school_slug,
-              link.module_type, link.source_url AS attachment_source_url
-       FROM school_curriculum_modules link
-       INNER JOIN programs curriculum ON curriculum.id = link.curriculum_program_id
-       ${where}
-       ORDER BY link.sort_order, curriculum.name`,
-    ).bind(...binds).all();
-    return json({ curricula: results });
+    return json({ curricula: await repository.listReviewedCoreCurricula(school) });
   }
 
   if (path.match(/^\/api\/programs\/[^/]+\/requirements$/) && request.method === "GET") {
     const programId = decodeURIComponent(path.split("/")[3]);
-    const program = await env.DB.prepare(
-      `SELECT * FROM programs
-       WHERE id = ?
-         AND review_status = 'reviewed'`,
-    ).bind(programId).first();
+    const program = await repository.findReviewedProgram(programId);
     if (!program) return json({ error: "not found" }, 404);
     if (!(await programHasCompleteRequirementEvidence(env, program))) {
       return json({ error: "not found" }, 404);
@@ -122,12 +83,7 @@ export async function handlePublicProgramRoute({
       return json({ error: "pass 1-25 valid program ids in ?programs=id1,id2" }, 400);
     }
     const out = {};
-    const { results: publicPrograms } = await env.DB.prepare(
-      `SELECT id, requirement_evidence_required, review_status
-       FROM programs
-       WHERE id IN (${ids.map(() => "?").join(",")})
-         AND review_status = 'reviewed'`,
-    ).bind(...ids).all();
+    const publicPrograms = await repository.listReviewedProgramEvidenceFlags(ids);
     const visibleProgramIds = new Set();
     for (const program of publicPrograms || []) {
       if (await programHasCompleteRequirementEvidence(env, program)) {
@@ -139,29 +95,13 @@ export async function handlePublicProgramRoute({
       out[id] = await getRequirementTree(env, id, visibleIds);
     }
 
-    let doubleCounts = [];
-    let doubleCountExceptions = [];
-    if (visibleIds.length) {
-      const { results } = await env.DB.prepare(
-        `SELECT * FROM double_count_rules
-         WHERE program_a IN (${visibleIds.map(() => "?").join(",")})
-           AND program_b IN (${visibleIds.map(() => "?").join(",")})`,
-      ).bind(...visibleIds, ...visibleIds).all();
-      doubleCounts = results;
-      const { results: exceptions } = await env.DB.prepare(
-        `SELECT * FROM double_count_exceptions
-         WHERE review_status = 'reviewed'
-           AND program_a IN (${visibleIds.map(() => "?").join(",")})
-           AND program_b IN (${visibleIds.map(() => "?").join(",")})`,
-      ).bind(...visibleIds, ...visibleIds).all();
-      doubleCountExceptions = exceptions || [];
-    }
+    const doubleCountData = await repository.getDoubleCountData(visibleIds);
     const eligibilityRules = await getProgramEligibilityRules(env, visibleIds);
     return json({
       requirements: out,
       catalog_listed_program_ids: [],
-      double_count_rules: doubleCounts,
-      double_count_exceptions: doubleCountExceptions,
+      double_count_rules: doubleCountData.rules,
+      double_count_exceptions: doubleCountData.exceptions,
       eligibility_rules: eligibilityRules,
     });
   }
@@ -176,17 +116,7 @@ export async function handlePublicProgramRoute({
 
   if (path === "/api/double-count-policies" && request.method === "GET") {
     const school = url.searchParams.get("school");
-    let where = "";
-    const binds = [];
-    if (school) {
-      where = " WHERE school_slug = ?";
-      binds.push(school);
-    }
-    const { results } = await env.DB
-      .prepare(`SELECT * FROM double_count_policies${where}`)
-      .bind(...binds)
-      .all();
-    return json({ policies: results });
+    return json({ policies: await repository.listDoubleCountPolicies(school) });
   }
 
   if (path === "/api/program-selection-policies" && request.method === "GET") {
@@ -217,20 +147,9 @@ export async function handlePublicProgramRoute({
     }
     const ids = [...new Set(programIds)];
     const programs = [];
-    if (ids.length) {
-      const { results } = await env.DB.prepare(
-        `SELECT id, name, school_slug, program_slug, type, degree_type,
-                program_family_id, requirement_evidence_required, review_status,
-                catalog_active
-         FROM programs
-         WHERE type NOT IN ('shared_requirement_set', 'core_curriculum')
-           AND review_status = 'reviewed'
-           AND id IN (${ids.map(() => "?").join(",")})`,
-      ).bind(...ids).all();
-      for (const program of results || []) {
-        if (await programHasCompleteRequirementEvidence(env, program)) {
-          programs.push(program);
-        }
+    for (const program of await repository.listReviewedProgramsByIds(ids)) {
+      if (await programHasCompleteRequirementEvidence(env, program)) {
+        programs.push(program);
       }
     }
     const [policyData, eligibilityRules] = await Promise.all([
