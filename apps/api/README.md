@@ -22,6 +22,10 @@ Cloudflare-facing request controllers.
   leased program-directory imports without depending on HTTP or D1.
 - `src/programs/storage/catalog-directory-repository.js` owns directory-source
   leases, identity overrides, catalog listing publication, and failure state.
+- `src/programs/services/requirement-import-service.js` coordinates bounded,
+  polite requirement-source snapshot imports without publishing degree audits.
+- `src/programs/storage/requirement-import-repository.js` owns requirement
+  source lookup, immutable snapshot persistence, pending queues, and errors.
 - `src/programs/scrapers/html.js` provides the shared conservative HTML
   normalization used by source adapters.
 - `src/programs/scrapers/business-school-parser.js` owns pure RBS table and
