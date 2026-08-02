@@ -37,6 +37,9 @@ Program-directory ingestion now runs through an independently tested service
 and repository. The service owns fetch/parse/import orchestration; the
 repository owns source leases, identity overrides, publication ordering, and
 failure cleanup.
+Requirement-source HTML snapshot ingestion likewise runs through a dedicated
+service and repository. Its boundary explicitly stores source evidence and
+never changes a program to reviewed or publishes a requirement audit.
 
 ## Goals
 
@@ -142,12 +145,11 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Extract the remaining requirement-source and scraping workflows from the
-   compatibility controller and give each workflow a focused persistence
-   adapter. Program-directory ingestion and public/authenticated route-level
-   D1 operations already live behind their respective services and
-   repositories. Retain the `worker/src` compatibility exports until callers
-   have migrated.
+2. Extract the remaining requirement discovery, candidate extraction, and
+   scraping workflows from the compatibility controller and give each a
+   focused persistence adapter. Program-directory and requirement-snapshot
+   ingestion already live behind their own services and repositories. Retain
+   the `worker/src` compatibility exports until callers have migrated.
 3. Add explicit module APIs to the newly relocated planner, requirements, and
    scheduling packages, then retire their root compatibility imports.
 4. Add an ordered structural migration runner, then retire compatibility files

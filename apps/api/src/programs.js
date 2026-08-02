@@ -41,7 +41,6 @@ import {
   discoverNestedMajorRequirementPage,
   discoverProfileRequirementPage,
   extractRequirementDraftCandidate,
-  importProgramRequirementSource,
 } from "./programs/imports/program-requirements.js";
 import { handlePublicProgramRoute } from "./programs/public-routes.js";
 import { handleProgramAdminRoute } from "./programs/admin-routes.js";
@@ -64,6 +63,13 @@ import {
 import {
   createCatalogDirectoryRepository,
 } from "./programs/storage/catalog-directory-repository.js";
+import {
+  createRequirementImportService,
+  requirementSourceImportBatchLimit,
+} from "./programs/services/requirement-import-service.js";
+import {
+  createRequirementImportRepository,
+} from "./programs/storage/requirement-import-repository.js";
 
 export { parseBizTable, groupAppliesToSelection, allocationForConditions };
 
@@ -251,10 +257,6 @@ async function runD1Batches(env, statements, chunkSize = 100) {
   }
 }
 
-function isSafeCatalogSourceId(value) {
-  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{2,119}$/.test(value);
-}
-
 /* ============================================================
    OFFICIAL REQUIREMENT-SOURCE SNAPSHOTS
 
@@ -275,13 +277,6 @@ function requirementDetailSourceIdForProgram(programId) {
 
 function nestedRequirementDetailSourceIdForProgram(programId) {
   return `nested-${programId}`;
-}
-
-function isSupportedRequirementImportSource(source) {
-  return source
-    && source.adapter === "html_requirement_source_v1"
-    && typeof source.source_url === "string"
-    && /^https:\/\//i.test(source.source_url);
 }
 
 async function registerRequirementSourcesForSchool(env, schoolSlug) {
@@ -488,101 +483,6 @@ async function discoverNestedRequirementDetailSources(env, parentSources) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return discovered;
-}
-
-async function saveProgramRequirementSnapshot(env, snapshot) {
-  const now = Date.now();
-  const inserted = await env.DB.prepare(
-    `INSERT OR IGNORE INTO program_requirement_source_snapshots (
-       source_id, program_id, source_url, source_title, content_hash,
-       content_text, parsed_json, fetched_at
-     ) VALUES (?,?,?,?,?,?,?,?)`
-  ).bind(
-    snapshot.source_id,
-    snapshot.program_id,
-    snapshot.source_url,
-    snapshot.source_title,
-    snapshot.content_hash,
-    snapshot.content_text,
-    snapshot.parsed_json,
-    now,
-  ).run();
-  const changed = (inserted.meta?.changes || 0) === 1;
-  await env.DB.prepare(
-    `UPDATE program_requirement_import_sources
-     SET last_imported_at = ?, last_content_hash = ?, last_error = NULL
-     WHERE id = ?`
-  ).bind(now, snapshot.content_hash, snapshot.source_id).run();
-  return { changed };
-}
-
-async function importRequirementSource(env, sourceId) {
-  if (!isSafeCatalogSourceId(sourceId)) throw new Error("invalid requirement source id");
-  const source = await env.DB.prepare(
-    `SELECT id, program_id, school_slug, source_url, source_title, adapter
-     FROM program_requirement_import_sources
-     WHERE id = ? AND enabled = 1`
-  ).bind(sourceId).first();
-  if (!source) throw new Error("unknown or disabled requirement source");
-  if (!isSupportedRequirementImportSource(source)) throw new Error("unsupported requirement source adapter");
-  let rawHtml = "";
-  try {
-    const result = await importProgramRequirementSource({
-      source,
-      fetchHtml: async (sourceUrl) => {
-        const response = await fetch(sourceUrl, { headers: FETCH_HEADERS });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        rawHtml = await response.text();
-        return rawHtml;
-      },
-      saveSnapshot: (snapshot) => saveProgramRequirementSnapshot(env, snapshot),
-    });
-    await logScrape(
-      env,
-      `requirements:${source.id}`,
-      "ok",
-      { groupsWritten: 0, coursesWritten: result.courses_found, notesWritten: result.headings_found },
-      `${result.changed ? "saved" : "reused"} draft snapshot from ${source.source_url}; no review status changed`,
-      rawHtml.slice(0, 1500),
-    );
-    return { ok: true, ...result };
-  } catch (err) {
-    await env.DB.prepare(
-      `UPDATE program_requirement_import_sources SET last_error = ? WHERE id = ?`
-    ).bind(String(err?.message || err), source.id).run();
-    await logScrape(env, `requirements:${source.id}`, "error", null, `requirements-source import failed: ${err.message}`, rawHtml.slice(0, 1500));
-    return { ok: false, source_id: source.id, program_id: source.program_id, error: err.message };
-  }
-}
-
-function requirementSourceImportBatchLimit(value) {
-  const parsed = Number.parseInt(String(value || ""), 10);
-  if (!Number.isSafeInteger(parsed)) return 20;
-  return Math.min(Math.max(parsed, 1), 25);
-}
-
-async function pendingRequirementSourceIds(env, schoolSlug, batchLimit) {
-  if (!isSafeHomeSchoolSlug(schoolSlug)) throw new Error("pass a valid school slug");
-  const { results } = await env.DB.prepare(
-    `SELECT id FROM program_requirement_import_sources
-     WHERE school_slug = ?
-       AND enabled = 1
-       AND last_imported_at IS NULL
-       AND last_error IS NULL
-     ORDER BY id
-     LIMIT ?`
-  ).bind(schoolSlug, batchLimit).all();
-  return results || [];
-}
-
-async function importRequirementSourceBatch(env, sources) {
-  const imported = [];
-  for (const source of sources) {
-    imported.push(await importRequirementSource(env, source.id));
-    // Keep bulk source imports polite to Rutgers and within Worker limits.
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return imported;
 }
 
 async function pendingRequirementCandidateSnapshots(env, schoolSlug, batchLimit) {
@@ -1310,6 +1210,10 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     repository: createCatalogDirectoryRepository(env),
     recordScrape: (...args) => logScrape(env, ...args),
   });
+  const requirementImportService = createRequirementImportService({
+    repository: createRequirementImportRepository(env),
+    recordScrape: (...args) => logScrape(env, ...args),
+  });
   const publicResponse = await handlePublicProgramRoute({
     request,
     env,
@@ -1350,13 +1254,16 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       getRequirementTree,
       importCatalogDirectorySource: (sourceId) =>
         catalogDirectoryImportService.importSource(sourceId),
-      importRequirementSource,
-      importRequirementSourceBatch,
+      importRequirementSource: (sourceId) =>
+        requirementImportService.importSource(sourceId),
+      importRequirementSourceBatch: (sources) =>
+        requirementImportService.importBatch(sources),
       isSafeHomeSchoolSlug,
       pendingMajorProfileSources,
       pendingNestedRequirementDetailSources,
       pendingRequirementCandidateSnapshots,
-      pendingRequirementSourceIds,
+      pendingRequirementSourceIds: (schoolSlug, batchLimit) =>
+        requirementImportService.listPendingSources(schoolSlug, batchLimit),
       registerRequirementSourcesForSchool,
       requirementSourceImportBatchLimit,
       scrapeCoreCurriculum,

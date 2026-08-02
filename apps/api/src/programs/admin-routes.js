@@ -130,7 +130,7 @@ export async function handleProgramAdminRoute({
     const sourceId = url.searchParams.get("source") || "";
     const school = url.searchParams.get("school") || "";
     if (sourceId) {
-      const result = await importRequirementSource(env, sourceId);
+      const result = await importRequirementSource(sourceId);
       return json(result, result.ok ? 200 : 502);
     }
     try {
@@ -139,7 +139,7 @@ export async function handleProgramAdminRoute({
         return json({ error: "no active catalog sources found for this school" }, 404);
       }
       const batchLimit = requirementSourceImportBatchLimit(url.searchParams.get("limit"));
-      const sources = await pendingRequirementSourceIds(env, school, batchLimit);
+      const sources = await pendingRequirementSourceIds(school, batchLimit);
       if (!sources.length) {
         return json({
           ok: true,
@@ -150,7 +150,7 @@ export async function handleProgramAdminRoute({
           note: "All eligible sources have draft snapshots; no program was automatically marked reviewed.",
         });
       }
-      ctx.waitUntil(importRequirementSourceBatch(env, sources));
+      ctx.waitUntil(importRequirementSourceBatch(sources));
       return json({
         ok: true,
         mode: "background",
