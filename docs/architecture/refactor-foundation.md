@@ -19,7 +19,10 @@ schedule-preference adapter also lives in `apps/api`, while deterministic
 preference normalization and ranking remain in `packages/scheduling`.
 Anonymous program and requirement endpoints are separated from contributor
 mutations in `apps/api/src/programs/public-routes.js` and receive their
-services explicitly from the compatibility controller.
+services explicitly from the compatibility controller. Their D1 reads now
+live behind `apps/api/src/programs/storage/public-program-repository.js`, so
+the public HTTP controller depends on a repository contract instead of the
+Cloudflare database binding.
 Authenticated program import, review, scraping, and requirement-contributor
 endpoints are likewise isolated in `apps/api/src/programs/admin-routes.js`.
 
@@ -127,9 +130,10 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Move the program controller's D1 statements behind focused storage
-   adapters, retaining the `worker/src` compatibility exports until callers
-   have migrated.
+2. Move the remaining authenticated program-controller D1 statements behind a
+   focused contributor storage adapter; anonymous program reads have already
+   moved behind the public repository. Retain the `worker/src` compatibility
+   exports until callers have migrated.
 3. Add explicit module APIs to the newly relocated planner, requirements, and
    scheduling packages, then retire their root compatibility imports.
 4. Add an ordered structural migration runner, then retire compatibility files
