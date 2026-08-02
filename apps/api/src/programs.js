@@ -51,6 +51,9 @@ import { handleProgramAdminRoute } from "./programs/admin-routes.js";
 import {
   createPublicProgramRepository,
 } from "./programs/storage/public-program-repository.js";
+import {
+  createAdminProgramRepository,
+} from "./programs/storage/admin-program-repository.js";
 
 function normalizedCatalogText(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -1914,6 +1917,7 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       scrapeCoreCurriculum,
       scrapeProgram,
       scrapeProgramFromBizSite,
+      repository: createAdminProgramRepository(env),
     },
   });
   if (adminResponse) return adminResponse;
