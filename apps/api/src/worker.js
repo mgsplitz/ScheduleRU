@@ -605,7 +605,6 @@ async function handleApi(request, env, ctx) {
         "POST /api/admin/programs/seed?secret=...            (body: {id,name,school_slug,program_slug,type,catalog_year} or an array)",
         "POST /api/admin/programs/discover?secret=...&school=&index_path=  (best-effort slug discovery)",
         "POST /api/admin/scrape-programs?secret=...[&program=id]",
-        "POST /api/admin/scrape-core-curriculum?secret=...[&program=id]",
         "GET /api/admin/scrape-log?secret=...",
         "GET /api/admin/review?secret=...",
         "POST /api/admin/programs/review-status?secret=...   (body: {program_id, status})",

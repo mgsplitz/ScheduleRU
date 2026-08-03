@@ -60,12 +60,6 @@ export function createAdminProgramRepository(env) {
         .first();
     },
 
-    findCoreCurriculum(programId) {
-      return database.prepare(
-        "SELECT * FROM programs WHERE id = ? AND type = 'core_curriculum'",
-      ).bind(programId).first();
-    },
-
     async listPrograms() {
       const { results } = await database.prepare("SELECT * FROM programs").all();
       return results || [];

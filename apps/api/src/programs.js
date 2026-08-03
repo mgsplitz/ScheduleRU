@@ -45,7 +45,6 @@ import {
 import {
   createAdminProgramRepository,
 } from "./programs/storage/admin-program-repository.js";
-import { htmlToFlatText } from "./programs/scrapers/html.js";
 import {
   parseBizTable,
 } from "./programs/scrapers/business-school-parser.js";
@@ -161,176 +160,6 @@ function catalogBase(env) {
   // catalog year publishes; override via CATALOG_SUBDOMAIN in wrangler.toml
   // rather than editing this file each year.
   return env.CATALOG_SUBDOMAIN || "newbrunswick-undergrad-25-26";
-}
-
-const FETCH_HEADERS = {
-  Accept: "text/html",
-  "User-Agent": "Mozilla/5.0 (compatible; RutgersDegreeNavigatorScraper/1.0; personal student project)",
-};
-
-// Rutgers publishes the New Brunswick Core Curriculum course list openly on
-// the SAS Undergraduate site. This is deliberately a source URL plus a
-// parser, not a hard-coded list of courses: the current catalog can change
-// which courses carry each Core code, and a refresh should pick that up.
-// The module is not RBS-owned: reviewed schools link to it through
-// school_curriculum_modules.
-const RUTGERS_NB_CORE_SOURCE_URL = "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core?id=106&layout=blog&view=category";
-const RUTGERS_NB_CORE_PROGRAM_ID = "rutgers-nb-core-curriculum";
-
-// Rules are stable curricular structure. Course memberships are obtained at
-// scrape time from the official New Brunswick Core list above.
-const RUTGERS_NB_CORE_GROUPS = [
-  { key: "contemporary", name: "Contemporary Challenges (2 courses)", rule: "all", children: [
-    { key: "ccd", name: "Diversities and Social Inequalities [CCD]", rule: "min_courses", count: 1, tags: ["CCD"] },
-    { key: "cco", name: "Our Common Future [CCO]", rule: "min_courses", count: 1, tags: ["CCO"] },
-  ] },
-  { key: "areas", name: "Areas of Inquiry (6 courses)", rule: "all", children: [
-    { key: "ns", name: "Natural Sciences [NS]", rule: "min_courses", count: 2, tags: ["NS"] },
-    { key: "hst", name: "Historical Analysis [HST]", rule: "min_courses", count: 1, tags: ["HST"] },
-    { key: "scl", name: "Social Analysis [SCL]", rule: "min_courses", count: 1, tags: ["SCL"] },
-    // The two Arts/Humanities courses must cover two distinct learning goals.
-    // The frontend understands this explicit rule; the child groups supply
-    // the goal membership used to check it.
-    { key: "ah", name: "Arts and Humanities [AH] (2 distinct goals)", rule: "min_distinct_children", count: 2, tags: ["AHo", "AHp", "AHq", "AHr"], children: [
-      { key: "aho", name: "Philosophical and Theoretical Issues [AHo]", rule: "all", tags: ["AHo"] },
-      { key: "ahp", name: "Arts and Humanities [AHp]", rule: "all", tags: ["AHp"] },
-      { key: "ahq", name: "Arts and Humanities [AHq]", rule: "all", tags: ["AHq"] },
-      { key: "ahr", name: "Arts and Humanities [AHr]", rule: "all", tags: ["AHr"] },
-    ] },
-  ] },
-  { key: "cognitive", name: "Cognitive Skills and Processes (5 courses)", rule: "all", children: [
-    { key: "wc", name: "College Writing [WC]", rule: "min_courses", count: 1, tags: ["WC"] },
-    { key: "wcr", name: "Revision-Based Writing and Communication [WCr]", rule: "min_courses", count: 1, tags: ["WCr"] },
-    { key: "wcd", name: "Discipline-Based Writing and Communication [WCd]", rule: "min_courses", count: 1, tags: ["WCd"] },
-    { key: "qq", name: "Quantitative Information [QQ]", rule: "min_courses", count: 1, tags: ["QQ"] },
-    { key: "qr", name: "Formal Reasoning [QR]", rule: "min_courses", count: 1, tags: ["QR"] },
-  ] },
-];
-
-/* ============================================================
-   RBS CORE CURRICULUM — official NB list -> requirement tree
-   ============================================================ */
-function flattenCoreGroups(groups, parent = null, out = []) {
-  for (const group of groups) {
-    const row = { ...group, parent };
-    out.push(row);
-    if (group.children) flattenCoreGroups(group.children, row.key, out);
-  }
-  return out;
-}
-
-function parseCoreCourseRows(html) {
-  const rows = new Map();
-  const cellText = (value) => htmlToFlatText(value)
-    .replace(/[\u0001\u0002]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const rowBlocks = [...html.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)].map((match) => match[0]);
-  for (const row of rowBlocks) {
-    const cells = [...row.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((match) => cellText(match[1]));
-    if (cells.length < 4) continue;
-    const code = cells[0];
-    const title = cells[1];
-    const credits = cells[2];
-    const rawTags = cells[3];
-    if (!/^\d{2}:\d{3}:\d{3}$/.test(code) || !/^\d+(?:\.\d+)?$/.test(credits)) continue;
-    // The New Brunswick Core page is campus-specific. This extra guard keeps
-    // known Newark/Camden course-number prefixes out if they ever appear in a
-    // future version of the source list.
-    if (/^(21|29|50):/.test(code)) continue;
-    const tags = rawTags.split(",").map((tag) => tag.trim()).filter((tag) => /^[A-Z][A-Za-z]{1,3}$/.test(tag));
-    if (!tags.length) continue;
-    const existing = rows.get(code);
-    rows.set(code, {
-      code,
-      title: existing?.title || title,
-      credits: existing?.credits || credits,
-      tags: new Set([...(existing?.tags || []), ...tags]),
-    });
-  }
-  return [...rows.values()];
-}
-
-function coreGroupCourseRows(group, courses) {
-  const tags = new Set(group.tags || []);
-  if (!tags.size) return [];
-  return courses.filter((course) => [...course.tags].some((tag) => tags.has(tag)));
-}
-
-async function runD1Batches(env, statements, chunkSize = 100) {
-  for (let i = 0; i < statements.length; i += chunkSize) {
-    await env.DB.batch(statements.slice(i, i + chunkSize));
-  }
-}
-
-async function scrapeCoreCurriculum(env, program) {
-  const source = program.source_url || RUTGERS_NB_CORE_SOURCE_URL;
-  const continuation = source.includes("?") ? `${source}&start=5` : `${source}?start=5`;
-  let pages;
-  try {
-    pages = await Promise.all([source, continuation].map(async (url) => {
-      const res = await fetch(url, { headers: FETCH_HEADERS });
-      if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-      return res.text();
-    }));
-  } catch (err) {
-    await logScrape(env, program.id, "error", null, `Core source fetch failed: ${err.message}`, "");
-    return { ok: false, error: err.message };
-  }
-
-  const courses = pages.flatMap(parseCoreCourseRows);
-  const merged = new Map();
-  for (const course of courses) {
-    const existing = merged.get(course.code);
-    merged.set(course.code, {
-      code: course.code,
-      title: existing?.title || course.title,
-      credits: existing?.credits || course.credits,
-      tags: new Set([...(existing?.tags || []), ...course.tags]),
-    });
-  }
-  const coreCourses = [...merged.values()];
-  if (!coreCourses.length) {
-    await logScrape(env, program.id, "empty", null, "Core source parsed zero course rows", pages.join("\n").slice(0, 1500));
-    return { ok: false, error: "no Core course rows parsed" };
-  }
-
-  const flatGroups = flattenCoreGroups(RUTGERS_NB_CORE_GROUPS);
-  const statements = [
-    env.DB.prepare(`DELETE FROM requirement_courses WHERE group_id IN (SELECT id FROM requirement_groups WHERE program_id = ? AND auto_generated = 1)`).bind(program.id),
-    env.DB.prepare(`DELETE FROM requirement_groups WHERE program_id = ? AND auto_generated = 1`).bind(program.id),
-    env.DB.prepare(`DELETE FROM requirement_raw_notes WHERE program_id = ?`).bind(program.id),
-  ];
-  let coursesWritten = 0;
-  for (let index = 0; index < flatGroups.length; index++) {
-    const group = flatGroups[index];
-    const groupId = `${program.id}-${group.key}`;
-    const parentId = group.parent ? `${program.id}-${group.parent}` : null;
-    statements.push(env.DB.prepare(
-      `INSERT INTO requirement_groups (id, program_id, parent_group_id, name, rule, count, sort_order, auto_generated)
-       VALUES (?,?,?,?,?,?,?,1)`
-    ).bind(groupId, program.id, parentId, group.name, group.rule, group.count ?? null, index));
-    for (const course of coreGroupCourseRows(group, coreCourses)) {
-      statements.push(env.DB.prepare(
-        `INSERT OR REPLACE INTO requirement_courses (group_id, course_code, note, source_title, source_credits)
-         VALUES (?,?,?,?,?)`
-      ).bind(groupId, course.code, "", course.title, course.credits));
-      coursesWritten++;
-    }
-  }
-  statements.push(env.DB.prepare(
-    `UPDATE programs SET last_scraped_at = ?, review_status = 'unreviewed', source_url = ? WHERE id = ?`
-  ).bind(Date.now(), source, program.id));
-
-  try {
-    await runD1Batches(env, statements);
-  } catch (err) {
-    await logScrape(env, program.id, "error", { groupsWritten: flatGroups.length, coursesWritten, notesWritten: 0 }, `Core D1 write failed: ${err.message}`, pages.join("\n").slice(0, 1500));
-    return { ok: false, error: err.message };
-  }
-  const counts = { groupsWritten: flatGroups.length, coursesWritten, notesWritten: 0 };
-  await logScrape(env, program.id, "ok", counts, `scraped official New Brunswick Core Curriculum: ${source}`, pages.join("\n").slice(0, 1500));
-  return { ok: true, parsed_courses: coreCourses.length, ...counts };
 }
 
 async function logScrape(env, programId, status, counts, message, rawSample) {
@@ -695,7 +524,6 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
     json,
     checkAdmin,
     services: {
-      RUTGERS_NB_CORE_PROGRAM_ID,
       discoverMajorRequirementSources: (profileSources) =>
         requirementDiscoveryService.discoverProfiles(profileSources),
       discoverNestedRequirementDetailSources: (parentSources) =>
@@ -723,7 +551,6 @@ export async function handleProgramsApi(request, env, ctx, path, url, json, chec
       registerRequirementSourcesForSchool: (schoolSlug) =>
         requirementDiscoveryService.registerSchool(schoolSlug),
       requirementSourceImportBatchLimit,
-      scrapeCoreCurriculum,
       scrapeProgram: (program) => programScrapeService.scrapeCatalogProgram(program),
       scrapeProgramFromBizSite: (program) =>
         programScrapeService.scrapeBusinessProgram(program),

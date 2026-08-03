@@ -106,6 +106,38 @@ validate or restore it through `npm run catalog-ingestion`. The backlog is
 portable workflow state; it must not contain duplicate course trees or
 program-specific executable logic.
 
+## Refresh a tagged curriculum into a draft
+
+Tagged curriculum pages such as the Rutgers–New Brunswick Core are refreshed
+locally from their reviewed definition. The command reads the official source
+URL from reviewed catalog data; application code contains no curriculum URL,
+program ID, group tree, or course list.
+
+```bash
+npm run catalog -- refresh-tagged-curriculum \
+  --snapshot catalog/snapshots/reviewed-programs.v1.jsonl \
+  --manifest catalog/snapshots/reviewed-programs.v1.manifest.json \
+  --program <core-curriculum-program-id> \
+  --output catalog/drafts/<core-curriculum-program-id>.v1.json \
+  --report tmp/<core-curriculum-program-id>-refresh-report.json
+```
+
+The command:
+
+- verifies the snapshot manifest and digest before fetching;
+- fetches only the official Rutgers HTTPS source declared by the definition;
+- maps source tags onto the existing generic requirement-group structure;
+- preserves group IDs, hierarchy, rules, counts, selectors, and conditions;
+- validates the complete generated definition;
+- always marks the result `unreviewed`;
+- writes no D1 data and has no publication option;
+- reports deterministic added and removed group/course assignments.
+
+Review both artifacts. Resolve unexplained additions, removals, empty tags, or
+source ambiguity before using the existing development-only publication
+command. A refresh never changes the reviewed snapshot or public application
+by itself.
+
 ## Reviewed snapshot and recovery
 
 Export every reviewed definition from development:

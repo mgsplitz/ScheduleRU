@@ -145,11 +145,13 @@ not changed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
-2. Move the New Brunswick Core curriculum importer out of the compatibility
-   controller without relocating its embedded curriculum structure into
-   application code. Coursedog and approved RBS scraping, program-directory,
+2. Continue decomposing generic catalog ingestion behind focused services and
+   repositories. The New Brunswick Core refresh now lives in `tools/catalog`;
+   its reviewed structure and source identity are catalog data rather than
+   application constants, and refreshes create reviewable drafts without
+   runtime D1 writes. Coursedog and approved RBS scraping, program-directory,
    requirement-source discovery, requirement-snapshot, and
-   requirement-candidate ingestion now live behind focused services and
+   requirement-candidate ingestion already live behind focused services and
    repositories. Retain the `worker/src` compatibility exports until callers
    have migrated.
 3. Add explicit module APIs to the newly relocated planner, requirements, and

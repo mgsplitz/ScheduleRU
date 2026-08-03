@@ -27,8 +27,17 @@ test("the shared Rutgers-New Brunswick Core is canonical and attached to RBS thr
 test("the public Core route resolves a school attachment instead of its program owner", () => {
   assert.match(programs, /FROM school_curriculum_modules link/);
   assert.match(programs, /link\.school_slug = \?/);
-  assert.match(programs, /const RUTGERS_NB_CORE_PROGRAM_ID = "rutgers-nb-core-curriculum"/);
   assert.doesNotMatch(programs, /const RBS_CORE_PROGRAM_ID/);
+  assert.doesNotMatch(programs, /RUTGERS_NB_CORE_SOURCE_URL/);
+  assert.doesNotMatch(programs, /RUTGERS_NB_CORE_PROGRAM_ID/);
+  assert.doesNotMatch(programs, /RUTGERS_NB_CORE_GROUPS/);
+  assert.doesNotMatch(programs, /function parseCoreCourseRows/);
+  assert.doesNotMatch(programs, /function scrapeCoreCurriculum/);
+  assert.doesNotMatch(programs, /\/api\/admin\/scrape-core-curriculum/);
+  assert.doesNotMatch(
+    programs,
+    /sasundergrad\.rutgers\.edu\/majors-and-core-curriculum\/core/,
+  );
 });
 
 test("reviewed RBS records with no catalog year are made transparently current-source-only", () => {

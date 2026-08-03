@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import test from "node:test";
 
 import { serializeCatalogSnapshot } from "@scheduleru/catalog";
+import type { ProgramDefinition } from "@scheduleru/catalog";
 import { runCatalogCli } from "../src/cli.ts";
 
 const cliPath = new URL("../src/cli.ts", import.meta.url);
@@ -204,6 +205,204 @@ test("publish fails before network access when the secret is missing", async () 
 
   assert.equal(code, 1);
   assert.match(errors.join("\n"), /SCHEDULERU_ADMIN_SECRET/);
+});
+
+function coreDefinition(): ProgramDefinition {
+  return {
+    contract_version: 1,
+    program: {
+      id: "rutgers-nb-example-core",
+      name: "Example Core",
+      school_slug: "rutgers-nb",
+      program_slug: "example-core",
+      type: "core_curriculum",
+      catalog_year: "2026-2027",
+      academic_program_code: null,
+      degree_type: null,
+      program_family_id: null,
+      source_url: "https://example.rutgers.edu/core",
+      review_status: "reviewed",
+      requirement_evidence_required: false,
+    },
+    sources: [{
+      id: "official-core",
+      url: "https://example.rutgers.edu/core",
+      title: "Official Core",
+      catalog_year: "2026-2027",
+      scope: "program_requirements",
+      accessed_at: 100,
+      note: "Official source.",
+    }],
+    requirement_groups: [
+      {
+        id: "root-group",
+        parent_group_id: null,
+        name: "Core",
+        rule: "all",
+        count: null,
+        sort_order: 0,
+        display_family: null,
+        display_priority: 0,
+        courses: [],
+        selectors: [],
+        conditions: [],
+      },
+      {
+        id: "qq-group",
+        parent_group_id: "root-group",
+        name: "Quantitative Information [QQ]",
+        rule: "min_courses",
+        count: 1,
+        sort_order: 1,
+        display_family: null,
+        display_priority: 0,
+        courses: [{
+          code: "01:640:100",
+          title: "OLD COURSE",
+          credits: 3,
+          note: null,
+        }],
+        selectors: [],
+        conditions: [],
+      },
+      {
+        id: "qr-group",
+        parent_group_id: "root-group",
+        name: "Formal Reasoning [QR]",
+        rule: "min_courses",
+        count: 1,
+        sort_order: 2,
+        display_family: null,
+        display_priority: 0,
+        courses: [{
+          code: "01:198:100",
+          title: "OLD REASONING",
+          credits: 3,
+          note: null,
+        }],
+        selectors: [],
+        conditions: [],
+      },
+    ],
+    eligibility_rules: [],
+  };
+}
+
+async function coreSnapshotFiles(): Promise<{
+  directory: string;
+  snapshotFile: string;
+  manifestFile: string;
+}> {
+  const directory = await mkdtemp(path.join(tmpdir(), "scheduleru-core-refresh-"));
+  const snapshotFile = path.join(directory, "reviewed.jsonl");
+  const manifestFile = path.join(directory, "reviewed.manifest.json");
+  const snapshot = await serializeCatalogSnapshot([coreDefinition()], {
+    generated_at: 100,
+  });
+  await writeFile(snapshotFile, snapshot.jsonl);
+  await writeFile(manifestFile, JSON.stringify(snapshot.manifest));
+  return { directory, snapshotFile, manifestFile };
+}
+
+test("refresh-tagged-curriculum writes an unreviewed draft and semantic report", async () => {
+  const { directory, snapshotFile, manifestFile } = await coreSnapshotFiles();
+  const output = path.join(directory, "draft.json");
+  const reportFile = path.join(directory, "report.json");
+  const requests: string[] = [];
+  const messages: string[] = [];
+
+  const code = await runCatalogCli([
+    "refresh-tagged-curriculum",
+    "--snapshot",
+    snapshotFile,
+    "--manifest",
+    manifestFile,
+    "--program",
+    "rutgers-nb-example-core",
+    "--output",
+    output,
+    "--report",
+    reportFile,
+  ], {
+    environment: {},
+    fetch: async (input) => {
+      requests.push(String(input));
+      return new Response(`
+        <table>
+          <tr><td>01:198:111</td><td>INTRO COMPUTER SCI</td><td>4</td><td>QQ, QR</td></tr>
+        </table>`);
+    },
+    stdout: (line) => messages.push(line),
+    stderr: (line) => messages.push(line),
+    now: () => 500,
+  });
+
+  assert.equal(code, 0);
+  assert.deepEqual(requests, [
+    "https://example.rutgers.edu/core",
+    "https://example.rutgers.edu/core?start=5",
+  ]);
+  const generated = JSON.parse(await readFile(output, "utf8"));
+  const report = JSON.parse(await readFile(reportFile, "utf8"));
+  assert.equal(generated.program.review_status, "unreviewed");
+  assert.equal(generated.sources[0].accessed_at, 500);
+  assert.equal(report.program_id, "rutgers-nb-example-core");
+  assert.equal(report.generated_assignment_count, 2);
+  assert.match(messages.join("\n"), /generated unreviewed curriculum draft/);
+});
+
+test("refresh-tagged-curriculum writes nothing after fetch or argument failure", async () => {
+  const { directory, snapshotFile, manifestFile } = await coreSnapshotFiles();
+  const output = path.join(directory, "draft.json");
+  const reportFile = path.join(directory, "report.json");
+  const errors: string[] = [];
+
+  const code = await runCatalogCli([
+    "refresh-tagged-curriculum",
+    "--snapshot",
+    snapshotFile,
+    "--manifest",
+    manifestFile,
+    "--program",
+    "rutgers-nb-example-core",
+    "--output",
+    output,
+    "--report",
+    reportFile,
+  ], {
+    fetch: async () => new Response("", { status: 503 }),
+    stdout: () => {},
+    stderr: (line) => errors.push(line),
+  });
+
+  assert.equal(code, 1);
+  assert.match(errors.join("\n"), /curriculum refresh failed: HTTP 503/);
+  await assert.rejects(readFile(output), { code: "ENOENT" });
+  await assert.rejects(readFile(reportFile), { code: "ENOENT" });
+
+  let fetched = false;
+  const aliasCode = await runCatalogCli([
+    "refresh-tagged-curriculum",
+    "--snapshot",
+    snapshotFile,
+    "--manifest",
+    manifestFile,
+    "--program",
+    "rutgers-nb-example-core",
+    "--output",
+    snapshotFile,
+    "--report",
+    reportFile,
+  ], {
+    fetch: async () => {
+      fetched = true;
+      return new Response();
+    },
+    stdout: () => {},
+    stderr: () => {},
+  });
+  assert.equal(aliasCode, 1);
+  assert.equal(fetched, false);
 });
 
 test("snapshot exports every reviewed definition without exposing the secret", async () => {

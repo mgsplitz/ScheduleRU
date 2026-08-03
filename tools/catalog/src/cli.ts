@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
@@ -11,6 +12,12 @@ import {
   publishDevelopmentCatalog,
   roundTripDevelopmentCatalog,
 } from "./parity.ts";
+import {
+  parseTaggedCurriculumPages,
+} from "./adapters/tagged-curriculum-source.ts";
+import {
+  buildTaggedCurriculumDraft,
+} from "./tagged-curriculum-refresh.ts";
 
 export interface CatalogCliDependencies {
   environment: Record<string, string | undefined>;
@@ -34,6 +41,7 @@ function usage(stderr: (line: string) => void): number {
   stderr("       catalog snapshot --api <development-api-url> --output <snapshot.jsonl>");
   stderr("       catalog round-trip --api <development-api-url> --snapshot <snapshot.jsonl> --manifest <manifest.json> --report <report.json>");
   stderr("       catalog restore --api <development-api-url> --snapshot <snapshot.jsonl> --manifest <manifest.json>");
+  stderr("       catalog refresh-tagged-curriculum --snapshot <snapshot.jsonl> --manifest <manifest.json> --program <program-id> --output <draft.json> --report <report.json>");
   return 1;
 }
 
@@ -395,12 +403,122 @@ async function restoreCatalog(
   }
 }
 
+function officialRutgersSource(value: string): URL {
+  const source = new URL(value);
+  if (
+    source.protocol !== "https:"
+    || source.username
+    || source.password
+    || !(source.hostname === "rutgers.edu" || source.hostname.endsWith(".rutgers.edu"))
+  ) {
+    throw new Error("curriculum source must be official Rutgers HTTPS");
+  }
+  return source;
+}
+
+async function refreshTaggedCurriculum(
+  snapshotFile: string,
+  manifestFile: string,
+  programId: string,
+  outputFile: string,
+  reportFile: string,
+  dependencies: CatalogCliDependencies,
+): Promise<number> {
+  const inputPaths = new Set([
+    resolvePath(snapshotFile),
+    resolvePath(manifestFile),
+  ]);
+  const outputPath = resolvePath(outputFile);
+  const reportPath = resolvePath(reportFile);
+  if (
+    outputPath === reportPath
+    || inputPaths.has(outputPath)
+    || inputPaths.has(reportPath)
+  ) {
+    dependencies.stderr(
+      "curriculum refresh outputs must be distinct from each other and all inputs",
+    );
+    return 1;
+  }
+
+  try {
+    const jsonl = await readFile(snapshotFile, "utf8");
+    const manifest = JSON.parse(
+      await readFile(manifestFile, "utf8"),
+    ) as CatalogSnapshotManifest;
+    const definitions = await parseCatalogSnapshot(jsonl, manifest);
+    const matches = definitions.filter(({ program }) => program.id === programId);
+    if (matches.length !== 1) {
+      throw new Error(`snapshot must contain exactly one program ${programId}`);
+    }
+    const definition = matches[0];
+    if (!definition || definition.program.type !== "core_curriculum") {
+      throw new Error(`${programId} must be a core_curriculum definition`);
+    }
+    const source = officialRutgersSource(definition.program.source_url);
+    const continuation = new URL(source);
+    continuation.searchParams.set("start", "5");
+    const pages: string[] = [];
+    for (const url of [source, continuation]) {
+      const response = await dependencies.fetch(url, {
+        headers: {
+          Accept: "text/html",
+          "User-Agent": "ScheduleRU catalog contributor/1.0",
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      pages.push(await response.text());
+    }
+    const courses = parseTaggedCurriculumPages(pages);
+    const generated = buildTaggedCurriculumDraft(
+      definition,
+      courses,
+      dependencies.now(),
+    );
+    const draftJson = `${JSON.stringify(generated.definition, null, 2)}\n`;
+    const reportJson = `${JSON.stringify(generated.report, null, 2)}\n`;
+    await writeFile(outputFile, draftJson);
+    await writeFile(reportFile, reportJson);
+    dependencies.stdout(
+      `generated unreviewed curriculum draft: ${generated.definition.program.id}`,
+    );
+    return 0;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    dependencies.stderr(`curriculum refresh failed: ${detail}`);
+    return 1;
+  }
+}
+
 export async function runCatalogCli(
   args: string[],
   overrides: Partial<CatalogCliDependencies> = {},
 ): Promise<number> {
   const dependencies = { ...defaultDependencies, ...overrides };
   const [command, file, ...rest] = args;
+  if (
+    command === "refresh-tagged-curriculum"
+    && file === "--snapshot"
+    && rest.length === 9
+    && rest[1] === "--manifest"
+    && rest[3] === "--program"
+    && rest[5] === "--output"
+    && rest[7] === "--report"
+    && rest[0]
+    && rest[2]
+    && rest[4]
+    && rest[6]
+    && rest[8]
+  ) {
+    return refreshTaggedCurriculum(
+      rest[0],
+      rest[2],
+      rest[4],
+      rest[6],
+      rest[8],
+      dependencies,
+    );
+  }
   if (
     command === "snapshot"
     && file === "--api"

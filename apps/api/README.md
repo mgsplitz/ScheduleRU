@@ -45,6 +45,12 @@ Cloudflare-facing request controllers.
   policy-note parsing. It can be tested without routing, network, or D1.
 - `src/programs/scrapers/coursedog-program-parser.js` owns generic Coursedog
   course-line and section parsing, including prerequisite-note isolation.
+- Reviewed shared curricula, including the Rutgers–New Brunswick Core, are
+  runtime catalog data. The API reads them through reviewed
+  `school_curriculum_modules` attachments; it does not own their source URLs,
+  IDs, group trees, course memberships, or refresh logic.
+- Tagged curriculum refreshes belong to `tools/catalog`. They produce validated
+  unreviewed draft artifacts and semantic reports without writing D1.
 - `src/programs/` owns the controller's pure policy/evidence helpers,
   response presentation, and conservative source-import adapters.
 - `src/schedule-assistant.js` owns the bounded OpenAI request adapter; the

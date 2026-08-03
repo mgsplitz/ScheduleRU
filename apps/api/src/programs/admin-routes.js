@@ -20,7 +20,6 @@ export async function handleProgramAdminRoute({
   if (!checkAdmin(url)) return json({ error: "bad secret" }, 403);
 
   const {
-    RUTGERS_NB_CORE_PROGRAM_ID,
     discoverMajorRequirementSources,
     discoverNestedRequirementDetailSources,
     discoverPrograms,
@@ -37,7 +36,6 @@ export async function handleProgramAdminRoute({
     registerRequirementSourcesForSchool,
     requirementSourceImportBatchLimit,
     repository,
-    scrapeCoreCurriculum,
     scrapeProgram,
     scrapeProgramFromBizSite,
   } = services;
@@ -268,14 +266,6 @@ export async function handleProgramAdminRoute({
     const program = await repository.findProgram(programId);
     if (!program) return json({ error: "unknown program id" }, 404);
     const result = await scrapeProgramFromBizSite(program);
-    return json({ ok: result.ok, program: programId, ...result });
-  }
-
-  if (path === "/api/admin/scrape-core-curriculum" && request.method === "POST") {
-    const programId = url.searchParams.get("program") || RUTGERS_NB_CORE_PROGRAM_ID;
-    const program = await repository.findCoreCurriculum(programId);
-    if (!program) return json({ error: "unknown Core Curriculum id" }, 404);
-    const result = await scrapeCoreCurriculum(env, program);
     return json({ ok: result.ok, program: programId, ...result });
   }
 
