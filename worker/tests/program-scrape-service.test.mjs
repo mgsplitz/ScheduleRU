@@ -61,16 +61,65 @@ test("catalog scraping records fetch failures without invoking persistence", asy
   assert.equal(events[0][1], "error");
 });
 
-test("business scraping rejects unknown program mappings before network access", async () => {
+test("business scraping reads its official source URL from program data", async () => {
+  const sourceUrl = "https://www.business.rutgers.edu/undergraduate-new-brunswick/example";
+  const fetched = [];
+  const saved = [];
+  const service = createProgramScrapeService({
+    repository: {
+      async replaceRequirements(...args) {
+        saved.push(args);
+        return { groupsWritten: 1, coursesWritten: 1, notesWritten: 0 };
+      },
+    },
+    recordScrape() {},
+    fetchImpl: async (url) => {
+      fetched.push(url);
+      return {
+        ok: true,
+        async text() {
+          return [
+            "<table>",
+            "<tr><th>Required courses</th></tr>",
+            "<tr><th>Course</th><th>Credits</th><th>Notes</th></tr>",
+            "<tr><td>33:123:101 Example</td><td>3</td><td></td></tr>",
+            "</table>",
+          ].join("");
+        },
+      };
+    },
+  });
+
+  const program = { ...PROGRAM, id: "rbsnb-example", source_url: sourceUrl };
+  const result = await service.scrapeBusinessProgram(program);
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(fetched, [sourceUrl]);
+  assert.equal(saved[0][0], program);
+  assert.equal(saved[0][2], sourceUrl);
+});
+
+test("business scraping rejects missing or unsupported source data before network access", async () => {
   const service = createProgramScrapeService({
     repository: {},
     recordScrape() {},
-    fetchImpl: async () => assert.fail("unknown programs must not be fetched"),
+    fetchImpl: async () => assert.fail("invalid sources must not be fetched"),
   });
 
-  const result = await service.scrapeBusinessProgram({ ...PROGRAM, id: "rbsnb-unknown" });
-  assert.equal(result.ok, false);
-  assert.match(result.error, /no BIZ_SLUG_MAP entry/);
+  for (const source_url of [
+    undefined,
+    "http://www.business.rutgers.edu/undergraduate-new-brunswick/example",
+    "https://example.com/undergraduate-new-brunswick/example",
+    "https://www.business.rutgers.edu/graduate/example",
+  ]) {
+    const result = await service.scrapeBusinessProgram({
+      ...PROGRAM,
+      id: "rbsnb-example",
+      source_url,
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /approved RBS requirements source URL/);
+  }
 });
 
 test("catalog discovery deduplicates stable program identities", async () => {

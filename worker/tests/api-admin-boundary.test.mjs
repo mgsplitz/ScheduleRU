@@ -201,6 +201,8 @@ test("the canonical program controller has no backward dependencies on worker/sr
   assert.doesNotMatch(canonicalProgramsSource, /function discoverPrograms/);
   assert.doesNotMatch(canonicalProgramsSource, /RUTGERS_NB_CORE_GROUPS/);
   assert.doesNotMatch(canonicalProgramsSource, /function scrapeCoreCurriculum/);
+  assert.doesNotMatch(canonicalProgramsSource, /BIZ_SLUG_MAP/);
+  assert.doesNotMatch(canonicalProgramsSource, /rbsnb-bait/);
   assert.doesNotMatch(
     adminProgramRoutesSource,
     /\/api\/admin\/scrape-core-curriculum/,

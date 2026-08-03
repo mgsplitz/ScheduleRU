@@ -6,15 +6,22 @@ const FETCH_HEADERS = {
   Accept: "text/html",
   "User-Agent": "Mozilla/5.0 (compatible; RutgersDegreeNavigatorScraper/1.0; personal student project)",
 };
-const BIZ_SITE_BASE = "https://www.business.rutgers.edu/undergraduate-new-brunswick";
-const BIZ_SLUG_MAP = {
-  "rbsnb-bait": "business-analytics-information-technology",
-  "rbsnb-accounting": "accounting",
-  "rbsnb-finance": "finance",
-  "rbsnb-leadership-management": "leadership-management",
-  "rbsnb-marketing": "marketing",
-  "rbsnb-supply-chain-management": "supply-chain-management",
-};
+
+function approvedBusinessRequirementsUrl(value) {
+  try {
+    const source = new URL(String(value || ""));
+    if (
+      source.protocol !== "https:"
+      || source.hostname !== "www.business.rutgers.edu"
+      || !/^\/undergraduate-new-brunswick\/[a-z0-9-]+\/?$/.test(source.pathname)
+    ) {
+      return null;
+    }
+    return source.href;
+  } catch {
+    return null;
+  }
+}
 
 export function createProgramScrapeService({
   repository,
@@ -67,14 +74,13 @@ export function createProgramScrapeService({
     },
 
     async scrapeBusinessProgram(program) {
-      const slug = BIZ_SLUG_MAP[program.id];
-      if (!slug) {
+      const url = approvedBusinessRequirementsUrl(program.source_url);
+      if (!url) {
         return {
           ok: false,
-          error: `no BIZ_SLUG_MAP entry for ${program.id} — add one before scraping this program from business.rutgers.edu`,
+          error: "program data does not declare an approved RBS requirements source URL",
         };
       }
-      const url = `${BIZ_SITE_BASE}/${slug}`;
       let html = "";
       try {
         html = await fetchText(url);

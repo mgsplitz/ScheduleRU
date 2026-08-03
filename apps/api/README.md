@@ -37,6 +37,8 @@ Cloudflare-facing request controllers.
   registration, discovery queues, discovered sources, and attempt evidence.
 - `src/programs/services/program-scrape-service.js` coordinates legacy
   Coursedog and approved RBS source fetches, parsing, and scrape outcomes.
+  RBS source identity comes from reviewed program data and is validated by the
+  adapter; the service contains no program-to-URL map.
 - `src/programs/storage/program-scrape-repository.js` atomically replaces
   generated requirement rows without owning source parsing or HTTP behavior.
 - `src/programs/scrapers/html.js` provides the shared conservative HTML
