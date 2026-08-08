@@ -8,6 +8,7 @@ export const webStyles = readFileSync(
   "utf8",
 );
 export const webControllerSource = [
+  "apps/web/src/backend-client.js",
   "apps/web/src/planner-controller.js",
   "apps/web/src/guided-setup-controller.js",
 ].map((path) => readFileSync(new URL(path, ROOT), "utf8")).join("\n");

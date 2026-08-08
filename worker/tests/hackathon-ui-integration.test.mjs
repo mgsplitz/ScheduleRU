@@ -53,9 +53,10 @@ test("hackathon UI wires the approved modules and removes hard-coded future buil
 
 test("localhost uses the development Worker instead of the production API", () => {
   assert.match(html, /LOCAL_DEVELOPMENT_HOSTS/);
-  assert.match(html, /\["localhost","127\.0\.0\.1","::1"\]/);
-  assert.match(html, /LOCAL_DEVELOPMENT_HOSTS\.includes\(CURRENT_HOST\)/);
-  assert.match(html, /IS_DEVELOPMENT_SITE \? DEVELOPMENT_BACKEND_URL : PRODUCTION_BACKEND_URL/);
+  assert.match(html, /"localhost", "127\.0\.0\.1", "::1"/);
+  assert.match(html, /LOCAL_DEVELOPMENT_HOSTS\.has\(host\)/);
+  assert.match(html, /development \? DEVELOPMENT_BACKEND_URL : PRODUCTION_BACKEND_URL/);
+  assert.match(html, /ScheduleRUBackendClient\.siteConfig/);
 });
 
 test("hackathon UI persists accepted programs, serializes program applies, and keeps the onboarding accessible", () => {

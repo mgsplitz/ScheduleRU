@@ -87,6 +87,9 @@ deterministic browser modules live under `packages/planner`,
 `packages/requirements`, and `packages/scheduling`. Presentation-only
 decisions live under `apps/web`. The root `*-logic.js` files contain imports
 only, while the production HTML shell loads the canonical paths directly.
+Backend endpoint selection, local endpoint persistence, and JSON transport now
+live behind `apps/web/src/backend-client.js` instead of being mixed into the
+planner controller.
 
 ## Dependency rules
 

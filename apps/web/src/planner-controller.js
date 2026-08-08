@@ -7,20 +7,10 @@ let COURSES = {};
 let GROUPS = {};
 let ROOT_GROUPS = [];
 
-// Production and the named development Pages branch deliberately use different
-// Workers. This keeps experiments with catalog syncing and degree rules away
-// from the live application. A student can still intentionally override the
-// URL in the Course Catalog connection bar; that override remains private to
-// the current browser and site address.
-const PRODUCTION_BACKEND_URL="https://rutgers-course-sync.housselllaura.workers.dev";
-const DEVELOPMENT_BACKEND_URL="https://rutgers-course-sync-dev.housselllaura.workers.dev";
-const CURRENT_HOST=((typeof location!=="undefined" && location.hostname)||"").toLowerCase();
-const LOCAL_DEVELOPMENT_HOSTS=["localhost","127.0.0.1","::1"];
-const IS_DEVELOPMENT_SITE=LOCAL_DEVELOPMENT_HOSTS.includes(CURRENT_HOST) || (CURRENT_HOST.endsWith(".scheduleru-9fb.pages.dev") && CURRENT_HOST!=="scheduleru-9fb.pages.dev");
-const BACKEND_URL_STORAGE_KEY=IS_DEVELOPMENT_SITE ? "scheduleru_dev_backend_url" : "bait_backend_url";
-function defaultBackendUrl(){
-  return IS_DEVELOPMENT_SITE ? DEVELOPMENT_BACKEND_URL : PRODUCTION_BACKEND_URL;
-}
+const BACKEND_SITE_CONFIG=ScheduleRUBackendClient.siteConfig({
+  hostname:(typeof location!=="undefined"&&location.hostname)||"",
+  storage:typeof localStorage!=="undefined"?localStorage:null,
+});
 
 /* ============================================================
    STATE
@@ -63,7 +53,7 @@ const ST = {
   // The worker reads Rutgers on a cron and serves cached results from D1,
   // so this is a plain same-origin-friendly fetch (the worker sends CORS
   // headers itself) rather than needing a public relay.
-  backendUrl: (typeof localStorage!=="undefined" && localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || defaultBackendUrl(),
+  backendUrl: BACKEND_SITE_CONFIG.initialUrl,
   availableSchools:[], availablePrograms:[], activeProgram:null, selectedPrograms:[],
   homeSchoolSlug:"", programSelectionPolicies:{limits:[],combination_policies:[]},
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, catalogListedProgramIds:[], doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
@@ -1846,17 +1836,20 @@ function renderCore(){
    in this browser via localStorage so you only enter it once.
    ============================================================ */
 function saveBackendUrl(u){
-  ST.backendUrl = (u||"").trim().replace(/\/$/,"");
-  try{ localStorage.setItem(BACKEND_URL_STORAGE_KEY, ST.backendUrl); }catch(e){}
+  ST.backendUrl=ScheduleRUBackendClient.saveUrl({
+    storage:typeof localStorage!=="undefined"?localStorage:null,
+    storageKey:BACKEND_SITE_CONFIG.storageKey,
+    value:u,
+  });
 }
 
 async function backendFetch(path,options={}){
-  if(!ST.backendUrl) throw new Error("No backend URL set.");
-  const res = await fetch(ST.backendUrl + path,options);
-  const text = await res.text();
-  if(!res.ok) throw new Error(`HTTP ${res.status} — ${text.slice(0,150)}`);
-  try{ return JSON.parse(text); }
-  catch(e){ throw new Error(`Response wasn't JSON: ${text.slice(0,150)}`); }
+  return ScheduleRUBackendClient.fetchJson({
+    baseUrl:ST.backendUrl,
+    path,
+    options,
+    fetchImpl:fetch,
+  });
 }
 
 function activeCatalogSelectorContext(){
