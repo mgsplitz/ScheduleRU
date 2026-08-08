@@ -73,56 +73,19 @@ const ST = {
 // plan private while still surviving reloads and Pages deployments at this
 // same site address. Catalog and requirement data stay on the Worker, so the
 // saved payload remains small and can be re-evaluated against updated rules.
-const PLANNER_STATE_KEY="scheduleru_planner_state_v1";
-// Keep legacy markers while accepting earlier migrations; new saves use the current version.
-const PLANNER_STATE_VERSION=3;
 const CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic.STATE_VERSION;
-function savedObject(value){
-  return value && typeof value==="object" && !Array.isArray(value) ? value : {};
-}
+function plannerStorage(){ return typeof localStorage!=="undefined"?localStorage:null; }
 function restorePlannerState(){
-  try{
-    if(typeof localStorage==="undefined") return;
-    const saved=JSON.parse(localStorage.getItem(PLANNER_STATE_KEY)||"null");
-    if(!saved || (![1,2,PLANNER_STATE_VERSION,4].includes(saved.version)&&saved.version!==CURRENT_PLANNER_STATE_VERSION)) return;
-    ST.apOn=savedObject(saved.apOn);
-    ST.completed=savedObject(saved.completed);
-    ST.schedule=savedObject(saved.schedule);
-    ST.wishlist=savedObject(saved.wishlist);
-    ST.groupSelections=savedObject(saved.groupSelections);
-    ST.creditLedger=savedObject(saved.creditLedger);
-    const year=Number(saved.year);
-    if(Number.isInteger(year) && year>=1 && year<=8) ST.year=year;
-    if(typeof saved.homeSchoolSlug==="string" && /^[a-z0-9-]{2,80}$/.test(saved.homeSchoolSlug)) ST.homeSchoolSlug=saved.homeSchoolSlug;
-    if(Array.isArray(saved.selectedPrograms)) ST.selectedPrograms=saved.selectedPrograms.filter(id=>typeof id==="string");
-    const migrated=ScheduleRUPlannerStateLogic.migratePlannerState({...saved,selectedProgramIds:saved.selectedProgramIds||saved.selectedPrograms});
-    Object.assign(ST,migrated);
-    ST.selectedPrograms=Array.isArray(saved.selectedPrograms)?saved.selectedPrograms.filter(id=>typeof id==="string"):[];
-  }catch(e){
-    // A malformed or outdated local value should never prevent the planner
-    // from opening; the user can continue with a fresh in-browser plan.
-  }
+  const restored=ScheduleRUPlannerStateStore.load({
+    storage:plannerStorage(),currentVersion:CURRENT_PLANNER_STATE_VERSION,
+    migrate:ScheduleRUPlannerStateLogic.migratePlannerState,
+  });
+  if(restored)Object.assign(ST,restored);
 }
 function savePlannerState(){
-  try{
-    if(typeof localStorage==="undefined") return;
-    localStorage.setItem(PLANNER_STATE_KEY,JSON.stringify({
-      version:CURRENT_PLANNER_STATE_VERSION, savedAt:Date.now(), apOn:ST.apOn, completed:ST.completed,
-      schedule:ST.schedule, wishlist:ST.wishlist, groupSelections:ST.groupSelections,
-      creditLedger:ST.creditLedger,
-      year:ST.year, homeSchoolSlug:ST.homeSchoolSlug, selectedPrograms:ST.selectedPrograms,
-      onboarding:ST.onboarding, academicPosition:ST.academicPosition, academicRecords:ST.academicRecords,
-      academicCalendarStartYear:ST.academicCalendarStartYear,
-      primaryProgramId:ST.primaryProgramId, secondaryProgramId:ST.secondaryProgramId,
-      programSelectionConfirmed:ST.programSelectionConfirmed===true,
-      generatedPlanPreview:ST.generatedPlanPreview, schedulePreferences:ST.schedulePreferences,
-      planPlaceholders:ST.planPlaceholders, issueDismissals:ST.issueDismissals,
-    }));
-  }catch(e){
-    // Browsers can disable or limit local storage. Planning still works for
-    // the current visit even when persistence is unavailable.
-  }
+  ScheduleRUPlannerStateStore.save({storage:plannerStorage(),state:ST,currentVersion:CURRENT_PLANNER_STATE_VERSION});
 }
+function clearPlannerState(){ ScheduleRUPlannerStateStore.clear({storage:plannerStorage()}); }
 restorePlannerState();
 Object.assign(ST,ScheduleRUPlannerStateLogic.migratePlannerState({...ST,selectedProgramIds:ST.selectedPrograms}));
 ST.expandedIds=new Set();

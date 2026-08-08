@@ -24,10 +24,9 @@ test("the browser migrates v1 state and evaluates the selected target term", asy
     frontend,
     /<script src="packages\/planner\/src\/eligibility-logic\.js"><\/script>/,
   );
-  assert.match(frontend, /const PLANNER_STATE_VERSION=3/);
-  assert.match(frontend, /\[1,2,PLANNER_STATE_VERSION,4\]\.includes\(saved\.version\)/);
+  assert.match(frontend, /<script src="apps\/web\/src\/planner-state-store\.js"><\/script>/);
   assert.match(frontend, /CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic\.STATE_VERSION/);
-  assert.match(frontend, /ST\.creditLedger\s*=\s*savedObject\(saved\.creditLedger\)/);
+  assert.match(frontend, /ScheduleRUPlannerStateStore\.load\(/);
   assert.match(frontend, /function confirmedAcademicCreditEntries\(/);
   assert.match(frontend, /\.\.\.courseCodesFromText\(ap\.equiv\)/);
   assert.match(frontend, /ScheduleRUAcademicCredit\.normalizeCourseCode\(value\)/);

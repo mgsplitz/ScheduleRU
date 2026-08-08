@@ -12,7 +12,7 @@ function openRestartSetupConfirmation(){
     body:"<p>This permanently clears your programs, completed coursework, AP selections, wishlist, semester plan, preferences, and setup progress from this browser.</p>",
     actions:[
       {label:"Cancel",secondary:true},
-      {label:"Restart everything",onClick:()=>{localStorage.removeItem(PLANNER_STATE_KEY);location.reload();}},
+      {label:"Restart everything",onClick:()=>{clearPlannerState();location.reload();}},
     ],
   });
 }

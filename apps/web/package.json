@@ -6,6 +6,7 @@
   "exports": {
     "./course-interactions": "./src/course-interaction-logic.js",
     "./guided-setup": "./src/guided-setup-controller.js",
+    "./planner-state-store": "./src/planner-state-store.js",
     "./planner-controller": "./src/planner-controller.js",
     "./planner-ui": "./src/planner-ui-logic.js",
     "./program-picker": "./src/program-picker-logic.js"

@@ -89,7 +89,9 @@ decisions live under `apps/web`. The root `*-logic.js` files contain imports
 only, while the production HTML shell loads the canonical paths directly.
 Backend endpoint selection, local endpoint persistence, and JSON transport now
 live behind `apps/web/src/backend-client.js` instead of being mixed into the
-planner controller.
+planner controller. Guest planner-state validation, migration, persistence,
+and clearing live behind `apps/web/src/planner-state-store.js`, leaving the
+controller responsible for active UI state and orchestration.
 
 ## Dependency rules
 
