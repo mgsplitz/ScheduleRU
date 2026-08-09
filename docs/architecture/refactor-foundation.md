@@ -91,7 +91,9 @@ Backend endpoint selection, local endpoint persistence, and JSON transport now
 live behind `apps/web/src/backend-client.js` instead of being mixed into the
 planner controller. Guest planner-state validation, migration, persistence,
 and clearing live behind `apps/web/src/planner-state-store.js`, leaving the
-controller responsible for active UI state and orchestration.
+controller responsible for active UI state and orchestration. School, program,
+requirement-policy, reference-tree, and Core reads live behind the stateless
+`apps/web/src/requirement-data-loader.js` boundary.
 
 ## Dependency rules
 

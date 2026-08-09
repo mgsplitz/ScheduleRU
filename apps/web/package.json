@@ -9,7 +9,8 @@
     "./planner-state-store": "./src/planner-state-store.js",
     "./planner-controller": "./src/planner-controller.js",
     "./planner-ui": "./src/planner-ui-logic.js",
-    "./program-picker": "./src/program-picker-logic.js"
+    "./program-picker": "./src/program-picker-logic.js",
+    "./requirement-data-loader": "./src/requirement-data-loader.js"
   },
   "scripts": {
     "test": "node --test ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-picker-logic.test.mjs"

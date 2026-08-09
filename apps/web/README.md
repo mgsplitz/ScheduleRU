@@ -9,6 +9,8 @@ script/style references only.
 device-local endpoint overrides, HTTP transport, and JSON/error handling.
 `src/planner-state-store.js` owns validation, migration, persistence, and
 clearing of the guest planner state stored on the current device.
+`src/requirement-data-loader.js` owns school, program, requirement-policy, and
+Core request orchestration without mutating browser or presentation state.
 `src/planner-controller.js` owns the compatibility planner and schedule-builder
 integration, while `src/guided-setup-controller.js` owns onboarding, program
 selection, modal, and plan-preview orchestration. Smaller domain decisions

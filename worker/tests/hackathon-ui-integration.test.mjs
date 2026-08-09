@@ -303,27 +303,24 @@ test("Core placeholder choices open a labeled Courses catalog filter instead of 
 });
 
 test("program discovery spans supported schools while policy lookup keeps the home school", async () => {
-  const requests = [];
+  const loads = [];
   const context = {
     ST: {
       homeSchoolSlug: "rbsnb",
       availablePrograms: [],
       selectedPrograms: ["rbsnb-finance"],
     },
-    backendFetch: async (path) => {
-      requests.push(path);
-      if (path === "/api/programs") {
+    requirementDataLoader: {
+      loadPrograms: async (options) => {
+        loads.push(options);
         return {
           programs: [
             { id: "rbsnb-finance", type: "major", eligibility_rules: [] },
             { id: "sasnb-economics-major", type: "major", eligibility_rules: [] },
           ],
+          selectionPolicies: { limits: [], combination_policies: [] },
         };
-      }
-      if (path === "/api/program-selection-policies?home_school=rbsnb") {
-        return { limits: [], combination_policies: [] };
-      }
-      throw new Error(`unexpected request: ${path}`);
+      },
     },
     savePlannerState: () => {},
     globalThis: {},
@@ -339,7 +336,7 @@ test("program discovery spans supported schools while policy lookup keeps the ho
 
   const result = await context.globalThis.load();
   assert.deepEqual(result.map((program) => program.id), ["rbsnb-finance", "sasnb-economics-major"]);
-  assert.deepEqual(requests, ["/api/programs", "/api/program-selection-policies?home_school=rbsnb"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(loads)), [{ homeSchoolSlug: "rbsnb", scope: "all" }]);
   assert.equal(context.ST.homeSchoolSlug, "rbsnb");
 });
 

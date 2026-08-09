@@ -485,15 +485,13 @@ function programRolesFor(ids,programs){const majors=ids.filter(id=>programs.find
 function candidateProgramsForSchool(payload,schoolSlug){return (payload?.programs||[]).filter(program=>["major","minor","concentration","certificate"].includes(program.type)).filter(program=>programIsAvailableForSchool(program,schoolSlug));}
 async function loadHomeSchoolCandidate(nextSchool){
   const schoolContext=schoolContextForProfile(nextSchool);
-  const [programPayload,programSelectionPolicies,corePayload]=await Promise.all([
-    backendFetch(`/api/programs?school=${encodeURIComponent(nextSchool.slug)}`),
-    backendFetch(`/api/program-selection-policies?home_school=${encodeURIComponent(nextSchool.slug)}`),
-    backendFetch(`/api/core-curricula?school=${encodeURIComponent(nextSchool.slug)}`),
+  const [programContext,coreContext]=await Promise.all([
+    requirementDataLoader.loadPrograms({homeSchoolSlug:nextSchool.slug,scope:"school"}),
+    requirementDataLoader.loadCoreCurriculum({homeSchoolSlug:nextSchool.slug,label:schoolContext.coreFallbackLabel}),
   ]);
-  const availablePrograms=candidateProgramsForSchool(programPayload,nextSchool.slug);
+  const availablePrograms=candidateProgramsForSchool({programs:programContext.programs},nextSchool.slug);
   if(!availablePrograms.length)throw new Error("No reviewed program is available for that home school.");
-  const curriculum=(corePayload?.curricula||[])[0];
-  if(!curriculum)throw new Error("No reviewed Core curriculum is available for that home school.");
+  const curriculum=coreContext.curriculum;
   const selectedPrograms=ScheduleRUProgramPickerLogic.initialProgramIds({
     restoredIds:[],
     programs:availablePrograms,
@@ -502,27 +500,25 @@ async function loadHomeSchoolCandidate(nextSchool){
     defaultProgramId:schoolContext.defaultProgramId,
   });
   const referenceTypes=schoolContext.sharedRequirementReferenceTypes||[],referencePrograms=availablePrograms.filter(program=>program.requirements_available!==false&&referenceTypes.includes(program.type));
-  const [requirementsPayload,doubleCountPayload,referencePayload,coreDetail]=await Promise.all([
-    selectedPrograms.length?backendFetch(`/api/requirements?programs=${selectedPrograms.map(encodeURIComponent).join(",")}`):Promise.resolve({requirements:{}}),
-    backendFetch(`/api/double-count-policies?school=${encodeURIComponent(nextSchool.slug)}`),
-    referencePrograms.length<2?Promise.resolve({requirements:{}}):backendFetch(`/api/requirements?programs=${referencePrograms.map(program=>encodeURIComponent(program.id)).join(",")}`),
-    backendFetch(`/api/programs/${encodeURIComponent(curriculum.id)}/requirements`),
+  const [requirementsContext,referenceRequirementTrees]=await Promise.all([
+    requirementDataLoader.loadRequirements({programIds:selectedPrograms,homeSchoolSlug:nextSchool.slug}),
+    requirementDataLoader.loadReferenceRequirements({programIds:referencePrograms.map(program=>program.id)}),
   ]);
-  const returned=requirementsPayload?.requirements||{},visibleIds=selectedPrograms.filter(id=>Array.isArray(returned[id]));
+  const returned=requirementsContext.requirements,visibleIds=selectedPrograms.filter(id=>Array.isArray(returned[id]));
   if(selectedPrograms.length&&!visibleIds.length)throw new Error("The replacement program requirements could not be loaded.");
-  const referenceRequirementTrees=referencePayload?.requirements||{},requirementTrees=normalizedCoreRequirementTrees(returned,visibleIds,{referenceRequirementTrees,availablePrograms});
-  const doubleCountPolicies=doubleCountPayload?.policies||[],doubleCountExceptions=requirementsPayload?.double_count_exceptions||[];
+  const requirementTrees=normalizedCoreRequirementTrees(returned,visibleIds,{referenceRequirementTrees,availablePrograms});
+  const doubleCountPolicies=requirementsContext.doubleCountPolicies,doubleCountExceptions=requirementsContext.doubleCountExceptions;
   const roles=programRolesFor(visibleIds,availablePrograms);
   return {
-    homeSchoolSlug:nextSchool.slug,availablePrograms,programSelectionPolicies:programSelectionPolicies||{limits:[],combination_policies:[]},
+    homeSchoolSlug:nextSchool.slug,availablePrograms,programSelectionPolicies:programContext.selectionPolicies,
     selectedPrograms:visibleIds,groupSelections:{},referenceRequirementTrees,requirementTrees,
-    catalogListedProgramIds:requirementsPayload?.catalog_listed_program_ids||[],doubleCountPolicies,
-    doubleCountRules:requirementsPayload?.double_count_rules||[],doubleCountExceptions,
-    programEligibilityRules:requirementsPayload?.eligibility_rules||[],majorRequirementTree:buildRequirementTree(requirementsForDisplay(requirementTrees,visibleIds)),
+    catalogListedProgramIds:requirementsContext.catalogListedProgramIds,doubleCountPolicies,
+    doubleCountRules:requirementsContext.doubleCountRules,doubleCountExceptions,
+    programEligibilityRules:requirementsContext.eligibilityRules,majorRequirementTree:buildRequirementTree(requirementsForDisplay(requirementTrees,visibleIds)),
     activeProgram:availablePrograms.find(program=>program.id===visibleIds[0])||null,
     doubleCount:visibleIds.length?computeDoubleCountOverlaps(requirementTrees,visibleIds,{availablePrograms,doubleCountExceptions,doubleCountPolicies}):null,
-    requirementsError:"",coreCurricula:corePayload?.curricula||[],activeCoreCurriculum:curriculum,
-    coreRequirementTree:buildRequirementTree(coreDetail?.requirements||[]),coreError:"",...roles,
+    requirementsError:"",coreCurricula:coreContext.curricula,activeCoreCurriculum:curriculum,
+    coreRequirementTree:buildRequirementTree(coreContext.requirements),coreError:"",...roles,
   };
 }
 function commitHomeSchoolCandidate(candidate){Object.assign(ST,candidate);useRequirementTree(ST.majorRequirementTree);}
@@ -1814,6 +1810,7 @@ async function backendFetch(path,options={}){
     fetchImpl:fetch,
   });
 }
+const requirementDataLoader=ScheduleRURequirementDataLoader.create({request:backendFetch});
 
 function activeCatalogSelectorContext(){
   if(ST.backendRequirementFilter?.selectors?.length)return ST.backendRequirementFilter;
@@ -2154,11 +2151,8 @@ async function loadAvailablePrograms(){
   // The API combines reviewed requirement trees with the official SAS catalog
   // coverage tier. Filtering stays client-side so all supported program types
   // remain visible as soon as source-backed data is available.
-  const [data,policyData]=await Promise.all([
-    backendFetch("/api/programs"),
-    backendFetch(`/api/program-selection-policies?home_school=${encodeURIComponent(ST.homeSchoolSlug)}`),
-  ]);
-  ST.availablePrograms=(data.programs||[])
+  const context=await requirementDataLoader.loadPrograms({homeSchoolSlug:ST.homeSchoolSlug,scope:"all"});
+  ST.availablePrograms=context.programs
     .filter(p=>["major","minor","concentration","certificate"].includes(p.type))
     .filter(programIsAvailableForHomeSchool);
   const catalogReplacements=new Map(ST.availablePrograms
@@ -2169,13 +2163,11 @@ async function loadAvailablePrograms(){
     ST.selectedPrograms=migratedSelections;
     savePlannerState();
   }
-  ST.programSelectionPolicies=policyData||{limits:[],combination_policies:[]};
+  ST.programSelectionPolicies=context.selectionPolicies;
   return ST.availablePrograms;
 }
 async function loadAvailableSchools(){
-  const data=await backendFetch("/api/schools");
-  const schools=Array.isArray(data.schools)?data.schools.filter(school=>school&&typeof school.slug==="string"&&school.slug):[];
-  if(!schools.length) throw new Error("No reviewed Rutgers school profiles are available yet.");
+  const schools=await requirementDataLoader.loadSchools();
   ST.availableSchools=schools;
   if(!schoolProfileBySlug(ST.homeSchoolSlug)){
     ST.homeSchoolSlug=schools[0].slug;
@@ -2191,21 +2183,18 @@ async function loadRequirements(programId){
 async function loadSelectedRequirements(programIds){
   const ids=[...new Set((programIds||[]).filter(Boolean))];
   if(!ids.length) throw new Error("Choose at least one program.");
-  const [data,policies]=await Promise.all([
-    backendFetch(`/api/requirements?programs=${ids.map(encodeURIComponent).join(",")}`),
-    backendFetch(`/api/double-count-policies?school=${encodeURIComponent(ST.homeSchoolSlug)}`),
-  ]);
-  const returned=data.requirements||{};
+  const context=await requirementDataLoader.loadRequirements({programIds:ids,homeSchoolSlug:ST.homeSchoolSlug});
+  const returned=context.requirements;
   const visibleIds=ids.filter(id=>Array.isArray(returned[id]));
   if(!visibleIds.length) throw new Error("None of the selected programs is available from the current catalog.");
   const normalized=normalizedCoreRequirementTrees(returned,visibleIds);
   ST.selectedPrograms=visibleIds;
-  ST.catalogListedProgramIds=data.catalog_listed_program_ids||[];
+  ST.catalogListedProgramIds=context.catalogListedProgramIds;
   ST.requirementTrees=normalized;
-  ST.doubleCountPolicies=policies.policies||[];
-  ST.doubleCountRules=data.double_count_rules||[];
-  ST.doubleCountExceptions=data.double_count_exceptions||[];
-  ST.programEligibilityRules=data.eligibility_rules||[];
+  ST.doubleCountPolicies=context.doubleCountPolicies;
+  ST.doubleCountRules=context.doubleCountRules;
+  ST.doubleCountExceptions=context.doubleCountExceptions;
+  ST.programEligibilityRules=context.eligibilityRules;
   ST.majorRequirementTree=buildRequirementTree(requirementsForDisplay(normalized,visibleIds));
   if(ST.tab!=="core") useRequirementTree(ST.majorRequirementTree);
   ST.doubleCount=computeDoubleCountOverlaps(normalized,visibleIds);
@@ -2214,9 +2203,7 @@ async function loadSelectedRequirements(programIds){
 }
 async function loadSchoolReferenceRequirementTrees(programs){
   const ids=(programs||[]).map(program=>program.id).filter(Boolean);
-  if(ids.length<2) return {};
-  const data=await backendFetch(`/api/requirements?programs=${ids.map(encodeURIComponent).join(",")}`);
-  ST.referenceRequirementTrees=data.requirements||{};
+  ST.referenceRequirementTrees=await requirementDataLoader.loadReferenceRequirements({programIds:ids});
   return ST.referenceRequirementTrees;
 }
 async function loadCoreCurriculum(){
@@ -2224,13 +2211,10 @@ async function loadCoreCurriculum(){
   ST.coreError="";
   renderPanel();
   try{
-    const data=await backendFetch(`/api/core-curricula?school=${encodeURIComponent(ST.homeSchoolSlug)}`);
-    const curriculum=(data.curricula||[])[0];
-    if(!curriculum) throw new Error(`No reviewed ${activeCoreLabel()} is available yet.`);
-    const detail=await backendFetch(`/api/programs/${encodeURIComponent(curriculum.id)}/requirements`);
-    ST.coreCurricula=data.curricula||[];
-    ST.activeCoreCurriculum=curriculum;
-    ST.coreRequirementTree=buildRequirementTree(detail.requirements||[]);
+    const context=await requirementDataLoader.loadCoreCurriculum({homeSchoolSlug:ST.homeSchoolSlug,label:activeCoreLabel()});
+    ST.coreCurricula=context.curricula;
+    ST.activeCoreCurriculum=context.curriculum;
+    ST.coreRequirementTree=buildRequirementTree(context.requirements);
   }catch(err){
     ST.coreError=err.message||"Unknown error";
   }finally{
