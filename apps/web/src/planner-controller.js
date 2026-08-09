@@ -75,6 +75,7 @@ const ST = {
 // saved payload remains small and can be re-evaluated against updated rules.
 const CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic.STATE_VERSION;
 const programRequirementModel=ScheduleRUProgramRequirementModel;
+const {requirementCourseId,build:buildRequirementTree}=ScheduleRURequirementTreeBuilder;
 const semesterScheduleModel=ScheduleRUSemesterScheduleModel;
 const {dayIndex,meetingTimeRange,formatClock,buildPermutations}=semesterScheduleModel;
 function plannerStorage(){ return typeof localStorage!=="undefined"?localStorage:null; }
@@ -1859,92 +1860,6 @@ async function loadCourseEligibilityForCodes(codes){
   }
 }
 
-function requirementCourseId(code){
-  return String(code||"").replace(/[^0-9A-Za-z]/g, "");
-}
-function prerequisiteIds(row, courseId, availableCourses=COURSES){
-  // The catalog prerequisite field contains nested AND/OR alternatives. It
-  // is not safe to flatten that grammar into a list of mandatory courses.
-  // Use only a simple scraper note with no alternatives; ambiguous rules are
-  // left unlocked rather than incorrectly blocking a student.
-  const text=String(row.note||"").trim();
-  if(!/^pre-reqs?:/i.test(text) || /;|\bor\b/i.test(text)) return [];
-  const codes = text.match(/\b\d{2}:\d{3}:\d{3}\b/g)||[];
-  return [...new Set(codes.map(requirementCourseId))].filter(id=>id && id!==courseId && availableCourses[id]);
-}
-function buildRequirementTree(requirements){
-  const nextCourses={};
-  const nextGroups={};
-  const rootIds=[];
-  const courseRows=[];
-  const mapRule=rule=>rule==="min_courses" ? "min" : rule==="max_courses" ? "max" : rule==="min_credits" ? "min_credits" : rule==="max_credits" ? "max_credits" : rule==="min_distinct_children" ? "distinct" : rule==="one_of" ? "one_of" : "all";
-
-  function addGroup(raw, parentId=null, inheritedSourceProgramIds=[]){
-    const sourceProgramIds=[...new Set([
-      ...(Array.isArray(raw.sourceProgramIds)?raw.sourceProgramIds:[]),
-      ...inheritedSourceProgramIds,
-    ].filter(Boolean))];
-    const group={
-      id:raw.id, name:raw.name, rule:mapRule(raw.rule), count:raw.count,
-      parentId, members:[], children:[], sourceProgramId:raw.program_id,
-      sourceProgramIds,
-      display_family:cleanApiText(raw.display_family),
-      display_priority:Number(raw.display_priority)||0,
-      allocation:raw.allocation,
-      courseSelectors:Array.isArray(raw.course_selectors)?raw.course_selectors:[],
-    };
-    nextGroups[group.id]=group;
-    for(const row of raw.courses||[]){
-      const id=requirementCourseId(row.course_code);
-      if(!id) continue;
-      const existing=nextCourses[id];
-      const sourceTitle=cleanApiText(row.source_title);
-      const catalogTitle=cleanApiText(row.catalog_title);
-      const sourceCredits=cleanApiText(row.source_credits);
-      const note=cleanApiText(row.note);
-      const alternatives=[
-        ...(existing?.alternatives||[]),
-        ...(row.alternatives||[]).map(alt=>({
-          code:cleanApiText(alt.equivalent_course_code)||cleanApiText(alt.code),
-          title:cleanApiText(alt.catalog_title)||cleanApiText(alt.source_title),
-          credits:cleanApiText(alt.catalog_credits),
-          note:cleanApiText(alt.note),
-          sourceLabel:cleanApiText(alt.source_label),
-        })),
-      ];
-      nextCourses[id]={
-        ...existing,
-        code:row.course_code,
-        // Keep source metadata when a course is not offered this term, but
-        // prefer the live Rutgers catalog when it is available: it carries
-        // the current official course title (for example, Game Theory and
-        // Economics rather than a stale abbreviated requirement label).
-        title:catalogTitle||sourceTitle||existing?.title||row.course_code,
-        fullTitle:catalogTitle||sourceTitle||existing?.fullTitle||row.course_code,
-        credits:sourceCredits||cleanApiText(row.catalog_credits)||existing?.credits||"",
-        description:cleanApiText(row.catalog_description)||existing?.description||"",
-        catalogPrereqs:cleanApiText(row.catalog_prereqs)||existing?.catalogPrereqs||"",
-        subjectNotes:cleanApiText(row.catalog_subject_notes)||existing?.subjectNotes||"",
-        restrictions:cleanApiText(row.section_restrictions)||existing?.restrictions||"",
-        catalogRecordAvailable:!!(catalogTitle||row.catalog_description||row.catalog_prereqs||row.catalog_subject_notes),
-        requirementNotes:[...new Set([...(existing?.requirementNotes||[]),note].filter(Boolean))],
-        prereqs:existing?.prereqs||[],
-        eligibility:row.eligibility||existing?.eligibility||null,
-        alternatives:[...new Map(alternatives.filter(alt=>alt.code).map(alt=>[alt.code,alt])).values()],
-      };
-      group.members.push(id);
-      courseRows.push({id,row});
-    }
-    for(const child of raw.children||[]) group.children.push(addGroup(child, group.id,sourceProgramIds));
-    return group.id;
-  }
-
-  for(const root of requirements||[]) rootIds.push(addGroup(root));
-  for(const {id,row} of courseRows){
-    nextCourses[id].prereqs=[...new Set([...(nextCourses[id].prereqs||[]),...prerequisiteIds(row,id,nextCourses)])];
-  }
-  return {courses:nextCourses, groups:nextGroups, roots:rootIds};
-}
 function useRequirementTree(tree){
   COURSES=tree?.courses||{};
   GROUPS=tree?.groups||{};

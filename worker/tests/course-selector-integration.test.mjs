@@ -9,6 +9,10 @@ const catalogWorker = await readFile(
   new URL("../../apps/api/src/worker.js", import.meta.url),
   "utf8",
 );
+const requirementTreeBuilder = await readFile(
+  new URL("../../packages/requirements/src/requirement-tree-builder.js", import.meta.url),
+  "utf8",
+);
 
 test("reviewed selector rows are stored with an audited source and returned with their group", () => {
   assert.match(schema, /CREATE TABLE IF NOT EXISTS requirement_course_selectors/);
@@ -27,7 +31,11 @@ test("the browser loads selector matching and uses schedule/completed records fo
   assert.match(frontend, /function groupAppliedCourseIds\(g\)/);
   assert.match(frontend, /plannedOrCompletedCourseRecords\(g\?\.id\)/);
   assert.match(frontend, /appliedCourseIds:groupAppliedCourseIds/);
-  assert.match(frontend, /courseSelectors:Array\.isArray\(raw\.course_selectors\)/);
+  assert.match(
+    frontend,
+    /<script src="packages\/requirements\/src\/requirement-tree-builder\.js"><\/script>/,
+  );
+  assert.match(requirementTreeBuilder, /courseSelectors:\s*Array\.isArray\(raw\.course_selectors\)/);
 });
 
 test("selector-backed requirements can open the catalog with their reviewed filter", () => {
@@ -44,8 +52,8 @@ test("the catalog applies selector filters on the server before it paginates", (
 
 test("reviewed credit-count group rules survive normalization and render course and credit progress", () => {
   assert.match(worker, /SELECT \* FROM requirement_groups/);
-  assert.match(frontend, /rule===\"min_credits\" \? \"min_credits\"/);
-  assert.match(frontend, /rule===\"max_credits\" \? \"max_credits\"/);
+  assert.match(requirementTreeBuilder, /min_credits:\s*\"min_credits\"/);
+  assert.match(requirementTreeBuilder, /max_credits:\s*\"max_credits\"/);
   assert.match(frontend, /groupProgress\(g\)/);
   assert.match(frontend, /courses.*credits applied/);
   assert.match(frontend, /g\.rule!==\"all\"&&g\.rule!==\"one_of\"&&!isCreditRule\(g\)/);

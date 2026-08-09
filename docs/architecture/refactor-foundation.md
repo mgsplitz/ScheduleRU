@@ -96,6 +96,8 @@ requirement-policy, reference-tree, and Core reads live behind the stateless
 `apps/web/src/requirement-data-loader.js` boundary. Cross-program Core
 normalization, display-family deduplication, and double-count analysis live in
 the pure `packages/requirements/src/program-requirement-model.js` domain model.
+API requirement roots are normalized into planner-ready course/group trees by
+`packages/requirements/src/requirement-tree-builder.js`.
 Meeting-time normalization, conflict detection, blocker reporting, and bounded
 section permutations live in `packages/scheduling/src/semester-schedule-model.js`.
 

@@ -5,6 +5,10 @@ import { programApiSource as worker } from "./helpers/program-api-source.mjs";
 import { webApplicationSource as frontend } from "./helpers/web-source.mjs";
 
 const schema = await readFile(new URL("../../migrations/schema_course_eligibility_conditions.sql", import.meta.url), "utf8");
+const requirementTreeBuilder = await readFile(
+  new URL("../../packages/requirements/src/requirement-tree-builder.js", import.meta.url),
+  "utf8",
+);
 
 test("eligibility facts are source-backed and review-gated", () => {
   assert.match(schema, /CREATE TABLE IF NOT EXISTS course_eligibility_reviews/);
@@ -42,5 +46,8 @@ test("the browser migrates v1 state and evaluates the selected target term", asy
   assert.match(frontend, /Planning eligibility/);
   assert.match(frontend, /eligibilityStatus:eligibility\.status/);
   assert.match(frontend, /courseEligibilityForTerm\(record,\{year:ST\.year,sem\}\)/);
-  assert.match(frontend, /eligibility:row\.eligibility\|\|existing\?\.eligibility\|\|null/);
+  assert.match(
+    requirementTreeBuilder,
+    /eligibility:\s*row\.eligibility\s*\|\|\s*existing\?\.eligibility\s*\|\|\s*null/,
+  );
 });
