@@ -95,6 +95,12 @@ const coreAllocationModel=ScheduleRUCoreAllocationModel.create({
   requirementCourseId,
   isApAllowedForGroup:coreApAllowedForGroup,
 });
+const courseRecordModel=ScheduleRUCourseRecordModel.create({
+  getState:()=>ST,
+  getRequirementCourses:()=>COURSES,
+  cleanText:cleanApiText,
+  saveState:savePlannerState,
+});
 function plannerStorage(){ return typeof localStorage!=="undefined"?localStorage:null; }
 function restorePlannerState(){
   const restored=ScheduleRUPlannerStateStore.load({
@@ -962,67 +968,22 @@ document.getElementById("pickerSearch").addEventListener("input",event=>{
    COURSE RECORDS — one shape for requirements, catalog, wishlist and plan
    ============================================================ */
 function catalogCourseCode(c){
-  return c?.code || [c?.school,c?.subject_code,c?.course_number].filter(Boolean).join(":");
+  return courseRecordModel.catalogCourseCode(c);
 }
 function requirementCourseRecord(id){
-  const c=COURSES[id];
-  if(!c) return null;
-  return {
-    id, code:c.code, title:c.title||c.fullTitle||c.code, fullTitle:c.fullTitle||c.title||c.code,
-    credits:c.credits??"", description:c.description||"", catalogPrereqs:c.catalogPrereqs||"",
-    subjectNotes:c.subjectNotes||"", restrictions:c.restrictions||"", requirementNotes:c.requirementNotes||[],
-    prereqs:Array.isArray(c.prereqs)?c.prereqs:[], alternatives:Array.isArray(c.alternatives)?c.alternatives:[], requirementId:id,
-    eligibility:c.eligibility||null, catalogRecordAvailable:c.catalogRecordAvailable===true,
-  };
+  return courseRecordModel.requirementCourseRecord(id);
 }
 function backendCourseRecord(c){
-  if(!c) return null;
-  const code=catalogCourseCode(c);
-  if(!code) return null;
-  return {
-    id:c.id||code, code, title:cleanApiText(c.title)||code, fullTitle:cleanApiText(c.title)||code,
-    credits:c.credits??"", description:cleanApiText(c.description), catalogPrereqs:cleanApiText(c.prereqs),
-    subjectNotes:cleanApiText(c.subject_notes), restrictions:cleanApiText(c.restrictions), requirementNotes:[], prereqs:[],
-    eligibility:ST.courseEligibilityByCode[code]||null, catalogRecordAvailable:true,
-  };
+  return courseRecordModel.backendCourseRecord(c);
 }
 function courseRecordFromId(ref){
-  const id=String(ref||"");
-  const directRequirement=COURSES[id] ? requirementCourseRecord(id) : null;
-  const requirementEntry=Object.entries(COURSES).find(([,course])=>course.code===id);
-  const requirement=requirementEntry ? requirementCourseRecord(requirementEntry[0]) : directRequirement;
-  const code=requirement?.code||(/^\d{2}:\d{3}:\d{3}$/.test(id)?id:"");
-  const wishlist=Object.values(ST.wishlist||{}).find(record=>record&&typeof record==="object"
-    && (record.code===code||record.id===id)) || (ST.wishlist[id]&&typeof ST.wishlist[id]==="object"?ST.wishlist[id]:null);
-  const scheduled=Object.values(ST.schedule||{}).find(entry=>entry?.code===code||entry?.course?.id===id);
-  const catalog=(ST.backendCourses||[]).find(c=>c.id===id || catalogCourseCode(c)===(code||id));
-  const merged=globalThis.ScheduleRUCourseInteractionLogic.mergeCourseRecords([
-    requirement,scheduled?.course,scheduled,wishlist,backendCourseRecord(catalog),
-  ]);
-  if(merged.code) return merged;
-  // Older in-memory wishlist entries were saved as { courseCode: true }.
-  // Preserve the code even when their original catalog page is no longer open.
-  return /^\d{2}:\d{3}:\d{3}$/.test(id)
-    ? {id,code:id,title:id,fullTitle:id,credits:"",description:"",catalogPrereqs:"",subjectNotes:"",restrictions:"",requirementNotes:[],prereqs:[],catalogRecordAvailable:false}
-    : null;
+  return courseRecordModel.courseRecordFromId(ref);
 }
 function addToWishlist(ref, explicitRecord=null){
-  const record=explicitRecord||courseRecordFromId(ref);
-  if(!record?.code) return;
-  // The public course code is the stable identity shared by Rutgers' catalog,
-  // a degree requirement and a scheduled section. Storing the full record here
-  // prevents title/credit data from disappearing during drag-and-drop.
-  ST.wishlist[record.code]=globalThis.ScheduleRUCourseInteractionLogic.mergeCourseRecords([
-    ST.wishlist[record.code],record,{id:record.id||record.code,code:record.code},
-  ]);
-  savePlannerState();
+  return courseRecordModel.addToWishlist(ref,explicitRecord);
 }
 function wishlistRecords(){
-  const seen=new Set();
-  return Object.entries(ST.wishlist).map(([key,value])=>{
-    const record=value&&typeof value==="object" ? value : courseRecordFromId(key);
-    return record?.code ? {...record,key} : null;
-  }).filter(record=>record&&!seen.has(record.code)&&seen.add(record.code));
+  return courseRecordModel.wishlistRecords();
 }
 
 /* ============================================================

@@ -45,6 +45,8 @@ test("hackathon UI wires the approved modules and removes hard-coded future buil
   assert.match(html, /four-year-planner-logic\.js/);
   assert.match(html, /packages\/requirements\/src\/core-allocation-model\.js/);
   assert.match(html, /ScheduleRUCoreAllocationModel\.create\(/);
+  assert.match(html, /apps\/web\/src\/course-record-model\.js/);
+  assert.match(html, /ScheduleRUCourseRecordModel\.create\(/);
   assert.match(html, /schedule-preference-logic\.js/);
   assert.doesNotMatch(html, /RUTGERSBUSINESS SCHOOL/);
   assert.doesNotMatch(html, /Degree Navigator/);

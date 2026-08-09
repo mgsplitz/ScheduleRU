@@ -11,6 +11,8 @@ device-local endpoint overrides, HTTP transport, and JSON/error handling.
 clearing of the guest planner state stored on the current device.
 `src/requirement-data-loader.js` owns school, program, requirement-policy, and
 Core request orchestration without mutating browser or presentation state.
+`src/course-record-model.js` normalizes and resolves requirement, catalog,
+wishlist, and planned-course records behind one stable course-code identity.
 `src/planner-controller.js` owns the compatibility planner and schedule-builder
 integration, while `src/guided-setup-controller.js` owns onboarding, program
 selection, modal, and plan-preview orchestration. Smaller domain decisions

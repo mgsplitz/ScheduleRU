@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./course-interactions": "./src/course-interaction-logic.js",
+    "./course-records": "./src/course-record-model.js",
     "./guided-setup": "./src/guided-setup-controller.js",
     "./planner-state-store": "./src/planner-state-store.js",
     "./planner-controller": "./src/planner-controller.js",
@@ -13,6 +14,6 @@
     "./requirement-data-loader": "./src/requirement-data-loader.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-picker-logic.test.mjs"
+    "test": "node --test ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-picker-logic.test.mjs"
   }
 }
