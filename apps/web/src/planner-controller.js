@@ -236,19 +236,10 @@ function standingRequirement(c){
   return null;
 }
 function groupFulfilled(gk){
-  return ScheduleRURequirementLogic.groupFulfilled(gk,GROUPS,{
-    isCompleted,
-    selectedRequirementCourses,
-    isConstraintGroup,
-    appliedCourseIds:groupAppliedCourseIds,
-    courseCredits:id=>creditNumber(COURSES[id]?.credits),
-  });
+  return requirementProgressModel.groupFulfilled(gk);
 }
 function groupProgress(g){
-  return ScheduleRURequirementLogic.groupProgress(g,isCompleted,{
-    appliedCourseIds:groupAppliedCourseIds,
-    courseCredits:id=>creditNumber(COURSES[id]?.credits),
-  });
+  return requirementProgressModel.groupProgress(g);
 }
 function reviewedGroupSelectors(g){
   const engine=globalThis.ScheduleRUCourseSelectorLogic;
@@ -322,38 +313,17 @@ function baseGroupAppliedCourseIds(g){
     .filter(Boolean);
   return [...new Set([...explicit,...selectorMatches])];
 }
-let requirementAllocationCache={key:"",value:null};
-function requirementAllocationKey(){
-  return JSON.stringify([
-    Object.keys(GROUPS).sort().map(id=>[
-      id,GROUPS[id]?.allocation,GROUPS[id]?.members,GROUPS[id]?.rule,
-      GROUPS[id]?.count,GROUPS[id]?.children,GROUPS[id]?.parentId,GROUPS[id]?.courseSelectors,
-    ]),
-    Object.keys(ST.completed||{}).filter(id=>ST.completed[id]).sort(),
-    Object.keys(ST.apOn||{}).filter(id=>ST.apOn[id]).sort(),
-    Object.values(ST.schedule||{}).map(entry=>entry?.code).filter(Boolean).sort(),
-    Object.keys(ST.groupSelections||{}).sort().map(id=>[id,ST.groupSelections[id]]),
-  ]);
-}
-function requirementAllocation(){
-  const engine=globalThis.ScheduleRURequirementLogic;
-  if(!engine?.allocateRequirementCourses) return null;
-  const key=requirementAllocationKey();
-  if(requirementAllocationCache.key===key) return requirementAllocationCache.value;
-  const value=engine.allocateRequirementCourses(GROUPS,{
-    isCompleted,
-    selectedRequirementCourses,
-    isConstraintGroup,
-    appliedCourseIds:baseGroupAppliedCourseIds,
-    courseCredits:id=>creditNumber(COURSES[id]?.credits),
-  });
-  requirementAllocationCache={key,value};
-  return value;
-}
+const requirementProgressModel=ScheduleRURequirementProgressModel.create({
+  getGroups:()=>GROUPS,
+  getState:()=>({
+    completed:ST.completed,apOn:ST.apOn,schedule:ST.schedule,groupSelections:ST.groupSelections,
+  }),
+  isCompleted,selectedRequirementCourses,isConstraintGroup,
+  baseAppliedCourseIds:baseGroupAppliedCourseIds,
+  courseCredits:id=>creditNumber(COURSES[id]?.credits),
+});
 function groupAppliedCourseIds(g){
-  if(!g?.allocation) return baseGroupAppliedCourseIds(g);
-  const allocated=requirementAllocation()?.appliedByGroup?.[g.id];
-  return Array.isArray(allocated) ? allocated : baseGroupAppliedCourseIds(g);
+  return requirementProgressModel.groupAppliedCourseIds(g);
 }
 function selectorGuidanceHtml(g){
   const raw=Array.isArray(g?.courseSelectors)?g.courseSelectors:[];

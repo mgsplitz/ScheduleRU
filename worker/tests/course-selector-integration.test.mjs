@@ -30,7 +30,10 @@ test("the browser loads selector matching and uses schedule/completed records fo
   );
   assert.match(frontend, /function groupAppliedCourseIds\(g\)/);
   assert.match(frontend, /plannedOrCompletedCourseRecords\(g\?\.id\)/);
-  assert.match(frontend, /appliedCourseIds:groupAppliedCourseIds/);
+  assert.match(
+    frontend,
+    /<script src="packages\/requirements\/src\/requirement-progress-model\.js"><\/script>/,
+  );
   assert.match(
     frontend,
     /<script src="packages\/requirements\/src\/requirement-tree-builder\.js"><\/script>/,

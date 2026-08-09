@@ -98,6 +98,8 @@ normalization, display-family deduplication, and double-count analysis live in
 the pure `packages/requirements/src/program-requirement-model.js` domain model.
 API requirement roots are normalized into planner-ready course/group trees by
 `packages/requirements/src/requirement-tree-builder.js`.
+Requirement completion, progress totals, and memoized exclusive allocation are
+coordinated by `packages/requirements/src/requirement-progress-model.js`.
 Meeting-time normalization, conflict detection, blocker reporting, and bounded
 section permutations live in `packages/scheduling/src/semester-schedule-model.js`.
 

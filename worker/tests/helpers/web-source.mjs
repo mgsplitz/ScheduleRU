@@ -8,6 +8,7 @@ export const webStyles = readFileSync(
   "utf8",
 );
 export const webControllerSource = [
+  "packages/requirements/src/requirement-progress-model.js",
   "packages/requirements/src/requirement-tree-builder.js",
   "packages/requirements/src/program-requirement-model.js",
   "packages/scheduling/src/semester-schedule-model.js",

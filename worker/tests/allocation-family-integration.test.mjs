@@ -17,7 +17,10 @@ test("reviewed allocation conditions are returned to the browser as group alloca
 });
 
 test("the group browser applies and explains a reviewed exclusive allocation without hiding eligible alternatives", () => {
-  assert.match(frontend, /allocateRequirementCourses\(GROUPS/);
+  assert.match(
+    frontend,
+    /<script src="packages\/requirements\/src\/requirement-progress-model\.js"><\/script>/,
+  );
   assert.match(frontend, /function allocationSummaryHtml\(g\)/);
   assert.match(frontend, /allocationSummaryHtml\(g\)/);
   assert.match(frontend, /\(g\.members\|\|\[\]\)\.filter\(id=>!applied\.includes\(id\)\)/);
