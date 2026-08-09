@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./preferences": "./src/schedule-preference-logic.js"
+    "./preferences": "./src/schedule-preference-logic.js",
+    "./semester-schedule-model": "./src/semester-schedule-model.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/schedule-preference-logic.test.mjs"
+    "test": "node --test ../../worker/tests/schedule-preference-logic.test.mjs ../../worker/tests/semester-schedule-model.test.mjs"
   }
 }

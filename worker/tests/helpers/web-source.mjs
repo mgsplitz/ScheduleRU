@@ -9,6 +9,7 @@ export const webStyles = readFileSync(
 );
 export const webControllerSource = [
   "packages/requirements/src/program-requirement-model.js",
+  "packages/scheduling/src/semester-schedule-model.js",
   "apps/web/src/backend-client.js",
   "apps/web/src/planner-state-store.js",
   "apps/web/src/requirement-data-loader.js",

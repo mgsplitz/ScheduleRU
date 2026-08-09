@@ -75,6 +75,8 @@ const ST = {
 // saved payload remains small and can be re-evaluated against updated rules.
 const CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic.STATE_VERSION;
 const programRequirementModel=ScheduleRUProgramRequirementModel;
+const semesterScheduleModel=ScheduleRUSemesterScheduleModel;
+const {dayIndex,meetingTimeRange,formatClock,buildPermutations}=semesterScheduleModel;
 function plannerStorage(){ return typeof localStorage!=="undefined"?localStorage:null; }
 function restorePlannerState(){
   const restored=ScheduleRUPlannerStateStore.load({
@@ -2549,101 +2551,6 @@ function renderCampusLegend(){
   ).join("");
   return `<div class="cal-legend">${swatches}<span class="cal-legend-item"><i class="dashed" style="border-color:#c0392b;"></i>CLOSED SECTION</span></div>`;
 }
-function dayIndex(d){
-  const M={M:0,MON:0,MONDAY:0,T:1,TU:1,TUE:1,TUESDAY:1,W:2,WED:2,WEDNESDAY:2,
-    H:3,TH:3,THU:3,THURSDAY:3,F:4,FRI:4,FRIDAY:4,S:5,SA:5,SAT:5,SATURDAY:5,
-    U:6,SU:6,SUN:6,SUNDAY:6};
-  return M[String(d||"").toUpperCase().trim()];
-}
-function parseRutgersClock(value){
-  const match=String(value||"").trim().match(/^(\d{1,2})(?::?(\d{2}))?\s*([AP]M)?$/i);
-  if(!match) return null;
-  let hour=Number(match[1]), minute=Number(match[2]||0);
-  if(!Number.isInteger(hour)||!Number.isInteger(minute)||hour<1||hour>12||minute>59) return null;
-  const suffix=(match[3]||"").toUpperCase();
-  if(suffix){
-    if(suffix==="PM" && hour!==12) hour+=12;
-    if(suffix==="AM" && hour===12) hour=0;
-    return {minutes:hour*60+minute, explicit:true};
-  }
-  // The Rutgers section feed uses a compact 12-hour clock without AM/PM:
-  // 0830 is 8:30am, 0200 is 2:00pm, and 0745 is 7:45pm.
-  return {hour,minute,explicit:false};
-}
-function compactRutgersMinutes(clock){
-  if(clock.explicit) return clock.minutes;
-  if(clock.hour===12) return 12*60+clock.minute;
-  return (clock.hour>=8 ? clock.hour : clock.hour+12)*60+clock.minute;
-}
-function meetingTimeRange(meeting){
-  const startClock=parseRutgersClock(meeting?.start_time), endClock=parseRutgersClock(meeting?.end_time);
-  if(!startClock||!endClock) return null;
-  const start=compactRutgersMinutes(startClock);
-  let end=compactRutgersMinutes(endClock);
-  // A 7:45-8:40 evening meeting arrives as 0745-0840. The end has to move
-  // into the same afternoon/evening period when the raw clock wraps.
-  if(!endClock.explicit && end<=start) end+=12*60;
-  return end>start ? {start,end} : null;
-}
-function formatClock(minutes){
-  const normalized=((minutes%(24*60))+(24*60))%(24*60);
-  const hour=Math.floor(normalized/60), minute=normalized%60;
-  const displayHour=(hour%12)||12;
-  return `${displayHour}:${String(minute).padStart(2,"0")} ${hour>=12?"PM":"AM"}`;
-}
-function timeToSlot(t){
-  const clock=parseRutgersClock(t);
-  return clock ? (compactRutgersMinutes(clock)-8*60)/30 : null;
-}
-function meetingsConflict(mA,mB){
-  const dA=dayIndex(mA.day_of_week), dB=dayIndex(mB.day_of_week);
-  if(dA==null||dB==null||dA!==dB) return false;
-  const a=meetingTimeRange(mA), b=meetingTimeRange(mB);
-  if(!a||!b) return false;
-  return a.start<b.end && b.start<a.end;
-}
-function comboConflicts(combo, sec){
-  for(const c of combo) for(const m1 of c.meetings||[]) for(const m2 of sec.meetings||[])
-    if(meetingsConflict(m1,m2)) return true;
-  return false;
-}
-// Cross-product of one checked section per REQUIRED course, skipping any
-// combo with a time conflict. Every enabled course in the pool must end up
-// represented — courses are never silently dropped from consideration just
-// because nothing's checked yet. If any required course can't contribute a
-// section (still loading, errored, no sections offered, or nothing checked),
-// generation stops and reports that course as a "blocker" instead of
-// quietly returning partial schedules. Capped so a heavily-checked pool
-// can't blow up runtime.
-function buildPermutations(pool){
-  const required = pool.filter(p=>p.enabled!==false);
-  if(!required.length) return {combos:[], blockers:[], required};
-
-  const blockers = required.filter(p=>
-    p.loading ||
-    (p.error && !(p.sections||[]).length) ||
-    !(p.sections||[]).length ||
-    !p.checked || p.checked.size===0
-  );
-  if(blockers.length) return {combos:[], blockers, required};
-
-  let combos=[[]];
-  for(const course of required){
-    const opts=(course.sections||[]).filter(s=>course.checked.has(s.index_number));
-    const next=[];
-    for(const combo of combos){
-      for(const sec of opts){
-        if(!comboConflicts(combo, sec)){
-          next.push([...combo, {code:course.code, title:course.title, credits:course.credits, ...sec}]);
-        }
-      }
-    }
-    combos = next;
-    if(!combos.length) break; // no point continuing the cross-product once it's dead
-  }
-  return {combos: combos.length>500 ? combos.slice(0,500) : combos, blockers:[], required};
-}
-
 function recomputeBuilderPermutations(){
   if(!ST.builder) return;
   const result = buildPermutations(ST.builder.pool);
