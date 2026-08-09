@@ -86,6 +86,15 @@ const academicProgressModel=ScheduleRUAcademicProgressModel.create({
   courseCodesFromText,
 });
 const {creditNumber}=ScheduleRUAcademicProgressModel;
+const coreAllocationModel=ScheduleRUCoreAllocationModel.create({
+  getGroups:()=>GROUPS,
+  getRootGroupIds:()=>ROOT_GROUPS,
+  isCourseCompleted:directlyCompletedCoreCourse,
+  getSelectedApAwards:()=>AP.filter(ap=>ST.apOn[ap.id]),
+  courseCodesFromText,
+  requirementCourseId,
+  isApAllowedForGroup:coreApAllowedForGroup,
+});
 function plannerStorage(){ return typeof localStorage!=="undefined"?localStorage:null; }
 function restorePlannerState(){
   const restored=ScheduleRUPlannerStateStore.load({
@@ -1494,107 +1503,13 @@ function coreApAllowedForGroup(g){
   return !/\[(?:CCD|CCO|WCr)\]/.test(g?.name||"");
 }
 function coreRequirementGroups(rootId){
-  const out=[];
-  function visit(groupId){
-    const g=GROUPS[groupId];
-    if(!g) return;
-    if(g.rule==="distinct" || (g.rule!=="all" && (g.members||[]).length)){
-      out.push(groupId);
-      return;
-    }
-    (g.children||[]).forEach(visit);
-  }
-  visit(rootId);
-  return out;
+  return coreAllocationModel.requirementGroupIds(rootId);
 }
 function coreGroupNeeded(g){
-  return g?.rule==="min" || g?.rule==="distinct" ? Math.max(1,Number(g.count)||1) : 0;
-}
-function chooseCoreGroups(items, size, start=0, picked=[], out=[]){
-  if(picked.length===size){ out.push([...picked]); return out; }
-  for(let i=start;i<=items.length-(size-picked.length);i++){
-    picked.push(items[i]);
-    chooseCoreGroups(items,size,i+1,picked,out);
-    picked.pop();
-  }
-  return out;
-}
-function coreCompletionTokens(){
-  const coreIds=new Set(Object.values(GROUPS).flatMap(g=>g.members||[]));
-  const tokens=[];
-  [...coreIds].filter(directlyCompletedCoreCourse).sort().forEach(id=>{
-    tokens.push({key:`course:${id}`,kind:"course",courseIds:new Set([id]),courseId:id});
-  });
-  AP.filter(ap=>ST.apOn[ap.id]).forEach(ap=>{
-    const equivalentIds=new Set([
-      ...courseCodesFromText(ap.equiv).map(requirementCourseId),
-      ...(ap.fulfills||[]),
-    ]);
-    const courseIds=[...coreIds].filter(id=>equivalentIds.has(id));
-    if(courseIds.length) tokens.push({key:`ap:${ap.id}`,kind:"ap",ap,courseIds:new Set(courseIds)});
-  });
-  return tokens;
-}
-function coreSlotsForRoot(rootId){
-  const fixed=[];
-  let variants=[[]];
-  coreRequirementGroups(rootId).forEach(groupId=>{
-    const g=GROUPS[groupId];
-    if(g.rule==="distinct"){
-      const children=(g.children||[]).map(id=>GROUPS[id]).filter(child=>(child?.members||[]).length);
-      const choices=[[]];
-      for(let count=1;count<=Math.min(coreGroupNeeded(g),children.length);count++){
-        chooseCoreGroups(children,count).forEach(subset=>{
-          choices.push(subset.map(child=>({groupId:g.id,subgroupId:child.id,courseIds:new Set(child.members||[]),apAllowed:coreApAllowedForGroup(g)})));
-        });
-      }
-      variants=variants.flatMap(base=>choices.map(choice=>[...base,...choice]));
-      return;
-    }
-    for(let i=0;i<coreGroupNeeded(g);i++){
-      fixed.push({groupId:g.id,courseIds:new Set(g.members||[]),apAllowed:coreApAllowedForGroup(g)});
-    }
-  });
-  return variants.map(variant=>[...fixed,...variant].map((slot,index)=>({...slot,key:`${rootId}:${slot.groupId}:${index}`})));
-}
-function coreMaximumMatching(slots,tokens){
-  const tokenByKey=new Map(tokens.map(token=>[token.key,token]));
-  const candidates=new Map(slots.map(slot=>[slot.key,tokens.filter(token=>
-    (token.kind!=="ap" || slot.apAllowed) && [...slot.courseIds].some(id=>token.courseIds.has(id))
-  ).map(token=>token.key)]));
-  const tokenToSlot=new Map();
-  const slotByKey=new Map(slots.map(slot=>[slot.key,slot]));
-  function place(slotKey,seenTokens){
-    for(const tokenKey of candidates.get(slotKey)||[]){
-      if(seenTokens.has(tokenKey)) continue;
-      seenTokens.add(tokenKey);
-      const previous=tokenToSlot.get(tokenKey);
-      if(previous===undefined || place(previous,seenTokens)){
-        tokenToSlot.set(tokenKey,slotKey);
-        return true;
-      }
-    }
-    return false;
-  }
-  [...slots].sort((a,b)=>(candidates.get(a.key)||[]).length-(candidates.get(b.key)||[]).length)
-    .forEach(slot=>place(slot.key,new Set()));
-  return [...tokenToSlot.entries()].map(([tokenKey,slotKey])=>({token:tokenByKey.get(tokenKey),slot:slotByKey.get(slotKey)}));
+  return coreAllocationModel.groupNeeded(g);
 }
 function computeCoreAllocation(){
-  const tokens=coreCompletionTokens();
-  const byGroup={};
-  ROOT_GROUPS.forEach(rootId=>{
-    let best=[];
-    coreSlotsForRoot(rootId).forEach(slots=>{
-      const matches=coreMaximumMatching(slots,tokens);
-      if(matches.length>best.length) best=matches;
-    });
-    best.forEach(({slot,token})=>{
-      (byGroup[slot.groupId] ||= []).push(token);
-      if(slot.subgroupId) (byGroup[slot.subgroupId] ||= []).push(token);
-    });
-  });
-  return {tokens,byGroup};
+  return coreAllocationModel.allocate();
 }
 function coreAppliedCardHtml(token){
   if(token.kind==="ap"){

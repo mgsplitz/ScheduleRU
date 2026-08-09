@@ -100,6 +100,9 @@ API requirement roots are normalized into planner-ready course/group trees by
 `packages/requirements/src/requirement-tree-builder.js`.
 Requirement completion, progress totals, and memoized exclusive allocation are
 coordinated by `packages/requirements/src/requirement-progress-model.js`.
+Core-course and AP evidence is assigned without double use across compatible
+curriculum goals by `packages/requirements/src/core-allocation-model.js`;
+school-specific AP policy is injected by the web boundary.
 Meeting-time normalization, conflict detection, blocker reporting, and bounded
 section permutations live in `packages/scheduling/src/semester-schedule-model.js`.
 Selected AP awards, completed and transferred credit, requirement equivalency

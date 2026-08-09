@@ -7,7 +7,9 @@ double-count analysis across selected programs. The requirement-tree builder
 normalizes reviewed API roots into course/group engine inputs, including
 metadata merging and conservative prerequisite IDs. The progress model owns
 memoized reviewed allocation, completion, and progress calculations over
-caller-provided state. This package owns no UI,
+caller-provided state. The Core allocation model turns completed-course and AP
+evidence into a maximum non-duplicating assignment across compatible goals,
+with school policy supplied by the caller. This package owns no UI,
 four-year placement policy, network access, or catalog content.
 
 The modules currently expose browser globals for compatibility. Root-level
