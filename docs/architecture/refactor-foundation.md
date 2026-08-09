@@ -93,7 +93,9 @@ planner controller. Guest planner-state validation, migration, persistence,
 and clearing live behind `apps/web/src/planner-state-store.js`, leaving the
 controller responsible for active UI state and orchestration. School, program,
 requirement-policy, reference-tree, and Core reads live behind the stateless
-`apps/web/src/requirement-data-loader.js` boundary.
+`apps/web/src/requirement-data-loader.js` boundary. Cross-program Core
+normalization, display-family deduplication, and double-count analysis live in
+the pure `packages/requirements/src/program-requirement-model.js` domain model.
 
 ## Dependency rules
 

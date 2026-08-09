@@ -6,9 +6,10 @@
   "exports": {
     "./academic-credit": "./src/academic-credit-logic.js",
     "./course-selector": "./src/course-selector-logic.js",
-    "./groups": "./src/requirement-group-logic.js"
+    "./groups": "./src/requirement-group-logic.js",
+    "./program-requirement-model": "./src/program-requirement-model.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/academic-credit-logic.test.mjs ../../worker/tests/course-selector-logic.test.mjs ../../worker/tests/requirement-group-logic.test.mjs"
+    "test": "node --test ../../worker/tests/academic-credit-logic.test.mjs ../../worker/tests/course-selector-logic.test.mjs ../../worker/tests/requirement-group-logic.test.mjs ../../worker/tests/program-requirement-model.test.mjs"
   }
 }

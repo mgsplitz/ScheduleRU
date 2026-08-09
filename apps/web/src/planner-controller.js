@@ -74,6 +74,7 @@ const ST = {
 // same site address. Catalog and requirement data stay on the Worker, so the
 // saved payload remains small and can be re-evaluated against updated rules.
 const CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic.STATE_VERSION;
+const programRequirementModel=ScheduleRUProgramRequirementModel;
 function plannerStorage(){ return typeof localStorage!=="undefined"?localStorage:null; }
 function restorePlannerState(){
   const restored=ScheduleRUPlannerStateStore.load({
@@ -506,7 +507,7 @@ async function loadHomeSchoolCandidate(nextSchool){
   ]);
   const returned=requirementsContext.requirements,visibleIds=selectedPrograms.filter(id=>Array.isArray(returned[id]));
   if(selectedPrograms.length&&!visibleIds.length)throw new Error("The replacement program requirements could not be loaded.");
-  const requirementTrees=normalizedCoreRequirementTrees(returned,visibleIds,{referenceRequirementTrees,availablePrograms});
+  const requirementTrees=programRequirementModel.normalizeProgramTrees({requirementTrees:returned,programIds:visibleIds,referenceRequirementTrees,availablePrograms});
   const doubleCountPolicies=requirementsContext.doubleCountPolicies,doubleCountExceptions=requirementsContext.doubleCountExceptions;
   const roles=programRolesFor(visibleIds,availablePrograms);
   return {
@@ -514,9 +515,9 @@ async function loadHomeSchoolCandidate(nextSchool){
     selectedPrograms:visibleIds,groupSelections:{},referenceRequirementTrees,requirementTrees,
     catalogListedProgramIds:requirementsContext.catalogListedProgramIds,doubleCountPolicies,
     doubleCountRules:requirementsContext.doubleCountRules,doubleCountExceptions,
-    programEligibilityRules:requirementsContext.eligibilityRules,majorRequirementTree:buildRequirementTree(requirementsForDisplay(requirementTrees,visibleIds)),
+    programEligibilityRules:requirementsContext.eligibilityRules,majorRequirementTree:buildRequirementTree(programRequirementModel.requirementsForDisplay({requirementTrees,programIds:visibleIds})),
     activeProgram:availablePrograms.find(program=>program.id===visibleIds[0])||null,
-    doubleCount:visibleIds.length?computeDoubleCountOverlaps(requirementTrees,visibleIds,{availablePrograms,doubleCountExceptions,doubleCountPolicies}):null,
+    doubleCount:visibleIds.length?programRequirementModel.computeDoubleCount({requirementTrees,programIds:visibleIds,availablePrograms,doubleCountExceptions,doubleCountPolicies}):null,
     requirementsError:"",coreCurricula:coreContext.curricula,activeCoreCurriculum:curriculum,
     coreRequirementTree:buildRequirementTree(coreContext.requirements),coreError:"",...roles,
   };
@@ -1948,132 +1949,6 @@ function useRequirementTree(tree){
   ROOT_GROUPS=tree?.roots||[];
 }
 
-/* ============================================================
-   MULTI-PROGRAM REQUIREMENTS + DOUBLE-COUNT CHECK
-   ============================================================ */
-function collectRawCourseCodes(group, into=new Set()){
-  for(const course of group?.courses||[]) if(course?.course_code) into.add(course.course_code);
-  for(const child of group?.children||[]) collectRawCourseCodes(child,into);
-  return into;
-}
-function collectRawSelectorSignatures(group, into=[]){
-  for(const selector of group?.course_selectors||[]){
-    const raw=typeof selector?.selector_json==="string" ? selector.selector_json : JSON.stringify(selector?.selector_json||{});
-    if(raw) into.push(raw);
-  }
-  for(const child of group?.children||[]) collectRawSelectorSignatures(child,into);
-  return into;
-}
-function normalizedRequirementName(name){
-  return String(name||"").replace(/\s+/g," ").trim().toLowerCase();
-}
-function rootRequirementSignature(root){
-  const codes=[...collectRawCourseCodes(root)].sort();
-  const selectors=collectRawSelectorSignatures(root).sort();
-  return JSON.stringify([normalizedRequirementName(root?.name),root?.rule||"",root?.count??null,codes,selectors]);
-}
-function sharedRootGroups(requirementTrees, programIds){
-  return ScheduleRURequirementLogic.sharedRequirementGroups(
-    requirementTrees,programIds,rootRequirementSignature
-  );
-}
-function sharedRootKey(root){
-  return ScheduleRURequirementLogic.sharedRequirementRootKey(root,rootRequirementSignature);
-}
-function rootCourseCodes(root){
-  return (root?.courses||[]).map(course=>course?.course_code).filter(Boolean);
-}
-function sharedCoreBaselines(referenceTrees){
-  const candidates=new Map();
-  for(const roots of Object.values(referenceTrees||{})){
-    for(const root of roots||[]){
-      const key=normalizedRequirementName(root?.name);
-      const codes=rootCourseCodes(root);
-      if(!key || root?.rule!=="all" || (root?.children||[]).length || codes.length<4 || !/(business|foundational|common|core)/i.test(root?.name||"")) continue;
-      const rows=candidates.get(key)||[];
-      rows.push(root);
-      candidates.set(key,rows);
-    }
-  }
-  const baselines=new Map();
-  for(const [key,roots] of candidates){
-    if(roots.length<2) continue;
-    const shared=roots.slice(1).reduce((codes,root)=>{
-      const available=new Set(rootCourseCodes(root));
-      return codes.filter(code=>available.has(code));
-    },rootCourseCodes(roots[0]));
-    if(shared.length>=4) baselines.set(key,{template:roots[0], codes:new Set(shared)});
-  }
-  return baselines;
-}
-function normalizedCoreRequirementTrees(requirementTrees, programIds,{referenceRequirementTrees=ST.referenceRequirementTrees,availablePrograms=ST.availablePrograms}={}){
-  const baselines=sharedCoreBaselines(Object.keys(referenceRequirementTrees||{}).length?referenceRequirementTrees:requirementTrees);
-  if(!baselines.size) return requirementTrees;
-  const out={};
-  for(const programId of programIds){
-    const roots=requirementTrees[programId]||[];
-    out[programId]=roots.flatMap(root=>{
-      const baseline=baselines.get(normalizedRequirementName(root?.name));
-      const rootCodes=rootCourseCodes(root);
-      if(!baseline || root?.rule!=="all" || (root?.children||[]).length || !rootCodes.length) return [root];
-      const byCode=new Map((root.courses||[]).map(course=>[course.course_code,course]));
-      const sharedCourses=[...baseline.codes].map(code=>byCode.get(code)||baseline.template.courses?.find(course=>course.course_code===code)).filter(Boolean);
-      const sharedRoot={...root, id:`${root.id}-shared-base`, courses:sharedCourses};
-      const residualCourses=(root.courses||[]).filter(course=>{
-        if(baseline.codes.has(course.course_code)) return false;
-        // If a school lists an Accounting-only course in both the business
-        // core and its Required Accounting section, show it once only.
-        return !roots.some(other=>other!==root && rootCourseCodes(other).includes(course.course_code));
-      });
-      if(!residualCourses.length) return [sharedRoot];
-      const program=(availablePrograms||[]).find(item=>item.id===programId);
-      return [sharedRoot,{
-        ...root,
-        id:`${root.id}-program-additions`,
-        name:`${program?.name||"Program"}-specific additions to ${root.name}`,
-        courses:residualCourses,
-      }];
-    });
-  }
-  return out;
-}
-function requirementsForDisplay(requirementTrees, programIds){
-  return ScheduleRURequirementLogic.requirementsForDisplay(
-    requirementTrees,programIds,rootRequirementSignature
-  );
-}
-function computeDoubleCountOverlaps(requirementTrees, programIds,{availablePrograms=ST.availablePrograms,doubleCountExceptions=ST.doubleCountExceptions,doubleCountPolicies=ST.doubleCountPolicies}={}){
-  const shared=sharedRootGroups(requirementTrees,programIds);
-  const sharedKeys=new Set(shared.map(entry=>entry.key));
-  const programsById=Object.fromEntries((availablePrograms||[]).map(program=>[program.id,program]));
-  const coursePrograms=new Map();
-  for(const id of programIds){
-    const codes=new Set();
-    for(const root of requirementTrees[id]||[]){
-      if(sharedKeys.has(sharedRootKey(root))) continue;
-      collectRawCourseCodes(root,codes);
-    }
-    for(const code of codes){
-      const ids=coursePrograms.get(code)||new Set();
-      ids.add(id);
-      coursePrograms.set(code,ids);
-    }
-  }
-  const overlaps=[...coursePrograms.entries()]
-    .filter(([,ids])=>ids.size>1)
-    .map(([code,ids])=>({code,programs:[...ids]}))
-    .sort((a,b)=>a.code.localeCompare(b.code));
-  const partition=ScheduleRURequirementLogic.partitionDoubleCountOverlaps(
-    overlaps,programsById,doubleCountExceptions||[]
-  );
-  const scopeResults=["major_major","major_concentration"].map(scope=>{
-    const policy=(doubleCountPolicies||[]).find(item=>item.scope===scope);
-    const codes=partition.scopes[scope]||[];
-    const cap=policy?.max_shared_courses===null||policy?.max_shared_courses===undefined ? null : Number(policy.max_shared_courses);
-    return {scope,policy,codes,cap,violates:cap!==null&&codes.length>cap};
-  });
-  return {shared,overlaps,scopeResults,unscoped:partition.unscoped||[],exceptions:partition.exceptions||[]};
-}
 function programEligibilityBannerHtml(){
   const rules=(ST.programEligibilityRules||[]).filter(rule=>ST.selectedPrograms.includes(rule.program_id));
   if(!rules.length) return "";
@@ -2187,7 +2062,7 @@ async function loadSelectedRequirements(programIds){
   const returned=context.requirements;
   const visibleIds=ids.filter(id=>Array.isArray(returned[id]));
   if(!visibleIds.length) throw new Error("None of the selected programs is available from the current catalog.");
-  const normalized=normalizedCoreRequirementTrees(returned,visibleIds);
+  const normalized=programRequirementModel.normalizeProgramTrees({requirementTrees:returned,programIds:visibleIds,referenceRequirementTrees:ST.referenceRequirementTrees,availablePrograms:ST.availablePrograms});
   ST.selectedPrograms=visibleIds;
   ST.catalogListedProgramIds=context.catalogListedProgramIds;
   ST.requirementTrees=normalized;
@@ -2195,9 +2070,9 @@ async function loadSelectedRequirements(programIds){
   ST.doubleCountRules=context.doubleCountRules;
   ST.doubleCountExceptions=context.doubleCountExceptions;
   ST.programEligibilityRules=context.eligibilityRules;
-  ST.majorRequirementTree=buildRequirementTree(requirementsForDisplay(normalized,visibleIds));
+  ST.majorRequirementTree=buildRequirementTree(programRequirementModel.requirementsForDisplay({requirementTrees:normalized,programIds:visibleIds}));
   if(ST.tab!=="core") useRequirementTree(ST.majorRequirementTree);
-  ST.doubleCount=computeDoubleCountOverlaps(normalized,visibleIds);
+  ST.doubleCount=programRequirementModel.computeDoubleCount({requirementTrees:normalized,programIds:visibleIds,availablePrograms:ST.availablePrograms,doubleCountExceptions:ST.doubleCountExceptions,doubleCountPolicies:ST.doubleCountPolicies});
   ST.activeProgram=visibleIds.length===1 ? (ST.availablePrograms||[]).find(program=>program.id===visibleIds[0])||null : null;
   return {requirements:normalized,policies:ST.doubleCountPolicies};
 }
