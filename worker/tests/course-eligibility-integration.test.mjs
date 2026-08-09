@@ -28,19 +28,21 @@ test("the browser migrates v1 state and evaluates the selected target term", asy
     frontend,
     /<script src="packages\/planner\/src\/eligibility-logic\.js"><\/script>/,
   );
+  assert.match(
+    frontend,
+    /<script src="packages\/planner\/src\/academic-progress-model\.js"><\/script>/,
+  );
   assert.match(frontend, /<script src="apps\/web\/src\/planner-state-store\.js"><\/script>/);
   assert.match(frontend, /CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic\.STATE_VERSION/);
   assert.match(frontend, /ScheduleRUPlannerStateStore\.load\(/);
+  assert.match(frontend, /ScheduleRUAcademicProgressModel\.create\(/);
   assert.match(frontend, /function confirmedAcademicCreditEntries\(/);
-  assert.match(frontend, /\.\.\.courseCodesFromText\(ap\.equiv\)/);
-  assert.match(frontend, /ScheduleRUAcademicCredit\.normalizeCourseCode\(value\)/);
   assert.match(frontend, /function apFulfillsRequirementCourse\(/);
   assert.match(frontend, /function plannedScheduleCreditEntries\(/);
   assert.match(frontend, /function courseEligibilityForTerm\(/);
   assert.match(frontend, /function loadCourseEligibilityForCodes\(/);
   assert.match(frontend, /courseEligibilityFetched:\{\}/);
   assert.match(frontend, /await loadCourseEligibilityForCodes\(\[record\.code\]\)/);
-  assert.match(frontend, /const eligibility=course\?\.eligibility\|\|ST\.courseEligibilityByCode\?\.\[course\?\.code\]\|\|null/);
   assert.match(frontend, /function reviewedEligibilityForCourse\(/);
   assert.match(frontend, /function courseEligibilityNotice\(/);
   assert.match(frontend, /Planning eligibility/);

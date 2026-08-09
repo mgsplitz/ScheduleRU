@@ -283,9 +283,9 @@ test("requirement picker, placeholders, and AP prerequisite credit use their sys
   assert.doesNotMatch(html, />Requirement filled</);
   assert.match(html, /data-pintent=/);
   assert.match(html, /candidateSelectionContext:placeholder\.candidateSelectionContext/);
-  assert.match(html, /ScheduleRUAcademicCredit\.normalizeCourseCode\(value\)/);
+  assert.match(html, /ScheduleRUAcademicProgressModel\.create\(/);
   assert.match(html, /\.\.\.confirmedAcademicCourseCodes\(\)/);
-  assert.match(html, /ScheduleRUAcademicCredit\.expandedPlannedCourseEntries\(/);
+  assert.match(html, /function plannedScheduleCreditEntries\(/);
 });
 
 test("Core placeholder choices open a labeled Courses catalog filter instead of a no-op modal path", () => {

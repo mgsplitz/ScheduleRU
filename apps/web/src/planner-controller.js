@@ -78,6 +78,14 @@ const programRequirementModel=ScheduleRUProgramRequirementModel;
 const {requirementCourseId,build:buildRequirementTree}=ScheduleRURequirementTreeBuilder;
 const semesterScheduleModel=ScheduleRUSemesterScheduleModel;
 const {dayIndex,meetingTimeRange,formatClock,buildPermutations}=semesterScheduleModel;
+const academicProgressModel=ScheduleRUAcademicProgressModel.create({
+  getState:()=>ST,
+  getApAwards:()=>AP,
+  getRequirementTrees:()=>[ST.majorRequirementTree,ST.coreRequirementTree].filter(Boolean),
+  courseRecordFromId,
+  courseCodesFromText,
+});
+const {creditNumber}=ScheduleRUAcademicProgressModel;
 function plannerStorage(){ return typeof localStorage!=="undefined"?localStorage:null; }
 function restorePlannerState(){
   const restored=ScheduleRUPlannerStateStore.load({
@@ -130,58 +138,20 @@ AP.forEach(a => a.fulfills.forEach(cid => {
   AP_FULFILLS[cid].push(a.id);
 }));
 
-function creditNumber(value){
-  const match=String(value??"").match(/\d+(?:\.\d+)?/);
-  const number=Number(match?.[0]);
-  return Number.isFinite(number)&&number>=0?number:0;
-}
 function confirmedAcademicCreditEntries(){
-  const entries=[];
-  AP.filter(ap=>ST.apOn[ap.id]).forEach(ap=>entries.push({
-    id:"ap:"+ap.id, source:"ap", credits:creditNumber(ap.credits),
-    course_code:courseCodesFromText(ap.equiv)[0]||"",
-    equivalent_course_codes:[...new Set([
-      ...courseCodesFromText(ap.equiv),
-      ...(ap.fulfills||[]).map(value=>globalThis.ScheduleRUAcademicCredit.normalizeCourseCode(value)).filter(Boolean),
-    ])],
-  }));
-  Object.entries(ST.completed||{}).forEach(([id,taken])=>{
-    if(!taken) return;
-    const course=courseRecordFromId(id);
-    if(course) entries.push({
-      id:"completed:"+id, source:"rutgers_completed", credits:creditNumber(course.credits), course_code:course.code,
-    });
-  });
-  Object.values(ST.creditLedger||{}).forEach(entry=>entries.push(entry));
-  return globalThis.ScheduleRUEligibilityLogic.confirmedCreditEntries(entries);
-}
-function academicRequirementTrees(){
-  return [ST.majorRequirementTree,ST.coreRequirementTree].filter(Boolean);
+  return academicProgressModel.confirmedCreditEntries();
 }
 function resolvedAcademicCourseCodes(codes){
-  return [...globalThis.ScheduleRUAcademicCredit.satisfiedCourseCodes({
-    confirmedCourseCodes:codes,
-    requirementTrees:academicRequirementTrees(),
-  })];
+  return academicProgressModel.resolvedCourseCodes(codes);
 }
 function confirmedAcademicCourseCodes(){
-  const logic=globalThis.ScheduleRUEligibilityLogic;
-  return resolvedAcademicCourseCodes(confirmedAcademicCreditEntries().flatMap(entry=>logic.entryCourseCodes(entry)));
+  return academicProgressModel.confirmedCourseCodes(confirmedAcademicCreditEntries());
 }
 function plannedScheduleCreditEntries(){
-  const entries=Object.values(ST.schedule||{}).map(entry=>({
-    id:"scheduled:"+entry.code, course_code:entry.code, credits:creditNumber(entry.credits),
-    year:Number(entry.year), sem:entry.sem,
-  }));
-  return globalThis.ScheduleRUAcademicCredit.expandedPlannedCourseEntries({
-    entries,
-    requirementTrees:academicRequirementTrees(),
-  });
+  return academicProgressModel.scheduledCreditEntries();
 }
 function courseEligibilityForTerm(course,term){
-  const payload=course?.eligibility||ST.courseEligibilityByCode?.[course?.code]||null;
-  return globalThis.ScheduleRUEligibilityLogic.evaluateEligibility({
-    targetTerm:term, mode:"plan", review:payload?.review, conditions:payload?.conditions||[],
+  return academicProgressModel.eligibilityForTerm(course,term,{
     confirmedEntries:confirmedAcademicCreditEntries(), scheduledEntries:plannedScheduleCreditEntries(),
   });
 }
@@ -196,8 +166,7 @@ function plannerEligibilityLabel(result){
   return "Eligibility needs review; verify with Rutgers before registration";
 }
 function reviewedEligibilityForCourse(course){
-  const payload=course?.eligibility||ST.courseEligibilityByCode?.[course?.code]||null;
-  return payload?.review?.review_status==="reviewed" ? payload : null;
+  return academicProgressModel.reviewedEligibility(course);
 }
 function courseEligibilityNotice(course,term){
   if(!reviewedEligibilityForCourse(course)) return "";

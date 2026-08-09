@@ -102,6 +102,9 @@ Requirement completion, progress totals, and memoized exclusive allocation are
 coordinated by `packages/requirements/src/requirement-progress-model.js`.
 Meeting-time normalization, conflict detection, blocker reporting, and bounded
 section permutations live in `packages/scheduling/src/semester-schedule-model.js`.
+Selected AP awards, completed and transferred credit, requirement equivalency
+closure, planned-credit evidence, and reviewed eligibility orchestration live
+in `packages/planner/src/academic-progress-model.js`.
 
 ## Dependency rules
 
