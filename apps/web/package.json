@@ -17,11 +17,12 @@
     "./program-picker-controller": "./src/program-picker-controller.js",
     "./program-picker": "./src/program-picker-logic.js",
     "./requirement-picker-controller": "./src/requirement-picker-controller.js",
+    "./required-panel-controller": "./src/required-panel-controller.js",
     "./requirement-data-loader": "./src/requirement-data-loader.js",
     "./schedule-builder-controller": "./src/schedule-builder-controller.js",
     "./schedule-builder-view": "./src/schedule-builder-view.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/catalog-page-controller.test.mjs ../../worker/tests/course-details-controller.test.mjs ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/home-school-transaction.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-apply-transaction.test.mjs ../../worker/tests/program-picker-controller.test.mjs ../../worker/tests/program-picker-logic.test.mjs ../../worker/tests/requirement-picker-controller.test.mjs ../../worker/tests/schedule-builder-controller.test.mjs ../../worker/tests/schedule-builder-view.test.mjs"
+    "test": "node --test ../../worker/tests/catalog-page-controller.test.mjs ../../worker/tests/course-details-controller.test.mjs ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/home-school-transaction.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-apply-transaction.test.mjs ../../worker/tests/program-picker-controller.test.mjs ../../worker/tests/program-picker-logic.test.mjs ../../worker/tests/requirement-picker-controller.test.mjs ../../worker/tests/required-panel-controller.test.mjs ../../worker/tests/schedule-builder-controller.test.mjs ../../worker/tests/schedule-builder-view.test.mjs"
   }
 }

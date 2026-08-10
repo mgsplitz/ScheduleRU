@@ -347,24 +347,11 @@ test("program discovery spans supported schools while policy lookup keeps the ho
   assert.equal(context.ST.homeSchoolSlug, "rbsnb");
 });
 
-test("program tabs include a shared family only for its contributing programs", () => {
-  const context = {
-    ST: { requirementTrees: {} },
-    globalThis: {},
-  };
-  vm.runInNewContext(
-    `${functionSource("treeIncludesSourceProgram")};`
-    + `${functionSource("groupBelongsToRequiredProgram")};`
-    + "globalThis.belongs = groupBelongsToRequiredProgram;",
-    context,
-  );
-  const sharedCore = {
-    sourceProgramId: "accounting-core-variant",
-    sourceProgramIds: ["rbsnb-bait", "rbsnb-finance"],
-  };
-  assert.equal(context.globalThis.belongs(sharedCore, "rbsnb-finance"), true);
-  assert.equal(context.globalThis.belongs(sharedCore, "rbsnb-bait"), true);
-  assert.equal(context.globalThis.belongs(sharedCore, "rbsnb-accounting"), false);
+test("program-tab ownership is delegated to the required-panel controller", () => {
+  assert.match(html, /<script src="apps\/web\/src\/required-panel-controller\.js"><\/script>/);
+  assert.match(html, /ScheduleRURequiredPanelController\.create\(/);
+  assert.match(html, /installRequiredPanelController\(requiredPanelPresentationController\)/);
+  assert.match(html, /function groupBelongsToProgram\(/);
 });
 
 test("home-school replacement rolls back on failure and ignores stale responses", () => {

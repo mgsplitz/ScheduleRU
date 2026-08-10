@@ -142,52 +142,16 @@ function issueList(){
   return issues;
 }
 function showIssues(){const issues=issueList(),groups=new Map();issues.forEach(issue=>{const entries=groups.get(issue.group)||[];entries.push(issue);groups.set(issue.group,entries);});modalController.show({title:`Issues · ${issues.length}`,body:issues.length?[...groups.entries()].map(([group,entries])=>`<section><h3>${html(group)}</h3>${entries.map(issue=>`<div class="planner-issue planner-issue-${issue.severity}"><span class="issue-severity issue-severity-${issue.severity}">${html(issue.severity)}</span><span>${html(issue.text)}</span></div>`).join("")}</section>`).join(""):"<p>No active planning issues.</p>",actions:[{label:"Close",secondary:true}]}); }
-function orderedPrograms(){ const rows=selectedProgramRows(); const byId=new Map(rows.map(row=>[row.id,row])); const ids=[ST.primaryProgramId,ST.secondaryProgramId,...rows.map(row=>row.id)].filter((id,index,list)=>id&&list.indexOf(id)===index);return ids.map(id=>byId.get(id)).filter(Boolean); }
-function setRequiredProgram(id){
-  if(ST.requiredProgramTab!==id){ST.requiredRootOpen={};ST.nestedGroupOpen={};}
-  ST.requiredProgramTab=id;renderPanel();
-}
-function treeIncludesSourceProgram(roots,sourceProgramId){return (roots||[]).some(root=>root?.program_id===sourceProgramId||treeIncludesSourceProgram(root?.children,sourceProgramId));}
-function groupBelongsToRequiredProgram(group,programId){if(Array.isArray(group?.sourceProgramIds)&&group.sourceProgramIds.length)return group.sourceProgramIds.includes(programId);return !group?.sourceProgramId||group.sourceProgramId===programId||treeIncludesSourceProgram(ST.requirementTrees?.[programId],group.sourceProgramId);}
-function requiredRootGroupHtml(group,collapsed){
-  if(group.rule!=="all")return groupHtml(group.id);
-  const applied=groupAppliedCourseIds(group),members=(group.members||[]).filter(id=>!applied.includes(id));
-  const body=`${selectorGuidanceHtml(group)}${applied.length?`<div class="choice-picked"><strong style="font-size:10px;">Applied here</strong><div class="cgrid">${applied.map(cardHtml).join("")}</div></div>`:""}${members.length?`<div class="cgrid">${members.map(cardHtml).join("")}</div>`:""}${(group.children||[]).map(groupHtml).join("")}`;
-  return `<section class="required-root"><button class="required-root-hdr" data-required-root-toggle="${html(group.id)}" aria-expanded="${String(!collapsed)}"><span>${html(groupDisplayName(group))}</span><span>${collapsed?"Show":"Hide"}</span></button><div class="required-root-body${collapsed?"":" open"}" id="required-root-${html(group.id)}">${body}</div></section>`;
-}
-const legacyRenderRequired=renderRequired;
-renderRequired=function(){
-  useRequirementTree(ST.majorRequirementTree); const pb=document.getElementById("pb"); if(ST.requirementsLoading||ST.requirementsError){legacyRenderRequired();return;}
-  const programs=orderedPrograms(); if(!ST.requiredProgramTab||!programs.some(program=>program.id===ST.requiredProgramTab))ST.requiredProgramTab=programs[0]?.id||"";
-  const issueCount=issueList().length; const subtabs=programs.map(program=>`<button class="program-subtab ${program.id===ST.requiredProgramTab?"active":""} ${program.type==="minor"?"program-subtab-minor":""}" data-required-program="${html(program.id)}">${html(program.name)}</button>`).join("");
-  let groups=ROOT_GROUPS.map(id=>GROUPS[id]).filter(Boolean).filter(group=>groupBelongsToRequiredProgram(group,ST.requiredProgramTab));
-  const selectedMajorIds=programs.filter(program=>program.type==="major").map(program=>program.id);
-  let content=groups.map(group=>{
-    const defaultOpen=!globalThis.ScheduleRUPlannerUI.shouldAutoCollapseSharedGroup({group,selectedMajorIds});
-    const open=globalThis.ScheduleRUCourseInteractionLogic.expansionOpen({
-      stored:ST.requiredRootOpen[group.id],defaultOpen,
-    });
-    return requiredRootGroupHtml(group,!open);
-  }).join("");
-  if(!content)content=`<div class="empty" style="margin-top:30px;">No reviewed requirements are available for this program yet.</div>`;
-  pb.innerHTML=`<div class="required-tools"><span class="leg">Reviewed requirements for this program.</span><button class="issues-btn" id="issuesBtn">Issues · ${issueCount}</button></div><div class="subtabs">${subtabs}</div>${content}<div class="planning-disclaimer">ScheduleRU is a planning aid, not an official degree audit.</div>`;
-  attachCardEvents(pb);
-  pb.querySelectorAll("[data-required-program]").forEach(button=>button.addEventListener("click",()=>setRequiredProgram(button.dataset.requiredProgram)));
-  pb.querySelectorAll("[data-required-root-toggle]").forEach(button=>button.addEventListener("click",()=>{
-    const groupId=button.dataset.requiredRootToggle,body=document.getElementById("required-root-"+groupId),open=body?.classList.toggle("open");
-    ST.requiredRootOpen[groupId]=!!open;button.setAttribute("aria-expanded",String(!!open));button.lastElementChild.textContent=open?"Hide":"Show";
-  }));
-  pb.querySelectorAll("[data-gtog]").forEach(toggle=>{
-    const groupId=toggle.dataset.gtog,body=document.getElementById("gb-"+groupId);
-    const open=globalThis.ScheduleRUCourseInteractionLogic.expansionOpen({stored:ST.nestedGroupOpen[groupId],defaultOpen:true});
-    body?.classList.toggle("open",open);
-    toggle.addEventListener("click",()=>{const next=body?.classList.toggle("open");ST.nestedGroupOpen[groupId]=!!next;});
-  });
-  pb.querySelectorAll("[data-gpicker]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openRequirementPicker(button.dataset.gpicker);}));
-  pb.querySelectorAll("[data-gbrowse]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openRequirementPicker(button.dataset.gbrowse);}));
-  pb.querySelectorAll("[data-gclear]").forEach(button=>button.addEventListener("click",()=>{delete ST.groupSelections[button.dataset.gclear];renderPanel();}));
-  document.getElementById("issuesBtn")?.addEventListener("click",showIssues);
-};
+const requiredPanelPresentationController=ScheduleRURequiredPanelController.create({
+  getState:()=>ST,document,selectedProgramRows,useRequirementTree,
+  getRequirementState:()=>({groups:GROUPS,rootGroupIds:ROOT_GROUPS}),
+  issueList,escapeHtml:html,groupHtml,groupDisplayName,groupAppliedCourseIds,
+  selectorGuidanceHtml,cardHtml,attachCardEvents,
+  shouldAutoCollapseSharedGroup:ScheduleRUPlannerUI.shouldAutoCollapseSharedGroup,
+  expansionOpen:ScheduleRUCourseInteractionLogic.expansionOpen,
+  openRequirementPicker,showIssues,renderPanel,
+});
+installRequiredPanelController(requiredPanelPresentationController);
 
 const programApplyTransaction=ScheduleRUProgramApplyTransaction.create({
   getState:()=>ST,

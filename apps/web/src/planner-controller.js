@@ -1098,49 +1098,9 @@ function coreGroupHtml(gk,allocation){
     ${selectedHtml}<div class="choice-actions"><button class="choice-btn" data-gpicker="${gk}">Browse approved courses</button>
     ${selected.length?`<button class="choice-btn secondary" data-gclear="${gk}">Clear picked courses</button>`:""}</div></div></div>`;
 }
-function renderRequired(){
-  useRequirementTree(ST.majorRequirementTree);
-  const pb=document.getElementById("pb");
-  if(ST.requirementsLoading){
-    pb.innerHTML=`<div class="empty" style="margin-top:30px;">Loading requirements from Rutgers…</div>`;
-    return;
-  }
-  if(ST.requirementsError){
-    pb.innerHTML=`<div class="api-status err">Could not load degree requirements: ${escapeHtml(ST.requirementsError)}</div>`;
-    return;
-  }
-  let h=`<div class="leg">Gray = not yet unlocked. Green = completed or AP-waived. Click any course card for full details; click ○ to mark a course taken/waived.</div>${catalogListedProgramsBannerHtml()}${programEligibilityBannerHtml()}${doubleCountBannerHtml()}`;
-  ROOT_GROUPS.forEach(gk=>{
-    const g=GROUPS[gk];
-    if(!g) return;
-    const applied=groupAppliedCourseIds(g);
-    const members=(g.members||[]).filter(id=>!applied.includes(id));
-    const children=(g.children||[]).map(groupHtml).join("");
-    if(g.rule==="all"){
-      h+=`<div class="sec-hdr">${groupDisplayName(g)}</div>`;
-      h+=selectorGuidanceHtml(g);
-      if(applied.length) h+=`<div class="choice-picked"><strong style="font-size:10px;">Applied here</strong><div class="cgrid">${applied.map(id=>cardHtml(id)).join("")}</div></div>`;
-      if(members.length) h+=`<div class="cgrid">${members.map(id=>cardHtml(id)).join("")}</div>`;
-      h+=children;
-    } else {
-      h+=groupHtml(gk);
-    }
-  });
-  if(!ROOT_GROUPS.length) h+=`<div class="empty" style="margin-top:30px;">No reviewed requirements are available for the selected catalog-listed program yet.</div>`;
-  pb.innerHTML=h;
-  attachCardEvents(pb);
-  pb.querySelectorAll("[data-gtog]").forEach(d=>d.addEventListener("click",()=>
-    document.getElementById("gb-"+d.dataset.gtog).classList.toggle("open")));
-  pb.querySelectorAll("[data-gpicker]").forEach(b=>b.addEventListener("click",e=>{
-    e.stopPropagation(); openRequirementPicker(b.dataset.gpicker);
-  }));
-  pb.querySelectorAll("[data-gbrowse]").forEach(b=>b.addEventListener("click",e=>{
-    e.stopPropagation(); openSelectorCourseBrowser(b.dataset.gbrowse);
-  }));
-  pb.querySelectorAll("[data-gclear]").forEach(b=>b.addEventListener("click",e=>{
-    e.stopPropagation(); delete ST.groupSelections[b.dataset.gclear]; renderPanel();
-  }));
-}
+let requiredPanelController=null;
+function installRequiredPanelController(controller){requiredPanelController=controller;}
+function renderRequired(){return requiredPanelController?.render();}
 
 function catalogListedProgramsBannerHtml(){
   const listed=selectedProgramRows().filter(program=>program?.requirements_available===false||program?.coverage_status==="catalog_listed");

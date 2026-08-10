@@ -20,6 +20,7 @@ export const webControllerSource = [
   "apps/web/src/course-details-controller.js",
   "apps/web/src/course-record-model.js",
   "apps/web/src/requirement-picker-controller.js",
+  "apps/web/src/required-panel-controller.js",
   "apps/web/src/schedule-builder-controller.js",
   "apps/web/src/schedule-builder-view.js",
   "apps/web/src/program-picker-logic.js",

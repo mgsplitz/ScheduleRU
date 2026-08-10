@@ -30,6 +30,8 @@ hydration, permutation recomputation, closed-section inclusion, and acceptance.
 presentation, schedule navigation, and browser event binding.
 `src/requirement-picker-controller.js` owns the approved-course picker,
 including stale-safe selector searches, pagination, focus, and picker actions.
+`src/required-panel-controller.js` owns selected-program requirement tabs,
+requirement-root presentation, expansion state, Issues access, and panel actions.
 `src/planner-controller.js` owns the compatibility planner and shared requirement
 integration, while `src/guided-setup-controller.js` owns onboarding, program
 selection, modal, and plan-preview orchestration. Smaller domain decisions
