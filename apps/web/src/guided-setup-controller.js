@@ -114,26 +114,21 @@ renderRequired=function(){
   document.getElementById("issuesBtn")?.addEventListener("click",showIssues);
 };
 
-function applyProgramRoles(ids,primaryId=ST.programDraftPrimaryId){const byId=new Map((ST.availablePrograms||[]).map(program=>[program.id,program]));const majors=ids.filter(id=>byId.get(id)?.type==="major");ST.primaryProgramId=majors.includes(primaryId)?primaryId:majors[0]||null;ST.secondaryProgramId=majors.find(id=>id!==ST.primaryProgramId)||null;ST.requiredProgramTab=ST.primaryProgramId||ids[0]||"";}
-function setProgramApplyPending(pending){ST.programApplyPending=!!pending;const button=document.getElementById("programApply");if(button){button.disabled=!!pending;button.textContent=pending?"Applying…":"Apply programs";}}
-function acceptedProgramSnapshot(){return {selectedPrograms:ST.selectedPrograms,primaryProgramId:ST.primaryProgramId,secondaryProgramId:ST.secondaryProgramId,requiredProgramTab:ST.requiredProgramTab,requirementTrees:ST.requirementTrees,referenceRequirementTrees:ST.referenceRequirementTrees,majorRequirementTree:ST.majorRequirementTree,catalogListedProgramIds:ST.catalogListedProgramIds,doubleCountPolicies:ST.doubleCountPolicies,doubleCountRules:ST.doubleCountRules,doubleCountExceptions:ST.doubleCountExceptions,programEligibilityRules:ST.programEligibilityRules,activeProgram:ST.activeProgram,doubleCount:ST.doubleCount,requirementsError:ST.requirementsError};}
-async function acceptProgramDraft(ids,generation){
-  if(generation!==ST.programApplyGeneration||ST.programApplyPending)return;
-  const snapshot=acceptedProgramSnapshot();setProgramApplyPending(true);ST.requirementsLoading=true;renderPanel();
-  try{await loadSelectedRequirements(ids);if(generation!==ST.programApplyGeneration)return;ST.selectedPrograms=ids;applyProgramRoles(ids);ST.programSelectionConfirmed=true;ST.requirementsError="";savePlannerState();updateProgramTitle();renderOnboarding();closeProgramPicker();}
-  catch(error){if(generation===ST.programApplyGeneration){Object.assign(ST,snapshot);showProgramPolicyFeedback({errors:[{message:`Programs were not changed: ${error.message||"requirements could not load"}.`} ]});}}
-  finally{if(generation===ST.programApplyGeneration){ST.requirementsLoading=false;setProgramApplyPending(false);renderPanel();}}
-}
-async function applyProgramDraft(){
-  if(ST.programApplyPending)return;const ids=[...new Set(ST.programDraft||[])],majors=(ST.availablePrograms||[]).filter(program=>ids.includes(program.id)&&program.type==="major");
-  if(!majors.length){showProgramPolicyFeedback({errors:[{message:"Choose one primary major before applying programs."}]});return;}if(majors.length>2){showProgramPolicyFeedback({errors:[{message:"Choose one primary major and, if needed, one secondary major. Three majors are not supported."}]});return;}
-  const generation=(ST.programApplyGeneration||0)+1;ST.programApplyGeneration=generation;setProgramApplyPending(true);let check;
-  try{check=await backendFetch("/api/program-selection-check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({home_school:ST.homeSchoolSlug,program_ids:ids})});}catch(_){if(generation===ST.programApplyGeneration)showProgramPolicyFeedback({errors:[{message:"Program policy checks could not be loaded. Your saved programs were not changed."}]});}finally{if(generation===ST.programApplyGeneration)setProgramApplyPending(false);}
-  if(!check||generation!==ST.programApplyGeneration)return;if(!check.allowed){showProgramPolicyFeedback(check);return;}
-  if(check.warnings?.length){modalController.show({title:"Review program warnings",body:`<ul class="policy-warning-list">${check.warnings.map(warning=>`<li>${html(warning.message||warning.note||"This program combination needs advising.")}</li>`).join("")}</ul>`,actions:[{label:"Go back",secondary:true},{label:"Apply anyway",onClick:()=>acceptProgramDraft(ids,generation)}]});return;}
-  await acceptProgramDraft(ids,generation);
-}
-const oldApply=document.getElementById("programApply"),newApply=oldApply.cloneNode(true);oldApply.replaceWith(newApply);newApply.addEventListener("click",applyProgramDraft);
+const programApplyTransaction=ScheduleRUProgramApplyTransaction.create({
+  getState:()=>ST,
+  checkSelection:ids=>backendFetch("/api/program-selection-check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({home_school:ST.homeSchoolSlug,program_ids:ids})}),
+  loadCandidate:loadSelectedRequirementCandidate,
+  programDraftView:ScheduleRUProgramPickerLogic.programDraftView,
+  applyRequirementTree:tree=>{if(ST.tab!=="core")useRequirementTree(tree);},
+  saveState:savePlannerState,
+  onPendingChange:pending=>{const button=document.getElementById("programApply");if(button){button.disabled=pending;button.textContent=pending?"Applying…":"Apply programs";}},
+  onLoadingChange:()=>renderPanel(),
+  onFeedback:showProgramPolicyFeedback,
+  onWarnings:({warnings,proceed})=>modalController.show({title:"Review program warnings",body:`<ul class="policy-warning-list">${warnings.map(warning=>`<li>${html(warning.message||warning.note||"This program combination needs advising.")}</li>`).join("")}</ul>`,actions:[{label:"Go back",secondary:true},{label:"Apply anyway",onClick:proceed}]}),
+  onCommitted:()=>{updateProgramTitle();renderOnboarding();closeProgramPicker();},
+});
+function applyProgramDraft(){return programApplyTransaction.execute({ids:ST.programDraft,primaryId:ST.programDraftPrimaryId});}
+document.getElementById("programApply").addEventListener("click",applyProgramDraft);
 let programDialogFocusRestore=null;
 function setProgramDialogOpen(open){const root=document.getElementById("programOv"),dialog=root.querySelector("[role=dialog]");root.setAttribute("aria-hidden",String(!open));[document.getElementById("app"),document.getElementById("page-courses"),document.querySelector(".pagenav")].filter(Boolean).forEach(node=>{node.inert=open||!ST.onboarding?.completed;});document.getElementById("onboarding").inert=open;if(open){programDialogFocusRestore=document.activeElement;requestAnimationFrame(()=>dialog.querySelector("input, select, button:not([disabled])")?.focus());}else{const restore=programDialogFocusRestore;programDialogFocusRestore=null;requestAnimationFrame(()=>{if(restore?.isConnected&&restore!==document.body)restore.focus();else(!ST.onboarding?.completed?document.getElementById("onboardingPrograms"):document.getElementById("programBtn"))?.focus();});}}
 const legacyOpenProgramPicker=openProgramPicker,legacyCloseProgramPicker=closeProgramPicker,legacyRenderProgramPickerList=renderProgramPickerList;

@@ -67,10 +67,10 @@ test("localhost uses the development Worker instead of the production API", () =
 
 test("hackathon UI persists accepted programs, serializes program applies, and keeps the onboarding accessible", () => {
   const html = webApplicationSource;
-  assert.match(html, /primaryProgramId:ST\.primaryProgramId/);
-  assert.match(html, /secondaryProgramId:ST\.secondaryProgramId/);
-  assert.match(html, /ST\.programApplyPending/);
-  assert.match(html, /ST\.programApplyGeneration/);
+  assert.match(html, /<script src="apps\/web\/src\/program-apply-transaction\.js"><\/script>/);
+  assert.match(html, /ScheduleRUProgramApplyTransaction\.create\(/);
+  assert.match(html, /function loadSelectedRequirementCandidate\(/);
+  assert.match(html, /programApplyTransaction\.execute\(/);
   assert.match(html, /id="onboarding"[^>]*role="dialog"[^>]*aria-modal="true"/);
   assert.match(html, /setOnboardingOpen\(/);
   assert.match(html, /document\.getElementById\("app"\)\.inert/);
@@ -132,8 +132,8 @@ test("program onboarding has no silent BAIT default and rerenders every draft mu
   assert.match(html, /programSelectionConfirmed/);
   assert.match(html, /ScheduleRUProgramPickerLogic\.programDraftView\(/);
   assert.match(html, /ST\.programDraft=\[\.\.\.draft\];[\s\S]*?renderProgramPickerList\(\)/);
-  assert.match(html, /ST\.programSelectionConfirmed=true/);
-  assert.match(html, /savePlannerState\(\);updateProgramTitle\(\);renderOnboarding\(\);closeProgramPicker\(\)/);
+  assert.match(html, /programSelectionConfirmed: true/);
+  assert.match(html, /onCommitted:\(\)=>\{updateProgramTitle\(\);renderOnboarding\(\);closeProgramPicker\(\);\}/);
   assert.match(html, /#programOv \.modal-footer\{[^}]*position:sticky[^}]*bottom:0/);
 });
 

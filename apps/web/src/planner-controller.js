@@ -483,7 +483,6 @@ function openProgramPicker(){
   ST.programDraft=[...ST.selectedPrograms];
   ST.programSearch="";
   ST.programBrowseSchoolSlug="";
-  delete ST.programDraftWarningSignature;
   document.getElementById("programPickerNote").textContent=`Choose a school, then select its majors and minors. Only reviewed programs show a requirement tree. ${selectionLimitSummary()} Your home school stays unchanged.`;
   showProgramPolicyFeedback(null);
   const search=document.getElementById("programSearch");
@@ -547,53 +546,12 @@ function renderProgramPickerList(){
       draft.delete(id);
     }
     ST.programDraft=[...draft];
-    delete ST.programDraftWarningSignature;
     renderProgramPickerList();
   }));
 }
 document.getElementById("programBtn").addEventListener("click", openProgramPicker);
 document.getElementById("programClose").addEventListener("click", closeProgramPicker);
 document.getElementById("programCancel").addEventListener("click", closeProgramPicker);
-document.getElementById("programApply").addEventListener("click", async()=>{
-  const ids=(ST.programDraft||[]);
-  if(!ids.length){ showProgramPolicyFeedback({errors:[{message:"Choose at least one program."}]}); return; }
-  let selectionCheck;
-  try{
-    selectionCheck=await backendFetch("/api/program-selection-check",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({home_school:ST.homeSchoolSlug,program_ids:ids}),
-    });
-  }catch(err){
-    showProgramPolicyFeedback({errors:[{message:"Program policy checks could not be loaded. Your selection was not changed; please try again."}]});
-    return;
-  }
-  if(!selectionCheck.allowed){
-    showProgramPolicyFeedback(selectionCheck);
-    return;
-  }
-  const warningSignature=JSON.stringify((selectionCheck.warnings||[]).map(issue=>issue.code).sort());
-  if(selectionCheck.warnings?.length && ST.programDraftWarningSignature!==warningSignature){
-    ST.programDraftWarningSignature=warningSignature;
-    showProgramPolicyFeedback(selectionCheck);
-    return;
-  }
-  showProgramPolicyFeedback(selectionCheck);
-  ST.selectedPrograms=ids;
-  closeProgramPicker();
-  ST.requirementsLoading=true;
-  ST.requirementsError="";
-  renderPanel();
-  try{
-    await loadSelectedRequirements(ids);
-    updateProgramTitle();
-  }catch(err){
-    ST.requirementsError=err.message||"Could not load the selected programs.";
-  }finally{
-    ST.requirementsLoading=false;
-    renderPanel();
-  }
-});
 
 /* ============================================================
    PANEL EXPAND
@@ -1731,7 +1689,7 @@ async function loadAvailableSchools(){
 async function loadRequirements(programId){
   return loadSelectedRequirements([programId]);
 }
-async function loadSelectedRequirements(programIds){
+async function loadSelectedRequirementCandidate(programIds){
   const ids=[...new Set((programIds||[]).filter(Boolean))];
   if(!ids.length) throw new Error("Choose at least one program.");
   const context=await requirementDataLoader.loadRequirements({programIds:ids,homeSchoolSlug:ST.homeSchoolSlug});
@@ -1739,18 +1697,23 @@ async function loadSelectedRequirements(programIds){
   const visibleIds=ids.filter(id=>Array.isArray(returned[id]));
   if(!visibleIds.length) throw new Error("None of the selected programs is available from the current catalog.");
   const normalized=programRequirementModel.normalizeProgramTrees({requirementTrees:returned,programIds:visibleIds,referenceRequirementTrees:ST.referenceRequirementTrees,availablePrograms:ST.availablePrograms});
-  ST.selectedPrograms=visibleIds;
-  ST.catalogListedProgramIds=context.catalogListedProgramIds;
-  ST.requirementTrees=normalized;
-  ST.doubleCountPolicies=context.doubleCountPolicies;
-  ST.doubleCountRules=context.doubleCountRules;
-  ST.doubleCountExceptions=context.doubleCountExceptions;
-  ST.programEligibilityRules=context.eligibilityRules;
-  ST.majorRequirementTree=buildRequirementTree(programRequirementModel.requirementsForDisplay({requirementTrees:normalized,programIds:visibleIds}));
-  if(ST.tab!=="core") useRequirementTree(ST.majorRequirementTree);
-  ST.doubleCount=programRequirementModel.computeDoubleCount({requirementTrees:normalized,programIds:visibleIds,availablePrograms:ST.availablePrograms,doubleCountExceptions:ST.doubleCountExceptions,doubleCountPolicies:ST.doubleCountPolicies});
-  ST.activeProgram=visibleIds.length===1 ? (ST.availablePrograms||[]).find(program=>program.id===visibleIds[0])||null : null;
-  return {requirements:normalized,policies:ST.doubleCountPolicies};
+  return {
+    selectedPrograms:visibleIds,catalogListedProgramIds:context.catalogListedProgramIds,
+    requirementTrees:normalized,doubleCountPolicies:context.doubleCountPolicies,
+    doubleCountRules:context.doubleCountRules,doubleCountExceptions:context.doubleCountExceptions,
+    programEligibilityRules:context.eligibilityRules,
+    majorRequirementTree:buildRequirementTree(programRequirementModel.requirementsForDisplay({requirementTrees:normalized,programIds:visibleIds})),
+    doubleCount:programRequirementModel.computeDoubleCount({requirementTrees:normalized,programIds:visibleIds,availablePrograms:ST.availablePrograms,doubleCountExceptions:context.doubleCountExceptions,doubleCountPolicies:context.doubleCountPolicies}),
+    activeProgram:visibleIds.length===1 ? (ST.availablePrograms||[]).find(program=>program.id===visibleIds[0])||null : null,
+  };
+}
+function commitSelectedRequirementCandidate(candidate){
+  Object.assign(ST,candidate);
+  if(ST.tab!=="core")useRequirementTree(ST.majorRequirementTree);
+  return {requirements:ST.requirementTrees,policies:ST.doubleCountPolicies};
+}
+async function loadSelectedRequirements(programIds){
+  return commitSelectedRequirementCandidate(await loadSelectedRequirementCandidate(programIds));
 }
 async function loadSchoolReferenceRequirementTrees(programs){
   const ids=(programs||[]).map(program=>program.id).filter(Boolean);

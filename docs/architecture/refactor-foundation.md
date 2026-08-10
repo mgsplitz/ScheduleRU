@@ -173,6 +173,10 @@ picker module. Home-school replacement is a separate stale-safe transaction
 that commits a complete academic context or restores the prior context while
 leaving the semester plan untouched. The compatibility controller retains
 only data loading and interface orchestration for this workflow.
+Program apply follows the same boundary: requirement requests build an
+immutable candidate, and the apply transaction performs the only accepted
+state commit after policy validation. Superseded legacy click handling has
+been removed.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
