@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { webApplicationSource } from "./helpers/web-source.mjs";
 
+await import("../../apps/web/src/program-picker-logic.js");
+
 const html = webApplicationSource;
 
 function functionSource(name) {
@@ -327,13 +329,11 @@ test("program discovery spans supported schools while policy lookup keeps the ho
       },
     },
     savePlannerState: () => {},
+    ScheduleRUProgramPickerLogic: globalThis.ScheduleRUProgramPickerLogic,
     globalThis: {},
   };
   vm.runInNewContext(
-    `${functionSource("eligibilityRuleValues")};`
-    + `${functionSource("programIsAvailableForSchool")};`
-    + `${functionSource("programIsAvailableForHomeSchool")};`
-    + `${asyncFunctionSource("loadAvailablePrograms")};`
+    `${asyncFunctionSource("loadAvailablePrograms")};`
     + "globalThis.load = loadAvailablePrograms;",
     context,
   );
@@ -365,55 +365,13 @@ test("program tabs include a shared family only for its contributing programs", 
 });
 
 test("home-school replacement rolls back on failure and ignores stale responses", () => {
-  assert.match(html, /function acceptedHomeSchoolSnapshot\(\)/);
-  assert.match(html, /function restoreHomeSchoolSnapshot\(snapshot\)/);
+  assert.match(html, /<script src="apps\/web\/src\/home-school-transaction\.js"><\/script>/);
+  assert.match(html, /ScheduleRUHomeSchoolTransaction\.create\(/);
   assert.match(html, /function loadHomeSchoolCandidate\(nextSchool\)/);
-  assert.match(html, /const generation=\(ST\.homeSchoolChangeGeneration\|\|0\)\+1/);
-  assert.match(html, /if\(generation!==ST\.homeSchoolChangeGeneration\)return;/);
-  assert.match(html, /commitHomeSchoolCandidate\(candidate\);\s*savePlannerState\(\)/);
-  assert.match(html, /restoreHomeSchoolSnapshot\(snapshot\);/);
+  assert.match(html, /return homeSchoolTransaction\.execute\(next\)/);
+  assert.match(html, /if \(generation !== state\(\)\.homeSchoolChangeGeneration\) return \{ status: "stale" \}/);
+  assert.match(html, /restore\(accepted\)/);
   assert.doesNotMatch(html, /ST\.selectedPrograms=\[\];\s*ST\.groupSelections=\{\};\s*ST\.requirementTrees=\{\};/);
-});
-
-test("home-school transaction restores the accepted context and discards stale candidates", async () => {
-  const commits = [];
-  const restores = [];
-  const saves = [];
-  const deferred = new Map();
-  const context = {
-    ST: { homeSchoolSlug: "sasnb", selectedPrograms: ["sas-major"], homeSchoolChangeGeneration: 0 },
-    schoolProfileBySlug: (slug) => ({ slug }),
-    acceptedHomeSchoolSnapshot: () => ({ homeSchoolSlug: "sasnb", selectedPrograms: ["sas-major"] }),
-    restoreHomeSchoolSnapshot: (snapshot) => { restores.push(snapshot); Object.assign(context.ST, snapshot); },
-    loadHomeSchoolCandidate: (school) => new Promise((resolve, reject) => { deferred.set(school.slug, { resolve, reject }); }),
-    commitHomeSchoolCandidate: (candidate) => { commits.push(candidate); Object.assign(context.ST, candidate); },
-    savePlannerState: () => saves.push("save"),
-    updateProgramTitle: () => {},
-    renderProgramSchoolSelector: () => {},
-    renderPanel: () => {},
-    openProgramPicker: () => {},
-    modalController: { show: () => {} },
-    escapeHtml: (value) => value,
-    globalThis: {},
-  };
-  vm.runInNewContext(`${asyncFunctionSource("changeHomeSchool")}; globalThis.changeHomeSchool = changeHomeSchool;`, context);
-
-  const failing = context.globalThis.changeHomeSchool("rbsnb", true);
-  deferred.get("rbsnb").reject(new Error("offline"));
-  await failing;
-  assert.equal(context.ST.homeSchoolSlug, "sasnb");
-  assert.equal(restores.length, 1);
-  assert.equal(saves.length, 0);
-
-  const first = context.globalThis.changeHomeSchool("rbsnb", true);
-  const second = context.globalThis.changeHomeSchool("sebs", true);
-  deferred.get("rbsnb").resolve({ homeSchoolSlug: "rbsnb" });
-  await first;
-  assert.equal(commits.length, 0);
-  deferred.get("sebs").resolve({ homeSchoolSlug: "sebs" });
-  await second;
-  assert.deepEqual(JSON.parse(JSON.stringify(commits)), [{ homeSchoolSlug: "sebs" }]);
-  assert.equal(saves.length, 1);
 });
 
 test("desktop polish keeps semantic overlays and visual workflow hooks", () => {

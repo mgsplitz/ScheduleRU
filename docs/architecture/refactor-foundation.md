@@ -168,6 +168,12 @@ not changed.
 
 ## Next application milestones
 
+Program-selection availability and accepted roles now live in the pure web
+picker module. Home-school replacement is a separate stale-safe transaction
+that commits a complete academic context or restores the prior context while
+leaving the semester plan untouched. The compatibility controller retains
+only data loading and interface orchestration for this workflow.
+
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
 2. Continue decomposing generic catalog ingestion behind focused services and

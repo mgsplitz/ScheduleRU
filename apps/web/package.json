@@ -7,6 +7,7 @@
     "./course-interactions": "./src/course-interaction-logic.js",
     "./course-records": "./src/course-record-model.js",
     "./guided-setup": "./src/guided-setup-controller.js",
+    "./home-school-transaction": "./src/home-school-transaction.js",
     "./planner-state-store": "./src/planner-state-store.js",
     "./planner-controller": "./src/planner-controller.js",
     "./planner-ui": "./src/planner-ui-logic.js",
@@ -14,6 +15,6 @@
     "./requirement-data-loader": "./src/requirement-data-loader.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-picker-logic.test.mjs"
+    "test": "node --test ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/home-school-transaction.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-picker-logic.test.mjs"
   }
 }

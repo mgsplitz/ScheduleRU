@@ -1,4 +1,6 @@
 (function exposeProgramPickerLogic(root) {
+  const SUPPORTED_PROGRAM_TYPES = new Set(["major", "minor", "concentration", "certificate"]);
+
   function availableProgramIds(programs = []) {
     return new Set((Array.isArray(programs) ? programs : []).map((program) => program?.id).filter(Boolean));
   }
@@ -37,5 +39,54 @@
     };
   }
 
-  root.ScheduleRUProgramPickerLogic = { initialProgramIds, programDraftView };
+  function eligibilityRuleValues(rule) {
+    try {
+      const parsed = JSON.parse(rule?.condition_value_json || "[]");
+      return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string") : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function programIsAvailableForSchool(program, homeSchoolSlug) {
+    return !(program?.eligibility_rules || []).some((rule) => {
+      if (rule.decision !== "blocked") return false;
+      const values = eligibilityRuleValues(rule);
+      if (rule.condition_type === "home_school_must_be_one_of") {
+        return !values.includes(homeSchoolSlug);
+      }
+      if (rule.condition_type === "home_school_must_not_be_one_of") {
+        return values.includes(homeSchoolSlug);
+      }
+      return false;
+    });
+  }
+
+  function availableProgramsForSchool(programs = [], homeSchoolSlug = "") {
+    return (Array.isArray(programs) ? programs : [])
+      .filter((program) => SUPPORTED_PROGRAM_TYPES.has(program?.type))
+      .filter((program) => programIsAvailableForSchool(program, homeSchoolSlug));
+  }
+
+  function programRoles(ids = [], programs = []) {
+    const selectedIds = Array.isArray(ids) ? ids : [];
+    const rows = Array.isArray(programs) ? programs : [];
+    const majors = selectedIds.filter(
+      (id) => rows.find((program) => program?.id === id)?.type === "major",
+    );
+    return {
+      primaryProgramId: majors[0] || null,
+      secondaryProgramId: majors[1] || null,
+      requiredProgramTab: majors[0] || selectedIds[0] || "",
+    };
+  }
+
+  root.ScheduleRUProgramPickerLogic = {
+    initialProgramIds,
+    programDraftView,
+    eligibilityRuleValues,
+    programIsAvailableForSchool,
+    availableProgramsForSchool,
+    programRoles,
+  };
 })(globalThis);

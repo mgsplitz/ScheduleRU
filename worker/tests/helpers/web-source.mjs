@@ -17,6 +17,8 @@ export const webControllerSource = [
   "packages/scheduling/src/semester-schedule-model.js",
   "apps/web/src/backend-client.js",
   "apps/web/src/course-record-model.js",
+  "apps/web/src/program-picker-logic.js",
+  "apps/web/src/home-school-transaction.js",
   "apps/web/src/planner-state-store.js",
   "apps/web/src/requirement-data-loader.js",
   "apps/web/src/planner-controller.js",

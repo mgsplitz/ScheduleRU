@@ -61,3 +61,58 @@ test("program role controls always derive from the latest draft", () => {
     programs,
   }).primaryId, "rbsnb-finance");
 });
+
+test("reviewed home-school eligibility rules filter only blocked program combinations", () => {
+  const rows = [
+    { id: "rbs-major", type: "major", eligibility_rules: [] },
+    {
+      id: "sas-only",
+      type: "minor",
+      eligibility_rules: [{
+        decision: "blocked",
+        condition_type: "home_school_must_be_one_of",
+        condition_value_json: JSON.stringify(["sasnb"]),
+      }],
+    },
+    {
+      id: "not-rbs",
+      type: "certificate",
+      eligibility_rules: [{
+        decision: "blocked",
+        condition_type: "home_school_must_not_be_one_of",
+        condition_value_json: JSON.stringify(["rbsnb"]),
+      }],
+    },
+    { id: "unsupported", type: "graduate_program", eligibility_rules: [] },
+  ];
+
+  assert.deepEqual(
+    logic.availableProgramsForSchool(rows, "rbsnb").map((program) => program.id),
+    ["rbs-major"],
+  );
+  assert.deepEqual(
+    logic.availableProgramsForSchool(rows, "sasnb").map((program) => program.id),
+    ["rbs-major", "sas-only", "not-rbs"],
+  );
+  assert.deepEqual(logic.eligibilityRuleValues({ condition_value_json: "invalid" }), []);
+});
+
+test("accepted program roles follow selected major order and fall back to any selected program tab", () => {
+  assert.deepEqual(logic.programRoles(
+    ["minor", "finance", "bait"],
+    [
+      { id: "bait", type: "major" },
+      { id: "finance", type: "major" },
+      { id: "minor", type: "minor" },
+    ],
+  ), {
+    primaryProgramId: "finance",
+    secondaryProgramId: "bait",
+    requiredProgramTab: "finance",
+  });
+  assert.deepEqual(logic.programRoles(["minor"], [{ id: "minor", type: "minor" }]), {
+    primaryProgramId: null,
+    secondaryProgramId: null,
+    requiredProgramTab: "minor",
+  });
+});

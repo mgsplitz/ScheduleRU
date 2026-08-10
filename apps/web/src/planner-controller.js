@@ -108,6 +108,15 @@ const coursePathModel=ScheduleRUCoursePathModel.create({
   getConfirmedCourseCodes:confirmedAcademicCourseCodes,
   getScheduledEntries:plannedScheduleCreditEntries,
 });
+const homeSchoolTransaction=ScheduleRUHomeSchoolTransaction.create({
+  getState:()=>ST,
+  loadCandidate:loadHomeSchoolCandidate,
+  applyRequirementTree:useRequirementTree,
+  saveState:savePlannerState,
+  onCommitted:()=>{updateProgramTitle();renderProgramSchoolSelector();renderOnboarding();},
+  onRolledBack:()=>modalController.show({title:"Home school unchanged",body:"<p>We could not load that home school. Your current plan and requirements were kept.</p>",actions:[{label:"Close",secondary:true}]}),
+  onLoadingChange:loading=>{if(!loading)renderProgramSchoolSelector();renderPanel();},
+});
 function plannerStorage(){ return typeof localStorage!=="undefined"?localStorage:null; }
 function restorePlannerState(){
   const restored=ScheduleRUPlannerStateStore.load({
@@ -370,22 +379,6 @@ function programTypeLabel(type){
   const section=programTypeSections().find(item=>item.type===type);
   return section?.singular||"Program";
 }
-function eligibilityRuleValues(rule){
-  try{
-    const parsed=JSON.parse(rule?.condition_value_json||"[]");
-    return Array.isArray(parsed)?parsed.filter(value=>typeof value==="string"):[];
-  }catch(err){ return []; }
-}
-function programIsAvailableForSchool(program,homeSchoolSlug){
-  return !(program?.eligibility_rules||[]).some(rule=>{
-    if(rule.decision!=="blocked") return false;
-    const values=eligibilityRuleValues(rule);
-    if(rule.condition_type==="home_school_must_be_one_of") return !values.includes(homeSchoolSlug);
-    if(rule.condition_type==="home_school_must_not_be_one_of") return values.includes(homeSchoolSlug);
-    return false;
-  });
-}
-function programIsAvailableForHomeSchool(program){ return programIsAvailableForSchool(program,ST.homeSchoolSlug); }
 function selectedProgramRows(){
   const selected=new Set(ST.selectedPrograms);
   return (ST.availablePrograms||[]).filter(program=>selected.has(program.id));
@@ -435,26 +428,13 @@ function renderProgramSchoolSelector(){
     : "Changing your home school re-evaluates your program requirements. Your planned courses stay in your browser.";
   select.onchange=()=>changeHomeSchool(select.value);
 }
-function acceptedHomeSchoolSnapshot(){return {
-  homeSchoolSlug:ST.homeSchoolSlug,availablePrograms:ST.availablePrograms,programSelectionPolicies:ST.programSelectionPolicies,
-  selectedPrograms:ST.selectedPrograms,primaryProgramId:ST.primaryProgramId,secondaryProgramId:ST.secondaryProgramId,
-  requiredProgramTab:ST.requiredProgramTab,groupSelections:ST.groupSelections,requirementTrees:ST.requirementTrees,
-  referenceRequirementTrees:ST.referenceRequirementTrees,majorRequirementTree:ST.majorRequirementTree,
-  catalogListedProgramIds:ST.catalogListedProgramIds,doubleCountPolicies:ST.doubleCountPolicies,doubleCountRules:ST.doubleCountRules,
-  doubleCountExceptions:ST.doubleCountExceptions,programEligibilityRules:ST.programEligibilityRules,activeProgram:ST.activeProgram,
-  doubleCount:ST.doubleCount,requirementsError:ST.requirementsError,coreCurricula:ST.coreCurricula,
-  activeCoreCurriculum:ST.activeCoreCurriculum,coreRequirementTree:ST.coreRequirementTree,coreError:ST.coreError,
-};}
-function restoreHomeSchoolSnapshot(snapshot){Object.assign(ST,snapshot);useRequirementTree(ST.majorRequirementTree);}
-function programRolesFor(ids,programs){const majors=ids.filter(id=>programs.find(program=>program.id===id)?.type==="major");return {primaryProgramId:majors[0]||null,secondaryProgramId:majors[1]||null,requiredProgramTab:majors[0]||ids[0]||""};}
-function candidateProgramsForSchool(payload,schoolSlug){return (payload?.programs||[]).filter(program=>["major","minor","concentration","certificate"].includes(program.type)).filter(program=>programIsAvailableForSchool(program,schoolSlug));}
 async function loadHomeSchoolCandidate(nextSchool){
   const schoolContext=schoolContextForProfile(nextSchool);
   const [programContext,coreContext]=await Promise.all([
     requirementDataLoader.loadPrograms({homeSchoolSlug:nextSchool.slug,scope:"school"}),
     requirementDataLoader.loadCoreCurriculum({homeSchoolSlug:nextSchool.slug,label:schoolContext.coreFallbackLabel}),
   ]);
-  const availablePrograms=candidateProgramsForSchool({programs:programContext.programs},nextSchool.slug);
+  const availablePrograms=ScheduleRUProgramPickerLogic.availableProgramsForSchool(programContext.programs,nextSchool.slug);
   if(!availablePrograms.length)throw new Error("No reviewed program is available for that home school.");
   const curriculum=coreContext.curriculum;
   const selectedPrograms=ScheduleRUProgramPickerLogic.initialProgramIds({
@@ -473,7 +453,7 @@ async function loadHomeSchoolCandidate(nextSchool){
   if(selectedPrograms.length&&!visibleIds.length)throw new Error("The replacement program requirements could not be loaded.");
   const requirementTrees=programRequirementModel.normalizeProgramTrees({requirementTrees:returned,programIds:visibleIds,referenceRequirementTrees,availablePrograms});
   const doubleCountPolicies=requirementsContext.doubleCountPolicies,doubleCountExceptions=requirementsContext.doubleCountExceptions;
-  const roles=programRolesFor(visibleIds,availablePrograms);
+  const roles=ScheduleRUProgramPickerLogic.programRoles(visibleIds,availablePrograms);
   return {
     homeSchoolSlug:nextSchool.slug,availablePrograms,programSelectionPolicies:programContext.selectionPolicies,
     selectedPrograms:visibleIds,groupSelections:{},referenceRequirementTrees,requirementTrees,
@@ -486,7 +466,6 @@ async function loadHomeSchoolCandidate(nextSchool){
     coreRequirementTree:buildRequirementTree(coreContext.requirements),coreError:"",...roles,
   };
 }
-function commitHomeSchoolCandidate(candidate){Object.assign(ST,candidate);useRequirementTree(ST.majorRequirementTree);}
 async function changeHomeSchool(nextSchoolSlug,confirmed=false){
   const next=schoolProfileBySlug(nextSchoolSlug);
   if(!next||next.slug===ST.homeSchoolSlug)return;
@@ -494,20 +473,7 @@ async function changeHomeSchool(nextSchoolSlug,confirmed=false){
     modalController.show({title:"Change home school?",body:`<p>Your planned courses stay saved. Program selections and requirement choices will be re-evaluated for ${escapeHtml(next.name||next.short_name||next.slug)}.</p>`,actions:[{label:"Go back",secondary:true},{label:"Continue",onClick:()=>changeHomeSchool(nextSchoolSlug,true)}]});
     renderProgramSchoolSelector();return;
   }
-  const generation=(ST.homeSchoolChangeGeneration||0)+1;const snapshot=acceptedHomeSchoolSnapshot();ST.homeSchoolChangeGeneration=generation;ST.requirementsLoading=true;renderPanel();
-  try{
-    const candidate=await loadHomeSchoolCandidate(next);
-    if(generation!==ST.homeSchoolChangeGeneration)return;
-    commitHomeSchoolCandidate(candidate);
-    savePlannerState();
-    updateProgramTitle();renderProgramSchoolSelector();renderOnboarding();
-  }catch(error){
-    if(generation!==ST.homeSchoolChangeGeneration)return;
-    restoreHomeSchoolSnapshot(snapshot);
-    modalController.show({title:"Home school unchanged",body:"<p>We could not load that home school. Your current plan and requirements were kept.</p>",actions:[{label:"Close",secondary:true}]});
-  }finally{
-    if(generation===ST.homeSchoolChangeGeneration){ST.requirementsLoading=false;renderProgramSchoolSelector();renderPanel();}
-  }
+  return homeSchoolTransaction.execute(next);
 }
 function closeProgramPicker(){
   document.getElementById("programOv").classList.remove("open");
@@ -1739,9 +1705,7 @@ async function loadAvailablePrograms(){
   // coverage tier. Filtering stays client-side so all supported program types
   // remain visible as soon as source-backed data is available.
   const context=await requirementDataLoader.loadPrograms({homeSchoolSlug:ST.homeSchoolSlug,scope:"all"});
-  ST.availablePrograms=context.programs
-    .filter(p=>["major","minor","concentration","certificate"].includes(p.type))
-    .filter(programIsAvailableForHomeSchool);
+  ST.availablePrograms=ScheduleRUProgramPickerLogic.availableProgramsForSchool(context.programs,ST.homeSchoolSlug);
   const catalogReplacements=new Map(ST.availablePrograms
     .filter(program=>typeof program.catalog_program_id==="string"&&program.catalog_program_id)
     .map(program=>[program.catalog_program_id,program.id]));
