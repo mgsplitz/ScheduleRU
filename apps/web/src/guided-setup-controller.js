@@ -111,15 +111,20 @@ async function loadHackathonConfiguration(){
 
 function academicRecords(){ return Array.isArray(ST.academicRecords)?ST.academicRecords:[]; }
 function addAcademicRecord(record){ ST.academicRecords.push(ScheduleRUPlannerStateLogic.normalizeAcademicRecord(record)); savePlannerState(); }
-function legacyCompletedAcademicCodes(){const completed=Object.entries(ST.completed||{}).filter(([,taken])=>taken).flatMap(([id])=>[courseRecordFromId(id)?.code||id]);const ap=AP.filter(entry=>ST.apOn?.[entry.id]).flatMap(entry=>courseCodesFromText(entry.equiv));return [...new Set([...completed,...ap].filter(Boolean))];}
+function storedCompletedAcademicCodes(){const completed=Object.entries(ST.completed||{}).filter(([,taken])=>taken).flatMap(([id])=>[courseRecordFromId(id)?.code||id]);const ap=AP.filter(entry=>ST.apOn?.[entry.id]).flatMap(entry=>courseCodesFromText(entry.equiv));return [...new Set([...completed,...ap].filter(Boolean))];}
 function completedAcademicCodes(){ return [...new Set([
-  ...resolvedAcademicCourseCodes([...legacyCompletedAcademicCodes(),...academicRecords().filter(record=>record.creditStatus==="applied").flatMap(record=>[record.courseCode,...(record.equivalentCourseCodes||[])])]),
+  ...resolvedAcademicCourseCodes([...storedCompletedAcademicCodes(),...academicRecords().filter(record=>record.creditStatus==="applied").flatMap(record=>[record.courseCode,...(record.equivalentCourseCodes||[])])]),
   ...confirmedAcademicCourseCodes(),
 ])]; }
-const legacyConfirmedEntries=confirmedAcademicCreditEntries;
-confirmedAcademicCreditEntries=function(){ return [...legacyConfirmedEntries(),...ScheduleRUPlannerStateLogic.academicCreditEntries(ST)]; };
-const legacyIsCompleted=isCompleted;
-isCompleted=function(id){ const code=COURSES[id]?.code||id; return legacyIsCompleted(id)||completedAcademicCodes().some(value=>requirementCourseId(value)===requirementCourseId(code)); };
+const academicCreditLifecycleController=ScheduleRUAcademicCreditController.create({
+  baseConfirmedEntries:()=>academicProgressModel.confirmedCreditEntries(),
+  additionalConfirmedEntries:()=>ScheduleRUPlannerStateLogic.academicCreditEntries(ST),
+  baseIsCompleted,
+  additionalCompletedCourseCodes:completedAcademicCodes,
+  courseCodeForId:id=>COURSES[id]?.code||id,
+  normalizeCourseId:requirementCourseId,
+});
+installAcademicCreditController(academicCreditLifecycleController);
 
 function plannerIssueText(issue){
   const courseCodes=issue.courseCodes?.join(", ")||issue.courseCode||"";
@@ -199,7 +204,7 @@ document.getElementById("assistantClose").addEventListener("click",()=>document.
 let onboardingFocusRestore=null;
 function setOnboardingOpen(open,wasOpen=document.getElementById("onboarding").classList.contains("open")){const root=document.getElementById("onboarding");root.classList.toggle("open",open);root.setAttribute("aria-hidden",String(!open));[document.getElementById("app"),document.getElementById("page-courses"),document.querySelector(".pagenav")].filter(Boolean).forEach(node=>{node.inert=open;});if(open){if(!wasOpen)onboardingFocusRestore=document.activeElement;requestAnimationFrame(()=>root.querySelector("#onboardingContent button:not([disabled]), #onboardingContent input, #onboardingContent select, #onboardingContent textarea, #onboardingContent [tabindex]")?.focus());}else if(wasOpen){const restore=onboardingFocusRestore;onboardingFocusRestore=null;requestAnimationFrame(()=>{if(restore?.isConnected&&restore!==document.body)restore.focus();else document.getElementById("restartSetup")?.focus();});}}
 
-function renderOnboarding(){
+function renderOnboardingContent(){
   const onboarding=ST.onboarding||{completed:false,step:0},root=document.getElementById("onboarding"),content=document.getElementById("onboardingContent"),step=Math.max(0,Math.min(4,Number(onboarding.step)||0));
   root.classList.toggle("open",!onboarding.completed);document.getElementById("onboardingSteps").setAttribute("aria-valuenow",String(step+1));document.getElementById("onboardingSteps").innerHTML=Array.from({length:5},(_,index)=>`<i class="onboarding-step-dot ${index<=step?"active":""}"></i>`).join("");
   const records=academicRecords(),layout=(title,text,body,options={})=>{content.innerHTML=`<h1 id="onboardingTitle">${title}</h1><p>${text}</p>${body}<div class="onboarding-actions"><button class="choice-btn secondary" id="onboardingBack" ${step===0?"disabled":""}>Back</button><div class="right">${options.skip?'<button class="choice-btn secondary" id="onboardingSkip">Skip</button>':""}<button class="choice-btn" id="onboardingNext">${options.next||"Continue"}</button></div></div>`;document.getElementById("onboardingBack").onclick=()=>{ST.onboarding.step=step-1;savePlannerState();renderOnboarding();};document.getElementById("onboardingSkip")?.addEventListener("click",()=>{ST.onboarding.step=step+1;savePlannerState();renderOnboarding();});document.getElementById("onboardingNext").onclick=()=>{if(step===4)ST.onboarding.completed=true;else ST.onboarding.step=step+1;savePlannerState();renderOnboarding();renderAll();};};
@@ -209,10 +214,7 @@ function renderOnboarding(){
   if(step===3)return layout("Choose programs of study","Set your home school, then add a primary major, optional second major, and minors.",`<div class="onboarding-fields"><label>Home school<select id="onboardingHomeSchool">${(ST.availableSchools||[]).map(school=>`<option value="${html(school.slug)}" ${school.slug===ST.homeSchoolSlug?"selected":""}>${html(school.name||school.short_name||school.slug)}</option>`).join("")}</select></label></div><div class="onboarding-review">${selectedProgramRows().map(program=>`<div>${html(program.name)} · ${html(program.type)}</div>`).join("")||"<div>No program selected yet.</div>"}</div><button class="choice-btn secondary" id="onboardingPrograms">Add program of study</button>`);
   return layout("Ready to explore","Try out our strongest planning features:","<ul class=\"onboarding-feature-list\"><li>Try the four-year auto-planner for a balanced eight-semester draft.</li><li>Build a real semester schedule from verified Rutgers sections.</li><li>Refine schedule options with natural-language preferences.</li></ul>",{next:"Get started"});
 }
-const legacyRenderOnboarding=renderOnboarding;
-renderOnboarding=function(){const wasOpen=document.getElementById("onboarding").classList.contains("open");legacyRenderOnboarding();setOnboardingOpen(!ST.onboarding?.completed,wasOpen);};
-const baseSetOnboardingOpen=setOnboardingOpen;
-setOnboardingOpen=function(open,wasOpen){document.getElementById("app").inert=open;document.getElementById("page-courses").inert=open;document.querySelector(".pagenav").inert=open;baseSetOnboardingOpen(open,wasOpen);};
+function renderOnboarding(){const wasOpen=document.getElementById("onboarding").classList.contains("open");renderOnboardingContent();setOnboardingOpen(!ST.onboarding?.completed,wasOpen);}
 document.addEventListener("change",event=>{if(event.target.matches("[data-onboarding-ap]")){ST.apOn[event.target.dataset.onboardingAp]=event.target.checked;savePlannerState();renderAll();}if(event.target.id==="onboardingHomeSchool")changeHomeSchool(event.target.value);});
 let onboardingCourseMatches=[];
 let onboardingCourseSearchTimer=null;
@@ -281,12 +283,11 @@ document.getElementById("restartSetup").addEventListener("click",openRestartSetu
 document.getElementById("onboardingRestart").addEventListener("click",openRestartSetupConfirmation);
 
 function plannerTermsFromAcademicPosition(){const terms=[];let year=Math.min(4,Math.max(1,Number(ST.academicPosition?.year)||1)),sem=ST.academicPosition?.startingSemester==="spring"?"spring":"fall";while(terms.length<8){terms.push({year,sem});if(sem==="fall")sem="spring";else{year+=1;sem="fall";}}return terms;}
-plannerTerms=plannerTermsFromAcademicPosition;
 function plannerKnownCourseCodes(){return new Set([...completedAcademicCodes(),...Object.values(ST.schedule||{}).map(entry=>entry.code).filter(Boolean)]);}
 function plannerLeafGroups(tree){return Object.values(tree?.groups||{}).filter(group=>(group.children||[]).length===0||(group.members||[]).length>0);}
 function plannerRequirementInputs(tree,{sourceType,sourceProgram=""}={}){const known=plannerKnownCourseCodes(),selectedByGroup=ST.groupSelections||{},coursesByCode=new Map(),placeholders=[];for(const group of plannerLeafGroups(tree)){const members=group.members||[],selected=members.filter(id=>selectedByGroup[group.id]?.includes(id)||known.has(tree.courses?.[id]?.code)),required=group.rule==="all"?members.length:Math.max(1,Number(group.count)||1),concrete=sourceType==="core"?selected:(group.rule==="all"?members:selected);concrete.forEach(id=>{const course=tree.courses?.[id];if(course?.code&&!known.has(course.code))coursesByCode.set(course.code,course);});if(selected.length<required&&(sourceType==="core"||group.rule!=="all"))placeholders.push({id:group.id,label:groupDisplayName(group),credits:3,sourceType:sourceType||"program",sourceProgram,requirementGroupId:group.id,candidateSelectionContext:{rule:group.rule,required}});}return {courses:[...coursesByCode.values()],placeholders};}
 function corePlannerStatus(){const inputs=plannerRequirementInputs(ST.coreRequirementTree,{sourceType:"core",sourceProgram:ST.activeCoreCurriculum?.id||"core"});return {...inputs,incomplete:inputs.placeholders.length>0};}
-normalizedPlannerInputs=function(){
+function normalizedPlannerInputs(){
   const terms=plannerTermsFromAcademicPosition(),core=corePlannerStatus();
   const input=ScheduleRUPlannerInput.buildPlannerInput({
     terms,
@@ -299,7 +300,7 @@ normalizedPlannerInputs=function(){
     confirmedCredits:confirmedAcademicCreditEntries().reduce((total,entry)=>total+(Number(entry.credits)||0),0),
   });
   return {...input,core};
-};
+}
 const checkedGeneratePlanButton=document.getElementById("generatePlanBtn"),coreAwareGeneratePlanButton=checkedGeneratePlanButton.cloneNode(true);checkedGeneratePlanButton.replaceWith(coreAwareGeneratePlanButton);
 function finishPlanGenerationPreflight(){ST.planGenerationPending=false;coreAwareGeneratePlanButton.disabled=false;}
 async function beginPlanGenerationPreflight(){

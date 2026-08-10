@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./academic-credit-controller": "./src/academic-credit-controller.js",
     "./course-interactions": "./src/course-interaction-logic.js",
     "./course-details-controller": "./src/course-details-controller.js",
     "./catalog-page-controller": "./src/catalog-page-controller.js",
@@ -23,6 +24,6 @@
     "./schedule-builder-view": "./src/schedule-builder-view.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/catalog-page-controller.test.mjs ../../worker/tests/course-details-controller.test.mjs ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/home-school-transaction.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-apply-transaction.test.mjs ../../worker/tests/program-picker-controller.test.mjs ../../worker/tests/program-picker-logic.test.mjs ../../worker/tests/requirement-picker-controller.test.mjs ../../worker/tests/required-panel-controller.test.mjs ../../worker/tests/schedule-builder-controller.test.mjs ../../worker/tests/schedule-builder-view.test.mjs"
+    "test": "node --test ../../worker/tests/academic-credit-controller.test.mjs ../../worker/tests/catalog-page-controller.test.mjs ../../worker/tests/course-details-controller.test.mjs ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/home-school-transaction.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-apply-transaction.test.mjs ../../worker/tests/program-picker-controller.test.mjs ../../worker/tests/program-picker-logic.test.mjs ../../worker/tests/requirement-picker-controller.test.mjs ../../worker/tests/required-panel-controller.test.mjs ../../worker/tests/schedule-builder-controller.test.mjs ../../worker/tests/schedule-builder-view.test.mjs"
   }
 }

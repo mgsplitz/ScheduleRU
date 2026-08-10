@@ -169,9 +169,11 @@ AP.forEach(a => a.fulfills.forEach(cid => {
   AP_FULFILLS[cid].push(a.id);
 }));
 
+let academicCreditController=null;
 function confirmedAcademicCreditEntries(){
-  return academicProgressModel.confirmedCreditEntries();
+  return academicCreditController?.confirmedEntries()||academicProgressModel.confirmedCreditEntries();
 }
+function installAcademicCreditController(controller){academicCreditController=controller;}
 function resolvedAcademicCourseCodes(codes){
   return academicProgressModel.resolvedCourseCodes(codes);
 }
@@ -211,7 +213,7 @@ function apFulfillsRequirementCourse(ap,id,course){
   (course?.alternatives||[]).forEach(alt=>acceptedIds.add(requirementCourseId(alt?.code||alt?.equivalent_course_code)));
   return courseCodesFromText(ap?.equiv).some(code=>acceptedIds.has(requirementCourseId(code)));
 }
-function isCompleted(id){
+function baseIsCompleted(id){
   if(ST.completed[id]) return true;
   const c = COURSES[id];
   if(c && Object.values(ST.schedule).some(e=>e.code===c.code)) return true;
@@ -228,6 +230,7 @@ function isCompleted(id){
   // makes every official equivalency available to reviewed programs too.
   return AP.some(ap=>ST.apOn[ap.id]&&apFulfillsRequirementCourse(ap,id,c));
 }
+function isCompleted(id){return academicCreditController?academicCreditController.isCompleted(id):baseIsCompleted(id);}
 function standingRequirement(c){
   const text=[c?.restrictions,...(c?.requirementNotes||[])].join(" ").toLowerCase();
   if(/seniors?\s+(year|standing|status|only)|4th\s+year/.test(text)) return {year:4,label:"Senior (4th-year) standing required"};

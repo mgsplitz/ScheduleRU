@@ -19,6 +19,10 @@ test("the HTML shell delegates presentation and controller code to apps/web", ()
   );
   assert.match(
     shell,
+    /<script src="apps\/web\/src\/academic-credit-controller\.js"><\/script>[\s\S]*<script src="apps\/web\/src\/planner-controller\.js"><\/script>/,
+  );
+  assert.match(
+    shell,
     /<script src="apps\/web\/src\/guided-setup-controller\.js"><\/script>/,
   );
   assert.doesNotMatch(shell, /<style>/);

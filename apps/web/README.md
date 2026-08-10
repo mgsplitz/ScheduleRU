@@ -9,6 +9,8 @@ script/style references only.
 device-local endpoint overrides, HTTP transport, and JSON/error handling.
 `src/planner-state-store.js` owns validation, migration, persistence, and
 clearing of the guest planner state stored on the current device.
+`src/academic-credit-controller.js` composes persisted planner progress with
+guided-setup credit records behind stable confirmed-credit and completion APIs.
 `src/requirement-data-loader.js` owns school, program, requirement-policy, and
 Core request orchestration without mutating browser or presentation state.
 `src/program-picker-logic.js` owns program availability, role, and draft

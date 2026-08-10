@@ -73,7 +73,7 @@ test("hackathon UI persists accepted programs, serializes program applies, and k
   assert.match(html, /programApplyTransaction\.execute\(/);
   assert.match(html, /id="onboarding"[^>]*role="dialog"[^>]*aria-modal="true"/);
   assert.match(html, /setOnboardingOpen\(/);
-  assert.match(html, /document\.getElementById\("app"\)\.inert/);
+  assert.match(html, /\[document\.getElementById\("app"\),document\.getElementById\("page-courses"\),document\.querySelector\("\.pagenav"\)\][\s\S]*?node\.inert=open/);
 });
 
 test("assistant projections retain Rutgers day and open-section semantics", () => {
@@ -147,16 +147,16 @@ test("plan previews name blocking courses without flooding the modal with warnin
   assert.match(html, /planning notes? (?:is|are) available under Issues/i);
 });
 
-test("planner horizon, legacy completion state, and modal transitions stay safe", () => {
+test("planner horizon, stored completion state, and modal transitions stay safe", () => {
   assert.match(html, /function plannerTermsFromAcademicPosition\([\s\S]*?terms\.length<8/);
   assert.match(html, /schedule:ST\.schedule\|\|\{\}/);
   assert.match(html, /concrete=sourceType==="core"\?selected/);
-  assert.match(html, /function legacyCompletedAcademicCodes\([\s\S]*?ST\.completed[\s\S]*?ST\.apOn/);
-  assert.match(html, /function completedAcademicCodes\([\s\S]*?legacyCompletedAcademicCodes\(\)/);
+  assert.match(html, /function storedCompletedAcademicCodes\([\s\S]*?ST\.completed[\s\S]*?ST\.apOn/);
+  assert.match(html, /function completedAcademicCodes\([\s\S]*?storedCompletedAcademicCodes\(\)/);
   assert.match(html, /function plannerKnownCourseCodes\([\s\S]*?completedAcademicCodes\(\)/);
   assert.match(html, /completedCourseCodes:completedAcademicCodes\(\)/);
   assert.doesNotMatch(html, /completedCourseCodes:\[\.\.\.plannerKnownCourseCodes\(\)\]/);
-  assert.match(html, /renderOnboarding=function\(\)\{const wasOpen=.*legacyRenderOnboarding\(\);setOnboardingOpen\([^,]+,wasOpen\)/);
+  assert.match(html, /function renderOnboarding\(\)\{const wasOpen=.*renderOnboardingContent\(\);setOnboardingOpen\([^,]+,wasOpen\)/);
   assert.match(html, /event\.key !== "Escape"[\s\S]*?close\(\)/);
   assert.match(html, /event\.target === pickerRoot\(\)[\s\S]*?close\(\)/);
   assert.match(html, /function rerenderOnboardingApStep\([\s\S]*?renderOnboarding\(\)/);
@@ -250,6 +250,17 @@ test("guest onboarding is the approved compact five-step workflow", () => {
   assert.match(html, /id="onboardingHomeSchool"/);
   assert.match(html, /Add program of study/);
   assert.match(html, /Try the four-year auto-planner/);
+  assert.match(html, /function renderOnboardingContent\(/);
+  assert.match(html, /function renderOnboarding\(/);
+  assert.doesNotMatch(html, /legacyRenderOnboarding|baseSetOnboardingOpen/);
+});
+
+test("academic credit and planner inputs use stable named integration boundaries", () => {
+  assert.match(html, /ScheduleRUAcademicCreditController\.create\(/);
+  assert.match(html, /installAcademicCreditController\(/);
+  assert.match(html, /function normalizedPlannerInputs\(/);
+  assert.doesNotMatch(html, /legacyConfirmedEntries|legacyIsCompleted/);
+  assert.doesNotMatch(html, /normalizedPlannerInputs\s*=\s*function/);
 });
 
 test("completed-course onboarding searches the full catalog and only adds verified matches", () => {
