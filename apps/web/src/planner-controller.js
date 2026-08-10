@@ -101,6 +101,13 @@ const courseRecordModel=ScheduleRUCourseRecordModel.create({
   cleanText:cleanApiText,
   saveState:savePlannerState,
 });
+const coursePathModel=ScheduleRUCoursePathModel.create({
+  getCourseById:id=>COURSES[id]||null,
+  getCourseByCode:courseByCode,
+  getEligibilityForCourse:course=>course?.eligibility||ST.courseEligibilityByCode?.[course?.code]||null,
+  getConfirmedCourseCodes:confirmedAcademicCourseCodes,
+  getScheduledEntries:plannedScheduleCreditEntries,
+});
 function plannerStorage(){ return typeof localStorage!=="undefined"?localStorage:null; }
 function restorePlannerState(){
   const restored=ScheduleRUPlannerStateStore.load({
@@ -667,40 +674,13 @@ function courseByCode(code){
   return Object.values(COURSES).find(course=>course.code===code) || wishlistRecords().find(course=>course.code===code);
 }
 function directPrerequisiteCodes(course){
-  return [...new Set((Array.isArray(course?.prereqs)?course.prereqs:[])
-    .map(id=>COURSES[id]?.code)
-    .filter(code=>/^\d{2}:\d{3}:\d{3}$/.test(code)))];
+  return coursePathModel.directPrerequisiteCodes(course);
 }
 function prerequisitePlanForCourse(course){
-  const parsed=globalThis.ScheduleRUEligibilityLogic.parseCatalogPrerequisitePaths(course?.catalogPrereqs||"");
-  const catalogPaths=globalThis.ScheduleRUEligibilityLogic.campusRelevantPrerequisitePaths({
-    courseCode:course?.code,
-    paths:parsed.paths,
-  });
-  const eligibility=course?.eligibility||ST.courseEligibilityByCode?.[course?.code]||null;
-  const reviewedPaths=globalThis.ScheduleRUEligibilityLogic.prerequisitePathsFromConditions(eligibility?.conditions||[]);
-  const verifiedNoPrerequisites=eligibility?.review?.review_status==="reviewed"
-    && Number(eligibility?.review?.no_known_conditions)===1
-    && !reviewedPaths.length;
-  const direct=directPrerequisiteCodes(course);
-  const references=new Map((parsed.references||[]).map(reference=>[reference.course_code,reference]));
-  [...direct,...reviewedPaths.flat()].forEach(code=>{
-    const known=courseByCode(code);
-    if(!references.has(code)) references.set(code,{course_code:code,title:known?.fullTitle||known?.title||""});
-  });
-  if(reviewedPaths.length) return {reviewable:true,paths:reviewedPaths,references:[...references.values()],source:"reviewed_conditions",verifiedNoPrerequisites};
-  if(direct.length) return {reviewable:true,paths:[direct],references:[...references.values()],source:"reviewed_simple",verifiedNoPrerequisites};
-  return {...parsed,paths:catalogPaths,references:[...references.values()],source:parsed.reviewable?"catalog":"catalog_unreviewed",verifiedNoPrerequisites};
+  return coursePathModel.planForCourse(course);
 }
 function prerequisiteEligibilityForTerm(course,term){
-  const plan=prerequisitePlanForCourse(course);
-  const result=globalThis.ScheduleRUEligibilityLogic.evaluatePrerequisitePaths({
-    targetTerm:term,
-    paths:plan.paths,
-    confirmedCourseCodes:confirmedAcademicCourseCodes(),
-    scheduledEntries:plannedScheduleCreditEntries(),
-  });
-  return {...result,plan};
+  return coursePathModel.eligibilityForTerm(course,term);
 }
 function prerequisiteDisplayName(code,plan){
   const known=courseByCode(code);

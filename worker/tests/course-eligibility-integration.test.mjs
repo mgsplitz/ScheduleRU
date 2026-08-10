@@ -32,10 +32,15 @@ test("the browser migrates v1 state and evaluates the selected target term", asy
     frontend,
     /<script src="packages\/planner\/src\/academic-progress-model\.js"><\/script>/,
   );
+  assert.match(
+    frontend,
+    /<script src="packages\/planner\/src\/course-path-model\.js"><\/script>/,
+  );
   assert.match(frontend, /<script src="apps\/web\/src\/planner-state-store\.js"><\/script>/);
   assert.match(frontend, /CURRENT_PLANNER_STATE_VERSION=ScheduleRUPlannerStateLogic\.STATE_VERSION/);
   assert.match(frontend, /ScheduleRUPlannerStateStore\.load\(/);
   assert.match(frontend, /ScheduleRUAcademicProgressModel\.create\(/);
+  assert.match(frontend, /ScheduleRUCoursePathModel\.create\(/);
   assert.match(frontend, /function confirmedAcademicCreditEntries\(/);
   assert.match(frontend, /function apFulfillsRequirementCourse\(/);
   assert.match(frontend, /function plannedScheduleCreditEntries\(/);

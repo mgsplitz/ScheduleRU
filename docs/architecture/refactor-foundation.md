@@ -110,6 +110,8 @@ section permutations live in `packages/scheduling/src/semester-schedule-model.js
 Selected AP awards, completed and transferred credit, requirement equivalency
 closure, planned-credit evidence, and reviewed eligibility orchestration live
 in `packages/planner/src/academic-progress-model.js`.
+Reviewed, requirement-tree, and safely parsed catalog prerequisite paths are
+selected and evaluated by `packages/planner/src/course-path-model.js`.
 
 ## Dependency rules
 
