@@ -33,6 +33,18 @@ const requirementPickerDialogController=ScheduleRURequirementPickerController.cr
 installRequirementPickerController(requirementPickerDialogController);
 requirementPickerDialogController.bind();
 
+const courseDetailsDialogController=ScheduleRUCourseDetailsController.create({
+  getState:()=>ST,document,requestAnimationFrame,
+  getCourse:courseRecordFromId,getCourseByCode:courseByCode,
+  loadEligibilityForCodes:loadCourseEligibilityForCodes,
+  requirementCourseId,prerequisiteEligibilityForTerm,prerequisiteBlockerLabel,
+  standingRequirement,courseEligibilityNotice,academicYearLabel,
+  plannerUI:ScheduleRUPlannerUI,escapeHtml:html,cleanText:cleanApiText,courseCreditsLabel,
+  resumeRequirementPicker:()=>requirementPickerDialogController.resume(),
+});
+installCourseDetailsController(courseDetailsDialogController);
+courseDetailsDialogController.bind();
+
 function openRestartSetupConfirmation(){
   modalController.show({
     title:"Restart everything?",

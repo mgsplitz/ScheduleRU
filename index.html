@@ -91,9 +91,9 @@
 </div>
 
 <!-- PREREQ MODAL -->
-<div class="ov" id="prOv">
-  <div class="modal">
-    <div class="mhdr"><span id="prTitle">Course details</span><button class="xbtn" id="prClose">✕</button></div>
+<div class="ov" id="prOv" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prTitle" tabindex="-1">
+    <div class="mhdr"><span id="prTitle">Course details</span><button class="xbtn" id="prClose" aria-label="Close course details">✕</button></div>
     <div class="mbody" id="prBody"></div>
   </div>
 </div>
@@ -149,6 +149,7 @@
 <script src="apps/web/src/course-interaction-logic.js"></script>
 <script src="apps/web/src/course-record-model.js"></script>
 <script src="apps/web/src/requirement-picker-controller.js"></script>
+<script src="apps/web/src/course-details-controller.js"></script>
 <script src="apps/web/src/program-picker-logic.js"></script>
 <script src="apps/web/src/program-picker-controller.js"></script>
 <script src="apps/web/src/program-apply-transaction.js"></script>
