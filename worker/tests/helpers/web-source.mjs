@@ -18,6 +18,7 @@ export const webControllerSource = [
   "apps/web/src/backend-client.js",
   "apps/web/src/course-record-model.js",
   "apps/web/src/program-picker-logic.js",
+  "apps/web/src/program-picker-controller.js",
   "apps/web/src/program-apply-transaction.js",
   "apps/web/src/home-school-transaction.js",
   "apps/web/src/planner-state-store.js",

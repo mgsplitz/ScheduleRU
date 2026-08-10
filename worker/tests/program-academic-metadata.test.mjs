@@ -22,6 +22,6 @@ test("program seeding retains reviewed degree-path metadata", () => {
   assert.match(worker, /academic_program_code=excluded\.academic_program_code/);
   assert.match(worker, /degree_type=excluded\.degree_type/);
   assert.match(worker, /program_family_id=excluded\.program_family_id/);
-  assert.match(frontend, /degreeType=cleanApiText/);
-  assert.match(frontend, /metadata\.textContent=`\$\{metadata\.textContent\} \| \$\{degreeType\}`/);
+  assert.match(frontend, /const degreeType = cleanText\(program\.degree_type\)/);
+  assert.match(frontend, /programCoverageLabel\(program\), degreeType/);
 });

@@ -112,8 +112,8 @@ test("program roles, grouped Issues, and closed sections have explicit UI contra
   assert.match(html, /id="programRoleControls"/);
   assert.match(html, /programDraftPrimaryId/);
   assert.match(html, /Make primary/);
-  assert.match(html, /function setProgramDialogOpen\(/);
-  assert.match(html, /document\.getElementById\("onboarding"\)\.inert=open/);
+  assert.match(html, /ScheduleRUProgramPickerController\.create\(/);
+  assert.match(html, /onboarding\.inert = open/);
   assert.match(html, /Advising and program policy/);
   assert.match(html, /Double-count policy/);
   assert.match(html, /function setBuilderIncludeClosed\(/);
@@ -126,12 +126,13 @@ test("program onboarding has no silent BAIT default and rerenders every draft mu
     html,
     /<script src="apps\/web\/src\/program-picker-logic\.js"><\/script>/,
   );
+  assert.match(html, /<script src="apps\/web\/src\/program-picker-controller\.js"><\/script>/);
   assert.match(html, /ScheduleRUProgramPickerLogic\.initialProgramIds\(/);
   assert.match(html, /function loadHomeSchoolCandidate\([\s\S]*?ScheduleRUProgramPickerLogic\.initialProgramIds\(/);
   assert.doesNotMatch(html, /const initial=availablePrograms\.find\(program=>program\.id===schoolContext\.defaultProgramId/);
   assert.match(html, /programSelectionConfirmed/);
-  assert.match(html, /ScheduleRUProgramPickerLogic\.programDraftView\(/);
-  assert.match(html, /ST\.programDraft=\[\.\.\.draft\];[\s\S]*?renderProgramPickerList\(\)/);
+  assert.match(html, /pickerLogic\.programDraftView\(/);
+  assert.match(html, /current\.programDraft = \[\.\.\.draft\];[\s\S]*?render\(\)/);
   assert.match(html, /programSelectionConfirmed: true/);
   assert.match(html, /onCommitted:\(\)=>\{updateProgramTitle\(\);renderOnboarding\(\);closeProgramPicker\(\);\}/);
   assert.match(html, /#programOv \.modal-footer\{[^}]*position:sticky[^}]*bottom:0/);
@@ -154,8 +155,8 @@ test("planner horizon, legacy completion state, and modal transitions stay safe"
   assert.match(html, /completedCourseCodes:completedAcademicCodes\(\)/);
   assert.doesNotMatch(html, /completedCourseCodes:\[\.\.\.plannerKnownCourseCodes\(\)\]/);
   assert.match(html, /renderOnboarding=function\(\)\{const wasOpen=.*legacyRenderOnboarding\(\);setOnboardingOpen\([^,]+,wasOpen\)/);
-  assert.match(html, /event\.key==="Escape"[\s\S]*?closeProgramPicker\(\)/);
-  assert.match(html, /event\.target===document\.getElementById\("programOv"\)[\s\S]*?closeProgramPicker\(\)/);
+  assert.match(html, /event\.key !== "Escape"[\s\S]*?close\(\)/);
+  assert.match(html, /event\.target === pickerRoot\(\)[\s\S]*?close\(\)/);
   assert.match(html, /function rerenderOnboardingApStep\([\s\S]*?renderOnboarding\(\)/);
   assert.match(html, /refreshApFulfillment\(\);[\s\S]*?rerenderOnboardingApStep\(\);[\s\S]*?renderSchedule\(\)/);
 });
@@ -279,7 +280,7 @@ test("Programs edits programs only while home-school changes use a separate cont
   const programDialog = html.match(/<!-- PROGRAM SELECTOR -->([\s\S]*?)<div class="app-modal"/)?.[1] || "";
   assert.doesNotMatch(programDialog, /programSchoolSelect/);
   assert.match(programDialog, /id="programSchoolNav"/);
-  assert.match(html, /ST\.programBrowseSchoolSlug=""/);
+  assert.match(html, /current\.programBrowseSchoolSlug = ""/);
   assert.match(html, /Choose a school to browse its available programs/);
   assert.match(html, /class="policy-warning-list"/);
 });

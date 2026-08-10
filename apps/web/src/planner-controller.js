@@ -400,10 +400,6 @@ function programCoverageLabel(program){
     ? "Catalog-listed · requirements under review"
     : "Reviewed requirements";
 }
-function programMatchesSearch(program, query){
-  const haystack=[program?.name,program?.degree_type,program?.type,program?.academic_program_code].join(" ").toLowerCase();
-  return !query || haystack.includes(query);
-}
 function showProgramPolicyFeedback(check){
   const node=document.getElementById("programPolicyFeedback");
   if(!node) return;
@@ -475,84 +471,6 @@ async function changeHomeSchool(nextSchoolSlug,confirmed=false){
   }
   return homeSchoolTransaction.execute(next);
 }
-function closeProgramPicker(){
-  document.getElementById("programOv").classList.remove("open");
-  delete ST.programDraft;
-}
-function openProgramPicker(){
-  ST.programDraft=[...ST.selectedPrograms];
-  ST.programSearch="";
-  ST.programBrowseSchoolSlug="";
-  document.getElementById("programPickerNote").textContent=`Choose a school, then select its majors and minors. Only reviewed programs show a requirement tree. ${selectionLimitSummary()} Your home school stays unchanged.`;
-  showProgramPolicyFeedback(null);
-  const search=document.getElementById("programSearch");
-  search.value="";
-  search.oninput=()=>{
-    ST.programSearch=search.value.trim().toLowerCase();
-    renderProgramPickerList();
-  };
-  renderProgramPickerList();
-  document.getElementById("programOv").classList.add("open");
-}
-function renderProgramPickerList(){
-  const list=document.getElementById("programList");
-  const nav=document.getElementById("programSchoolNav");
-  const search=document.getElementById("programSearch");
-  const query=ST.programSearch||"";
-  const schoolChoices=globalThis.ScheduleRUPlannerUI.programSchoolChoices({
-    schools:ST.availableSchools||[],
-    programs:ST.availablePrograms||[],
-  });
-  nav.innerHTML=schoolChoices.map(school=>`<button type="button" data-program-school="${escapeHtml(school.slug)}" class="${school.slug===ST.programBrowseSchoolSlug?"active":""}">${escapeHtml(school.label)}</button>`).join("");
-  nav.querySelectorAll("[data-program-school]").forEach(button=>button.addEventListener("click",()=>{
-    ST.programBrowseSchoolSlug=button.dataset.programSchool;
-    ST.programSearch="";
-    search.value="";
-    renderProgramPickerList();
-  }));
-  search.hidden=!ST.programBrowseSchoolSlug;
-  const visiblePrograms=globalThis.ScheduleRUPlannerUI.programsForBrowse({
-    programs:ST.availablePrograms||[],
-    schoolSlug:ST.programBrowseSchoolSlug,
-    query,
-  });
-  if(!ST.programBrowseSchoolSlug){
-    list.innerHTML=`<div class="api-status">Choose a school to browse its available programs.</div>`;
-    return;
-  }
-  const categories=programTypeSections().map(section=>({
-    ...section,
-    programs:visiblePrograms.filter(program=>program.type===section.type),
-  })).filter(section=>section.programs.length);
-  list.innerHTML=categories.map(section=>`<section class="program-category">
-    <h3 class="program-category-title">${escapeHtml(section.label)}</h3>
-    ${section.programs.map(program=>`<label class="program-option">
-      <input type="checkbox" data-program-choice="${escapeHtml(program.id)}" ${ST.programDraft.includes(program.id)?"checked":""}/>
-      <span><strong>${escapeHtml(program.name)}</strong><small>${escapeHtml(programTypeLabel(program.type))} · ${escapeHtml(programCoverageLabel(program))}</small></span>
-    </label>`).join("")}
-  </section>`).join("") || `<div class="api-status">No programs match that search for the selected school.</div>`;
-  for(const option of list.querySelectorAll("[data-program-choice]")){
-    const degreeType=cleanApiText((ST.availablePrograms||[]).find(program=>program.id===option.dataset.programChoice)?.degree_type);
-    if(!degreeType) continue;
-    const metadata=option.closest(".program-option")?.querySelector("small");
-    if(metadata) metadata.textContent=`${metadata.textContent} | ${degreeType}`;
-  }
-  list.querySelectorAll("[data-program-choice]").forEach(input=>input.addEventListener("change",()=>{
-    const id=input.dataset.programChoice;
-    const draft=new Set(ST.programDraft||[]);
-    if(input.checked){
-      draft.add(id);
-    }else{
-      draft.delete(id);
-    }
-    ST.programDraft=[...draft];
-    renderProgramPickerList();
-  }));
-}
-document.getElementById("programBtn").addEventListener("click", openProgramPicker);
-document.getElementById("programClose").addEventListener("click", closeProgramPicker);
-document.getElementById("programCancel").addEventListener("click", closeProgramPicker);
-
 /* ============================================================
    PANEL EXPAND
    ============================================================ */

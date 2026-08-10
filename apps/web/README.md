@@ -12,7 +12,9 @@ clearing of the guest planner state stored on the current device.
 `src/requirement-data-loader.js` owns school, program, requirement-policy, and
 Core request orchestration without mutating browser or presentation state.
 `src/program-picker-logic.js` owns program availability, role, and draft
-selection decisions. `src/program-apply-transaction.js` validates and commits
+selection decisions. `src/program-picker-controller.js` owns the picker dialog,
+focus lifecycle, browsing presentation, and its one-time event bindings.
+`src/program-apply-transaction.js` validates and commits
 complete program/requirement candidates without exposing partial state.
 `src/home-school-transaction.js` owns stale-safe home school replacement,
 commit, and rollback without rendering the interface.

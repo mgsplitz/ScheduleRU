@@ -128,19 +128,16 @@ const programApplyTransaction=ScheduleRUProgramApplyTransaction.create({
   onCommitted:()=>{updateProgramTitle();renderOnboarding();closeProgramPicker();},
 });
 function applyProgramDraft(){return programApplyTransaction.execute({ids:ST.programDraft,primaryId:ST.programDraftPrimaryId});}
-document.getElementById("programApply").addEventListener("click",applyProgramDraft);
-let programDialogFocusRestore=null;
-function setProgramDialogOpen(open){const root=document.getElementById("programOv"),dialog=root.querySelector("[role=dialog]");root.setAttribute("aria-hidden",String(!open));[document.getElementById("app"),document.getElementById("page-courses"),document.querySelector(".pagenav")].filter(Boolean).forEach(node=>{node.inert=open||!ST.onboarding?.completed;});document.getElementById("onboarding").inert=open;if(open){programDialogFocusRestore=document.activeElement;requestAnimationFrame(()=>dialog.querySelector("input, select, button:not([disabled])")?.focus());}else{const restore=programDialogFocusRestore;programDialogFocusRestore=null;requestAnimationFrame(()=>{if(restore?.isConnected&&restore!==document.body)restore.focus();else(!ST.onboarding?.completed?document.getElementById("onboardingPrograms"):document.getElementById("programBtn"))?.focus();});}}
-const legacyOpenProgramPicker=openProgramPicker,legacyCloseProgramPicker=closeProgramPicker,legacyRenderProgramPickerList=renderProgramPickerList;
-openProgramPicker=function(){ST.programDraftPrimaryId=ST.primaryProgramId;legacyOpenProgramPicker();setProgramDialogOpen(true);};
-closeProgramPicker=function(){legacyCloseProgramPicker();setProgramDialogOpen(false);};
-renderProgramPickerList=function(){legacyRenderProgramPickerList();const controls=document.getElementById("programRoleControls"),byId=new Map((ST.availablePrograms||[]).map(program=>[program.id,program]));if(!ST.programBrowseSchoolSlug){controls.innerHTML="";return;}const view=ScheduleRUProgramPickerLogic.programDraftView({draftIds:ST.programDraft,primaryId:ST.programDraftPrimaryId,programs:ST.availablePrograms});ST.programDraft=view.selectedIds;ST.programDraftPrimaryId=view.primaryId;controls.innerHTML=view.majorIds.length?`<div class="onboarding-note"><b>Major roles</b><br/>${view.majorIds.map(id=>`<button class="choice-btn secondary" data-draft-primary="${html(id)}" ${id===view.primaryId?"disabled":""}>${id===view.primaryId?"Primary: ":"Make primary: "}${html(byId.get(id)?.name||id)}</button>`).join(" ")}<br/>The first selected major is primary by default; choose another to swap roles.</div>`:"";controls.querySelectorAll("[data-draft-primary]").forEach(button=>button.addEventListener("click",()=>{ST.programDraftPrimaryId=button.dataset.draftPrimary;renderProgramPickerList();}));};
-function replaceProgramPickerControl(id,handler){const control=document.getElementById(id),replacement=control.cloneNode(true);control.replaceWith(replacement);replacement.addEventListener("click",handler);}
-replaceProgramPickerControl("programBtn",openProgramPicker);
-replaceProgramPickerControl("programClose",closeProgramPicker);
-replaceProgramPickerControl("programCancel",closeProgramPicker);
-document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.getElementById("programOv").classList.contains("open")&&!document.getElementById("appModal").classList.contains("open")&&!ST.programApplyPending){event.preventDefault();closeProgramPicker();}});
-document.getElementById("programOv").addEventListener("click",event=>{if(event.target===document.getElementById("programOv")&&!ST.programApplyPending)closeProgramPicker();});
+const programPickerController=ScheduleRUProgramPickerController.create({
+  getState:()=>ST,document,requestAnimationFrame,
+  pickerLogic:ScheduleRUProgramPickerLogic,plannerUI:ScheduleRUPlannerUI,
+  escapeHtml:html,cleanText:cleanApiText,getProgramTypeSections:programTypeSections,
+  programTypeLabel,programCoverageLabel,selectionLimitSummary,
+  showFeedback:showProgramPolicyFeedback,onApply:applyProgramDraft,
+});
+function openProgramPicker(){return programPickerController.open();}
+function closeProgramPicker(){return programPickerController.close();}
+programPickerController.bind();
 
 function plannerTerms(){return plannerTermsFromAcademicPosition();}
 function unresolvedPlannerRequirements(){return normalizedPlannerInputs().unresolvedRequirements;}

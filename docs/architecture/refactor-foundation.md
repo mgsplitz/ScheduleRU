@@ -177,6 +177,9 @@ Program apply follows the same boundary: requirement requests build an
 immutable candidate, and the apply transaction performs the only accepted
 state commit after policy validation. Superseded legacy click handling has
 been removed.
+The program picker now has one controller for rendering, focus, and event
+ownership; controller reassignment and cloned-control listener replacement
+are no longer part of the browser integration.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.
