@@ -26,9 +26,11 @@ eligibility refreshes, modal accessibility, and return-to-picker behavior.
 lazy section expansion, wishlist controls, and catalog view restoration.
 `src/schedule-builder-controller.js` owns semester-builder state, section
 hydration, permutation recomputation, closed-section inclusion, and acceptance.
+`src/schedule-builder-view.js` owns semester-builder markup, calendar and campus
+presentation, schedule navigation, and browser event binding.
 `src/requirement-picker-controller.js` owns the approved-course picker,
 including stale-safe selector searches, pagination, focus, and picker actions.
-`src/planner-controller.js` owns the compatibility planner and schedule-builder
+`src/planner-controller.js` owns the compatibility planner and shared requirement
 integration, while `src/guided-setup-controller.js` owns onboarding, program
 selection, modal, and plan-preview orchestration. Smaller domain decisions
 remain in their named modules; new browser logic must not return to

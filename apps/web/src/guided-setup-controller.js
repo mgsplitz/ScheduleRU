@@ -57,6 +57,20 @@ const catalogPageLifecycleController=ScheduleRUCatalogPageController.create({
 installCatalogPageController(catalogPageLifecycleController);
 catalogPageLifecycleController.initialize();
 
+const scheduleBuilderPresentation=ScheduleRUScheduleBuilderView.create({
+  getBuilder:()=>ST.builder,document,escapeHtml:html,formatMeeting:fmtMeeting,
+  dayIndex,meetingTimeRange,formatClock,academicYearLabel,
+  sortSections:ScheduleRUCourseInteractionLogic.sortSections,
+  calendarBlockGeometry:ScheduleRUCourseInteractionLogic.calendarBlockGeometry,
+  handlers:{
+    close:closeBuilder,openAssistant:openScheduleAssistant,
+    setIncludeClosed:setBuilderIncludeClosed,add:addToBuilderPool,remove:removeFromBuilderPool,
+    toggleSection:toggleBuilderSection,toggleCollapse:toggleBuilderCourseCollapse,
+    toggleEnabled:toggleBuilderCourseEnabled,confirm:confirmBuilderSchedule,
+  },
+});
+installScheduleBuilderView(scheduleBuilderPresentation);
+
 const scheduleBuilderLifecycleController=ScheduleRUScheduleBuilderController.create({
   getState:()=>ST,currentPlannerTerm,
   canOpenBuilder:ScheduleRUPlannerUI.canOpenSemesterBuilder,
