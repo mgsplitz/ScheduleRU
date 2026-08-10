@@ -6,6 +6,33 @@ const modalController=(()=>{
   root.addEventListener("click",event=>{if(event.target===root&&dismissible)close();}); document.addEventListener("keydown",event=>{if(event.key==="Escape"&&root.classList.contains("open")&&dismissible){event.preventDefault();close();}}); return {show,close};
 })();
 
+const requirementPickerDialogController=ScheduleRURequirementPickerController.create({
+  getState:()=>ST,document,requestAnimationFrame,setTimeout,clearTimeout,pageSize:PAGE_SIZE,
+  getGroup:id=>GROUPS[id]||null,getCourse:id=>COURSES[id]||null,
+  selectorsForGroup:reviewedGroupSelectors,groupDisplayName,groupRuleLabel,isConstraintGroup,
+  selectedCourseIds:selectedRequirementCourses,appliedCourseIds:groupAppliedCourseIds,selectionLimit,
+  registerSelectorCourseRecord,
+  loadSelectorCourses:async({search,limit,offset,selectors})=>{
+    const params=new URLSearchParams({search,limit:String(limit),offset:String(offset),selector:JSON.stringify(selectors)});
+    const response=await backendFetch("/api/courses?"+params.toString());
+    return {records:(response.courses||[]).map(backendCourseRecord).filter(Boolean),total:response.total};
+  },
+  courseRecordFromId,plannerUI:ScheduleRUPlannerUI,escapeHtml:html,courseCreditsLabel,
+  constraintViolation:parentSelectionConstraintViolation,
+  showSelectionReview:message=>modalController.show({title:"Selection needs review",body:`<p>${html(message)}</p>`,actions:[{label:"Close",secondary:true}]}),
+  commitSelection:(groupId,selectedIds,record)=>{
+    ST.groupSelections[groupId]=selectedIds;
+    if(record?.code)addToWishlist(record.code,record);else savePlannerState();
+  },
+  toggleWishlist:record=>{
+    if(ST.wishlist[record.code]){delete ST.wishlist[record.code];savePlannerState();}
+    else addToWishlist(record.code,record);
+  },
+  renderAll,openCourseDetails,
+});
+installRequirementPickerController(requirementPickerDialogController);
+requirementPickerDialogController.bind();
+
 function openRestartSetupConfirmation(){
   modalController.show({
     title:"Restart everything?",

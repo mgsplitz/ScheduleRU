@@ -638,8 +638,7 @@ function closeCourseDetails(){
   document.getElementById("prOv").classList.remove("open");
   if(ST.returnToPicker && ST.pickerGroupId){
     ST.returnToPicker=false;
-    document.getElementById("pickerOv").classList.add("open");
-    renderRequirementPicker();
+    requirementPickerController?.resume();
   }
 }
 document.getElementById("prClose").addEventListener("click", closeCourseDetails);
@@ -647,144 +646,14 @@ document.getElementById("prClose").addEventListener("click", closeCourseDetails)
 /* ============================================================
    LARGE REQUIREMENT GROUP PICKER
    ============================================================ */
-function closeRequirementPicker(){
-  document.getElementById("pickerOv").classList.remove("open");
-  ST.pickerGroupId=null;
-  ST.pickerSelector=null;
-}
-function openRequirementPicker(gk){
-  const g=GROUPS[gk];
-  const selectors=reviewedGroupSelectors(g);
-  if(!g) return;
-  if(!(g.members||[]).length&&!selectors.length) return;
-  ST.pickerGroupId=gk;
-  ST.pickerSelector=selectors.length?{
-    groupId:gk,records:[],loading:false,error:"",page:1,total:0,search:"",requestGeneration:0,
-  }:null;
-  document.getElementById("pickerTitle").textContent=groupDisplayName(g);
-  document.getElementById("pickerOv").classList.add("open");
-  document.getElementById("pickerSearch").value="";
-  renderRequirementPicker();
-  document.getElementById("pickerSearch").focus();
-  if(ST.pickerSelector) loadRequirementPickerSelectorCourses();
-}
+let requirementPickerController=null;
+function installRequirementPickerController(controller){requirementPickerController=controller;}
+function openRequirementPicker(gk){return requirementPickerController?.open(gk);}
 function groupAcceptsCourseId(g,id){
   if((g?.members||[]).includes(id))return true;
   const record=COURSES[id] ? requirementCourseRecord(id) : courseRecordFromId(id);
   return !!record&&globalThis.ScheduleRUCourseSelectorLogic.matchesAnySelector(record,reviewedGroupSelectors(g));
 }
-async function loadRequirementPickerSelectorCourses(){
-  const state=ST.pickerSelector,group=GROUPS[ST.pickerGroupId];
-  if(!state||!group||state.groupId!==group.id)return;
-  const generation=state.requestGeneration+1;
-  state.requestGeneration=generation;state.loading=true;state.error="";renderRequirementPicker();
-  try{
-    const params=new URLSearchParams({
-      search:state.search||"",limit:String(PAGE_SIZE),offset:String((state.page-1)*PAGE_SIZE),
-      selector:JSON.stringify(reviewedGroupSelectors(group)),
-    });
-    const response=await backendFetch("/api/courses?"+params.toString());
-    if(ST.pickerSelector!==state||state.requestGeneration!==generation)return;
-    state.records=(response.courses||[]).map(backendCourseRecord).filter(Boolean);
-    state.records.forEach(registerSelectorCourseRecord);
-    state.total=Number(response.total)||state.records.length;
-  }catch(error){
-    if(ST.pickerSelector===state&&state.requestGeneration===generation)state.error=error.message||"Approved courses could not be loaded.";
-  }finally{
-    if(ST.pickerSelector===state&&state.requestGeneration===generation){state.loading=false;renderRequirementPicker();}
-  }
-}
-function renderRequirementPicker(){
-  const g=GROUPS[ST.pickerGroupId];
-  if(!g) return;
-  const selected=selectedRequirementCourses(g.id);
-  const applied=groupAppliedCourseIds(g);
-  const limit=selectionLimit(g);
-  const constraints=(g.children||[]).map(id=>GROUPS[id]).filter(isConstraintGroup);
-  const search=String(document.getElementById("pickerSearch")?.value||"").trim().toLowerCase();
-  document.getElementById("pickerIntro").textContent=
-    g.rule==="distinct"
-      ? `Choose ${limit} approved courses that cover ${g.count} distinct Arts and Humanities learning goals. Save any course here to your Wishlist without changing the requirement choice.`
-      : `Scheduled, completed, and shared selected courses apply automatically. Choose up to ${Math.max(0,limit-applied.length)} additional approved ${limit===1?"course":"courses"} for this requirement.${constraints.length?` Your choices must also satisfy: ${constraints.map(child=>`${groupDisplayName(child)} (${groupRuleLabel(child)})`).join("; ")}.`:""} Chosen courses are also saved to your Wishlist.`;
-  const selectorState=ST.pickerSelector;
-  const sourceIds=selectorState
-    ? selectorState.records.map(registerSelectorCourseRecord).filter(Boolean)
-    : (g.members||[]);
-  const ids=sourceIds.filter(id=>{
-    const c=COURSES[id];
-    return c && (!search || `${c.code} ${c.title} ${c.fullTitle||""}`.toLowerCase().includes(search));
-  });
-  const list=document.getElementById("pickerList");
-  if(selectorState?.loading)list.innerHTML=`<div class="loading">Loading approved courses…</div>`;
-  else if(selectorState?.error)list.innerHTML=`<div class="api-status err">${escapeHtml(selectorState.error)}</div><div class="choice-actions"><button class="choice-btn" id="pickerRetry">Retry</button></div>`;
-  else list.innerHTML=ids.length?ids.map(id=>{
-    const c=COURSES[id];
-    const picked=selected.includes(id);
-    const alreadyApplied=applied.includes(id);
-    const selectSlotAvailable=new Set([...applied,...selected]).size<limit;
-    const pickerActions=globalThis.ScheduleRUPlannerUI.pickerActions({
-      alreadyApplied,
-      selected:picked,
-      canSelect:selectSlotAvailable,
-      inWishlist:!!ST.wishlist[c.code],
-    });
-    return `<div class="picker-row${picked||alreadyApplied?" selected":""}">
-      <div><div class="picker-code">${escapeHtml(c.code)}</div><div class="picker-name">${escapeHtml(c.fullTitle||c.title)}</div><div class="picker-meta">${escapeHtml(courseCreditsLabel(c.credits))}</div></div>
-      <div class="picker-actions"><button class="picker-btn view" data-pview="${id}">Details</button><button class="picker-btn${pickerActions.intent==="wishlist"?" secondary":""}${pickerActions.intent==="wishlist"&&pickerActions.selected?" wishlist-active":""}" data-paction="${id}" data-pintent="${pickerActions.intent}" ${pickerActions.disabled?"disabled":""}>${pickerActions.label}</button></div>
-    </div>`;
-  }).join(""):`<div class="api-status">No approved course matches that search.</div>`;
-  if(selectorState&&!selectorState.loading&&!selectorState.error){
-    const pages=Math.max(1,Math.ceil(selectorState.total/PAGE_SIZE));
-    list.insertAdjacentHTML("beforeend",`<div class="pager"><button id="pickerPrev" ${selectorState.page<=1?"disabled":""}>← Prev</button><span class="pg-info">Page ${selectorState.page} of ${pages}</span><button id="pickerNext" ${selectorState.page>=pages?"disabled":""}>Next →</button></div>`);
-  }
-  document.getElementById("pickerRetry")?.addEventListener("click",loadRequirementPickerSelectorCourses);
-  document.getElementById("pickerPrev")?.addEventListener("click",()=>{selectorState.page-=1;loadRequirementPickerSelectorCourses();});
-  document.getElementById("pickerNext")?.addEventListener("click",()=>{selectorState.page+=1;loadRequirementPickerSelectorCourses();});
-  list.querySelectorAll("[data-pview]").forEach(b=>b.addEventListener("click",()=>{
-    ST.returnToPicker=true;
-    document.getElementById("pickerOv").classList.remove("open");
-    openCourseDetails(b.dataset.pview);
-  }));
-  list.querySelectorAll("[data-paction]").forEach(b=>b.addEventListener("click",()=>{
-    const id=b.dataset.paction;
-    if(b.dataset.pintent==="wishlist"){
-      const record=courseRecordFromId(id);
-      if(!record?.code)return;
-      if(ST.wishlist[record.code])delete ST.wishlist[record.code];
-      else addToWishlist(record.code,record);
-      savePlannerState();
-      renderAll();
-      renderRequirementPicker();
-      return;
-    }
-    const current=selectedRequirementCourses(g.id);
-    const currentlyApplied=groupAppliedCourseIds(g);
-    if(currentlyApplied.includes(id)){
-      return;
-    }else if(current.includes(id)){
-      ST.groupSelections[g.id]=current.filter(item=>item!==id);
-    }else if(new Set([...currentlyApplied,...current]).size<limit){
-      const proposed=[...current,id];
-      const violation=parentSelectionConstraintViolation(g, proposed);
-      if(violation){
-        modalController.show({title:"Selection needs review",body:`<p>${escapeHtml(violation)}</p>`,actions:[{label:"Close",secondary:true}]});
-        return;
-      }
-      ST.groupSelections[g.id]=proposed;
-      addToWishlist(id,courseRecordFromId(id));
-    }
-    renderAll();
-    renderRequirementPicker();
-  }));
-}
-document.getElementById("pickerClose").addEventListener("click", closeRequirementPicker);
-let pickerSearchTimer;
-document.getElementById("pickerSearch").addEventListener("input",event=>{
-  if(!ST.pickerSelector){renderRequirementPicker();return;}
-  ST.pickerSelector.search=event.target.value;ST.pickerSelector.page=1;
-  clearTimeout(pickerSearchTimer);
-  pickerSearchTimer=setTimeout(loadRequirementPickerSelectorCourses,250);
-});
 
 /* ============================================================
    COURSE RECORDS — one shape for requirements, catalog, wishlist and plan

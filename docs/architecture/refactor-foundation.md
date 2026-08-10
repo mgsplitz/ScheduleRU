@@ -180,6 +180,10 @@ been removed.
 The program picker now has one controller for rendering, focus, and event
 ownership; controller reassignment and cloned-control listener replacement
 are no longer part of the browser integration.
+The approved requirement-course picker now follows the same boundary. Its
+dialog lifecycle, debounced selector requests, paging, and course actions live
+in one controller, while requirement evaluation and canonical course records
+remain in their domain modules.
 
 1. Split the extracted planner and guided-setup controllers into smaller
    state, API, rendering, and feature controllers behind contract tests.

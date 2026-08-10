@@ -20,6 +20,8 @@ complete program/requirement candidates without exposing partial state.
 commit, and rollback without rendering the interface.
 `src/course-record-model.js` normalizes and resolves requirement, catalog,
 wishlist, and planned-course records behind one stable course-code identity.
+`src/requirement-picker-controller.js` owns the approved-course picker,
+including stale-safe selector searches, pagination, focus, and picker actions.
 `src/planner-controller.js` owns the compatibility planner and schedule-builder
 integration, while `src/guided-setup-controller.js` owns onboarding, program
 selection, modal, and plan-preview orchestration. Smaller domain decisions

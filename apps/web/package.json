@@ -14,9 +14,10 @@
     "./program-apply-transaction": "./src/program-apply-transaction.js",
     "./program-picker-controller": "./src/program-picker-controller.js",
     "./program-picker": "./src/program-picker-logic.js",
+    "./requirement-picker-controller": "./src/requirement-picker-controller.js",
     "./requirement-data-loader": "./src/requirement-data-loader.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/home-school-transaction.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-apply-transaction.test.mjs ../../worker/tests/program-picker-controller.test.mjs ../../worker/tests/program-picker-logic.test.mjs"
+    "test": "node --test ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/home-school-transaction.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-apply-transaction.test.mjs ../../worker/tests/program-picker-controller.test.mjs ../../worker/tests/program-picker-logic.test.mjs ../../worker/tests/requirement-picker-controller.test.mjs"
   }
 }
