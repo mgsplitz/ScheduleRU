@@ -1221,6 +1221,11 @@ function activeCatalogSelectorContext(){
   const selectors=reviewedGroupSelectors(group);
   return group&&selectors.length ? {group,selectors} : null;
 }
+let catalogPageController=null;
+function installCatalogPageController(controller){catalogPageController=controller;}
+function renderCoursesPage(){return catalogPageController?.render();}
+function loadBackendMeta(){return catalogPageController?.loadMeta();}
+function loadBackendCourses(){return catalogPageController?.loadCourses();}
 function openSelectorCourseBrowser(gk){
   const group=GROUPS[gk];
   if(ST.tab==="core"){
@@ -1236,11 +1241,7 @@ function openSelectorCourseBrowser(gk){
   openRequirementPicker(gk);
 }
 function clearCatalogSelectorBrowser(){
-  ST.backendSelectorGroupId=null;
-  ST.backendRequirementFilter=null;
-  ST.backendPage=1;
-  ST.expandedIds.clear();
-  loadBackendCourses();
+  return catalogPageController?.clearSelector();
 }
 
 async function loadCourseEligibilityForCodes(codes){
@@ -1454,44 +1455,6 @@ async function loadInitialRequirements({reloadSchools=true}={}){
   }
 }
 
-async function loadBackendMeta(){
-  try{ const d = await backendFetch("/api/subjects"); ST.backendSubjects = d.subjects||[]; }catch(e){ ST.backendSubjects=[]; }
-  try{ ST.backendStatus = await backendFetch("/api/sync-status"); }catch(e){ ST.backendStatus=null; }
-  renderCoursesPage();
-}
-
-async function loadBackendCourses(){
-  if(!ST.backendUrl){ ST.backendError=""; ST.backendCourses=[]; renderCoursesPage(); return; }
-  ST.backendLoading=true; ST.backendError=""; renderCoursesPage();
-  try{
-    const params=new URLSearchParams({
-      search: ST.backendSearch||"", subject: ST.backendSubject||"",
-      limit: String(PAGE_SIZE), offset: String((ST.backendPage-1)*PAGE_SIZE),
-    });
-    const selectorContext=activeCatalogSelectorContext();
-    if(selectorContext) params.set("selector",JSON.stringify(selectorContext.selectors));
-    const d = await backendFetch("/api/courses?"+params.toString());
-    ST.backendCourses = d.courses||[];
-    await loadCourseEligibilityForCodes(ST.backendCourses.map(catalogCourseCode));
-    ST.backendTotal = d.total ?? ST.backendCourses.length;
-  }catch(err){
-    ST.backendError = `Couldn't reach backend: ${err.message}`;
-    ST.backendCourses=[];
-  }
-  ST.backendLoading=false;
-  renderCoursesPage();
-}
-
-function fmtTimeAgo(ts){
-  if(!ts) return "never";
-  const mins = Math.round((Date.now()-ts)/60000);
-  if(mins < 1) return "just now";
-  if(mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins/60);
-  if(hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs/24)}d ago`;
-}
-
 function escapeHtml(s){
   return String(s).replace(/[&<>]/g, ch=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[ch]));
 }
@@ -1527,233 +1490,6 @@ function fmtMeeting(m){
   if(!bits && !loc) return (m.mode||"").toUpperCase().includes("ONLINE") ? "Online" : "—";
   return loc ? `${bits || "—"} · ${loc}` : (bits || "Online");
 }
-
-// Sections are fetched lazily (one call per course, only once it's expanded)
-// rather than up front for every row on the page.
-async function toggleCourseExpand(id){
-  if(ST.expandedIds.has(id)){
-    ST.expandedIds.delete(id);
-    renderCoursesPage();
-    return;
-  }
-  ST.expandedIds.add(id);
-  renderCoursesPage();
-  if(!ST.sectionsCache[id]){
-    try{
-      const d = await backendFetch(`/api/courses/${encodeURIComponent(id)}/sections`);
-      ST.sectionsCache[id] = { sections: d.sections||[] };
-    }catch(err){
-      ST.sectionsCache[id] = { error: err.message };
-    }
-    renderCoursesPage();
-  }
-}
-
-function courseRowHtml(c){
-  const code = `${c.school}:${c.subject_code}:${c.course_number}`;
-  const inW = !!ST.wishlist[code] || wishlistRecords().some(item=>item.code===code);
-  const wishlistAction=globalThis.ScheduleRUPlannerUI.catalogWishlistAction({inWishlist:inW});
-  const isOpen = ST.expandedIds.has(c.id);
-  const openCt = c.open_count ?? 0, totalCt = c.section_count ?? 0;
-
-  let bodyHtml = "";
-  if(isOpen){
-    const cached = ST.sectionsCache[c.id];
-    if(!cached){
-      bodyHtml = `<div class="loading">Loading sections…</div>`;
-    } else if(cached.error){
-      bodyHtml = `<div class="api-status err">${escapeHtml(cached.error)}</div>`;
-    } else {
-      const sections = cached.sections;
-      bodyHtml = `
-        ${c.subject_notes ? `<div class="subj-notes"><b>Subject Notes:</b>${escapeHtml(cleanApiText(c.subject_notes))}</div>` : ""}
-        ${c.description ? `<div class="cr-desc">${escapeHtml(cleanApiText(c.description))}</div>` : ""}
-        ${cleanApiText(c.prereqs)
-          ? `<details class="catalog-advanced"><summary>Official prerequisite details</summary><p>${escapeHtml(cleanApiText(c.prereqs))}</p></details>`
-          : `<div class="cr-prereqs"><b>Prerequisites</b>None listed</div>`}
-        ${sections.length ? `<table class="sec-table">
-          <thead><tr><th>Sec</th><th>Status</th><th>Index</th><th>Meeting</th><th>Instructor</th></tr></thead>
-          <tbody>${sections.map(s=>{
-            const extras=[];
-            if(cleanApiText(s.notes)) extras.push(`<div class="row"><b>Notes:</b> ${escapeHtml(cleanApiText(s.notes))}</div>`);
-            if(cleanApiText(s.restrictions)) extras.push(`<div class="row"><b>Restrictions:</b> ${escapeHtml(cleanApiText(s.restrictions))}</div>`);
-            if(cleanApiText(s.comments)) extras.push(`<div class="row"><b>Comments:</b> ${escapeHtml(cleanApiText(s.comments))}</div>`);
-            if(cleanApiText(s.open_to)) extras.push(`<div class="row"><b>Open To:</b> ${escapeHtml(cleanApiText(s.open_to))}</div>`);
-            return `<tr>
-            <td>${escapeHtml(s.section_number||s.index_number||"")}</td>
-            <td class="${s.open_status?'status-open':'status-closed'}">${s.open_status?'OPEN':'CLOSED'}</td>
-            <td>${escapeHtml(s.index_number||"")}</td>
-            <td>${(s.meetings||[]).map(fmtMeeting).map(escapeHtml).join('<br/>')||'—'}</td>
-            <td>${escapeHtml(s.instructor||"—")}</td>
-          </tr>${extras.length?`<tr class="sec-extra"><td colspan="5">${extras.join("")}</td></tr>`:""}`;
-          }).join("")}</tbody>
-        </table>` : `<div class="api-status">No sections found for this course.</div>`}`;
-    }
-  }
-
-  return `<div class="course-row">
-    <div class="course-row-hdr" data-toggle="${c.id}">
-      <span class="cr-arrow${isOpen?" open":""}">▶</span>
-      <span class="cr-code">${escapeHtml(code)}</span>
-      ${cleanApiText(c.prereqs) ? `<span class="prereq-hint" onclick="event.stopPropagation()">Prereqs listed<span class="tip">${escapeHtml(cleanApiText(c.prereqs))}</span></span>` : ""}
-      <span class="cr-title">${escapeHtml(c.title)}<span class="sub"> ${escapeHtml(c.subject_description||"")}</span></span>
-      <span class="cr-credits">${escapeHtml(courseCreditsLabel(c.credits,true))}</span>
-      <span class="cr-sections" style="color:${openCt>0?'#3a8a3a':'var(--grayt)'}">${openCt}/${totalCt} open</span>
-      <button class="cr-wish${wishlistAction.remove?" selected":""}" data-wadd="${escapeHtml(code)}" aria-pressed="${wishlistAction.remove}">${wishlistAction.label}</button>
-    </div>
-    <div class="course-row-body${isOpen?" open":""}">${bodyHtml}</div>
-  </div>`;
-}
-
-function renderCoursesPage(){
-  const root = document.getElementById("coursesRoot");
-  if(!root) return;
-  const coursePage=document.getElementById("page-courses");
-  const previousSearch=document.getElementById("cpSearch");
-  const viewState=globalThis.ScheduleRUCourseInteractionLogic.catalogViewState({
-    scrollLeft:coursePage?.scrollLeft,scrollTop:coursePage?.scrollTop,
-    activeElementId:document.activeElement?.id||"",
-    selectionStart:previousSearch?.selectionStart,selectionEnd:previousSearch?.selectionEnd,
-  });
-  const restoreView=()=>requestAnimationFrame(()=>{
-    const search=document.getElementById("cpSearch");
-    if(viewState.restoreSearchFocus&&search){
-      search.focus({preventScroll:true});
-      if(viewState.selectionStart!==null)search.setSelectionRange(viewState.selectionStart,viewState.selectionEnd);
-    }
-    if(coursePage){
-      coursePage.scrollLeft=viewState.scrollLeft;
-      coursePage.scrollTop=viewState.scrollTop;
-    }
-  });
-  const selectorContext=activeCatalogSelectorContext();
-
-  // Connection bar is always visible so the backend URL can be seen/changed
-  // at any time, not just on first connect. The "Open" link hits the raw
-  // endpoint directly in a new tab — useful for telling apart "the Worker
-  // isn't deployed/reachable" from "it's reachable but CORS/JSON is off",
-  // since a plain browser tab isn't subject to the app's CORS fetch rules.
-  const connectionBar = `
-    <div class="cp-connect">
-      <input id="cpUrl" placeholder="https://your-worker.workers.dev" value="${escapeHtml(ST.backendUrl)}"/>
-      <button class="add-btn" id="cpConnect">${ST.backendUrl?"Update":"Connect"}</button>
-      ${ST.backendUrl?`<a href="${escapeHtml(ST.backendUrl)}/api/sync-status" target="_blank" rel="noopener" class="cp-connect-testlink">Open ↗</a>`:""}
-      <span class="cp-connect-status ${ST.backendUrl && !ST.backendError ? "ok" : ""}">${
-        ST.backendUrl ? (ST.backendError ? "⚠ " + escapeHtml(ST.backendError) : "● Connected") : "Not connected"
-      }</span>
-    </div>`;
-
-  function wireConnectionBar(){
-    const connectBtn=document.getElementById("cpConnect");
-    const urlEl=document.getElementById("cpUrl");
-    connectBtn?.addEventListener("click", ()=>{
-      saveBackendUrl(urlEl.value);
-      ST.backendPage=1; ST.expandedIds.clear(); ST.sectionsCache={};
-      loadBackendMeta(); loadBackendCourses();
-    });
-    urlEl?.addEventListener("keydown", e=>{ if(e.key==="Enter") connectBtn?.click(); });
-  }
-
-  if(!ST.backendUrl){
-    root.innerHTML = `
-      <div class="cp-header"><h1>Course Catalog</h1><div class="cp-sub">Live section data, synced from Rutgers</div></div>
-      ${connectionBar}
-      <div class="api-status" style="margin-top:8px">Not connected yet. Deploy <code>worker.js</code> (see README.md), then paste its
-        <code>https://your-worker.workers.dev</code> URL above.</div>`;
-    wireConnectionBar();
-    restoreView();
-    return;
-  }
-
-  const subjOpts = `<option value="">All subjects</option>` + (ST.backendSubjects||[]).map(s=>
-    `<option value="${s.code}"${ST.backendSubject===s.code?" selected":""}>${escapeHtml(s.description||s.code)} (${s.code})</option>`
-  ).join("");
-  const selectorDescription=selectorContext
-    ? selectorContext.selectors.map(selector=>globalThis.ScheduleRUCourseSelectorLogic.selectorDescription(selector)).join("; ")
-    : "";
-  const displayedCourses=selectorContext
-    ? ST.backendCourses.filter(course=>globalThis.ScheduleRUCourseSelectorLogic.matchesAnySelector(backendCourseRecord(course),selectorContext.selectors))
-    : ST.backendCourses;
-
-  let statusLine = "";
-  if(ST.backendStatus){
-    const st = ST.backendStatus;
-    statusLine = `${st.courses_in_db.toLocaleString()} courses in database · last sync ${fmtTimeAgo(st.last_fetch_at)}`;
-  }
-
-  let bodyHtml;
-  if(ST.backendLoading){
-    bodyHtml = `<div class="loading">Loading courses…</div>`;
-  } else if(ST.backendError){
-    bodyHtml = `<div class="api-status err">${escapeHtml(ST.backendError)}</div>`;
-  } else if(displayedCourses.length){
-    const pages = Math.max(1, Math.ceil(ST.backendTotal / PAGE_SIZE));
-    bodyHtml = `
-      <div class="course-list">${displayedCourses.map(courseRowHtml).join("")}</div>
-      <div class="pager">
-        <button id="cpPrev" ${ST.backendPage<=1?"disabled":""}>← Prev</button>
-        <span class="pg-info">Page ${ST.backendPage} of ${pages} (${ST.backendTotal.toLocaleString()} courses)</span>
-        <button id="cpNext" ${ST.backendPage>=pages?"disabled":""}>Next →</button>
-      </div>`;
-  } else {
-    bodyHtml = `<div class="api-status">Connected — 0 courses matched. Try clearing the search/subject filter, or the backend hasn't finished its first sync yet (check ${escapeHtml(ST.backendUrl)}/api/sync-status).</div>`;
-  }
-
-  root.innerHTML = `
-    <div class="cp-header"><h1>Course Catalog</h1><div class="cp-sub">${statusLine}</div></div>
-    ${connectionBar}
-    ${selectorContext?`<div class="choice-summary">Choosing for <b>${escapeHtml(groupDisplayName(selectorContext.group))}</b>: ${escapeHtml(selectorDescription)}. Add one to your wishlist, then place it in your plan to apply it automatically.</div>`:""}
-    <div class="cp-controls">
-      <input id="cpSearch" placeholder="Search by title or course code…" value="${escapeHtml(ST.backendSearch)}"/>
-      ${selectorContext?`<button class="choice-btn secondary" id="cpClearSelector">Clear requirement filter</button>`:`<select id="cpSubject">${subjOpts}</select>`}
-    </div>
-    ${bodyHtml}`;
-
-  wireConnectionBar();
-  attachCoursesPageControls();
-  restoreView();
-}
-
-function attachCoursesPageControls(){
-  const searchEl=document.getElementById("cpSearch");
-  const subjEl=document.getElementById("cpSubject");
-
-  if(searchEl){
-    let t;
-    searchEl.addEventListener("input", e=>{
-      ST.backendSearch=e.target.value;
-      clearTimeout(t);
-      t=setTimeout(()=>{ ST.backendPage=1; loadBackendCourses(); }, 350);
-    });
-  }
-  if(subjEl) subjEl.addEventListener("change", e=>{
-    ST.backendSubject=e.target.value; ST.backendPage=1; loadBackendCourses();
-  });
-  document.getElementById("cpClearSelector")?.addEventListener("click", clearCatalogSelectorBrowser);
-
-  document.getElementById("cpPrev")?.addEventListener("click", ()=>{ ST.backendPage--; loadBackendCourses(); });
-  document.getElementById("cpNext")?.addEventListener("click", ()=>{ ST.backendPage++; loadBackendCourses(); });
-
-  document.querySelectorAll("[data-toggle]").forEach(el=>el.addEventListener("click", e=>{
-    if(e.target.closest(".cr-wish")) return;
-    toggleCourseExpand(el.dataset.toggle);
-  }));
-  document.querySelectorAll("[data-wadd]").forEach(b=>b.addEventListener("click", e=>{
-    e.stopPropagation();
-    const code=b.dataset.wadd;
-    const saved=wishlistRecords().find(item=>item.code===code);
-    if(saved) delete ST.wishlist[saved.key];
-    else addToWishlist(code);
-    savePlannerState();
-    const action=globalThis.ScheduleRUPlannerUI.catalogWishlistAction({inWishlist:!saved});
-    b.textContent=action.label;
-    b.classList.toggle("selected",action.remove);
-    b.setAttribute("aria-pressed",String(action.remove));
-  }));
-}
-
-// Auto-connect on load if a backend URL was already saved from a previous visit.
-if(ST.backendUrl){ loadBackendMeta(); loadBackendCourses(); }
 
 /* ============================================================
    TAB 3: WISHLIST

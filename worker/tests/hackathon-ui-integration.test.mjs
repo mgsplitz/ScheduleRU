@@ -306,7 +306,7 @@ test("Core placeholder choices open a labeled Courses catalog filter instead of 
   assert.match(html, /await loadCoreCurriculum\(\);[\s\S]*?placeholderSourceType=planPlaceholderSourceType\(placeholder\)/);
   assert.match(html, /if\(destination==="course_catalog"\)\{openCorePlaceholderCourseBrowser\(placeholder,group\);return;\}/);
   assert.match(html, /Choosing for <b>/);
-  assert.match(html, /ST\.backendRequirementFilter=null/);
+  assert.match(html, /current\.backendRequirementFilter = null/);
 });
 
 test("program discovery spans supported schools while policy lookup keeps the home school", async () => {

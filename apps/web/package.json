@@ -6,6 +6,7 @@
   "exports": {
     "./course-interactions": "./src/course-interaction-logic.js",
     "./course-details-controller": "./src/course-details-controller.js",
+    "./catalog-page-controller": "./src/catalog-page-controller.js",
     "./course-records": "./src/course-record-model.js",
     "./guided-setup": "./src/guided-setup-controller.js",
     "./home-school-transaction": "./src/home-school-transaction.js",
@@ -19,6 +20,6 @@
     "./requirement-data-loader": "./src/requirement-data-loader.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/course-details-controller.test.mjs ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/home-school-transaction.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-apply-transaction.test.mjs ../../worker/tests/program-picker-controller.test.mjs ../../worker/tests/program-picker-logic.test.mjs ../../worker/tests/requirement-picker-controller.test.mjs"
+    "test": "node --test ../../worker/tests/catalog-page-controller.test.mjs ../../worker/tests/course-details-controller.test.mjs ../../worker/tests/course-interaction-logic.test.mjs ../../worker/tests/course-record-model.test.mjs ../../worker/tests/home-school-transaction.test.mjs ../../worker/tests/planner-ui-logic.test.mjs ../../worker/tests/program-apply-transaction.test.mjs ../../worker/tests/program-picker-controller.test.mjs ../../worker/tests/program-picker-logic.test.mjs ../../worker/tests/requirement-picker-controller.test.mjs"
   }
 }

@@ -45,6 +45,18 @@ const courseDetailsDialogController=ScheduleRUCourseDetailsController.create({
 installCourseDetailsController(courseDetailsDialogController);
 courseDetailsDialogController.bind();
 
+const catalogPageLifecycleController=ScheduleRUCatalogPageController.create({
+  getState:()=>ST,document,requestAnimationFrame,setTimeout,clearTimeout,pageSize:PAGE_SIZE,
+  request:backendFetch,saveBackendUrl,selectorContext:activeCatalogSelectorContext,
+  loadEligibilityForCodes:loadCourseEligibilityForCodes,catalogCourseCode,backendCourseRecord,
+  wishlistRecords,addToWishlist,saveState:savePlannerState,
+  plannerUI:ScheduleRUPlannerUI,selectorLogic:ScheduleRUCourseSelectorLogic,
+  interactionLogic:ScheduleRUCourseInteractionLogic,
+  escapeHtml:html,cleanText:cleanApiText,courseCreditsLabel,formatMeeting:fmtMeeting,groupDisplayName,
+});
+installCatalogPageController(catalogPageLifecycleController);
+catalogPageLifecycleController.initialize();
+
 function openRestartSetupConfirmation(){
   modalController.show({
     title:"Restart everything?",

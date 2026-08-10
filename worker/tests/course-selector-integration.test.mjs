@@ -44,7 +44,7 @@ test("the browser loads selector matching and uses schedule/completed records fo
 test("selector-backed requirements can open the catalog with their reviewed filter", () => {
   assert.match(frontend, /function openSelectorCourseBrowser\(gk\)/);
   assert.match(frontend, /data-gbrowse=/);
-  assert.match(frontend, /params\.set\("selector",JSON\.stringify\(selectorContext\.selectors\)\)/);
+  assert.match(frontend, /params\.set\("selector", JSON\.stringify\(filter\.selectors\)\)/);
 });
 
 test("the catalog applies selector filters on the server before it paginates", () => {
