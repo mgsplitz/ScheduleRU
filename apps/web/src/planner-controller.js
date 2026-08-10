@@ -1604,148 +1604,20 @@ function renderCampusLegend(){
   ).join("");
   return `<div class="cal-legend">${swatches}<span class="cal-legend-item"><i class="dashed" style="border-color:#c0392b;"></i>CLOSED SECTION</span></div>`;
 }
-function recomputeBuilderPermutations(){
-  if(!ST.builder) return;
-  const result = buildPermutations(ST.builder.pool);
-  ST.builder.permutations = result.combos;
-  ST.builder.blockers = result.blockers;
-  ST.builder.requiredCount = result.required.length;
-  ST.builder.permIndex = 0;
-}
-
-function openBuilder(sem){
-  const currentTerm=currentPlannerTerm();
-  if(!globalThis.ScheduleRUPlannerUI.canOpenSemesterBuilder({
-    displayedYear:ST.year,
-    activeYear:currentTerm.year,
-    semester:sem,
-    activeSemester:currentTerm.semester,
-  }))return;
-  ST.builder = { year:ST.year, sem, pool:[], permutations:[], blockers:[], requiredCount:0, permIndex:0 };
-  renderMain();
-  // Pull in anything already dropped into this semester's column so the
-  // builder starts in sync with the 4-Year Plan instead of empty.
-  Object.values(ST.schedule)
-    .filter(e=>e.year===ST.builder.year && e.sem===sem)
-    .forEach(seedBuilderPoolFromSchedule);
-}
-function closeBuilder(){
-  ST.builder = null;
-  renderAll();
-}
-
-// Fetches title/credits (if missing) and sections for a pool entry, then
-// sets its default checked sections. Shared by addToBuilderPool (adding a
-// course fresh from the panel) and seedBuilderPoolFromSchedule (pulling in
-// a course already dropped into this semester on the 4-Year Plan). If
-// preselectIndex is given and still offered, only that section starts
-// checked (it's the one already locked in); otherwise all open sections do.
-async function hydratePoolEntry(entry, preselectIndex){
-  const parts=entry.code.split(":");
-  const backendId=`${parts[0]}:${parts[1]}:${parts[2]}:${activeBackendYear()}:${activeBackendTerm()}`;
-  try{
-    if(!entry.title||entry.credits===undefined){
-      const meta = await backendFetch(`/api/courses/${encodeURIComponent(backendId)}`);
-      entry.title = entry.title || meta.course?.title || entry.code;
-      entry.credits = entry.credits ?? meta.course?.credits ?? "";
-    }
-    const d = await backendFetch(`/api/courses/${encodeURIComponent(backendId)}/sections`);
-    entry.sections = d.sections||[];
-    if(preselectIndex!=null && entry.sections.some(s=>s.index_number===preselectIndex)){
-      entry.checked = new Set([preselectIndex]);
-    } else {
-      entry.checked = new Set(entry.sections.filter(s=>s.open_status===true||s.open_status===1||s.open_status==="1").map(s=>s.index_number));
-    }
-    if(!entry.sections.length) entry.error = "No sections found for this course/term in the backend.";
-  }catch(err){
-    entry.error = err.message;
-  }
-  entry.loading=false;
-}
-
-async function addToBuilderPool(cid){
-  if(!ST.builder || !cid) return;
-  const record=courseRecordFromId(cid);
-  if(!record) return;
-  const {code,title,fullTitle,credits}=record;
-  if(ST.builder.pool.some(p=>p.code===code)) return;
-  if(lockedElsewhere(code, ST.builder.year, ST.builder.sem)){
-    const e=ST.schedule[code];
-    modalController.show({title:"Course already locked",body:`<p>${escapeHtml(code)} is already scheduled for ${escapeHtml(academicYearLabel(e.year))} ${escapeHtml(e.sem)}. Remove it there first.</p>`,actions:[{label:"Close",secondary:true}]});
-    return;
-  }
-  const entry={code, title, fullTitle:fullTitle||title, credits, course:record, sections:[], checked:new Set(), loading:true, enabled:true, collapsed:false};
-  ST.builder.pool.push(entry);
-  renderBuilder();
-  await hydratePoolEntry(entry);
-  recomputeBuilderPermutations();
-  renderBuilder();
-}
-// A course dropped straight into this semester's column on the 4-Year Plan
-// (drag-and-drop, no section chosen yet) should show up here automatically
-// instead of leaving the builder empty and out of sync with the plan.
-async function seedBuilderPoolFromSchedule(e){
-  if(!ST.builder || ST.builder.pool.some(p=>p.code===e.code)) return;
-  const entry={code:e.code, title:e.title, fullTitle:e.fullTitle||e.title, credits:e.credits, course:e.course, sections:[], checked:new Set(), loading:true, enabled:true, collapsed:false};
-  ST.builder.pool.push(entry);
-  renderBuilder();
-  // If this course was already locked with a specific section (e.g. set via
-  // the builder previously, or synced back from a saved schedule), keep
-  // that exact section pre-selected rather than defaulting to "all open".
-  await hydratePoolEntry(entry, e.locked ? e.index_number : null);
-  recomputeBuilderPermutations();
-  renderBuilder();
-}
-function removeFromBuilderPool(code){
-  if(!ST.builder) return;
-  ST.builder.pool = ST.builder.pool.filter(p=>p.code!==code);
-  recomputeBuilderPermutations();
-  renderBuilder();
-}
-function toggleBuilderSection(code, indexNum){
-  if(!ST.builder) return;
-  const p = ST.builder.pool.find(p=>p.code===code);
-  if(!p) return;
-  if(p.checked.has(indexNum)) p.checked.delete(indexNum); else p.checked.add(indexNum);
-  recomputeBuilderPermutations();
-  renderBuilder();
-}
-// Collapsing a course's section list is pure UI state — it doesn't change
-// which schedules are possible, so no need to recompute permutations.
-function toggleBuilderCourseCollapse(code){
-  if(!ST.builder) return;
-  const p = ST.builder.pool.find(p=>p.code===code);
-  if(!p) return;
-  p.collapsed = !p.collapsed;
-  renderBuilder();
-}
-// Unchecking a course removes it from consideration when building
-// schedules (without losing its section list / selections), letting
-// someone temporarily exclude a class rather than delete it from the pool.
-function toggleBuilderCourseEnabled(code){
-  if(!ST.builder) return;
-  const p = ST.builder.pool.find(p=>p.code===code);
-  if(!p) return;
-  p.enabled = p.enabled===false ? true : false;
-  recomputeBuilderPermutations();
-  renderBuilder();
-}
-function confirmBuilderSchedule(){
-  if(!ST.builder) return;
-  const combo = ST.builder.permutations[ST.builder.permIndex];
-  if(!combo || !combo.length){ modalController.show({title:"No schedule to use",body:"<p>Check at least one section for every required course before using a conflict-free schedule.</p>",actions:[{label:"Close",secondary:true}]}); return; }
-  const {year, sem} = ST.builder;
-  combo.forEach(c=>{
-    ST.schedule[c.code] = {
-      year, sem, code:c.code, title:c.title, fullTitle:c.fullTitle||c.title, credits:c.credits,
-      course:c.course||courseRecordFromId(c.code),
-      sectionId:c.id, index_number:c.index_number, section_number:c.section_number,
-      meetings:c.meetings||[], locked:true, userPinned:true,
-    };
-  });
-  ST.builder = null;
-  renderAll();
-}
+let scheduleBuilderController=null;
+function installScheduleBuilderController(controller){scheduleBuilderController=controller;}
+function recomputeBuilderPermutations(){return scheduleBuilderController?.recompute();}
+function openBuilder(sem){return scheduleBuilderController?.open(sem);}
+function closeBuilder(){return scheduleBuilderController?.close();}
+function addToBuilderPool(cid){return scheduleBuilderController?.add(cid);}
+function seedBuilderPoolFromSchedule(entry){return scheduleBuilderController?.seedFromSchedule(entry);}
+function removeFromBuilderPool(code){return scheduleBuilderController?.remove(code);}
+function toggleBuilderSection(code,indexNum){return scheduleBuilderController?.toggleSection(code,indexNum);}
+function toggleBuilderCourseCollapse(code){return scheduleBuilderController?.toggleCollapse(code);}
+function toggleBuilderCourseEnabled(code){return scheduleBuilderController?.toggleEnabled(code);}
+function confirmBuilderSchedule(){return scheduleBuilderController?.confirm();}
+function setBuilderIncludeClosed(includeClosed){return scheduleBuilderController?.setIncludeClosed(includeClosed);}
+function openScheduleAssistant(){return scheduleBuilderController?.openAssistant?.();}
 
 function poolCourseHtml(p){
   const enabled = p.enabled !== false;
@@ -1759,7 +1631,7 @@ function poolCourseHtml(p){
     const checked=p.checked && p.checked.has(s.index_number);
     const meet=(s.meetings||[]).map(fmtMeeting).join(", ")||"—";
     const instructor = escapeHtml(s.instructor||"Staff / TBA");
-    return `<label class="pool-sec-row">
+    return `<label class="pool-sec-row" ${!open&&!ST.builder?.includeClosed?"hidden":""}>
       <input type="checkbox" data-poolsec="${escapeHtml(p.code)}|${escapeHtml(s.index_number)}" ${checked?"checked":""}/>
       <span style="width:36px;flex-shrink:0;">${escapeHtml(s.section_number||s.index_number||"")}</span>
       <span class="pool-sec-meet">${escapeHtml(meet)}</span>
@@ -1869,14 +1741,18 @@ function renderBuilder(){
   root.innerHTML = `
     <div class="builder-hdr">
       <h2>Build Schedule — ${semLabel} · ${academicYearLabel(b.year)}</h2>
+      <button class="schedule-assistant-toggle" id="builderAssistant">Schedule assistant</button>
       <button class="builder-back" id="builderBack">← Back to 4-Year Plan</button>
     </div>
     <div class="drop-pool" id="poolDrop">Drag courses here from the Required / Wishlist panel →</div>
     ${resultsHtml}
+    <label class="include-closed"><input type="checkbox" ${b.includeClosed?"checked":""}/> Include closed sections</label>
     <div id="poolList">${b.pool.map(poolCourseHtml).join("")}</div>
   `;
 
   document.getElementById("builderBack").addEventListener("click", closeBuilder);
+  document.getElementById("builderAssistant").addEventListener("click",openScheduleAssistant);
+  document.querySelector(".include-closed input").addEventListener("change",event=>setBuilderIncludeClosed(event.target.checked));
   const drop = document.getElementById("poolDrop");
   drop.ondragover = e=>{ e.preventDefault(); drop.classList.add("over"); };
   drop.ondragleave = ()=> drop.classList.remove("over");

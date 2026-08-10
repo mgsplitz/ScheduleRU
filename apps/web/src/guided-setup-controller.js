@@ -57,6 +57,16 @@ const catalogPageLifecycleController=ScheduleRUCatalogPageController.create({
 installCatalogPageController(catalogPageLifecycleController);
 catalogPageLifecycleController.initialize();
 
+const scheduleBuilderLifecycleController=ScheduleRUScheduleBuilderController.create({
+  getState:()=>ST,currentPlannerTerm,
+  canOpenBuilder:ScheduleRUPlannerUI.canOpenSemesterBuilder,
+  buildPermutations,renderMain,renderAll,
+  showModal:options=>modalController.show(options),courseRecordFromId,lockedElsewhere,
+  request:backendFetch,activeBackendYear,activeBackendTerm,academicYearLabel,escapeHtml:html,
+  openAssistant:()=>{document.getElementById("assistantDrawer").classList.add("open");renderAssistant();},
+});
+installScheduleBuilderController(scheduleBuilderLifecycleController);
+
 function openRestartSetupConfirmation(){
   modalController.show({
     title:"Restart everything?",
@@ -291,15 +301,6 @@ document.addEventListener("input",event=>{if(event.target.id==="recordCourseSear
 document.addEventListener("click",event=>{const courseOption=event.target.closest("[data-record-course-option]");if(courseOption){const input=document.getElementById("recordCourseSearch");if(input)input.value=courseOption.dataset.recordCourseOption;addOnboardingCompletedCourse();return;}if(event.target.id==="addCourseRecord")addOnboardingCompletedCourse();if(event.target.matches("[data-remove-record]")){ST.academicRecords=academicRecords().filter(record=>record.id!==event.target.dataset.removeRecord);savePlannerState();renderOnboarding();renderAll();}if(event.target.id==="onboardingPrograms")openProgramPicker();});
 document.getElementById("restartSetup").addEventListener("click",openRestartSetupConfirmation);
 document.getElementById("onboardingRestart").addEventListener("click",openRestartSetupConfirmation);
-
-const legacyRenderBuilder=renderBuilder;
-renderBuilder=function(){legacyRenderBuilder();const root=document.getElementById("builderRoot"),header=root.querySelector(".builder-hdr");if(header){const control=document.createElement("button");control.className="schedule-assistant-toggle";control.textContent="Schedule assistant";control.onclick=()=>{document.getElementById("assistantDrawer").classList.add("open");renderAssistant();};header.append(control);}root.querySelectorAll(".pool-sec-row").forEach(row=>{if(row.querySelector(".status-closed"))row.hidden=!ST.builder?.includeClosed;});const pool=root.querySelector("#poolList");if(pool){const label=document.createElement("label");label.className="include-closed";label.innerHTML=`<input type="checkbox" ${ST.builder?.includeClosed?"checked":""}/> Include closed sections`;label.querySelector("input").onchange=event=>{ST.builder.includeClosed=event.target.checked;renderBuilder();};pool.before(label);}};
-const originalRecompute=recomputeBuilderPermutations;
-recomputeBuilderPermutations=function(){originalRecompute();(ST.builder?.permutations||[]).forEach((combo,index)=>{combo.stableIndex=index+1;});};
-function sectionIsOpen(section){return section?.open_status===true||section?.open_status===1||section?.open_status==="1";}
-function setBuilderIncludeClosed(includeClosed){if(!ST.builder)return;ST.builder.includeClosed=includeClosed;ST.builder.pool.forEach(pool=>{pool.autoIncludedClosed||=new Set();(pool.sections||[]).forEach(section=>{if(sectionIsOpen(section))return;const index=section.index_number;if(includeClosed){if(!pool.checked.has(index)){pool.checked.add(index);pool.autoIncludedClosed.add(index);}}else if(pool.autoIncludedClosed.has(index)){pool.checked.delete(index);pool.autoIncludedClosed.delete(index);}});});recomputeBuilderPermutations();renderBuilder();}
-const legacyRenderBuilderWithClosed=renderBuilder;
-renderBuilder=function(){legacyRenderBuilderWithClosed();const toggle=document.querySelector(".include-closed input");if(toggle)toggle.onchange=event=>setBuilderIncludeClosed(event.target.checked);};
 
 function plannerTermsFromAcademicPosition(){const terms=[];let year=Math.min(4,Math.max(1,Number(ST.academicPosition?.year)||1)),sem=ST.academicPosition?.startingSemester==="spring"?"spring":"fall";while(terms.length<8){terms.push({year,sem});if(sem==="fall")sem="spring";else{year+=1;sem="fall";}}return terms;}
 plannerTerms=plannerTermsFromAcademicPosition;

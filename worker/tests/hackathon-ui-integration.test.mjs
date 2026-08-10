@@ -118,7 +118,9 @@ test("program roles, grouped Issues, and closed sections have explicit UI contra
   assert.match(html, /Double-count policy/);
   assert.match(html, /function setBuilderIncludeClosed\(/);
   assert.match(html, /autoIncludedClosed/);
-  assert.match(html, /recomputeBuilderPermutations\(\);renderBuilder\(\)/);
+  assert.match(html, /ScheduleRUScheduleBuilderController\.create\(/);
+  assert.match(html, /current\.builder\.includeClosed = includeClosed/);
+  assert.match(html, /recompute\(\);\s*renderMain\(\)/);
 });
 
 test("program onboarding has no silent BAIT default and rerenders every draft mutation", () => {

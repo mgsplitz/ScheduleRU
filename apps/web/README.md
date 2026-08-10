@@ -24,6 +24,8 @@ wishlist, and planned-course records behind one stable course-code identity.
 eligibility refreshes, modal accessibility, and return-to-picker behavior.
 `src/catalog-page-controller.js` owns catalog loading, filters, pagination,
 lazy section expansion, wishlist controls, and catalog view restoration.
+`src/schedule-builder-controller.js` owns semester-builder state, section
+hydration, permutation recomputation, closed-section inclusion, and acceptance.
 `src/requirement-picker-controller.js` owns the approved-course picker,
 including stale-safe selector searches, pagination, focus, and picker actions.
 `src/planner-controller.js` owns the compatibility planner and schedule-builder
