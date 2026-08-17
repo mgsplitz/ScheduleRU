@@ -210,6 +210,27 @@ test("publishes every generic reviewed catalog entity", async () => {
   assert.match(sql, /INSERT INTO program_eligibility_rules/);
 });
 
+test("derives normalized course attributes from reviewed Core groups", async () => {
+  const database = new RecordingDatabase();
+  const value = definition();
+  (value.program as Record<string, unknown>).type = "core_curriculum";
+  const group = (value.requirement_groups as Array<Record<string, unknown>>)[0]!;
+  group.name = "Revision-Based Writing [WCr]";
+
+  await publishProgramDefinition(database, value, { published_at: 1785456000000 });
+
+  const attributeInsert = database.batches[0]!.find((entry) =>
+    entry.sql.includes("INSERT INTO course_requirement_attributes")
+  );
+  assert.ok(attributeInsert);
+  assert.deepEqual(attributeInsert.params, [
+    "sasnb-example-minor",
+    "sasnb-example-minor-core",
+    "01:999:101",
+    "WCr",
+  ]);
+});
+
 test("identical definitions produce identical statements and binds", async () => {
   const first = new RecordingDatabase();
   const second = new RecordingDatabase();

@@ -59,7 +59,7 @@ const ST = {
   requirementTrees:{}, referenceRequirementTrees:{}, majorRequirementTree:null, catalogListedProgramIds:[], doubleCountPolicies:[], doubleCountRules:[], doubleCountExceptions:[], programEligibilityRules:[], doubleCount:null,
   requirementsLoading:true, requirementsError:"",
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
-  backendSubject:"", backendSearch:"", backendPage:1, backendSelectorGroupId:null, backendRequirementFilter:null,
+  backendSubject:"", backendSearch:"", backendLevels:[], backendCredits:[], backendAvailability:"any", backendCoreCodes:[], backendPage:1, backendSelectorGroupId:null, backendRequirementFilter:null,
   backendCourses:[], backendTotal:0, backendLoading:false, backendError:"",
   backendSubjects:[], backendStatus:null,
   expandedIds: new Set(),   // course ids currently expanded on the Courses page

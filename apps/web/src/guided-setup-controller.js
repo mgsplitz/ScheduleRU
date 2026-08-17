@@ -53,6 +53,7 @@ const catalogPageLifecycleController=ScheduleRUCatalogPageController.create({
   activeRequirementChoice:()=>ST.activeRequirementChoice,
   useForRequirement:useCatalogCourseForRequirement,
   plannerUI:ScheduleRUPlannerUI,selectorLogic:ScheduleRUCourseSelectorLogic,
+  filterModel:ScheduleRUCatalogFilterModel,
   interactionLogic:ScheduleRUCourseInteractionLogic,
   escapeHtml:html,cleanText:cleanApiText,courseCreditsLabel,formatMeeting:fmtMeeting,groupDisplayName,
 });

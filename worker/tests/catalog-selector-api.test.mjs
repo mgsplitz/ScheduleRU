@@ -31,7 +31,7 @@ test("catalog selector filtering happens in D1 before limit and offset", async (
   const response = await worker.fetch(request, { DB: db }, {});
 
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).courses, [{ id: "01:640:300:2026:9", school: "01", subject_code: "640", course_number: "300" }]);
+  assert.deepEqual((await response.json()).courses, [{ id: "01:640:300:2026:9", school: "01", subject_code: "640", course_number: "300", attributes: [] }]);
   assert.equal(db.calls.length, 2);
   assert.match(db.calls[0].sql, /FROM courses c WHERE/);
   assert.match(db.calls[0].sql, /CAST\(c\.course_number AS INTEGER\) BETWEEN \? AND \?/);
@@ -99,4 +99,46 @@ test("large subject-level exclusion pools also stay within D1 bind limits", asyn
   assert.match(db.calls[0].sql, /NOT IN \(SELECT value FROM json_each\(\?\)\)/);
   assert.equal(db.calls[0].values.length, 5);
   assert.deepEqual(JSON.parse(db.calls[0].values[4]), excludeCourseCodes);
+});
+
+test("catalog API composes course, section, Core, and requirement filters", async () => {
+  const db = catalogDb([{
+    id: "01:355:301:2026:9",
+    school: "01",
+    subject_code: "355",
+    course_number: "301",
+    credits: "3",
+    attributes_json: '["WCr"]',
+  }]);
+  const selector = {
+    version: 1,
+    kind: "subject_level",
+    school_codes: ["01"],
+    subject_codes: ["355"],
+    course_number_min: 200,
+    course_number_max: 499,
+  };
+  const params = new URLSearchParams({
+    search: "writing",
+    subject: "355",
+    levels: "300",
+    credits: "3",
+    availability: "open",
+    core: "WCr",
+    selector: JSON.stringify([selector]),
+  });
+  const response = await worker.fetch(
+    new Request(`https://example.test/api/courses?${params}`),
+    { DB: db },
+    {},
+  );
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.deepEqual(payload.courses[0].attributes, ["WCr"]);
+  assert.equal("attributes_json" in payload.courses[0], false);
+  assert.match(db.calls[0].sql, /CAST\(c\.course_number AS INTEGER\) BETWEEN \? AND \?/);
+  assert.match(db.calls[0].sql, /CAST\(c\.credits AS REAL\) IN \(SELECT value FROM json_each\(\?\)\)/);
+  assert.match(db.calls[0].sql, /EXISTS \(SELECT 1 FROM sections/);
+  assert.match(db.calls[0].sql, /course_requirement_attributes/);
 });

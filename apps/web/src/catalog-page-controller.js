@@ -24,6 +24,7 @@
     saveState,
     plannerUI,
     selectorLogic,
+    filterModel,
     interactionLogic,
     escapeHtml,
     cleanText,
@@ -113,7 +114,7 @@
           <span class="cr-arrow${isOpen ? " open" : ""}">▶</span>
           <span class="cr-code">${escapeHtml(code)}</span>
           ${cleanText(course.prereqs) ? `<span class="prereq-hint" onclick="event.stopPropagation()">Prereqs listed<span class="tip">${escapeHtml(cleanText(course.prereqs))}</span></span>` : ""}
-          <span class="cr-title">${escapeHtml(course.title)}<span class="sub"> ${escapeHtml(course.subject_description || "")}</span></span>
+          <span class="cr-title">${escapeHtml(course.title)}${(course.attributes || []).map((code) => `<span class="core-badge" aria-label="Fulfills Core goal ${escapeHtml(code)}">${escapeHtml(code)}</span>`).join("")}<span class="sub"> ${escapeHtml(course.subject_description || "")}</span></span>
           <span class="cr-credits">${escapeHtml(courseCreditsLabel(course.credits, true))}</span>
           <span class="cr-sections" style="color:${openCount > 0 ? "#3a8a3a" : "var(--grayt)"}">${openCount}/${totalCount} open</span>
           ${choice ? `<button class="cr-use" data-cuse="${escapeHtml(code)}">Use for this requirement</button>` : ""}
@@ -140,6 +141,7 @@
       current.activeRequirementChoice = null;
       current.backendPage = 1;
       current.expandedIds.clear();
+      saveState();
       return loadCourses();
     }
 
@@ -194,7 +196,34 @@
         current.backendPage = 1;
         void loadCourses();
       });
+      document.getElementById("cpLevel")?.addEventListener("change", (event) => {
+        current.backendLevels = event.target.value ? [Number(event.target.value)] : [];
+        current.backendPage = 1;
+        void loadCourses();
+      });
+      document.getElementById("cpCredits")?.addEventListener("change", (event) => {
+        current.backendCredits = event.target.value ? [Number(event.target.value)] : [];
+        current.backendPage = 1;
+        void loadCourses();
+      });
+      document.getElementById("cpAvailability")?.addEventListener("change", (event) => {
+        current.backendAvailability = event.target.value || "any";
+        current.backendPage = 1;
+        void loadCourses();
+      });
       document.getElementById("cpClearSelector")?.addEventListener("click", () => void clearSelector());
+      document.querySelectorAll("[data-filter-clear]").forEach((button) => button.addEventListener("click", () => {
+        const key = button.dataset.filterClear;
+        if (key === "requirement" || key === "core") {
+          void clearSelector();
+          return;
+        }
+        if (key === "levels") current.backendLevels = [];
+        if (key === "credits") current.backendCredits = [];
+        if (key === "availability") current.backendAvailability = "any";
+        current.backendPage = 1;
+        void loadCourses();
+      }));
       document.getElementById("cpPrev")?.addEventListener("click", () => {
         current.backendPage -= 1;
         void loadCourses();
@@ -261,6 +290,18 @@
       const selectorDescription = filter
         ? filter.selectors.map((item) => selectorLogic.selectorDescription(item)).join("; ")
         : "";
+      const intentCoreCode = filterModel?.coreCodeFromLabel(filter?.group?.name || "");
+      const activeCoreCodes = [...new Set([
+        ...(current.backendCoreCodes || []),
+        ...(intentCoreCode ? [intentCoreCode] : []),
+      ])];
+      const activeChips = [
+        ...(filter ? [{ label: `Requirement: ${groupDisplayName(filter.group)}`, key: "requirement" }] : []),
+        ...activeCoreCodes.map((code) => ({ label: `Core: ${code}`, key: "core" })),
+        ...(current.backendLevels || []).map((level) => ({ label: `${level}-level`, key: "levels" })),
+        ...(current.backendCredits || []).map((credits) => ({ label: `${credits} credits`, key: "credits" })),
+        ...(current.backendAvailability === "open" ? [{ label: "Open sections", key: "availability" }] : []),
+      ];
       const displayedCourses = filter
         ? current.backendCourses.filter((course) => selectorLogic.matchesAnySelector(backendCourseRecord(course), filter.selectors))
         : current.backendCourses;
@@ -292,8 +333,13 @@
         ${filter ? `<div class="choice-summary">Choosing for <b>${escapeHtml(groupDisplayName(filter.group))}</b>: ${escapeHtml(selectorDescription)}. Select <b>Use for this requirement</b> to apply a course directly.</div>` : ""}
         <div class="cp-controls">
           <input id="cpSearch" placeholder="Search by title or course code…" value="${escapeHtml(current.backendSearch || "")}"/>
-          ${filter ? `<button class="choice-btn secondary" id="cpClearSelector">Clear requirement filter</button>` : `<select id="cpSubject">${subjectOptions}</select>`}
+          <select id="cpSubject">${subjectOptions}</select>
+          <select id="cpLevel" aria-label="Course level"><option value="">All levels</option>${[100,200,300,400,500].map((level) => `<option value="${level}"${(current.backendLevels || []).includes(level) ? " selected" : ""}>${level}${level === 500 ? "+" : ""} level</option>`).join("")}</select>
+          <select id="cpCredits" aria-label="Credits"><option value="">Any credits</option>${[1,2,3,4,5,6].map((credits) => `<option value="${credits}"${(current.backendCredits || []).includes(credits) ? " selected" : ""}>${credits} credit${credits === 1 ? "" : "s"}</option>`).join("")}</select>
+          <select id="cpAvailability" aria-label="Section availability"><option value="any">Any availability</option><option value="open"${current.backendAvailability === "open" ? " selected" : ""}>Open sections</option></select>
+          ${filter ? `<button class="choice-btn secondary" id="cpClearSelector">Clear requirement</button>` : ""}
         </div>
+        ${activeChips.length ? `<div class="catalog-filter-chips" aria-label="Active filters">${activeChips.map((chip) => `<button class="catalog-filter-chip" data-filter-clear="${escapeHtml(chip.key)}" aria-label="Remove ${escapeHtml(chip.label)} filter">${escapeHtml(chip.label)} <span aria-hidden="true">×</span></button>`).join("")}</div>` : ""}
         ${bodyHtml}`;
       wireControls();
       restoreView();
@@ -335,13 +381,20 @@
       current.backendError = "";
       render();
       try {
-        const params = new URLSearchParams({
-          search: current.backendSearch || "",
-          subject: current.backendSubject || "",
-          limit: String(pageSize),
-          offset: String((current.backendPage - 1) * pageSize),
-        });
         const filter = selectorContext();
+        const intentCoreCode = filterModel?.coreCodeFromLabel(filter?.group?.name || "");
+        const params = filterModel.toSearchParams({
+          search: current.backendSearch,
+          subject: current.backendSubject,
+          levels: current.backendLevels,
+          credits: current.backendCredits,
+          availability: current.backendAvailability,
+          requirementIntentId: current.activeRequirementChoice?.requirementGroupId || null,
+          coreCodes: [...(current.backendCoreCodes || []), ...(intentCoreCode ? [intentCoreCode] : [])],
+        }, {
+          limit: pageSize,
+          offset: (current.backendPage - 1) * pageSize,
+        });
         if (filter) params.set("selector", JSON.stringify(filter.selectors));
         const result = await request(`/api/courses?${params.toString()}`);
         if (generation !== courseRequestGeneration) return;

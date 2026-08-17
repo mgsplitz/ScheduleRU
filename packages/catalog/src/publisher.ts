@@ -81,6 +81,11 @@ function deleteStatements(
   return [
     statement(
       database,
+      "DELETE FROM course_requirement_attributes WHERE program_id = ?",
+      programId,
+    ),
+    statement(
+      database,
       "DELETE FROM program_requirement_evidence WHERE program_id = ?",
       programId,
     ),
@@ -115,6 +120,48 @@ function deleteStatements(
       programId,
     ),
   ];
+}
+
+function coreAttributeCode(group: RequirementGroupDefinition): string | null {
+  const match = group.name.match(/\[([A-Za-z][A-Za-z0-9]{1,7})\]/);
+  return match?.[1] ?? null;
+}
+
+function courseAttributeStatements(
+  database: CatalogDatabase,
+  definition: ProgramDefinition,
+  groups: RequirementGroupDefinition[],
+): CatalogPreparedStatement[] {
+  if (
+    definition.program.type !== "core_curriculum"
+    || definition.program.review_status !== "reviewed"
+  ) return [];
+  const rows: unknown[][] = [];
+  const seen = new Set<string>();
+  for (const group of groups) {
+    const attributeCode = coreAttributeCode(group);
+    if (!attributeCode) continue;
+    const courseCodes = [
+      ...group.courses.map((course) => course.code),
+      ...group.selectors.flatMap((selector) =>
+        selector.selector.kind === "course_codes"
+          ? selector.selector.include_course_codes
+          : []
+      ),
+    ];
+    for (const courseCode of courseCodes) {
+      const key = `${group.id}\u0000${courseCode}\u0000${attributeCode}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push([definition.program.id, group.id, courseCode, attributeCode]);
+    }
+  }
+  return insertRows(
+    database,
+    "course_requirement_attributes",
+    ["program_id", "group_id", "course_code", "attribute_code"],
+    rows,
+  );
 }
 
 function programStatement(
@@ -479,6 +526,7 @@ export async function publishProgramDefinition(
   ];
   const contentRows = groupContentRows(definition, sources, groups);
   statements.push(...groupContentStatements(database, contentRows));
+  statements.push(...courseAttributeStatements(database, definition, groups));
   statements.push(...eligibilityStatements(database, definition, sources));
 
   const batchResult = await database.batch(statements);

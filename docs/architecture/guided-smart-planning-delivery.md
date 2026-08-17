@@ -38,13 +38,13 @@
 - Produces: `createIntent({ placeholder, group, returnPage })`, `courseMatchesIntent(course, intent, selectorLogic)`, and `commitChoice({ intent, courseId, groupSelections })`.
 - `commitChoice` returns `{ groupSelections, resolvedPlaceholderId, returnPage }` without mutating its input.
 
-- [ ] Write failing tests proving that a Core placeholder creates a persistent intent, a matching course commits to the originating group, a nonmatching course is rejected, and the matching placeholder disappears from rebuilt planner input.
-- [ ] Run `node --test worker/tests/requirement-choice-model.test.mjs worker/tests/catalog-page-controller.test.mjs worker/tests/planner-correctness-regression.test.mjs`; verify the new cases fail because `ScheduleRURequirementChoiceModel` is absent.
-- [ ] Implement the pure model and persist only the active intent; do not use wishlist state as requirement state.
-- [ ] Replace the filtered catalog’s primary `+ Wishlist` action with `Use for this requirement` while retaining a separate wishlist action.
-- [ ] Commit the selection, rebuild planner input, return to the planner, and focus the resolved semester location.
-- [ ] Run the focused tests and verify all pass.
-- [ ] Commit with `git commit -m "fix(web): resolve planner choices transactionally"`.
+- [x] Write failing tests proving that a Core placeholder creates a persistent intent, a matching course commits to the originating group, a nonmatching course is rejected, and the matching placeholder disappears from rebuilt planner input.
+- [x] Run `node --test worker/tests/requirement-choice-model.test.mjs worker/tests/catalog-page-controller.test.mjs worker/tests/planner-correctness-regression.test.mjs`; verify the new cases fail because `ScheduleRURequirementChoiceModel` is absent.
+- [x] Implement the pure model and persist only the active intent; do not use wishlist state as requirement state.
+- [x] Replace the filtered catalog’s primary `+ Wishlist` action with `Use for this requirement` while retaining a separate wishlist action.
+- [x] Commit the selection, rebuild planner input, return to the planner, and focus the resolved semester location.
+- [x] Run the focused tests and verify all pass.
+- [x] Commit with `git commit -m "fix(web): resolve planner choices transactionally"`.
 
 ### Task 2: Composable catalog filters and Core badges
 
@@ -63,12 +63,12 @@
 - Produces `CatalogFilterState = { search, subject, levels, credits, availability, requirementIntentId, coreCodes }`.
 - Public courses API accepts all fields concurrently and returns `attributes: string[]` per course.
 
-- [ ] Add failing API and controller tests for an active WCr intent combined with subject, search, and course-level filters.
-- [ ] Add the structural attribute table and derive its content from published reviewed Core requirement groups during catalog publication; do not insert course content in the migration.
-- [ ] Extend `/api/courses` to join/filter normalized attributes and return stable badge codes.
-- [ ] Render removable filter chips and keep every traditional control visible while a requirement intent is active.
-- [ ] Render subtle accessible Core badges beside course titles.
-- [ ] Run the focused catalog/API tests and commit with `git commit -m "feat(catalog): compose requirement and course filters"`.
+- [x] Add failing API and controller tests for an active WCr intent combined with subject, search, and course-level filters.
+- [x] Add the structural attribute table and derive its content from published reviewed Core requirement groups during catalog publication; do not insert course content in the migration.
+- [x] Extend `/api/courses` to join/filter normalized attributes and return stable badge codes.
+- [x] Render removable filter chips and keep every traditional control visible while a requirement intent is active.
+- [x] Render subtle accessible Core badges beside course titles.
+- [x] Run the focused catalog/API tests and commit with `git commit -m "feat(catalog): compose requirement and course filters"`.
 
 ### Task 3: Plain-language issue presentation
 

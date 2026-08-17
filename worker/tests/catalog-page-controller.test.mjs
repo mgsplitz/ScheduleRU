@@ -5,6 +5,10 @@ import vm from "node:vm";
 
 const moduleUrl = new URL("../../apps/web/src/catalog-page-controller.js", import.meta.url);
 const context = { globalThis: {}, URLSearchParams, encodeURIComponent };
+const filterModuleUrl = new URL("../../apps/web/src/catalog-filter-model.js", import.meta.url);
+if (fs.existsSync(filterModuleUrl)) {
+  vm.runInNewContext(fs.readFileSync(filterModuleUrl, "utf8"), context);
+}
 if (fs.existsSync(moduleUrl)) {
   vm.runInNewContext(fs.readFileSync(moduleUrl, "utf8"), context);
 }
@@ -66,6 +70,10 @@ function fixture({ request } = {}) {
     backendUrl: "https://catalog.example",
     backendSearch: "",
     backendSubject: "",
+    backendLevels: [],
+    backendCredits: [],
+    backendAvailability: "any",
+    backendCoreCodes: [],
     backendPage: 1,
     backendCourses: [],
     backendTotal: 0,
@@ -116,6 +124,7 @@ function fixture({ request } = {}) {
       selectorDescription: () => "approved courses",
       matchesAnySelector: () => true,
     },
+    filterModel: context.globalThis.ScheduleRUCatalogFilterModel,
     interactionLogic: { catalogViewState: () => ({
       restoreSearchFocus: false,
       selectionStart: null,
@@ -206,11 +215,42 @@ test("an active requirement choice has a distinct commit action without losing w
     group: { id: "core-wcr", name: "Revision-Based Writing [WCr]" },
     selectors: [{ version: 1, kind: "course_codes", include_course_codes: ["01:355:201"] }],
   };
+  app.state.backendSearch = "writing";
+  app.state.backendSubject = "355";
+  app.state.backendLevels = [300];
+  app.state.backendCredits = [3];
+  app.state.backendAvailability = "open";
 
   await app.controller.loadCourses();
 
   assert.match(app.elements.coursesRoot.innerHTML, /Use for this requirement/);
   assert.match(app.elements.coursesRoot.innerHTML, /\+ Wishlist/);
+  assert.match(app.elements.coursesRoot.innerHTML, /id="cpSubject"/);
+  assert.match(app.elements.coursesRoot.innerHTML, /id="cpLevel"/);
+  assert.match(app.elements.coursesRoot.innerHTML, /WCr/);
+  assert.match(app.elements.coursesRoot.innerHTML, /data-filter-clear="requirement"/);
+  const requestUrl = new URL(app.calls.requests[0], "https://catalog.example");
+  assert.equal(requestUrl.searchParams.get("search"), "writing");
+  assert.equal(requestUrl.searchParams.get("subject"), "355");
+  assert.equal(requestUrl.searchParams.get("levels"), "300");
+  assert.equal(requestUrl.searchParams.get("credits"), "3");
+  assert.equal(requestUrl.searchParams.get("availability"), "open");
+  assert.equal(requestUrl.searchParams.get("core"), "WCr");
   assert.deepEqual(app.controller.useForRequirement("01:355:201"), { status: "committed" });
   assert.deepEqual(app.calls.requirementChoices, ["01:355:201"]);
+});
+
+test("course rows render stable Core attribute badges", async () => {
+  const app = fixture({ request: async () => ({
+    courses: [{
+      id: "c1", code: "01:355:201", title: "Research in the Disciplines", credits: 3,
+      attributes: ["WCr", "AH"],
+    }],
+    total: 1,
+  }) });
+
+  await app.controller.loadCourses();
+
+  assert.match(app.elements.coursesRoot.innerHTML, /class="core-badge"[^>]*>WCr</);
+  assert.match(app.elements.coursesRoot.innerHTML, /class="core-badge"[^>]*>AH</);
 });

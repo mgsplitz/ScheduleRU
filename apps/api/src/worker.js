@@ -467,6 +467,10 @@ async function handleApi(request, env, ctx) {
   if (path === "/api/courses") {
     const q = (url.searchParams.get("search") || "").trim();
     const subject = (url.searchParams.get("subject") || "").trim();
+    const levels = (url.searchParams.get("levels") || "").split(",").filter(Boolean).map(Number).filter((value) => Number.isInteger(value) && value >= 0 && value <= 900);
+    const credits = (url.searchParams.get("credits") || "").split(",").filter(Boolean).map(Number).filter((value) => Number.isFinite(value) && value > 0 && value <= 30);
+    const availability = (url.searchParams.get("availability") || "any").trim();
+    const coreCodes = (url.searchParams.get("core") || "").split(",").map((value) => value.trim()).filter((value) => /^[A-Za-z][A-Za-z0-9]{1,7}$/.test(value));
     const selectorValue = url.searchParams.get("selector");
     const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100);
     const offset = Number(url.searchParams.get("offset") || 0);
@@ -498,6 +502,24 @@ async function handleApi(request, env, ctx) {
       where += ` AND (LOWER(id) LIKE ?${tokenClauses.length ? ` OR (${tokenClauses.join(" AND ")})` : ""})`;
       binds.splice(subject ? 1 : 0, 0, `%${q.toLowerCase()}%`);
     }
+    if (levels.length) {
+      const clauses = levels.map((level) => {
+        binds.push(level, level === 500 ? 999 : level + 99);
+        return "CAST(c.course_number AS INTEGER) BETWEEN ? AND ?";
+      });
+      where += ` AND (${clauses.join(" OR ")})`;
+    }
+    if (credits.length) {
+      where += " AND CAST(c.credits AS REAL) IN (SELECT value FROM json_each(?))";
+      binds.push(JSON.stringify(credits));
+    }
+    if (availability === "open") {
+      where += " AND EXISTS (SELECT 1 FROM sections availability_section WHERE availability_section.course_id = c.id AND availability_section.open_status = 1)";
+    }
+    if (coreCodes.length) {
+      where += " AND EXISTS (SELECT 1 FROM course_requirement_attributes attribute_filter WHERE attribute_filter.course_code = (c.school || ':' || c.subject_code || ':' || c.course_number) AND attribute_filter.attribute_code IN (SELECT value FROM json_each(?)))";
+      binds.push(JSON.stringify(coreCodes));
+    }
     if (selectorValue !== null) {
       const selectors = parseCourseSelectorFilter(selectorValue);
       if (!selectors) return json({ error: "invalid course selector" }, 400);
@@ -511,10 +533,22 @@ async function handleApi(request, env, ctx) {
 
     const sql = `SELECT c.*,
                    (SELECT COUNT(*) FROM sections s WHERE s.course_id = c.id) as section_count,
-                   (SELECT COUNT(*) FROM sections s WHERE s.course_id = c.id AND s.open_status = 1) as open_count
+                   (SELECT COUNT(*) FROM sections s WHERE s.course_id = c.id AND s.open_status = 1) as open_count,
+                   COALESCE((SELECT json_group_array(attribute_code) FROM (
+                     SELECT DISTINCT attribute_code
+                     FROM course_requirement_attributes course_attribute
+                     WHERE course_attribute.course_code = (c.school || ':' || c.subject_code || ':' || c.course_number)
+                     ORDER BY attribute_code
+                   )), '[]') as attributes_json
                  FROM courses c${where} ORDER BY subject_code, course_number LIMIT ? OFFSET ?`;
     const { results } = await env.DB.prepare(sql).bind(...binds, limit, offset).all();
-    return json({ courses: results, count: results.length, total, limit, offset });
+    const courses = results.map((course) => {
+      let attributes = [];
+      try { attributes = JSON.parse(course.attributes_json || "[]"); } catch (_) { attributes = []; }
+      const { attributes_json: _attributesJson, ...record } = course;
+      return { ...record, attributes };
+    });
+    return json({ courses, count: courses.length, total, limit, offset });
   }
 
   if (path.match(/^\/api\/courses\/[^/]+$/)) {

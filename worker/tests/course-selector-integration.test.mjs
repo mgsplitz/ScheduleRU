@@ -13,6 +13,10 @@ const requirementTreeBuilder = await readFile(
   new URL("../../packages/requirements/src/requirement-tree-builder.js", import.meta.url),
   "utf8",
 );
+const attributeSchema = await readFile(
+  new URL("../../migrations/schema_course_requirement_attributes.sql", import.meta.url),
+  "utf8",
+).catch(() => "");
 
 test("reviewed selector rows are stored with an audited source and returned with their group", () => {
   assert.match(schema, /CREATE TABLE IF NOT EXISTS requirement_course_selectors/);
@@ -51,6 +55,13 @@ test("the catalog applies selector filters on the server before it paginates", (
   assert.match(catalogWorker, /function parseCourseSelectorFilter\(/);
   assert.match(catalogWorker, /url\.searchParams\.get\("selector"\)/);
   assert.match(catalogWorker, /course_number AS INTEGER/);
+});
+
+test("Core course attributes use structural schema with publication-derived content", () => {
+  assert.match(attributeSchema, /CREATE TABLE IF NOT EXISTS course_requirement_attributes/);
+  assert.match(attributeSchema, /CREATE INDEX/);
+  assert.doesNotMatch(attributeSchema, /INSERT\s+INTO/i);
+  assert.match(catalogWorker, /attributes_json/);
 });
 
 test("reviewed credit-count group rules survive normalization and render course and credit progress", () => {
