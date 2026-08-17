@@ -1,0 +1,162 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-creative-writing-minor",
+    "name": "Creative Writing",
+    "school_slug": "sasnb",
+    "program_slug": "creative-writing",
+    "type": "minor",
+    "catalog_year": "Current official pages (catalog year not stated)",
+    "academic_program_code": "351",
+    "degree_type": null,
+    "program_family_id": "sasnb-creative-writing-351",
+    "source_url": "https://english.rutgers.edu/academics/undergraduate-91/minors/4315-creative-writing-minor.html",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://english.rutgers.edu/academics/undergraduate-91/minors/4315-creative-writing-minor.html",
+      "title": "Minor in Creative Writing",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current English Department minor page; states 21 credits, seven courses, course lists, minimum grade, and overlap restrictions."
+    },
+    {
+      "id": "source-002",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/creative-writing",
+      "title": "Creative Writing (Minor)",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS profile; confirms SAS ownership, program code 351, minor status, and English overlap restriction."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-creative-writing-intro",
+      "parent_group_id": null,
+      "name": "One introductory Creative Writing course.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:351:211","title":"Introduction to Creative Writing","credits":3,"note":null},
+        {"code":"01:351:212","title":"Introduction to Creative Writing","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"All courses used for the Creative Writing minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current official Creative Writing minor requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-creative-writing-electives",
+      "parent_group_id": null,
+      "name": "Three Creative Writing electives from the approved list.",
+      "rule": "min_courses",
+      "count": 3,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:351:209","title":null,"credits":3,"note":null},
+        {"code":"01:351:220","title":null,"credits":3,"note":null},
+        {"code":"01:351:303","title":null,"credits":3,"note":null},
+        {"code":"01:351:304","title":null,"credits":3,"note":null},
+        {"code":"01:351:305","title":null,"credits":3,"note":null},
+        {"code":"01:351:306","title":null,"credits":3,"note":null},
+        {"code":"01:351:307","title":null,"credits":3,"note":null},
+        {"code":"01:351:308","title":null,"credits":3,"note":null},
+        {"code":"01:351:309","title":null,"credits":3,"note":null},
+        {"code":"01:351:314","title":null,"credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"All courses used for the Creative Writing minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current official Creative Writing minor requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-creative-writing-advanced",
+      "parent_group_id": null,
+      "name": "One advanced Creative Writing workshop.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 30,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:351:405","title":null,"credits":3,"note":null},
+        {"code":"01:351:406","title":null,"credits":3,"note":null},
+        {"code":"01:351:407","title":null,"credits":3,"note":null},
+        {"code":"01:351:408","title":null,"credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"All courses used for the Creative Writing minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current official Creative Writing minor requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-creative-writing-critical-study",
+      "parent_group_id": null,
+      "name": "Two three-credit courses in Literature (358), Theory and Methods (359), or Film (354).",
+      "rule": "min_courses",
+      "count": 2,
+      "sort_order": 40,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-creative-writing-critical-study-selector",
+          "source_id": "source-001",
+          "source_label": "Minor in Creative Writing",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["354", "358", "359"],
+            "course_number_min": 100,
+            "course_number_max": 499,
+            "minimum_credits": 3,
+            "label": "Three-credit Literature, Theory and Methods, or Film courses"
+          }
+        }
+      ],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"All courses used for the Creative Writing minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current official Creative Writing minor requirement; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": [
+    {
+      "key": "sasnb-creative-writing-english-overlap",
+      "condition_type": "cross_program_course_overlap_restriction",
+      "condition_value": {"other_program_code":"350","restricted_subject_code":"351","allowed_overlap_subject_codes":["354","358","359"]},
+      "decision": "requires_approval",
+      "note": "If paired with an English major or minor, Creative Writing minor courses may not also satisfy the English program; literature courses may overlap.",
+      "source_id": "source-001",
+      "review_status": "unreviewed",
+      "verified_at": 1787004300000
+    },
+    {
+      "key": "sasnb-creative-writing-portfolio-exclusion",
+      "condition_type": "advisor_confirmation",
+      "condition_value": {"restriction":"creative-writing-minor-and-creative-writing-portfolio-cannot-both-be-completed"},
+      "decision": "requires_approval",
+      "note": "The department states that students cannot complete the Creative Writing minor and the Creative Writing portfolio at the same time.",
+      "source_id": "source-001",
+      "review_status": "unreviewed",
+      "verified_at": 1787004300000
+    }
+  ]
+}
