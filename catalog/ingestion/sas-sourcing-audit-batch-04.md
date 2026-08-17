@@ -1,0 +1,26 @@
+# SAS Program Sourcing Audit — Batch 04
+
+Continuation of the working SAS sourcing ledger. Review aid only; not canonical published catalog data.
+
+| Program | Status | Exact blocker / review issue |
+|---|---|---|
+| English major (350) | BLOCKED_CONTRACT_AND_DYNAMIC_CLASSIFICATION | Current major requires historical-period, African-American/Global South, theory, and seminar classifications maintained by the department. A single course may satisfy at most two designated requirements, which requires max-use allocation not exposed by contract v1; non-New-Brunswick and Creative Writing caps add further policy rules. |
+| Italian major (560) | BLOCKED_DYNAMIC_APPROVAL_AND_LANGUAGE_CLASSIFICATION | Current program combines language coursework, placement-dependent replacements, cross-department Italian Studies courses, upper-level courses taught in Italian, and Undergraduate Director approval. The valid route depends on placement, language of instruction, and approved cognates. |
+| Italian minor (560) | BLOCKED_DYNAMIC_APPROVAL_AND_LANGUAGE_CLASSIFICATION | Current minor requires a language-heavy six-course program but permits placement-dependent advanced replacements and approved Italian Studies coursework from outside the department. |
+| German minor (470) | BLOCKED_DYNAMIC_APPROVAL | The 18-credit minor is department-approved and includes a thematically coherent concentration; study-abroad coursework is assigned toward requirements by the Undergraduate Director. A fixed finite selector would not represent all valid programs. |
+| Portuguese major (810) | BLOCKED_DYNAMIC_APPROVAL_AND_EXTERNAL_ASSESSMENT | Current major permits approved courses from other departments, placement/special-permission exceptions, and requires a final-year oral examination. Valid outside-department courses are approved based on Portuguese/Lusophone content rather than a stable finite list. |
+| Portuguese minor (810) | BLOCKED_CONTRACT_AND_DYNAMIC_APPROVAL | Current minor requires courses taught in Portuguese and a literature-credit minimum, with adviser approval. Language of instruction/literature classification are not first-class selector attributes in contract v1. |
+| French major (420 / 420I) | BLOCKED_DYNAMIC_APPROVAL_AND_LANGUAGE_CLASSIFICATION | The standard major permits department-approved outside/English electives and placement exceptions; the interdisciplinary option permits up to three approved cognates in other departments. Language-of-instruction and approval paths cannot be captured faithfully by current selectors. |
+| Geography minor (450) | BLOCKED_DYNAMIC_APPROVAL | Although the 18-credit structure is explicit, Internship Geography 485/486, Geographic Problems 491/492, and honors thesis 495/496 may be assigned to any track based on content at the Undergraduate Director's discretion. |
+| Medieval Studies major (667) | BLOCKED_DYNAMIC_APPROVAL_AND_EXTERNAL_CREDENTIAL | Language can be satisfied through proficiency test scores/coursework; many 400-level Middle Ages courses may substitute for the senior seminar; six electives come from approved cognate courses across affiliated departments. |
+| Medieval Studies minor (667) | BLOCKED_CONTRACT_AND_DYNAMIC_APPROVAL | Four electives come from a maintained approved-course list, while at least five of seven courses must be outside the student's major and two outside disciplines must each contribute at least two courses. This requires cross-program/discipline distribution logic and a dynamic cognate set. |
+| Geological Sciences minor / Earth & Planetary Sciences minor (460) | BLOCKED_DYNAMIC_APPROVAL | Current EPS page explicitly says the published approved-elective list is not exhaustive and additional courses from within or outside the department may count with Undergraduate Program Director approval. |
+| Chemistry minor (160) | BLOCKED_SOURCE | Current department page states the common core includes general and organic chemistry but does not enumerate the current common-core alternatives. Older catalog pages do enumerate them, but the inorganic option uses older course numbering (361/371) while the current page uses 351 plus 352/353, demonstrating curriculum change. Do not splice old common-core data into current option tables without a current authoritative source. |
+| Data Science — Chemical Data Track major (219C) | BLOCKED_VERSIONING_REVIEW | Chemical Data is a newer track (introduced Fall 2024) and the program has continued changing through Spring 2026, including a new capstone and March 2026 Data in Context course-code update. The live track table should be reconciled against the latest curriculum sheet/Degree Navigator before freezing a definition. |
+
+## Sources / review emphasis
+
+- Current SAS directory is the census source for program identity and school ownership.
+- Current department pages are preferred for requirement detail.
+- Chemistry minor is intentionally left as a source blocker rather than reconstructed from an older catalog because the option numbering proves substantive curriculum evolution.
+- French/Italian/Portuguese are not being reduced to broad subject-code selectors because language of instruction and individualized approvals materially affect valid completion.
