@@ -65,6 +65,7 @@ const ST = {
   expandedIds: new Set(),   // course ids currently expanded on the Courses page
   sectionsCache: {},        // course id -> { sections } | { error }, lazy-loaded
   pickerSelector:null,      // selector-backed requirement modal state
+  activeRequirementChoice:null,
   requiredRootOpen:{}, nestedGroupOpen:{},
   builder: null,            // { year, sem, pool:[{code,title,credits,sections,checked,loading,error}], permutations, permIndex } | null
 };
@@ -662,11 +663,20 @@ function openCorePlaceholderCourseBrowser(placeholder,group){
     include_course_codes:courseCodes,
     exclude_course_codes:[],
   });
+  ST.activeRequirementChoice=ScheduleRURequirementChoiceModel.createIntent({
+    placeholder:{
+      ...placeholder,
+      candidateSelectionContext:{...context,memberCourseCodes:courseCodes,courseSelectors:selectors},
+    },
+    group,
+    returnPage:"nav",
+  });
   ST.backendRequirementFilter={
     group:group||{id:placeholder?.requirementGroupId,name:placeholder?.label||"Core requirement"},
     selectors,
   };
   ST.backendSelectorGroupId=null;ST.backendSearch="";ST.backendSubject="";ST.backendPage=1;ST.expandedIds.clear();
+  savePlannerState();
   setTopLevelPage("courses");loadBackendCourses();
 }
 
@@ -1205,6 +1215,36 @@ function openSelectorCourseBrowser(gk){
 }
 function clearCatalogSelectorBrowser(){
   return catalogPageController?.clearSelector();
+}
+
+function useCatalogCourseForRequirement(record){
+  const intent=ST.activeRequirementChoice;
+  if(!intent||!ScheduleRURequirementChoiceModel.courseMatchesIntent(record,intent,ScheduleRUCourseSelectorLogic)){
+    return {status:"rejected"};
+  }
+  const courseId=registerSelectorCourseRecord(record);
+  const committed=ScheduleRURequirementChoiceModel.commitChoice({
+    intent,courseId,groupSelections:ST.groupSelections,
+  });
+  if(!committed)return {status:"rejected"};
+  const placement=committed.returnPlacement;
+  ST.groupSelections=committed.groupSelections;
+  ST.planPlaceholders=(ST.planPlaceholders||[]).filter(item=>item.id!==committed.resolvedPlaceholderId);
+  if(placement&&!ST.schedule[record.code]){
+    ST.schedule[record.code]={
+      year:placement.year,sem:placement.sem,code:record.code,
+      title:record.title||record.code,fullTitle:record.fullTitle||record.title||record.code,
+      credits:record.credits,course:record,locked:false,userPinned:false,
+    };
+  }
+  ST.activeRequirementChoice=null;
+  ST.backendRequirementFilter=null;
+  ST.backendSelectorGroupId=null;
+  if(placement)ST.year=placement.year;
+  savePlannerState();
+  setTopLevelPage(committed.returnPage);
+  renderAll();
+  return {status:"committed"};
 }
 
 async function loadCourseEligibilityForCodes(codes){

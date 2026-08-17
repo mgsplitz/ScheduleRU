@@ -50,6 +50,8 @@ const catalogPageLifecycleController=ScheduleRUCatalogPageController.create({
   request:backendFetch,saveBackendUrl,selectorContext:activeCatalogSelectorContext,
   loadEligibilityForCodes:loadCourseEligibilityForCodes,catalogCourseCode,backendCourseRecord,
   wishlistRecords,addToWishlist,saveState:savePlannerState,
+  activeRequirementChoice:()=>ST.activeRequirementChoice,
+  useForRequirement:useCatalogCourseForRequirement,
   plannerUI:ScheduleRUPlannerUI,selectorLogic:ScheduleRUCourseSelectorLogic,
   interactionLogic:ScheduleRUCourseInteractionLogic,
   escapeHtml:html,cleanText:cleanApiText,courseCreditsLabel,formatMeeting:fmtMeeting,groupDisplayName,

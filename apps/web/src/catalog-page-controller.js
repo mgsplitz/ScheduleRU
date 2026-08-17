@@ -19,6 +19,8 @@
     backendCourseRecord,
     wishlistRecords,
     addToWishlist,
+    activeRequirementChoice,
+    useForRequirement,
     saveState,
     plannerUI,
     selectorLogic,
@@ -85,6 +87,7 @@
       const code = catalogCourseCode(course);
       const saved = wishlistRecords().some((item) => item.code === code);
       const wishlistAction = plannerUI.catalogWishlistAction({ inWishlist: saved });
+      const choice = activeRequirementChoice?.();
       const isOpen = current.expandedIds.has(course.id);
       const openCount = course.open_count ?? 0;
       const totalCount = course.section_count ?? 0;
@@ -113,6 +116,7 @@
           <span class="cr-title">${escapeHtml(course.title)}<span class="sub"> ${escapeHtml(course.subject_description || "")}</span></span>
           <span class="cr-credits">${escapeHtml(courseCreditsLabel(course.credits, true))}</span>
           <span class="cr-sections" style="color:${openCount > 0 ? "#3a8a3a" : "var(--grayt)"}">${openCount}/${totalCount} open</span>
+          ${choice ? `<button class="cr-use" data-cuse="${escapeHtml(code)}">Use for this requirement</button>` : ""}
           <button class="cr-wish${wishlistAction.remove ? " selected" : ""}" data-wadd="${escapeHtml(code)}" aria-pressed="${wishlistAction.remove}">${wishlistAction.label}</button>
         </div>
         <div class="course-row-body${isOpen ? " open" : ""}">${bodyHtml}</div>
@@ -133,6 +137,7 @@
       const current = state();
       current.backendSelectorGroupId = null;
       current.backendRequirementFilter = null;
+      current.activeRequirementChoice = null;
       current.backendPage = 1;
       current.expandedIds.clear();
       return loadCourses();
@@ -154,6 +159,13 @@
         button.setAttribute("aria-pressed", String(action.remove));
       }
       return action;
+    }
+
+    function commitRequirementChoice(code) {
+      const current = state();
+      const course = (current.backendCourses || []).find((item) => catalogCourseCode(item) === code);
+      if (!course) return { status: "missing" };
+      return useForRequirement?.(backendCourseRecord(course)) || { status: "unavailable" };
     }
 
     function wireControls() {
@@ -192,12 +204,16 @@
         void loadCourses();
       });
       document.querySelectorAll("[data-toggle]").forEach((element) => element.addEventListener("click", (event) => {
-        if (event.target.closest(".cr-wish")) return;
+        if (event.target.closest(".cr-wish, .cr-use")) return;
         void toggleCourseExpand(element.dataset.toggle);
       }));
       document.querySelectorAll("[data-wadd]").forEach((button) => button.addEventListener("click", (event) => {
         event.stopPropagation();
         toggleWishlist(button.dataset.wadd, button);
+      }));
+      document.querySelectorAll("[data-cuse]").forEach((button) => button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        commitRequirementChoice(button.dataset.cuse);
       }));
     }
 
@@ -273,7 +289,7 @@
       container.innerHTML = `
         <div class="cp-header"><h1>Course Catalog</h1><div class="cp-sub">${statusLine}</div></div>
         ${connectionBar}
-        ${filter ? `<div class="choice-summary">Choosing for <b>${escapeHtml(groupDisplayName(filter.group))}</b>: ${escapeHtml(selectorDescription)}. Add one to your wishlist, then place it in your plan to apply it automatically.</div>` : ""}
+        ${filter ? `<div class="choice-summary">Choosing for <b>${escapeHtml(groupDisplayName(filter.group))}</b>: ${escapeHtml(selectorDescription)}. Select <b>Use for this requirement</b> to apply a course directly.</div>` : ""}
         <div class="cp-controls">
           <input id="cpSearch" placeholder="Search by title or course code…" value="${escapeHtml(current.backendSearch || "")}"/>
           ${filter ? `<button class="choice-btn secondary" id="cpClearSelector">Clear requirement filter</button>` : `<select id="cpSubject">${subjectOptions}</select>`}
@@ -382,6 +398,7 @@
       clearSelector,
       toggleCourseExpand,
       toggleWishlist,
+      useForRequirement: commitRequirementChoice,
     };
   }
 

@@ -79,7 +79,7 @@ function fixture({ request } = {}) {
     sectionsCache: {},
     wishlist: {},
   };
-  const calls = { requests: [], eligibility: [], saves: 0, additions: [] };
+  const calls = { requests: [], eligibility: [], saves: 0, additions: [], requirementChoices: [] };
   const controller = controllers().create({
     getState: () => state,
     document,
@@ -101,6 +101,11 @@ function fixture({ request } = {}) {
     addToWishlist: (code) => {
       calls.additions.push(code);
       state.wishlist[code] = { code };
+    },
+    activeRequirementChoice: () => state.activeRequirementChoice || null,
+    useForRequirement: (course) => {
+      calls.requirementChoices.push(course.code);
+      return { status: "committed" };
     },
     saveState: () => { calls.saves += 1; },
     plannerUI: { catalogWishlistAction: ({ inWishlist }) => ({
@@ -186,4 +191,26 @@ test("wishlist actions add and remove the canonical course code", () => {
   app.controller.toggleWishlist("01:198:111");
   assert.deepEqual(app.state.wishlist, {});
   assert.equal(app.calls.saves, 1);
+});
+
+test("an active requirement choice has a distinct commit action without losing wishlist access", async () => {
+  const app = fixture({ request: async () => ({
+    courses: [{ id: "c1", code: "01:355:201", title: "Research in the Disciplines", credits: 3 }],
+    total: 1,
+  }) });
+  app.state.activeRequirementChoice = {
+    requirementGroupId: "core-wcr",
+    label: "Revision-Based Writing [WCr]",
+  };
+  app.state.backendRequirementFilter = {
+    group: { id: "core-wcr", name: "Revision-Based Writing [WCr]" },
+    selectors: [{ version: 1, kind: "course_codes", include_course_codes: ["01:355:201"] }],
+  };
+
+  await app.controller.loadCourses();
+
+  assert.match(app.elements.coursesRoot.innerHTML, /Use for this requirement/);
+  assert.match(app.elements.coursesRoot.innerHTML, /\+ Wishlist/);
+  assert.deepEqual(app.controller.useForRequirement("01:355:201"), { status: "committed" });
+  assert.deepEqual(app.calls.requirementChoices, ["01:355:201"]);
 });

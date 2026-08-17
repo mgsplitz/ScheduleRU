@@ -136,3 +136,25 @@ test("reviewed College Writing stays prerequisite-free through end-to-end genera
       ),
   );
 });
+
+test("a selected Core course replaces its unresolved placeholder in planner input", () => {
+  const tree = {
+    roots: ["core-root"],
+    courses: {
+      writing: { code: "01:355:201", title: "RESEARCH IN THE DISCIPLINES", credits: 3 },
+    },
+    groups: {
+      "core-root": { id: "core-root", name: "Core", rule: "all", members: [], children: ["core-wcr"] },
+      "core-wcr": { id: "core-wcr", name: "Revision-Based Writing [WCr]", rule: "min", count: 1, members: ["writing"], children: [] },
+    },
+  };
+
+  const canonical = adapter.buildPlannerInput({
+    terms: [{ year: 1, sem: "fall" }, { year: 1, sem: "spring" }],
+    coreTree: tree,
+    groupSelections: { "core-wcr": ["writing"] },
+  });
+
+  assert.deepEqual(plain(canonical.courses.map((course) => course.code)), ["01:355:201"]);
+  assert.deepEqual(plain(canonical.unresolvedRequirements), []);
+});

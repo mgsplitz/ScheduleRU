@@ -64,6 +64,16 @@ test("round-trips the complete device-local planner state without runtime-only d
     schedulePreferences: { "2:fall": { version: 1, constraints: [] } },
     planPlaceholders: [{ id: "core-slot", year: 2, sem: "fall" }],
     issueDismissals: { notice: true },
+    activeRequirementChoice: {
+      version: 1,
+      placeholderId: "core-slot",
+      requirementGroupId: "core-wcr",
+      label: "Revision-Based Writing [WCr]",
+      memberCourseCodes: ["01:355:201"],
+      selectors: [],
+      returnPage: "nav",
+      returnPlacement: { year: 2, sem: "fall" },
+    },
     backendCourses: [{ code: "must-not-persist" }],
   };
 
@@ -79,6 +89,7 @@ test("round-trips the complete device-local planner state without runtime-only d
   assert.equal(restored.year, 2);
   assert.equal(restored.homeSchoolSlug, "rbs-new-brunswick");
   assert.deepEqual(restored.planPlaceholders, [{ id: "core-slot", year: 2, sem: "fall" }]);
+  assert.equal(restored.activeRequirementChoice.requirementGroupId, "core-wcr");
 });
 
 test("loads supported legacy state while sanitizing browser-controlled fields", () => {
