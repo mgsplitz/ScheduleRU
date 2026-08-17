@@ -1,0 +1,350 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-chemistry-education-minor",
+    "name": "Chemistry Education",
+    "school_slug": "sasnb",
+    "program_slug": "chemistry-education",
+    "type": "minor",
+    "catalog_year": "Current official department page (catalog year not stated)",
+    "academic_program_code": null,
+    "degree_type": null,
+    "program_family_id": "sasnb-chemistry-160",
+    "source_url": "https://chem.rutgers.edu/academics/undergraduate-program/minor-s",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://chem.rutgers.edu/academics/undergraduate-program/minor-s",
+      "title": "Chemistry Education Minor",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current Department of Chemistry and Chemical Biology page; gives the full chemistry and physics requirements and the integrated-laboratory exception for 01:750:193 and 01:750:201."
+    },
+    {
+      "id": "source-002",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/list-of-majors-and-minors",
+      "title": "SAS Majors and Minors",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS directory confirms Chemistry Education as an SAS minor."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-chemistry-education-general-chemistry",
+      "parent_group_id": null,
+      "name": "One approved two-course General Chemistry sequence.",
+      "rule": "one_of",
+      "count": null,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current Chemistry Education general-chemistry sequence requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-general-161-162",
+      "parent_group_id": "sasnb-chemistry-education-general-chemistry",
+      "name": "General Chemistry 161-162.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 11,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:160:161","title":"General Chemistry","credits":4,"note":null},
+        {"code":"01:160:162","title":"General Chemistry","credits":4,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current approved General Chemistry sequence; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-general-163-164",
+      "parent_group_id": "sasnb-chemistry-education-general-chemistry",
+      "name": "Honors General Chemistry 163-164.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 12,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:160:163","title":"Honors General Chemistry","credits":4,"note":null},
+        {"code":"01:160:164","title":"Honors General Chemistry","credits":4,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current approved Honors General Chemistry sequence; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-general-165-166",
+      "parent_group_id": "sasnb-chemistry-education-general-chemistry",
+      "name": "Extended General Chemistry 165-166.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 13,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:160:165","title":"Extended General Chemistry","credits":4,"note":null},
+        {"code":"01:160:166","title":"Extended General Chemistry","credits":4,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current approved Extended General Chemistry sequence; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-experimentation",
+      "parent_group_id": null,
+      "name": "Introduction to Experimentation.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:160:171","title":"Introduction to Experimentation","credits":1,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current fixed Chemistry Education requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-organic-chemistry",
+      "parent_group_id": null,
+      "name": "One approved two-course Organic Chemistry sequence.",
+      "rule": "one_of",
+      "count": null,
+      "sort_order": 30,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current Organic Chemistry sequence requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-organic-307-308",
+      "parent_group_id": "sasnb-chemistry-education-organic-chemistry",
+      "name": "Organic Chemistry 307-308.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 31,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:160:307","title":"Organic Chemistry","credits":4,"note":null},
+        {"code":"01:160:308","title":"Organic Chemistry","credits":4,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current approved Organic Chemistry sequence; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-organic-315-316",
+      "parent_group_id": "sasnb-chemistry-education-organic-chemistry",
+      "name": "Honors Organic Chemistry 315-316.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 32,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:160:315","title":"Honors Organic Chemistry","credits":4,"note":null},
+        {"code":"01:160:316","title":"Honors Organic Chemistry","credits":4,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current approved Honors Organic Chemistry sequence; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-organic-lab",
+      "parent_group_id": null,
+      "name": "One approved Organic Chemistry laboratory.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 40,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:160:309","title":"Organic Chemistry Laboratory","credits":2.5,"note":null},
+        {"code":"01:160:311","title":"Organic Chemistry Laboratory","credits":2,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current Organic Chemistry laboratory choice; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-pedagogy",
+      "parent_group_id": null,
+      "name": "Required Chemistry Education courses.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 50,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:160:387","title":"Introduction to Chemistry Education","credits":3,"note":null},
+        {"code":"01:160:499","title":"Introduction to Teaching Chemistry Laboratory","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current fixed Chemistry Education pedagogy requirements; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-upper-chemistry",
+      "parent_group_id": null,
+      "name": "At least six credits from the approved upper-level chemistry list.",
+      "rule": "min_credits",
+      "count": 6,
+      "sort_order": 60,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:160:251","title":"Analytical Chemistry","credits":3,"note":null},
+        {"code":"01:160:327","title":"Physical Chemistry","credits":4,"note":null},
+        {"code":"01:160:328","title":"Physical Chemistry","credits":4,"note":null},
+        {"code":"01:160:341","title":"Physical Chemistry: Biochemical Systems","credits":3,"note":null},
+        {"code":"01:160:342","title":"Physical Chemistry: Biochemical Systems","credits":3,"note":null},
+        {"code":"01:160:361","title":"Chemical Bonding","credits":1.5,"note":null},
+        {"code":"01:160:371","title":"Inorganic Chemistry","credits":3,"note":"01:160:361 is a prerequisite."}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current six-credit upper-level chemistry requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-physics-path",
+      "parent_group_id": null,
+      "name": "One approved physics lecture/laboratory path.",
+      "rule": "one_of",
+      "count": null,
+      "sort_order": 70,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current physics requirement, including the integrated-lab exception for 193 and 201; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-physics-193",
+      "parent_group_id": "sasnb-chemistry-education-physics-path",
+      "name": "Physics for the Sciences, whose laboratory is integrated.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 71,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:750:193","title":"Physics for the Sciences","credits":4,"note":"Current Chemistry page states that this course has an associated laboratory and requires no additional physics laboratory."}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current integrated-laboratory physics path; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-physics-201",
+      "parent_group_id": "sasnb-chemistry-education-physics-path",
+      "name": "Extended General Physics, whose laboratory is integrated.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 72,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:750:201","title":"Extended General Physics","credits":5,"note":"Current Chemistry page states that this course has an associated laboratory and requires no additional physics laboratory."}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current integrated-laboratory physics path; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-physics-203-205",
+      "parent_group_id": "sasnb-chemistry-education-physics-path",
+      "name": "General Physics with General Physics Laboratory.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 73,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:750:203","title":"General Physics","credits":3,"note":null},
+        {"code":"01:750:205","title":"General Physics Laboratory","credits":1,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current explicit lecture/lab path; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-physics-203-275",
+      "parent_group_id": "sasnb-chemistry-education-physics-path",
+      "name": "General Physics with Classical Physics Laboratory.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 74,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:750:203","title":"General Physics","credits":3,"note":null},
+        {"code":"01:750:275","title":"Classical Physics Laboratory","credits":1,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current explicit lecture/lab path; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-physics-271-205",
+      "parent_group_id": "sasnb-chemistry-education-physics-path",
+      "name": "Honors Physics I with General Physics Laboratory.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 75,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:750:271","title":"Honors Physics I","credits":3,"note":null},
+        {"code":"01:750:205","title":"General Physics Laboratory","credits":1,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current explicit lecture/lab path; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chemistry-education-physics-271-275",
+      "parent_group_id": "sasnb-chemistry-education-physics-path",
+      "name": "Honors Physics I with Classical Physics Laboratory.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 76,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:750:271","title":"Honors Physics I","credits":3,"note":null},
+        {"code":"01:750:275","title":"Classical Physics Laboratory","credits":1,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current explicit lecture/lab path; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": [
+    {
+      "key": "sasnb-chemistry-education-non-chemistry-major",
+      "condition_type": "selected_program_must_not_include_any",
+      "condition_value": ["sasnb-chemistry-major"],
+      "decision": "requires_approval",
+      "note": "The department describes the Chemistry Education minor as intended for students not already majoring in chemistry; confirm formal applicability with Chemistry advising.",
+      "source_id": "source-001",
+      "review_status": "unreviewed",
+      "verified_at": 1787004300000
+    }
+  ]
+}
