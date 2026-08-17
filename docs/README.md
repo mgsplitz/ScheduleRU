@@ -17,6 +17,10 @@ Their previous repository versions remain available in Git history.
   defines catalog round-trip and parity expectations.
 - [`architecture/reference-data-boundary.md`](architecture/reference-data-boundary.md)
   defines portable cross-program and school-level data.
+- [`architecture/guided-smart-planning.md`](architecture/guided-smart-planning.md)
+  defines the approved requirement-choice, optimization, and student-language design.
+- [`architecture/guided-smart-planning-delivery.md`](architecture/guided-smart-planning-delivery.md)
+  divides that design into independently testable releases and acceptance gates.
 
 ## Contributor workflows
 
