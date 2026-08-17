@@ -1,0 +1,112 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-chinese-minor",
+    "name": "Chinese",
+    "school_slug": "sasnb",
+    "program_slug": "chinese",
+    "type": "minor",
+    "catalog_year": "Current official pages (catalog year not stated)",
+    "academic_program_code": "165",
+    "degree_type": null,
+    "program_family_id": "sasnb-chinese-165",
+    "source_url": "https://alc.rutgers.edu/academics/undergraduate/undergraduate-majors-minors/chinese-major",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://alc.rutgers.edu/academics/undergraduate/undergraduate-majors-minors/chinese-major",
+      "title": "Chinese (165) Major and Minor",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current ALC page states four Chinese-language courses above the 100 level plus two additional subject-165 electives of at least 3 credits; electives may be language or culture courses."
+    },
+    {
+      "id": "source-002",
+      "url": "https://alc.rutgers.edu/academics/undergraduate/master-course-list",
+      "title": "Asian Languages and Cultures Master Course List",
+      "catalog_year": null,
+      "scope": "course_classification",
+      "accessed_at": 1787004300000,
+      "note": "Current ALC master list explicitly classifies Chinese courses as language or culture courses."
+    },
+    {
+      "id": "source-003",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/chinese",
+      "title": "Chinese (Major, Minor) | BA",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS profile confirms SAS ownership and program code 165."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-chinese-total",
+      "parent_group_id": null,
+      "name": "Six Chinese courses at the 200 level or above, each worth at least 3 credits.",
+      "rule": "min_courses",
+      "count": 6,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-chinese-total-selector",
+          "source_id": "source-001",
+          "source_label": "Chinese (165) Minor",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["165"],
+            "course_number_min": 200,
+            "course_number_max": 499,
+            "minimum_credits": 3,
+            "label": "Chinese subject-165 courses above the 100 level"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current Chinese minor total-course requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-chinese-language-subset",
+      "parent_group_id": "sasnb-chinese-total",
+      "name": "At least four of the six courses must be Chinese language courses above the 100 level.",
+      "rule": "min_courses",
+      "count": 4,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-chinese-language-selector",
+          "source_id": "source-002",
+          "source_label": "Chinese Language Courses",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "course_codes",
+            "include_course_codes": [
+              "01:165:201","01:165:202","01:165:205","01:165:222","01:165:301","01:165:302","01:165:305","01:165:321","01:165:322","01:165:361","01:165:362","01:165:371","01:165:393","01:165:401","01:165:402","01:165:410","01:165:412","01:165:419","01:165:420","01:165:424","01:165:425","01:165:430","01:165:451","01:165:452","01:165:490","01:165:493","01:165:494","01:165:497","01:165:498"
+            ],
+            "minimum_credits": 3,
+            "label": "Current ALC Chinese language-course pool above the 100 level"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-002","reviewer_note":"Finite current ALC language-course classification; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": []
+}
