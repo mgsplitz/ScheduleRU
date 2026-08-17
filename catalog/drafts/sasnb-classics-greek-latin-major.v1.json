@@ -1,0 +1,197 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-classics-greek-latin-major",
+    "name": "Classics - Greek and Latin Option",
+    "school_slug": "sasnb",
+    "program_slug": "classics-greek-latin-option",
+    "type": "major",
+    "catalog_year": "Current official department and 2025-2026 catalog pages",
+    "academic_program_code": "190C",
+    "degree_type": "B.A.",
+    "program_family_id": "sasnb-classics-190",
+    "source_url": "https://classics.rutgers.edu/academics/undergraduate/majors-minors",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://classics.rutgers.edu/academics/undergraduate/majors-minors",
+      "title": "Classics Majors and Minors",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current Classics Department page identifies the Greek and Latin option as option code C and requires 35 department credits, at least 29 credits in ancient Greek and Latin combined, at least 11 credits in each language, at least six Classics courses at the 300 level or above, and C or better in all major courses."
+    },
+    {
+      "id": "source-002",
+      "url": "https://newbrunswick-undergrad-25-26.catalogs.rutgers.edu/pages/KTND3uzBARykISJtOJM6",
+      "title": "Classics 190 (SAS)",
+      "catalog_year": "2025-2026",
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Official 2025-2026 Rutgers catalog confirms the Classics program and its Greek, Greek and Latin, Latin, and Classical Humanities options."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-classics-greek-latin-total",
+      "parent_group_id": null,
+      "name": "At least 35 credits in the Classics department.",
+      "rule": "min_credits",
+      "count": 35,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-classics-greek-latin-department-selector",
+          "source_id": "source-001",
+          "source_label": "Classics Greek and Latin Option",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["190", "490", "580"],
+            "course_number_min": 100,
+            "course_number_max": 499,
+            "label": "Classical Humanities, ancient Greek, and Latin department courses"
+          }
+        }
+      ],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"All courses applied to the Classics major must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current Classics Greek and Latin Option total-credit requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-classics-greek-latin-language-total",
+      "parent_group_id": "sasnb-classics-greek-latin-total",
+      "name": "At least 29 credits must be in ancient Greek and Latin combined.",
+      "rule": "min_credits",
+      "count": 29,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-classics-greek-latin-language-selector",
+          "source_id": "source-001",
+          "source_label": "Classics Greek and Latin Option",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["490", "580"],
+            "course_number_min": 100,
+            "course_number_max": 499,
+            "label": "Ancient Greek and Latin language courses"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current 29-credit combined ancient-language requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-classics-greek-latin-greek-minimum",
+      "parent_group_id": "sasnb-classics-greek-latin-total",
+      "name": "At least 11 credits must be in ancient Greek.",
+      "rule": "min_credits",
+      "count": 11,
+      "sort_order": 30,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-classics-greek-latin-greek-selector",
+          "source_id": "source-001",
+          "source_label": "Classics Greek and Latin Option",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["490"],
+            "course_number_min": 100,
+            "course_number_max": 499,
+            "label": "Ancient Greek courses"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current minimum ancient-Greek credit requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-classics-greek-latin-latin-minimum",
+      "parent_group_id": "sasnb-classics-greek-latin-total",
+      "name": "At least 11 credits must be in Latin.",
+      "rule": "min_credits",
+      "count": 11,
+      "sort_order": 40,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-classics-greek-latin-latin-selector",
+          "source_id": "source-001",
+          "source_label": "Classics Greek and Latin Option",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["580"],
+            "course_number_min": 100,
+            "course_number_max": 499,
+            "label": "Latin courses"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current minimum Latin credit requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-classics-greek-latin-upper-level",
+      "parent_group_id": "sasnb-classics-greek-latin-total",
+      "name": "At least six Classics courses must be at the 300 level or above.",
+      "rule": "min_courses",
+      "count": 6,
+      "sort_order": 50,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-classics-greek-latin-upper-level-selector",
+          "source_id": "source-001",
+          "source_label": "Classics Greek and Latin Option",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["190", "490", "580"],
+            "course_number_min": 300,
+            "course_number_max": 499,
+            "label": "Upper-level Classics department courses"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current six-course upper-level requirement; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": []
+}
