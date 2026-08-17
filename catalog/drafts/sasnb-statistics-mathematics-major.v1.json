@@ -1,0 +1,216 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-statistics-mathematics-major",
+    "name": "Statistics/Mathematics",
+    "school_slug": "sasnb",
+    "program_slug": "statistics-mathematics",
+    "type": "major",
+    "catalog_year": "Current official department and SAS pages",
+    "academic_program_code": "961",
+    "degree_type": "B.A.",
+    "program_family_id": "sasnb-statistics-mathematics-961",
+    "source_url": "https://statistics.rutgers.edu/majors",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://statistics.rutgers.edu/majors",
+      "title": "Statistics Major Requirements",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current Statistics Department page gives the complete 56-credit Statistics/Mathematics major: 28 mathematics credits, 25 statistics credits, and 3 computer-science credits, including all finite course alternatives. It also states that no course with grade D may count."
+    },
+    {
+      "id": "source-002",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/statistics-mathematics",
+      "title": "Statistics/Mathematics (Major) | BA",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS profile confirms SAS ownership, program code 961, B.A. degree type, credit-intensive status, declaration prerequisite, and Math/Statistics combination restrictions."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-statistics-mathematics-computer-science",
+      "parent_group_id": null,
+      "name": "One approved introductory computer-science course.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:198:107","title":null,"credits":null,"note":null},
+        {"code":"01:198:110","title":null,"credits":null,"note":null},
+        {"code":"01:198:111","title":null,"credits":null,"note":null},
+        {"code":"01:198:170","title":null,"credits":null,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"No course with grade D may be counted toward the major.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current finite computer-science requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-statistics-mathematics-math-core",
+      "parent_group_id": null,
+      "name": "Required mathematics core.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:640:151","title":null,"credits":null,"note":null},
+        {"code":"01:640:152","title":null,"credits":null,"note":null},
+        {"code":"01:640:250","title":null,"credits":null,"note":null},
+        {"code":"01:640:251","title":null,"credits":null,"note":null},
+        {"code":"01:640:252","title":null,"credits":null,"note":null},
+        {"code":"01:640:300","title":null,"credits":null,"note":null},
+        {"code":"01:640:311","title":null,"credits":null,"note":null},
+        {"code":"01:640:478","title":null,"credits":null,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"No course with grade D may be counted toward the major.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current fixed 28-credit mathematics core; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-statistics-mathematics-probability-i",
+      "parent_group_id": null,
+      "name": "Probability requirement I: Statistics 381 or Mathematics 477.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 30,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:960:381","title":null,"credits":null,"note":null},
+        {"code":"01:640:477","title":null,"credits":null,"note":"May substitute for 01:960:381; credit is not given for both."}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"mutually_exclusive_credit","value":["01:960:381","01:640:477"],"note":"The department states that credit is not given for both courses in this substitution pair.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current explicit Statistics/Mathematics substitution pair; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-statistics-mathematics-probability-ii",
+      "parent_group_id": null,
+      "name": "Probability requirement II: Statistics 382 or Mathematics 481.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 40,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:960:382","title":null,"credits":null,"note":null},
+        {"code":"01:640:481","title":null,"credits":null,"note":"May substitute for 01:960:382; credit is not given for both."}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"mutually_exclusive_credit","value":["01:960:382","01:640:481"],"note":"The department states that credit is not given for both courses in this substitution pair.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current explicit Statistics/Mathematics substitution pair; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-statistics-mathematics-statistics-choice-212-384",
+      "parent_group_id": null,
+      "name": "One of Statistics 212 or 384.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 50,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:960:212","title":null,"credits":null,"note":null},
+        {"code":"01:960:384","title":null,"credits":null,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current finite Statistics choice; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-statistics-mathematics-statistics-choice-295-390",
+      "parent_group_id": null,
+      "name": "One of Statistics 295 or 390.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 60,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:960:295","title":null,"credits":null,"note":null},
+        {"code":"01:960:390","title":null,"credits":null,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current finite Statistics choice; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-statistics-mathematics-statistics-core",
+      "parent_group_id": null,
+      "name": "Required Statistics core courses.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 70,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:960:463","title":null,"credits":null,"note":null},
+        {"code":"01:960:486","title":null,"credits":null,"note":null},
+        {"code":"01:960:490","title":null,"credits":null,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current fixed Statistics core; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-statistics-mathematics-statistics-electives",
+      "parent_group_id": null,
+      "name": "Two approved Statistics electives.",
+      "rule": "min_courses",
+      "count": 2,
+      "sort_order": 80,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:960:365","title":null,"credits":null,"note":null},
+        {"code":"01:960:467","title":null,"credits":null,"note":null},
+        {"code":"01:960:476","title":null,"credits":null,"note":null},
+        {"code":"01:960:483","title":null,"credits":null,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current finite two-course Statistics elective pool; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": [
+    {
+      "key": "sasnb-statistics-mathematics-declaration-calculus-average",
+      "condition_type": "advisor_confirmation",
+      "condition_value": {"courses":["01:640:151","01:640:152"],"minimum_combined_average":"C","include_all_attempts":true},
+      "decision": "requires_approval",
+      "note": "Declaration requires an overall C average or above in Calculus I and II, based on all attempts.",
+      "source_id": "source-002",
+      "review_status": "unreviewed",
+      "verified_at": 1787004300000
+    },
+    {
+      "key": "sasnb-statistics-mathematics-no-math-or-statistics-program",
+      "condition_type": "selected_academic_program_code_must_not_include_any",
+      "condition_value": ["640","960"],
+      "decision": "blocked",
+      "note": "Statistics/Mathematics (961) majors may not major or minor in Mathematics (640) or Statistics (960).",
+      "source_id": "source-002",
+      "review_status": "unreviewed",
+      "verified_at": 1787004300000
+    }
+  ]
+}
