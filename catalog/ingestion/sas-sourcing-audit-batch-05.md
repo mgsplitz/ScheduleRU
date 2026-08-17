@@ -1,0 +1,21 @@
+# SAS Program Sourcing Audit — Batch 05
+
+Continuation of the working SAS sourcing ledger. Review aid only; not canonical published catalog data.
+
+| Program | Status | Exact blocker / review issue |
+|---|---|---|
+| American Studies major (050) | BLOCKED_CONTRACT | The April 2025 current major is otherwise unusually clean (three core courses plus nine 050 electives, four at 300+), but for double majors only three elective credits may overlap with the other major. Faithful completion therefore requires cross-program allocation/overlap semantics not exposed by contract v1. |
+| American Studies minor (050) | BLOCKED_SOURCE_AND_DYNAMIC_APPROVAL | The live minor page directly conflicts with itself: it says approved outside-department courses may fulfill the minor, then says courses must be in American Studies only. Outside-course qualification also depends on Undergraduate Director approval. |
+| Comparative and Critical Race and Ethnic Studies (CCRES) minor | BLOCKED_DYNAMIC_APPROVAL_AND_CONTRACT | Approved electives are updated yearly and students may request additional courses based on learning-goal criteria. At most two courses may overlap with a major outside American Studies, requiring cross-program overlap accounting. |
+| Cinema Studies major (175) | BLOCKED_DYNAMIC_APPROVAL_AND_CONTRACT | Qualifying electives are published on a preregistration flyer each semester and additional courses may be approved by the Program Director. Major options and production-course rules use dynamic classifications; current/archived descriptions also impose course-use limits. |
+| Cinema Studies minor (175) | BLOCKED_DYNAMIC_APPROVAL_AND_CONTRACT | Four electives come from a semester-specific preregistration flyer or other director-approved courses; five of seven courses must be outside the student's major and only one production/filmmaking course may count. |
+| Latin American Studies minor (590) | BLOCKED_DYNAMIC_APPROVAL | Rutgers explicitly says replacement allowances are commonly granted when courses are unavailable. Literature/culture and elective requirements are also partly defined by semantic Latin American focus rather than a complete stable finite list, with a language-proficiency requirement. |
+| Middle Eastern Studies major (685) | BLOCKED_DYNAMIC_APPROVAL_AND_EXTERNAL_CREDENTIAL | Current rules allow director-approved substitute senior seminars and related arts/literature/elective courses, less-common languages arranged in consultation, placement-based reductions for advanced students, and internship credit. |
+| Middle Eastern Studies minor (685) | BLOCKED_DYNAMIC_APPROVAL_AND_EXTERNAL_CREDENTIAL | Same dynamic approval/placement model as the major: substitute seminars and related courses by director approval, less-common languages arranged in consultation, advanced-placement reductions, and internship elective credit. |
+| Military Science — Army Commissioning Track (691N) | BLOCKED_DYNAMIC_APPROVAL | Current Army ROTC site provides the eight-course Military Science sequence, but the required military-history component may be satisfied by a listed course or a substitute approved by the Professor of Military Science. Commissioning eligibility is also external to ordinary SAS course completion. |
+| Military Science — Naval Science Track (692N) | BLOCKED_PROGRAM_EXTERNAL_REQUIREMENTS | Current NROTC program requires Naval Science coursework plus commissioning-option-specific calculus, physics, upper-level writing, military history/national-security, cultural-studies and eligibility requirements. The public current material does not present this as a simple static SAS-minor-only requirement tree independent of NROTC status. |
+| Military Science — Non-Commissioning Track (695N) | BLOCKED_CONTRACT | Current Rutgers catalog requires basic courses, one military-history course and four leadership courses, while the same course cannot safely be assumed reusable across requirement buckets. Contract v1 lacks reviewed exclusive-allocation metadata. |
+
+## Coverage note
+
+The Aerospace Science track (693N) remains the one Military Science track drafted in this sourcing branch because its current Rutgers page provides a sufficiently finite academic course structure. The other tracks are being held rather than forcing ROTC commissioning/approval semantics into ordinary catalog course selectors.
