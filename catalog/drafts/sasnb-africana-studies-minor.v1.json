@@ -1,0 +1,155 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-africana-studies-minor",
+    "name": "Africana Studies",
+    "school_slug": "sasnb",
+    "program_slug": "africana-studies",
+    "type": "minor",
+    "catalog_year": "Rutgers New Brunswick Undergraduate Catalog 2024-2025 with current SAS profile",
+    "academic_program_code": "014",
+    "degree_type": null,
+    "program_family_id": "sasnb-africana-studies-014",
+    "source_url": "https://catalogs.rutgers.edu/generated/nb-ug_2425/pg41.html",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://catalogs.rutgers.edu/generated/nb-ug_2425/pg41.html",
+      "title": "Africana Studies Minor Requirements",
+      "catalog_year": "2024-2025",
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Official Rutgers New Brunswick undergraduate catalog states six department courses of at least 3 credits, including 01:014:103, one of 01:014:203/204, and 01:014:490; at least three of six must be at the 300 level or above; C or better required."
+    },
+    {
+      "id": "source-002",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/africana-studies",
+      "title": "Africana Studies (Major, Minor) | BA",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS profile confirms SAS ownership, program code 014, and no declaration prerequisite."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-africana-studies-total",
+      "parent_group_id": null,
+      "name": "Six Africana Studies courses of at least 3 credits each.",
+      "rule": "min_courses",
+      "count": 6,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-africana-studies-total-selector",
+          "source_id": "source-001",
+          "source_label": "Africana Studies Minor Requirements",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["014"],
+            "course_number_min": 100,
+            "course_number_max": 499,
+            "minimum_credits": 3,
+            "label": "Africana Studies department courses worth at least 3 credits"
+          }
+        }
+      ],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"All courses counted toward the minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Official 2024-2025 Rutgers catalog total-course requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-africana-studies-introduction",
+      "parent_group_id": "sasnb-africana-studies-total",
+      "name": "Introduction to Africana Studies.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:014:103","title":"Introduction to Africana Studies","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Official fixed introductory requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-africana-studies-black-experience",
+      "parent_group_id": "sasnb-africana-studies-total",
+      "name": "One approved Black Experience in America course.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 30,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:014:203","title":"The Black Experience in America","credits":3,"note":null},
+        {"code":"01:014:204","title":"The Black Experience in America","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Official 203-or-204 requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-africana-studies-seminar",
+      "parent_group_id": "sasnb-africana-studies-total",
+      "name": "Seminar in Africana Studies.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 40,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:014:490","title":"Seminar in Africana Studies","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Official fixed seminar requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-africana-studies-upper-level",
+      "parent_group_id": "sasnb-africana-studies-total",
+      "name": "At least three of the six courses must be at the 300 level or above.",
+      "rule": "min_courses",
+      "count": 3,
+      "sort_order": 50,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-africana-studies-upper-level-selector",
+          "source_id": "source-001",
+          "source_label": "Africana Studies Minor Requirements",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["014"],
+            "course_number_min": 300,
+            "course_number_max": 499,
+            "minimum_credits": 3,
+            "label": "300- and 400-level Africana Studies courses"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Official upper-level distribution requirement; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": []
+}
