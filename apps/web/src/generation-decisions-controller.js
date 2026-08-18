@@ -7,7 +7,28 @@
 
   function create({ decisions = [], programs = [], initialPreferences = {}, onChange } = {}) {
     const programById = new Map((programs || []).map((program) => [program.id, program]));
-    const ordered = (decisions || [])
+    const expanded = (decisions || []).flatMap((decision) => {
+      const families = new Map();
+      (decision.candidates || []).filter((candidate) => candidate.optionFamily).forEach((candidate) => {
+        const rows = families.get(candidate.optionFamily) || [];
+        rows.push(candidate);
+        families.set(candidate.optionFamily, rows);
+      });
+      const familyCandidates = new Set([...families.values()].flat().map((candidate) => candidate.code));
+      const stages = [...families].filter(([, candidates]) => candidates.length > 1).map(([family, candidates]) => ({
+        ...decision,
+        decisionId: `${decision.decisionId || decision.requirementGroupId}:option:${family}`,
+        label: `Choose at most one alternative for ${decision.label || "this requirement"}`,
+        slotCount: 1,
+        candidates,
+        guidanceOnly: true,
+        canSkip: true,
+        canDefer: false,
+      }));
+      const remaining = (decision.candidates || []).filter((candidate) => !familyCandidates.has(candidate.code));
+      return [...stages, ...(remaining.length ? [{ ...decision, candidates: remaining }] : [])];
+    });
+    const ordered = expanded
       .filter((decision) => ["sequence_critical", "guided_flexible"].includes(decision?.planningMode))
       .map((decision) => copy(decision))
       .sort((left, right) => {
@@ -16,6 +37,10 @@
           return programById.get(decision.sourceProgram)?.school_slug === "rbsnb" ? 0 : 1;
         };
         return priority(left) - priority(right)
+          || Number(right.guidanceOnly === true) - Number(left.guidanceOnly === true)
+          || (left.sourceProgram === right.sourceProgram
+            ? (left.candidates || []).length - (right.candidates || []).length
+            : 0)
           || String(left.label || "").localeCompare(String(right.label || ""))
           || String(left.requirementGroupId || "").localeCompare(String(right.requirementGroupId || ""));
       });
@@ -38,6 +63,14 @@
       if (saved.mode === "deferred" && decision.canDefer) preference.mode = "deferred";
       preferences[key] = preference;
     });
+    const globalPreference = { interested: [], maybe: [], avoid: [] };
+    BUCKETS.forEach((bucket) => {
+      globalPreference[bucket] = [...new Set([
+        ...(initialPreferences?.__global?.[bucket] || []),
+        ...Object.values(preferences).flatMap((preference) => preference[bucket] || []),
+      ])];
+    });
+    preferences.__global = globalPreference;
 
     const emit = () => onChange?.(copy(preferences));
     function resolveKey(identifier) {
@@ -50,9 +83,13 @@
       const preference = preferences[key];
       if (!preference || !BUCKETS.includes(bucket) || !known.get(key)?.has(courseCode)) return false;
       BUCKETS.forEach((name) => {
+        preferences.__global[name] = preferences.__global[name].filter((code) => code !== courseCode);
+        Object.entries(preferences).filter(([otherKey]) => otherKey !== "__global" && otherKey !== key)
+          .forEach(([, other]) => { other[name] = other[name].filter((code) => code !== courseCode); });
         preference[name] = preference[name].filter((code) => code !== courseCode);
       });
       preference[bucket].push(courseCode);
+      preferences.__global[bucket].push(courseCode);
       preference.mode = "ranked";
       emit();
       return true;
@@ -67,7 +104,7 @@
     function defer(identifier) {
       const key = resolveKey(identifier);
       const decision = ordered.find((item) => decisionKey(item) === key);
-      if (!decision?.canDefer || !preferences[key]) return false;
+      if (!(decision?.canDefer || decision?.canSkip) || !preferences[key]) return false;
       preferences[key].mode = "deferred";
       emit();
       return true;
@@ -78,9 +115,21 @@
       if (!preference) return false;
       if (preference.mode === "recommend_for_me") return true;
       if (preference.mode === "deferred") {
-        return ordered.find((item) => decisionKey(item) === key)?.canDefer === true;
+        const decision = ordered.find((item) => decisionKey(item) === key);
+        return decision?.canDefer === true || decision?.canSkip === true;
       }
-      return BUCKETS.some((bucket) => preference[bucket].length > 0);
+      if (BUCKETS.some((bucket) => preference[bucket].length > 0)) return true;
+      const decision = ordered.find((item) => decisionKey(item) === key);
+      const candidateCodes = new Set((decision?.candidates || []).map((candidate) => candidate.code));
+      return BUCKETS.some((bucket) => (preferences.__global[bucket] || []).some((code) => candidateCodes.has(code)));
+    }
+    function unratedCandidates(identifier) {
+      const key = resolveKey(identifier);
+      const decision = ordered.find((item) => decisionKey(item) === key);
+      if (!decision) return [];
+      const rated = new Set(BUCKETS.flatMap((bucket) => preferences.__global[bucket] || []));
+      const local = new Set(BUCKETS.flatMap((bucket) => preferences[key]?.[bucket] || []));
+      return copy((decision.candidates || []).filter((candidate) => !rated.has(candidate.code) || local.has(candidate.code)), []);
     }
 
     return {
@@ -90,6 +139,7 @@
       chooseForMe,
       defer,
       canAdvance,
+      unratedCandidates,
     };
   }
 

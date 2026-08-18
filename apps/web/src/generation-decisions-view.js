@@ -11,9 +11,31 @@
     return `Builds on ${count} course${count === 1 ? "" : "s"}`;
   }
 
-  function renderDecision({ decision = {}, preference = {}, index = 0, total = 1 } = {}) {
+  function rankedCandidates(candidates) {
+    const unlocks = new Map();
+    (candidates || []).forEach((candidate) => {
+      const dependencies = new Set([...(candidate.prerequisitePaths || []), ...(candidate.enforceablePrerequisitePaths || [])].flat());
+      dependencies.forEach((code) => unlocks.set(code, (unlocks.get(code) || 0) + 1));
+    });
+    const prerequisiteBurden = (candidate) => {
+      const sizes = (candidate.prerequisitePaths || []).map((path) => path.length).filter(Boolean);
+      return sizes.length ? Math.min(...sizes) : 0;
+    };
+    return [...(candidates || [])].sort((left, right) =>
+      (unlocks.get(right.code) || 0) - (unlocks.get(left.code) || 0)
+      || prerequisiteBurden(left) - prerequisiteBurden(right)
+      || String(left.title || left.code).localeCompare(String(right.title || right.code)));
+  }
+
+  function renderDecision({ decision = {}, preference = {}, globalPreference = {}, index = 0, total = 1, expanded = false, search = "" } = {}) {
     const selected = (code, bucket) => (preference[bucket] || []).includes(code);
-    const candidates = (decision.candidates || []).map((candidate) => `
+    const locallyRated = new Set(["interested", "maybe", "avoid"].flatMap((bucket) => preference[bucket] || []));
+    const globallyRated = new Set(["interested", "maybe", "avoid"].flatMap((bucket) => globalPreference[bucket] || []));
+    const available = rankedCandidates((decision.candidates || []).filter((candidate) => !globallyRated.has(candidate.code) || locallyRated.has(candidate.code)));
+    const query = String(search || "").trim().toLowerCase();
+    const filtered = query ? available.filter((candidate) => `${candidate.title || ""} ${candidate.code || ""}`.toLowerCase().includes(query)) : available;
+    const visible = expanded || query ? filtered : filtered.slice(0, 8);
+    const candidates = visible.map((candidate) => `
       <article class="generation-candidate">
         <div class="generation-candidate-main"><strong>${escapeHtml(candidate.title || candidate.code)}</strong><code>${escapeHtml(candidate.code)}</code><span>${escapeHtml(prerequisiteNote(candidate))}</span></div>
         <div class="generation-interest" aria-label="Interest in ${escapeHtml(candidate.title || candidate.code)}">
@@ -24,9 +46,10 @@
       <section class="generation-decision" data-decision-group="${escapeHtml(decision.decisionId || decision.requirementGroupId)}">
         <div class="generation-progress">Choice ${index + 1} of ${total}</div>
         <h2>${escapeHtml(decision.label || "Choose courses")}</h2>
-        <p>${Number(decision.slotCount) > 1 ? "Mark as many as you can. More preferences help us build a better path." : "Mark what sounds useful. We’ll balance your interests with prerequisites and degree progress."}</p>
+        <p>${decision.guidanceOnly ? "These courses fill the same role. Mark the one you prefer, or skip this path." : Number(decision.slotCount) > 1 ? "Mark as many as you can. More preferences help us build a better path." : "Mark what sounds useful. We’ll balance your interests with prerequisites and degree progress."}</p>
         <p class="generation-guidance">Avoid is a preference; a course may still be needed to unlock the path you choose.</p>
-        <div class="generation-candidates">${candidates}</div>
+        ${available.length > 8 ? `<div class="generation-candidate-tools"><strong>Best matches</strong><input type="search" data-decision-search value="${escapeHtml(search)}" placeholder="Search ${available.length} courses" aria-label="Search course choices"><button type="button" class="quiet-action" data-decision-expand>${expanded ? "Show best matches" : `Show all ${available.length}`}</button></div>` : ""}
+        <div class="generation-candidates">${candidates || `<p class="generation-empty">${query ? "No courses match that search." : "Your earlier ratings already cover these choices."}</p>`}</div>
         <div class="generation-delegate"><button type="button" data-decision-recommend class="choice-btn secondary">Choose for me</button></div>
       </section>`;
   }

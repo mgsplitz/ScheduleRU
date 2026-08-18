@@ -161,7 +161,11 @@ function selectorWhereClause(selectors) {
    FETCH FROM RUTGERS (source of truth — always full & fresh)
    ============================================================ */
 async function fetchFullCatalog(env) {
-  const url = `${RUTGERS_BASE}/courses.json?year=${env.CURRENT_YEAR}&term=${env.CURRENT_TERM}&campus=NB`;
+  return fetchCatalogTerm(env.CURRENT_YEAR, env.CURRENT_TERM);
+}
+
+async function fetchCatalogTerm(year, term) {
+  const url = `${RUTGERS_BASE}/courses.json?year=${year}&term=${term}&campus=NB`;
   const res = await fetch(url, {
     headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; RutgersCourseSync/2.0)" },
   });
@@ -173,6 +177,37 @@ async function fetchFullCatalog(env) {
   const list = JSON.parse(trimmed);
   if (!Array.isArray(list)) throw new Error("Response was JSON but not an array");
   return list;
+}
+
+async function syncCourseReferenceTerm(env, year, term) {
+  const list = await fetchCatalogTerm(year, term);
+  const updatedAt = Date.now();
+  const rows = new Map();
+  for (const course of list) {
+    const school = String(course.offeringUnitCode || course.school || "01").padStart(2, "0");
+    const subject = String(course.subject || "").padStart(3, "0");
+    const number = String(course.courseNumber || (course.courseString ? course.courseString.split(":").pop() : "")).padStart(3, "0");
+    const code = `${school}:${subject}:${number}`;
+    const title = String(course.expandedTitle || course.title || "").trim();
+    if (!COURSE_CODE_PATTERN.test(code) || !title) continue;
+    rows.set(code, { code, title, credits: String(course.credits ?? course.creditsObject?.value ?? "") });
+  }
+  const statements = [...rows.values()].sort((left, right) => left.code.localeCompare(right.code)).map((course) =>
+    env.DB.prepare(
+      `INSERT INTO course_reference (course_code, title, credits, source_kind, source_url, updated_at)
+       VALUES (?, ?, ?, 'schedule_archive', ?, ?)
+       ON CONFLICT(course_code) DO UPDATE SET
+         title = excluded.title,
+         credits = CASE WHEN excluded.credits <> '' THEN excluded.credits ELSE course_reference.credits END,
+         source_kind = excluded.source_kind,
+         source_url = excluded.source_url,
+         updated_at = excluded.updated_at`
+    ).bind(course.code, course.title, course.credits, `${RUTGERS_BASE}/courses.json?year=${year}&term=${term}&campus=NB`, updatedAt)
+  );
+  for (let offset = 0; offset < statements.length; offset += 400) {
+    await env.DB.batch(statements.slice(offset, offset + 400));
+  }
+  return rows.size;
 }
 
 async function fetchOpenSections(env) {
@@ -285,6 +320,15 @@ function courseStatements(env, mapped) {
          credits=excluded.credits, description=excluded.description,
          prereqs=excluded.prereqs, subject_notes=excluded.subject_notes, synced_at=excluded.synced_at`
     ).bind(c.id, c.school, c.subject_code, c.subject_description, c.course_number, c.year, c.term, c.title, c.credits, c.description, c.prereqs, c.subject_notes, c.synced_at),
+    env.DB.prepare(
+      `INSERT INTO course_reference (course_code, title, credits, source_kind, source_url, updated_at)
+       VALUES (?, ?, ?, 'schedule', NULL, ?)
+       ON CONFLICT(course_code) DO UPDATE SET
+         title = excluded.title,
+         credits = CASE WHEN excluded.credits <> '' THEN excluded.credits ELSE course_reference.credits END,
+         source_kind = excluded.source_kind,
+         updated_at = excluded.updated_at`
+    ).bind(`${c.school}:${c.subject_code}:${c.course_number}`, c.title, c.credits, c.synced_at),
   ];
   for (const sec of mapped.sections) {
     stmts.push(
@@ -474,6 +518,32 @@ async function handleApi(request, env, ctx) {
     return json({ attributes: (results || []).map((row) => row.attribute_code).filter((code) => code && code !== "AH") });
   }
 
+  if (path === "/api/course-metadata") {
+    const rawCodes = (url.searchParams.get("codes") || "").split(",").map((value) => value.trim()).filter(Boolean);
+    const codes = [...new Set(rawCodes)];
+    if (!codes.length || codes.length > 100 || codes.some((code) => !COURSE_CODE_PATTERN.test(code))) {
+      return json({ error: "invalid course codes" }, 400);
+    }
+    const { results } = await env.DB.prepare(
+      `SELECT course_code, title, credits
+       FROM course_reference
+       WHERE course_code IN (SELECT value FROM json_each(?))
+       ORDER BY course_code`
+    ).bind(JSON.stringify(codes)).all();
+    return json({ courses: results || [] });
+  }
+
+  if (path === "/api/admin/course-reference/sync" && request.method === "POST") {
+    if (!checkAdmin(url, env)) return json({ error: "bad secret" }, 403);
+    const year = Number(url.searchParams.get("year"));
+    const term = String(url.searchParams.get("term") || "");
+    if (!Number.isInteger(year) || year < 2000 || year > 2100 || !["0", "1", "7", "9"].includes(term)) {
+      return json({ error: "invalid Rutgers term" }, 400);
+    }
+    const courses = await syncCourseReferenceTerm(env, year, term);
+    return json({ ok: true, year, term, courses });
+  }
+
   if (path === "/api/courses") {
     const q = (url.searchParams.get("search") || "").trim();
     const subject = (url.searchParams.get("subject") || "").trim();
@@ -630,6 +700,7 @@ async function handleApi(request, env, ctx) {
       error: "not found",
       available: [
         "GET /api/courses?search=&subject=&limit=&offset=",
+        "GET /api/course-metadata?codes=01:198:111,01:640:250",
         "GET /api/courses/:id",
         "GET /api/courses/:id/sections",
         "GET /api/subjects",
@@ -637,6 +708,7 @@ async function handleApi(request, env, ctx) {
         "GET /api/sync-log",
         "POST /api/admin/sync-now?secret=...            (writes one cursor chunk)",
         "POST /api/admin/sync-now?secret=...&full=true  (background full resync)",
+        "POST /api/admin/course-reference/sync?secret=...&year=2025&term=9",
         "--- programs / degree requirements ---",
         "GET /api/schools",
         "GET /api/programs?school=&type=",

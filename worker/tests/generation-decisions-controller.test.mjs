@@ -58,6 +58,43 @@ test("Business decisions come first and Core decisions come last", () => {
   ]);
 });
 
+test("a restrictive subset is guided before the broader total for one program", () => {
+  const broad = {
+    decisionId: "program:philosophy:total", requirementGroupId: "total",
+    sourceProgram: "philosophy", sourceType: "program", label: "Six Philosophy courses",
+    planningMode: "guided_flexible", candidates: ["101", "301", "302"].map((code) => ({ code, title: code })),
+  };
+  const subset = {
+    ...broad, decisionId: "program:philosophy:upper", requirementGroupId: "upper",
+    label: "Three upper-level Philosophy courses", slotCount: 3,
+    candidates: ["301", "302"].map((code) => ({ code, title: code })),
+  };
+  const flow = modules().controller.create({ decisions: [broad, subset] });
+
+  assert.deepEqual(plain(flow.decisions().map((item) => item.requirementGroupId)), ["upper", "total"]);
+});
+
+test("interchangeable alternatives receive a focused screen before the remaining elective pool", () => {
+  const family = "math-electives:explicit-alternatives";
+  const flow = modules().controller.create({ decisions: [{
+    decisionId: "math-electives", requirementGroupId: "math-electives",
+    sourceProgram: "mathematics", sourceType: "program", label: "Four Mathematics electives",
+    planningMode: "guided_flexible", slotCount: 4,
+    candidates: [
+      { code: "01:640:244", title: "Differential Equations for Engineering", optionFamily: family },
+      { code: "01:640:252", title: "Elementary Differential Equations", optionFamily: family },
+      { code: "01:640:300", title: "Introduction to Mathematical Reasoning" },
+    ],
+  }] });
+  const ordered = flow.decisions();
+
+  assert.equal(ordered.length, 2);
+  assert.equal(ordered[0].guidanceOnly, true);
+  assert.equal(ordered[0].canSkip, true);
+  assert.deepEqual(plain(ordered[0].candidates.map(({ code }) => code)), ["01:640:244", "01:640:252"]);
+  assert.deepEqual(plain(ordered[1].candidates.map(({ code }) => code)), ["01:640:300"]);
+});
+
 test("interest buckets are exclusive and persist through a restarted flow", () => {
   const first = modules().controller.create({ decisions: decisions(), programs: [] });
   first.setInterest("cs-electives", "01:198:111", "interested");
@@ -72,6 +109,19 @@ test("interest buckets are exclusive and persist through a restarted flow", () =
     decisions: decisions(), initialPreferences: saved, programs: [],
   });
   assert.deepEqual(plain(restarted.preferences()), plain(saved));
+});
+
+test("one global rating is reused across overlapping requirements", () => {
+  const shared = { code: "01:730:424", title: "Logic of Decision", prerequisitePaths: [] };
+  const flow = modules().controller.create({ decisions: [
+    { ...decisions()[1], decisionId: "program:phil:upper", candidates: [shared] },
+    { ...decisions()[1], decisionId: "program:phil:total", candidates: [shared, { code: "01:730:103", title: "Introduction", prerequisitePaths: [] }] },
+  ] });
+
+  flow.setInterest("program:phil:upper", shared.code, "interested");
+  const saved = flow.preferences();
+  assert.deepEqual(plain(saved.__global.interested), [shared.code]);
+  assert.deepEqual(plain(flow.unratedCandidates("program:phil:total").map((course) => course.code)), ["01:730:103"]);
 });
 
 test("program decisions cannot defer while eligible Core decisions can", () => {
@@ -141,6 +191,43 @@ test("multi-course guidance asks for as many preferences as possible", () => {
     decision: { ...decisions()[1], slotCount: 6 }, preference: {}, index: 0, total: 1,
   });
   assert.match(html, /Mark as many as you can/);
+});
+
+test("large guidance pools open with eight best matches and an expandable search", () => {
+  const candidates = Array.from({ length: 20 }, (_, index) => ({
+    code: `01:198:${String(300 + index)}`,
+    title: `Course ${String(index + 1).padStart(2, "0")}`,
+    prerequisitePaths: index < 8 ? [] : [["01:198:112"]],
+  }));
+  const collapsed = modules().view.renderDecision({
+    decision: { ...decisions()[1], candidates }, preference: {}, index: 0, total: 1,
+  });
+  const expanded = modules().view.renderDecision({
+    decision: { ...decisions()[1], candidates }, preference: {}, index: 0, total: 1,
+    expanded: true, search: "Course 19",
+  });
+
+  assert.equal((collapsed.match(/class="generation-candidate"/g) || []).length, 8);
+  assert.match(collapsed, /Best matches/);
+  assert.match(collapsed, /Show all 20/);
+  assert.match(expanded, /Course 19/);
+  assert.doesNotMatch(expanded, /Course 18/);
+});
+
+test("best matches put gateway courses that unlock the pool first", () => {
+  const candidates = [
+    { code: "01:198:112", title: "Data Structures", prerequisitePaths: [] },
+    ...Array.from({ length: 9 }, (_, index) => ({
+      code: `01:198:${String(300 + index)}`,
+      title: `Advanced ${index + 1}`,
+      prerequisitePaths: [["01:198:112"]],
+    })),
+  ];
+  const html = modules().view.renderDecision({
+    decision: { ...decisions()[1], candidates }, preference: {}, index: 0, total: 1,
+  });
+
+  assert.ok(html.indexOf("Data Structures") < html.indexOf("Advanced 1"));
 });
 
 test("recommendation review is concise and exposes replacement before approval", () => {

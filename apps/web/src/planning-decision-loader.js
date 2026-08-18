@@ -13,6 +13,24 @@
     }).filter(Boolean);
   }
 
+  function mergeCandidateRecords(left = {}, right = {}) {
+    const merged = { ...left };
+    Object.entries(right || {}).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === "") return;
+      if (Array.isArray(value) && !value.length && Array.isArray(merged[key]) && merged[key].length) return;
+      merged[key] = value;
+    });
+    return merged;
+  }
+
+  function mergeCandidates(...lists) {
+    const byCode = new Map();
+    lists.flat().filter((course) => course?.code).forEach((course) => {
+      byCode.set(course.code, mergeCandidateRecords(byCode.get(course.code), course));
+    });
+    return [...byCode.values()].sort((left, right) => left.code.localeCompare(right.code));
+  }
+
   async function hydrate({ decisions = [], request, normalizeCandidate = (value) => value } = {}) {
     if (typeof request !== "function") throw new TypeError("request must be a function");
     const cache = new Map();
@@ -46,10 +64,45 @@
     }
 
     return Promise.all((decisions || []).map(async (decision) => {
-      if ((decision.candidates || []).length || !(decision.courseSelectors || []).length) return copy(decision, {});
-      return { ...copy(decision, {}), candidates: await candidatesFor(decision.courseSelectors) };
+      if (!(decision.courseSelectors || []).length) return copy(decision, {});
+      const explicit = decision.candidates || [];
+      const selected = await candidatesFor(decision.courseSelectors);
+      const selectedCodes = new Set(selected.map((candidate) => candidate.code));
+      const supplemental = explicit.filter((candidate) => !selectedCodes.has(candidate.code));
+      const optionFamily = supplemental.length > 1
+        ? `${decision.decisionId || decision.requirementGroupId}:explicit-alternatives`
+        : null;
+      return {
+        ...copy(decision, {}),
+        candidates: mergeCandidates(explicit, selected).map((candidate) =>
+          optionFamily && supplemental.some((record) => record.code === candidate.code)
+            ? { ...candidate, optionFamily }
+            : candidate),
+      };
     }));
   }
 
-  root.ScheduleRUPlanningDecisionLoader = { hydrate, normalizedSelectors };
+  async function hydratePrerequisiteMetadata({ decisions = [], request } = {}) {
+    if (typeof request !== "function") throw new TypeError("request must be a function");
+    const codes = [...new Set((decisions || []).flatMap((decision) =>
+      (decision.candidates || []).flatMap((candidate) =>
+        [...(candidate.prerequisitePaths || []), ...(candidate.enforceablePrerequisitePaths || [])].flat()
+      )
+    ).filter(Boolean))].sort();
+    const records = [];
+    for (let offset = 0; offset < codes.length; offset += 100) {
+      const params = new URLSearchParams({ codes: codes.slice(offset, offset + 100).join(",") });
+      const response = await request(`/api/course-metadata?${params.toString()}`);
+      records.push(...(Array.isArray(response?.courses) ? response.courses : []));
+    }
+    const prerequisiteCourses = records.map((record) => ({
+      code: record.course_code || record.code,
+      title: record.title,
+      credits: Number(record.credits) > 0 ? Number(record.credits) : 3,
+    })).filter((record) => record.code && record.title)
+      .sort((left, right) => left.code.localeCompare(right.code));
+    return (decisions || []).map((decision) => ({ ...copy(decision, {}), prerequisiteCourses: copy(prerequisiteCourses) }));
+  }
+
+  root.ScheduleRUPlanningDecisionLoader = { hydrate, hydratePrerequisiteMetadata, normalizedSelectors, mergeCandidates };
 })(globalThis);

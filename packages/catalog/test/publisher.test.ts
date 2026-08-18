@@ -208,6 +208,29 @@ test("publishes every generic reviewed catalog entity", async () => {
   assert.match(sql, /INSERT INTO requirement_group_conditions/);
   assert.match(sql, /INSERT INTO program_requirement_evidence/);
   assert.match(sql, /INSERT INTO program_eligibility_rules/);
+  assert.match(sql, /INSERT INTO course_reference/);
+});
+
+test("publishes titled requirement courses into the canonical course reference table", async () => {
+  const database = new RecordingDatabase();
+
+  await publishProgramDefinition(database, definition(), {
+    published_at: 1785456000000,
+  });
+
+  const reference = database.batches[0]!.find((entry) =>
+    entry.sql.includes("INSERT INTO course_reference")
+  );
+  assert.ok(reference);
+  assert.match(reference.sql, /ON CONFLICT\(course_code\) DO UPDATE/);
+  assert.deepEqual(reference.params, [
+    "01:999:101",
+    "Introduction",
+    "3",
+    "reviewed_program",
+    "https://example.rutgers.edu/requirements",
+    1785456000000,
+  ]);
 });
 
 test("derives normalized course attributes from reviewed Core groups", async () => {

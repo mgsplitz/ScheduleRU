@@ -147,6 +147,23 @@ test("a multi-slot requirement selects distinct courses and asks for all slots",
   assert.equal(result.selectedCourses.length, 2);
 });
 
+test("one plan never selects two interchangeable courses from the same option family", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("mathematics", { slotCount: 2 })],
+    candidates: [
+      candidate("01:640:244", ["mathematics"], { optionFamily: "differential-equations" }),
+      candidate("01:640:252", ["mathematics"], { optionFamily: "differential-equations" }),
+      candidate("01:640:300", ["mathematics"]),
+    ],
+    conflicts: [],
+  });
+
+  assert.equal(result.status, "complete");
+  const chosenAlternatives = result.selectedCourses.filter((course) => course.optionFamily === "differential-equations");
+  assert.equal(chosenAlternatives.length, 1);
+  assert.equal(result.selectedCourses.some((course) => course.code === "01:640:300"), true);
+});
+
 test("a distinct Core requirement uses different reviewed subgoals", () => {
   const result = optimizer().optimizeCourseSet({
     requirements: [requirement("ah", {

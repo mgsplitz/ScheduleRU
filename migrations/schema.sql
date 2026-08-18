@@ -48,6 +48,18 @@ CREATE INDEX IF NOT EXISTS idx_courses_subject ON courses(subject_code, year, te
 CREATE INDEX IF NOT EXISTS idx_courses_title ON courses(title);
 CREATE INDEX IF NOT EXISTS idx_courses_number ON courses(course_number);
 
+-- Stable metadata survives term changes and also covers reviewed prerequisite
+-- courses which may not be offered in the active schedule.
+CREATE TABLE IF NOT EXISTS course_reference (
+  course_code TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  credits TEXT,
+  source_kind TEXT NOT NULL,
+  source_url TEXT,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_course_reference_title ON course_reference(title);
+
 CREATE TABLE IF NOT EXISTS sections (
   id TEXT PRIMARY KEY,          -- "{course_id}:{index_number}"
   course_id TEXT,

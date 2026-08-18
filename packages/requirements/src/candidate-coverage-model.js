@@ -130,6 +130,27 @@
     const families = equivalenceFamilies(allCodes, equivalencies);
     const byCanonical = new Map();
 
+    decisions.flatMap((decision) => decision?.prerequisiteCourses || []).forEach((record) => {
+      const code = text(record?.code);
+      if (!code || byCanonical.has(code)) return;
+      byCanonical.set(code, {
+        code,
+        title: text(record?.title) || "Course title unavailable",
+        credits: Number(record?.credits) > 0 ? Number(record.credits) : 3,
+        creditsEstimated: !(Number(record?.credits) > 0),
+        equivalentCourseCodes: [code],
+        coverageRequirementIds: [],
+        reviewedEquivalentRequirementIds: [],
+        prerequisitePaths: [],
+        enforceablePrerequisitePaths: [],
+        prerequisiteClosure: [],
+        attributes: [],
+        offeringEvidence: null,
+        minimumPlanYear: null,
+        minimumPriorCredits: null,
+      });
+    });
+
     decisions.forEach((decision, index) => {
       const requirement = normalizedRequirement(decision, index);
       (decision?.candidates || []).forEach((record) => {
@@ -151,6 +172,7 @@
           offeringEvidence: null,
           minimumPlanYear: Number(record?.minimumPlanYear) || null,
           minimumPriorCredits: Number(record?.minimumPriorCredits) || null,
+          optionFamily: text(record?.optionFamily) || null,
         };
         current.equivalentCourseCodes.push(code);
         current.coverageRequirementIds.push(requirement.id);
@@ -168,6 +190,7 @@
         current.offeringEvidence ||= record?.offeringEvidence || null;
         current.minimumPlanYear ||= Number(record?.minimumPlanYear) || null;
         current.minimumPriorCredits ||= Number(record?.minimumPriorCredits) || null;
+        current.optionFamily ||= text(record?.optionFamily) || null;
         if (code === canonical && text(record?.title)) current.title = text(record.title);
         current.credits = Math.min(current.credits, Number(record?.credits) > 0 ? Number(record.credits) : 3);
         current.creditsEstimated &&= record?.creditsEstimated === true;
