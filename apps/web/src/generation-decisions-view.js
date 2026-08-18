@@ -27,9 +27,18 @@
         <p>Mark what sounds useful. We’ll balance your interests with prerequisites and degree progress.</p>
         <p class="generation-guidance">Avoid is a preference; a course may still be needed to unlock the path you choose.</p>
         <div class="generation-candidates">${candidates}</div>
-        <div class="generation-delegate"><button type="button" data-decision-recommend class="choice-btn secondary">Choose for me</button>${decision.canDefer ? `<button type="button" data-decision-defer class="choice-btn secondary">I’ll do this later</button>` : ""}</div>
+        <div class="generation-delegate"><button type="button" data-decision-recommend class="choice-btn secondary">Choose for me</button></div>
       </section>`;
   }
 
-  root.ScheduleRUGenerationDecisionsView = { renderDecision };
+  function captureListScroll(document) {
+    return Number(document?.querySelector?.(".generation-candidates")?.scrollTop) || 0;
+  }
+
+  function restoreListScroll(document, scrollTop) {
+    const list = document?.querySelector?.(".generation-candidates");
+    if (list) list.scrollTop = Math.max(0, Number(scrollTop) || 0);
+  }
+
+  root.ScheduleRUGenerationDecisionsView = { renderDecision, captureListScroll, restoreListScroll };
 })(globalThis);

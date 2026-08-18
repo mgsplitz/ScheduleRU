@@ -2,7 +2,7 @@
 const modalController=(()=>{
   const root=document.getElementById("appModal"),card=root.querySelector("[role=dialog]"); let restore=null,dismissible=true;
   function close(){ if(!root.classList.contains("open")) return; root.classList.remove("open"); root.setAttribute("aria-hidden","true"); restore?.focus?.(); }
-  function show({title,body,actions=[],canDismiss=true}){ restore=document.activeElement; dismissible=canDismiss; document.getElementById("appModalTitle").textContent=title; document.getElementById("appModalBody").innerHTML=body; const actionsRoot=document.getElementById("appModalActions"); actionsRoot.innerHTML=""; actions.forEach(action=>{const button=document.createElement("button");button.className=`choice-btn ${action.secondary?"secondary":""}`;button.textContent=action.label;button.disabled=action.disabled===true;button.addEventListener("click",()=>{if(action.close!==false) close(); action.onClick?.();});actionsRoot.append(button);}); root.classList.add("open");root.setAttribute("aria-hidden","false");(actionsRoot.querySelector("button:not(:disabled)")||card).focus(); }
+  function show({title,body,actions=[],canDismiss=true}){ restore=document.activeElement; dismissible=canDismiss; document.getElementById("appModalTitle").textContent=title; document.getElementById("appModalBody").innerHTML=body; const actionsRoot=document.getElementById("appModalActions"); actionsRoot.innerHTML=""; actions.forEach(action=>{const button=document.createElement("button");button.className=`choice-btn ${action.secondary?"secondary":""} ${action.className||""}`;button.textContent=action.label;button.disabled=action.disabled===true;button.addEventListener("click",()=>{if(action.close!==false) close(); action.onClick?.();});actionsRoot.append(button);}); root.classList.add("open");root.setAttribute("aria-hidden","false");(actionsRoot.querySelector("button:not(:disabled)")||card).focus(); }
   root.addEventListener("click",event=>{if(event.target===root&&dismissible)close();}); document.addEventListener("keydown",event=>{if(event.key==="Escape"&&root.classList.contains("open")&&dismissible){event.preventDefault();close();}}); return {show,close};
 })();
 
@@ -301,6 +301,23 @@ function normalizedPlannerInputs(){
   });
   return {...input,core};
 }
+async function hydratePlannerDecisions(input){
+  const decisions=await ScheduleRUPlanningDecisionLoader.hydrate({
+    decisions:input.planningDecisions||[],request:backendFetch,
+    normalizeCandidate:course=>backendCourseRecord(course),
+  });
+  const codes=[...new Set(decisions.flatMap(decision=>(decision.candidates||[]).map(candidate=>candidate.code)).filter(Boolean))];
+  for(let index=0;index<codes.length;index+=25)await loadCourseEligibilityForCodes(codes.slice(index,index+25));
+  return {...input,planningDecisions:decisions.map(decision=>({
+    ...decision,
+    candidates:(decision.candidates||[]).map(candidate=>({
+      ...ScheduleRUPlannerInput.normalizedCourse({
+        ...candidate,eligibility:ST.courseEligibilityByCode[candidate.code]||candidate.eligibility,
+      }),
+      attributes:[...(candidate.attributes||[])],
+    })),
+  }))};
+}
 const checkedGeneratePlanButton=document.getElementById("generatePlanBtn"),coreAwareGeneratePlanButton=checkedGeneratePlanButton.cloneNode(true);checkedGeneratePlanButton.replaceWith(coreAwareGeneratePlanButton);
 function finishPlanGenerationPreflight(){ST.planGenerationPending=false;coreAwareGeneratePlanButton.disabled=false;}
 function confirmPlanGenerationPreview(){
@@ -320,6 +337,7 @@ function confirmPlanGenerationPreview(){
 }
 function openGenerationDecisionFlow(input){
   let index=0;
+  const scrollByDecision={};
   const flow=ScheduleRUGenerationDecisionsController.create({
     decisions:input.planningDecisions||[],
     programs:ST.availablePrograms||[],
@@ -329,6 +347,8 @@ function openGenerationDecisionFlow(input){
   const decisions=flow.decisions();
   if(!decisions.length){confirmPlanGenerationPreview();return;}
   function renderDecision(){
+    const previous=document.querySelector(".generation-decision")?.dataset?.decisionGroup;
+    if(previous)scrollByDecision[previous]=ScheduleRUGenerationDecisionsView.captureListScroll(document);
     const decision=decisions[index],groupId=decision.requirementGroupId;
     const preference=flow.preferences()[groupId]||{};
     modalController.show({
@@ -337,16 +357,17 @@ function openGenerationDecisionFlow(input){
       canDismiss:false,
       actions:[
         {label:"Back",secondary:true,close:index===0,onClick:()=>{if(index===0)finishPlanGenerationPreflight();else{index-=1;renderDecision();}}},
-        {label:index===decisions.length-1?"Review plan":"Next",disabled:!flow.canAdvance(groupId),close:false,onClick:()=>{if(index===decisions.length-1)confirmPlanGenerationPreview();else{index+=1;renderDecision();}}},
+        ...(decision.canDefer?[{label:"I’ll do this later",className:"quiet-action",close:false,onClick:()=>{flow.defer(groupId);if(index===decisions.length-1)confirmPlanGenerationPreview();else{index+=1;renderDecision();}}}]:[]),
+        {label:index===decisions.length-1?"Review plan":"Next",className:"push-right",disabled:!flow.canAdvance(groupId),close:false,onClick:()=>{if(index===decisions.length-1)confirmPlanGenerationPreview();else{index+=1;renderDecision();}}},
       ],
     });
+    ScheduleRUGenerationDecisionsView.restoreListScroll(document,scrollByDecision[groupId]);
     const body=document.getElementById("appModalBody");
     body.querySelectorAll("[data-decision-bucket]").forEach(button=>button.addEventListener("click",()=>{
       flow.setInterest(groupId,button.dataset.decisionCourse,button.dataset.decisionBucket);
       renderDecision();
     }));
     body.querySelector("[data-decision-recommend]")?.addEventListener("click",()=>{flow.chooseForMe(groupId);renderDecision();});
-    body.querySelector("[data-decision-defer]")?.addEventListener("click",()=>{flow.defer(groupId);renderDecision();});
   }
   renderDecision();
 }
@@ -359,7 +380,14 @@ async function beginPlanGenerationPreflight(){
     modalController.show({title:"Core requirements unavailable",body:"<p>The reviewed Core requirements could not be loaded, so ScheduleRU did not generate an incomplete plan. Try again after the connection recovers.</p>",actions:[{label:"Close",secondary:true}]});
     return;
   }
-  openGenerationDecisionFlow(normalizedPlannerInputs());
+  modalController.show({title:"Preparing your choices",body:"<p>Loading the reviewed courses for your selected programs…</p>",actions:[],canDismiss:false});
+  try{
+    openGenerationDecisionFlow(await hydratePlannerDecisions(normalizedPlannerInputs()));
+  }catch(error){
+    finishPlanGenerationPreflight();
+    const shown=ScheduleRUUserMessageModel.presentIssue(error);
+    modalController.show({title:"Course choices unavailable",body:`<p>${html(shown.message)}</p>`,actions:[{label:"Close",secondary:true}]});
+  }
 }
 coreAwareGeneratePlanButton.addEventListener("click",beginPlanGenerationPreflight);
 

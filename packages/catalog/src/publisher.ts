@@ -138,7 +138,9 @@ function courseAttributeStatements(
   ) return [];
   const rows: unknown[][] = [];
   const seen = new Set<string>();
+  const parentGroupIds = new Set(groups.map((group) => group.parent_group_id).filter(Boolean));
   for (const group of groups) {
+    if (parentGroupIds.has(group.id)) continue;
     const attributeCode = coreAttributeCode(group);
     if (!attributeCode) continue;
     const courseCodes = [

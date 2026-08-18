@@ -464,6 +464,16 @@ async function handleApi(request, env, ctx) {
     }
   }
 
+  if (path === "/api/course-attributes") {
+    const { results } = await env.DB.prepare(
+      `SELECT DISTINCT attribute_code
+       FROM course_requirement_attributes
+       WHERE attribute_code <> 'AH'
+       ORDER BY attribute_code`
+    ).bind().all();
+    return json({ attributes: (results || []).map((row) => row.attribute_code).filter((code) => code && code !== "AH") });
+  }
+
   if (path === "/api/courses") {
     const q = (url.searchParams.get("search") || "").trim();
     const subject = (url.searchParams.get("subject") || "").trim();

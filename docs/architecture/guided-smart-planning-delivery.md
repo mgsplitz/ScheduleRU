@@ -96,9 +96,23 @@
 
 **Release 1 checkpoint:** Manually verify Core Choose → filtered Courses → Use for requirement → placeholder removed; combine WCr with subject/search; simulate offline and 404 responses. Then run the global verification commands.
 
+### Core allocation policy evidence
+
+The current SAS Core FAQ permits one course to satisfy goals in different Core requirements, while requiring different courses within HST/SCL, the two AH goals, WCr/WCd, and QQ/QR. The allocation engine therefore maximizes progress across top-level families but consumes each course only once inside each of those four families. Evidence: [SAS Core Curriculum FAQ](https://sasundergrad.rutgers.edu/resources/faq/core-curriculum-faq) and [SAS Core Curriculum overview](https://sasundergrad.rutgers.edu/majors-and-core-curriculum/core/about-sas-core).
+
 ---
 
 ## Release 2 — Guided generation and concrete electives
+
+### Task 3A: Guided-generation correctness checkpoint
+
+- [x] Load reviewed selector-backed candidates before rendering program decisions, including selector-only minors.
+- [x] Preserve program ownership and repeated slot counts for major and minor decisions.
+- [x] Apply an AH child selection to its parent distinct-goal requirement and rerun cross-family Core coverage.
+- [x] Protect the published HST/SCL, AH, WCr/WCd, and QQ/QR same-family allocation limits.
+- [x] Replace anonymous `Choose 1` planner labels with parent requirement context.
+- [x] Expose leaf Core goals as a normal catalog filter and suppress the aggregate `AH` attribute.
+- [x] Move the Core defer action beside Back as quiet text and preserve candidate-list scroll during ranking.
 
 ### Task 4: Requirement planning-mode classifier
 

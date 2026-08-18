@@ -29,6 +29,7 @@ export const webControllerSource = [
   "apps/web/src/program-apply-transaction.js",
   "apps/web/src/home-school-transaction.js",
   "apps/web/src/planner-state-store.js",
+  "apps/web/src/planning-decision-loader.js",
   "apps/web/src/requirement-data-loader.js",
   "apps/web/src/planner-controller.js",
   "apps/web/src/guided-setup-controller.js",

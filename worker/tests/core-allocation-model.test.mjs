@@ -131,3 +131,23 @@ test("allocation honors distinct goals and caller-provided AP restrictions", () 
   assert.deepEqual(plain(allocation.byGroup["goal-b"].map((token) => token.key)), ["ap:goal-b"]);
   assert.equal(allocation.byGroup.writing, undefined);
 });
+
+test("one course cannot fill both goals in an exclusive Core family but can cross Core families", () => {
+  const groups = {
+    writing: { id: "writing", rule: "all", children: ["wcr", "wcd"] },
+    wcr: { id: "wcr", rule: "min", count: 1, members: ["shared"] },
+    wcd: { id: "wcd", rule: "min", count: 1, members: ["shared"] },
+    contemporary: { id: "contemporary", rule: "all", children: ["ccd"] },
+    ccd: { id: "ccd", rule: "min", count: 1, members: ["shared"] },
+  };
+  const model = createModel({
+    groups,
+    rootGroupIds: ["writing", "contemporary"],
+    isCourseCompleted: (id) => id === "shared",
+  });
+
+  const allocation = model.allocate();
+  const writingUses = (allocation.byGroup.wcr?.length || 0) + (allocation.byGroup.wcd?.length || 0);
+  assert.equal(writingUses, 1);
+  assert.equal(allocation.byGroup.ccd.length, 1);
+});

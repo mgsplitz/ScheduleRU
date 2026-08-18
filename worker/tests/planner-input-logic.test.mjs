@@ -505,6 +505,76 @@ test("Core placeholders retain Core identity when backend groups have a program 
   assert.equal(result.unresolvedRequirements[0].candidateSelectionContext.sourceType, "core");
 });
 
+test("a selected Arts and Humanities child goal resolves its parent slot and every compatible Core requirement", () => {
+  const shared = { code: "01:730:104", title: "Introduction to Philosophy - Writing Intensive", credits: "4" };
+  const coreTree = {
+    roots: ["contemporary", "areas"],
+    courses: { shared },
+    groups: {
+      contemporary: { id: "contemporary", name: "Contemporary Challenges", rule: "all", members: [], children: ["ccd"] },
+      ccd: { id: "ccd", name: "Diversities and Social Inequalities [CCD]", rule: "min", count: 1, members: ["shared"], children: [], parentId: "contemporary" },
+      areas: { id: "areas", name: "Areas of Inquiry", rule: "all", members: [], children: ["ah"] },
+      ah: { id: "ah", name: "Arts and Humanities [AH]", rule: "distinct", count: 2, members: ["shared"], children: ["ahp", "aho"], parentId: "areas" },
+      ahp: { id: "ahp", name: "Philosophical and Theoretical Issues [AHp]", rule: "all", members: ["shared"], children: [], parentId: "ah" },
+      aho: { id: "aho", name: "Arts and Humanities [AHo]", rule: "all", members: [], children: [], parentId: "ah" },
+    },
+  };
+
+  const result = build({
+    requirementTrees: [],
+    coreTree,
+    groupSelections: { ahp: ["shared"] },
+  });
+
+  assert.deepEqual(plain(result.courses.map((course) => course.code)), ["01:730:104"]);
+  assert.equal(result.unresolvedRequirements.some((item) => item.requirementGroupId === "ccd"), false);
+  assert.equal(result.unresolvedRequirements.filter((item) => item.requirementGroupId === "ah").length, 1);
+});
+
+test("selector-backed minor decisions retain ownership and remain guideable before candidates load", () => {
+  const tree = {
+    roots: ["philosophy"],
+    courses: {},
+    groups: {
+      philosophy: {
+        id: "philosophy",
+        name: "Six Philosophy courses of at least three credits",
+        rule: "min",
+        count: 6,
+        members: [],
+        children: [],
+        sourceProgramId: "sasnb-philosophy-minor",
+        courseSelectors: [{ selector_json: JSON.stringify({ version: 1, kind: "subject_level", school_codes: ["01"], subject_codes: ["730"], course_number_min: 100, course_number_max: 499, minimum_credits: 3 }) }],
+      },
+    },
+  };
+
+  const result = build({ requirementTrees: [{ id: "selected-programs", tree }] });
+  const decision = result.planningDecisions[0];
+
+  assert.equal(decision.sourceProgram, "sasnb-philosophy-minor");
+  assert.equal(decision.planningMode, "guided_flexible");
+  assert.equal(decision.slotCount, 6);
+  assert.equal(decision.courseSelectors.length, 1);
+});
+
+test("generic choose labels inherit meaningful parent requirement context", () => {
+  const tree = {
+    roots: ["business-core"],
+    courses: {
+      first: { code: "33:136:385", title: "Statistical Methods in Business", credits: "3" },
+      second: { code: "33:136:386", title: "Business Operations Analytics", credits: "3" },
+    },
+    groups: {
+      "business-core": { id: "business-core", name: "Business Core", rule: "all", members: [], children: ["choose-one"] },
+      "choose-one": { id: "choose-one", name: "Choose 1", rule: "min", count: 1, members: ["first", "second"], children: [], parentId: "business-core" },
+    },
+  };
+
+  const result = build({ requirementTrees: [{ id: "rbsnb-finance", tree }] });
+  assert.equal(result.unresolvedRequirements[0].label, "Business Core option");
+});
+
 test("raw off-universe prerequisites stay advisory while in-plan chains remain ordered", () => {
   const tree = {
     roots: ["root"],

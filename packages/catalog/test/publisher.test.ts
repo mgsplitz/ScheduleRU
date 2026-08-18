@@ -231,6 +231,33 @@ test("derives normalized course attributes from reviewed Core groups", async () 
   ]);
 });
 
+test("publishes leaf Core goal attributes without the aggregate AH parent tag", async () => {
+  const database = new RecordingDatabase();
+  const value = definition();
+  (value.program as Record<string, unknown>).type = "core_curriculum";
+  const groups = value.requirement_groups as Array<Record<string, unknown>>;
+  const parent = groups[0]!;
+  parent.name = "Arts and Humanities [AH]";
+  parent.rule = "min_distinct_children";
+  parent.count = 1;
+  parent.selectors = [];
+  const child = structuredClone(parent);
+  child.id = "sasnb-example-minor-ahp";
+  child.parent_group_id = parent.id;
+  child.name = "Philosophical and Theoretical Issues [AHp]";
+  child.rule = "all";
+  child.count = null;
+  groups.push(child);
+
+  await publishProgramDefinition(database, value, { published_at: 1785456000000 });
+
+  const values = database.batches[0]!
+    .filter((entry) => entry.sql.includes("INSERT INTO course_requirement_attributes"))
+    .flatMap((entry) => entry.params);
+  assert.equal(values.includes("AH"), false);
+  assert.equal(values.includes("AHp"), true);
+});
+
 test("identical definitions produce identical statements and binds", async () => {
   const first = new RecordingDatabase();
   const second = new RecordingDatabase();

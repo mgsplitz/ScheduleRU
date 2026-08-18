@@ -74,6 +74,7 @@ function fixture({ request } = {}) {
     backendCredits: [],
     backendAvailability: "any",
     backendCoreCodes: [],
+    backendCoreAttributeOptions: ["CCD", "CCO", "AHp", "WCr", "WCd"],
     backendPage: 1,
     backendCourses: [],
     backendTotal: 0,
@@ -143,6 +144,16 @@ function fixture({ request } = {}) {
   });
   return { controller, state, calls, elements };
 }
+
+test("Core goals are available as a standard catalog filter and exclude aggregate AH", () => {
+  const app = fixture();
+  app.controller.render();
+
+  assert.match(app.elements.coursesRoot.innerHTML, /id="cpCore"/);
+  assert.match(app.elements.coursesRoot.innerHTML, />AHp</);
+  assert.match(app.elements.coursesRoot.innerHTML, />WCr</);
+  assert.doesNotMatch(app.elements.coursesRoot.innerHTML, /value="AH"/);
+});
 
 test("catalog loading sends filters, records eligibility, and renders pagination", async () => {
   const app = fixture({ request: async () => ({

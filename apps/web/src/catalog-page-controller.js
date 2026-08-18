@@ -223,6 +223,9 @@
         current.backendPage = 1;
         void loadCourses();
       });
+      document.getElementById("cpCore")?.addEventListener("change", (event) => {
+        if (event.target.value) void filterByCore(event.target.value);
+      });
       document.getElementById("cpClearSelector")?.addEventListener("click", () => void clearSelector());
       document.querySelectorAll("[data-filter-clear]").forEach((button) => button.addEventListener("click", () => {
         const key = button.dataset.filterClear;
@@ -314,6 +317,9 @@
       const subjectOptions = `<option value="">All subjects</option>${(current.backendSubjects || []).map((subject) =>
         `<option value="${escapeHtml(subject.code)}"${current.backendSubject === subject.code ? " selected" : ""}>${escapeHtml(subject.description || subject.code)} (${escapeHtml(subject.code)})</option>`
       ).join("")}`;
+      const coreOptions = `<option value="">Any Core goal</option>${(current.backendCoreAttributeOptions || [])
+        .filter((code) => code !== "AH")
+        .map((code) => `<option value="${escapeHtml(code)}">${escapeHtml(code)}</option>`).join("")}`;
       const selectorDescription = filter
         ? filter.selectors.map((item) => selectorLogic.selectorDescription(item)).join("; ")
         : "";
@@ -365,6 +371,7 @@
           <select id="cpLevel" aria-label="Course level"><option value="">All levels</option>${[100,200,300,400,500].map((level) => `<option value="${level}"${(current.backendLevels || []).includes(level) ? " selected" : ""}>${level}${level === 500 ? "+" : ""} level</option>`).join("")}</select>
           <select id="cpCredits" aria-label="Credits"><option value="">Any credits</option>${[1,2,3,4,5,6].map((credits) => `<option value="${credits}"${(current.backendCredits || []).includes(credits) ? " selected" : ""}>${credits} credit${credits === 1 ? "" : "s"}</option>`).join("")}</select>
           <select id="cpAvailability" aria-label="Section availability"><option value="any">Any availability</option><option value="open"${current.backendAvailability === "open" ? " selected" : ""}>Open sections</option></select>
+          <select id="cpCore" aria-label="Core requirement">${coreOptions}</select>
           ${filter ? `<button class="choice-btn secondary" id="cpClearSelector">Clear requirement</button>` : ""}
         </div>
         ${activeChips.length ? `<div class="catalog-filter-chips" aria-label="Active filters">${activeChips.map((chip) => `<button class="catalog-filter-chip" data-filter-clear="${escapeHtml(chip.key)}" aria-label="Remove ${escapeHtml(chip.label)} filter">${escapeHtml(chip.label)} <span aria-hidden="true">×</span></button>`).join("")}</div>` : ""}
@@ -383,6 +390,14 @@
       } catch (_error) {
         if (generation !== metadataRequestGeneration) return;
         current.backendSubjects = [];
+      }
+      try {
+        const data = await request("/api/course-attributes");
+        if (generation !== metadataRequestGeneration) return;
+        current.backendCoreAttributeOptions = (data.attributes || []).filter((code) => code !== "AH");
+      } catch (_error) {
+        if (generation !== metadataRequestGeneration) return;
+        current.backendCoreAttributeOptions = [];
       }
       try {
         const status = await request("/api/sync-status");

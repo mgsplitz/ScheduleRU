@@ -174,7 +174,7 @@
     const credits = group.rule === "min_credits" ? Math.min(DEFAULT_ESTIMATED_CREDITS, Number(group.count) || DEFAULT_ESTIMATED_CREDITS) : DEFAULT_ESTIMATED_CREDITS;
     const total = Math.max(1, Number(slot.total) || 1);
     const position = Math.max(1, Number(slot.position) || index + 1);
-    const groupLabel = text(group.name) || "Unresolved requirement";
+    const groupLabel = text(slot.label) || text(group.name) || "Unresolved requirement";
     return {
       id: `planner-choice:${sourceProgram || "program"}:${group.id}:${index}`,
       kind,
@@ -200,6 +200,7 @@
         children: [...(group.children || [])],
         courseSelectors: [...(group.courseSelectors || [])],
         sourceProgramIds: [...(group.sourceProgramIds || [])],
+        allocationFamily: text(group.parentId) || text(group.allocation?.allocation_family) || null,
       },
     };
   }
@@ -218,6 +219,14 @@
     const courses = tree?.courses || {};
     const groups = tree?.groups || {};
 
+    function meaningfulGroupLabel(group) {
+      const own = text(group?.name);
+      if (!/^choose\s+\d+$/i.test(own)) return own || "Unresolved requirement";
+      const parent = groups[group?.parentId];
+      const parentName = text(parent?.name);
+      return parentName ? `${parentName} option` : "Required course option";
+    }
+
     const addCourse = (id) => {
       const course = courses[id];
       if (!validCode(course?.code) || excluded.has(course.code)) return;
@@ -227,8 +236,16 @@
     function visit(groupId) {
       const group = groups[groupId];
       if (!group) return;
-      const selected = (Array.isArray(groupSelections?.[group.id]) ? groupSelections[group.id] : [])
+      const directSelected = (Array.isArray(groupSelections?.[group.id]) ? groupSelections[group.id] : [])
         .filter((id) => group.members?.includes(id) || group.children?.includes(id));
+      const selectedFromDistinctChildren = group.rule === "distinct"
+        ? (group.children || []).flatMap((childId) => {
+          const child = groups[childId];
+          return (Array.isArray(groupSelections?.[childId]) ? groupSelections[childId] : [])
+            .filter((id) => child?.members?.includes(id) && group.members?.includes(id));
+        })
+        : [];
+      const selected = unique([...directSelected, ...selectedFromDistinctChildren]);
 
       const groupProgram = text(group.sourceProgramId) || sourceProgram;
       if (group.rule === "one_of") {
@@ -241,7 +258,7 @@
           0,
           "choice_placeholder",
           courses,
-          {},
+          { label: meaningfulGroupLabel(group) },
           planningContext,
         ));
         return;
@@ -264,13 +281,21 @@
         }, 0);
         const childContribution = selectedPartitionChildren.length + subsetContribution;
         const required = Math.max(1, Number(group.count) || 1);
+        const distinctCovered = group.rule === "distinct"
+          ? new Set((group.children || []).filter((childId) => {
+            const childMembers = new Set(groups[childId]?.members || []);
+            return fulfilledMembers.some((id) => childMembers.has(id));
+          })).size
+          : 0;
         const remaining = group.rule === "min_credits"
           ? Math.max(0, Math.ceil((
             Math.max(DEFAULT_ESTIMATED_CREDITS, Number(group.count) || DEFAULT_ESTIMATED_CREDITS)
             - fulfilledMembers.reduce((sum, id) => sum + (numericCredits(courses[id]?.credits) || DEFAULT_ESTIMATED_CREDITS), 0)
             - selectedPartitionChildren.length * DEFAULT_ESTIMATED_CREDITS
           ) / DEFAULT_ESTIMATED_CREDITS))
-          : Math.max(0, required - fulfilledMembers.length - childContribution);
+          : group.rule === "distinct"
+            ? Math.max(0, required - distinctCovered)
+            : Math.max(0, required - fulfilledMembers.length - childContribution);
         for (let index = 0; index < remaining; index += 1) {
           placeholders.push(placeholder(
             group,
@@ -282,6 +307,7 @@
             {
               position: required - remaining + index + 1,
               total: required,
+              label: meaningfulGroupLabel(group),
             },
             planningContext,
           ));

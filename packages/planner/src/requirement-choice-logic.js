@@ -31,7 +31,9 @@
 
   function classifyRequirement(group = {}, candidates = []) {
     const finite = candidatesByCode(candidates);
-    if (!finite.length) return "reserve_only";
+    if (!finite.length) {
+      return (group.courseSelectors || []).length ? "guided_flexible" : "reserve_only";
+    }
     if (group.sourceType === "core") return "guided_flexible";
     if (finite.length === 1) return "fixed";
     const equivalenceKeys = [...new Set(finite.map((candidate) => text(candidate.equivalenceKey)).filter(Boolean))];
@@ -52,6 +54,7 @@
       const key = `${sourceType}\u0000${sourceProgram}\u0000${groupId}`;
       const context = requirement.candidateSelectionContext || {};
       const current = grouped.get(key) || {
+        decisionId: `${sourceType}:${sourceProgram}:${groupId}`,
         requirementGroupId: groupId,
         sourceProgram,
         sourceType,
@@ -59,6 +62,9 @@
         rule: text(context.rule),
         slotCount: 0,
         candidates: [],
+        courseSelectors: [...(context.courseSelectors || [])],
+        sourceProgramIds: [...(context.sourceProgramIds || [])],
+        allocationFamily: text(context.allocationFamily) || null,
       };
       current.slotCount += 1;
       current.candidates.push(...(context.candidatePrerequisiteSummaries || []));

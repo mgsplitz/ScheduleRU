@@ -104,5 +104,16 @@ test("the focused decision view shows prerequisite burden and only deferrable Co
   assert.match(programHtml, /Interested/);
   assert.match(programHtml, /Avoid is a preference/);
   assert.doesNotMatch(programHtml, /I’ll do this later/);
-  assert.match(coreHtml, /I’ll do this later/);
+  assert.doesNotMatch(coreHtml, /I’ll do this later/);
+});
+
+test("decision-list scroll can be restored after an interest update rerenders the modal", () => {
+  const { view } = modules();
+  const before = { scrollTop: 418 };
+  const after = { scrollTop: 0 };
+  const document = { querySelector: () => after };
+
+  assert.equal(view.captureListScroll({ querySelector: () => before }), 418);
+  view.restoreListScroll(document, 418);
+  assert.equal(after.scrollTop, 418);
 });

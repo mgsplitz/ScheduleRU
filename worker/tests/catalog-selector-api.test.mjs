@@ -21,6 +21,15 @@ function catalogDb(results = []) {
   };
 }
 
+test("catalog exposes reviewed leaf Core attributes for the standard filter", async () => {
+  const db = catalogDb([{ attribute_code: "AH" }, { attribute_code: "AHp" }, { attribute_code: "WCr" }]);
+  const response = await worker.fetch(new Request("https://example.test/api/course-attributes"), { DB: db }, {});
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { attributes: ["AHp", "WCr"] });
+  assert.match(db.calls[0].sql, /SELECT DISTINCT attribute_code/);
+});
+
 test("catalog selector filtering happens in D1 before limit and offset", async () => {
   const db = catalogDb([{ id: "01:640:300:2026:9", school: "01", subject_code: "640", course_number: "300" }]);
   const selector = {

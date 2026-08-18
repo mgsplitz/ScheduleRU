@@ -61,7 +61,7 @@ const ST = {
   coreCurricula:[], activeCoreCurriculum:null, coreRequirementTree:null, coreLoading:false, coreError:"",
   backendSubject:"", backendSearch:"", backendLevels:[], backendCredits:[], backendAvailability:"any", backendCoreCodes:[], backendPage:1, backendSelectorGroupId:null, backendRequirementFilter:null,
   backendCourses:[], backendTotal:0, backendLoading:false, backendError:"",
-  backendSubjects:[], backendStatus:null,
+  backendSubjects:[], backendCoreAttributeOptions:[], backendStatus:null,
   expandedIds: new Set(),   // course ids currently expanded on the Courses page
   sectionsCache: {},        // course id -> { sections } | { error }, lazy-loaded
   pickerSelector:null,      // selector-backed requirement modal state
