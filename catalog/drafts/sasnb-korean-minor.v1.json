@@ -1,0 +1,112 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-korean-minor",
+    "name": "Korean",
+    "school_slug": "sasnb",
+    "program_slug": "korean",
+    "type": "minor",
+    "catalog_year": "Current official pages (catalog year not stated)",
+    "academic_program_code": "574",
+    "degree_type": null,
+    "program_family_id": "sasnb-korean-574",
+    "source_url": "https://alc.rutgers.edu/academics/undergraduate/undergraduate-majors-minors",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://alc.rutgers.edu/academics/undergraduate/undergraduate-majors-minors",
+      "title": "Asian Languages and Cultures Majors/Minors",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current ALC page states four Korean-language courses above the 100 level plus two additional subject-574 electives of at least 3 credits; electives may be language or culture courses."
+    },
+    {
+      "id": "source-002",
+      "url": "https://alc.rutgers.edu/academics/undergraduate/master-course-list",
+      "title": "Asian Languages and Cultures Master Course List",
+      "catalog_year": null,
+      "scope": "course_classification",
+      "accessed_at": 1787004300000,
+      "note": "Current ALC master list explicitly classifies Korean courses as language or culture courses."
+    },
+    {
+      "id": "source-003",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/korean",
+      "title": "Korean (Major, Minor) | BA",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS profile confirms SAS ownership and program code 574."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-korean-total",
+      "parent_group_id": null,
+      "name": "Six Korean courses at the 200 level or above, each worth at least 3 credits.",
+      "rule": "min_courses",
+      "count": 6,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-korean-total-selector",
+          "source_id": "source-001",
+          "source_label": "Korean (574) Minor",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["574"],
+            "course_number_min": 200,
+            "course_number_max": 499,
+            "minimum_credits": 3,
+            "label": "Korean subject-574 courses above the 100 level"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current Korean minor total-course requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-korean-language-subset",
+      "parent_group_id": "sasnb-korean-total",
+      "name": "At least four of the six courses must be Korean language courses above the 100 level.",
+      "rule": "min_courses",
+      "count": 4,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-korean-language-selector",
+          "source_id": "source-002",
+          "source_label": "Korean Language Courses",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "course_codes",
+            "include_course_codes": [
+              "01:574:201","01:574:202","01:574:203","01:574:301","01:574:302","01:574:303","01:574:304","01:574:320","01:574:401","01:574:402","01:574:410","01:574:411","01:574:450","01:574:471","01:574:495","01:574:496","01:574:497","01:574:498"
+            ],
+            "minimum_credits": 3,
+            "label": "Current ALC Korean language-course pool above the 100 level"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-002","reviewer_note":"Finite current ALC language-course classification; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": []
+}

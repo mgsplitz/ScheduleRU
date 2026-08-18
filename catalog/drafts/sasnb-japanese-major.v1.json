@@ -1,0 +1,170 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-japanese-major",
+    "name": "Japanese",
+    "school_slug": "sasnb",
+    "program_slug": "japanese",
+    "type": "major",
+    "catalog_year": "Current official ALC and SAS pages",
+    "academic_program_code": "565",
+    "degree_type": "B.A.",
+    "program_family_id": "sasnb-japanese-565",
+    "source_url": "https://alc.rutgers.edu/academics/undergraduate/undergraduate-majors-minors/japanese-major",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://alc.rutgers.edu/academics/undergraduate/undergraduate-majors-minors/japanese-major",
+      "title": "Japanese (565) Major",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current ALC page requires twelve courses of at least 3 credits: six Japanese-language courses above the 100 level, four Japanese literature/history/culture courses under subject 565, one of 098:241/242/250, and 098:444."
+    },
+    {
+      "id": "source-002",
+      "url": "https://alc.rutgers.edu/academics/undergraduate/master-course-list",
+      "title": "Asian Languages and Cultures Master Course List",
+      "catalog_year": null,
+      "scope": "course_classification",
+      "accessed_at": 1787004300000,
+      "note": "Current ALC master list classifies Japanese language and culture courses. Course-specific ALC pages additionally state that 01:565:361 and 01:565:362 may count toward either the language or culture component for Japanese majors."
+    },
+    {
+      "id": "source-003",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/list-of-majors-and-minors",
+      "title": "SAS Majors and Minors",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS directory confirms Japanese as an SAS B.A. major/minor."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-japanese-major-department-total",
+      "parent_group_id": null,
+      "name": "Ten distinct Japanese subject-565 language/culture courses of at least 3 credits.",
+      "rule": "min_courses",
+      "count": 10,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-japanese-major-department-pool",
+          "source_id": "source-002",
+          "source_label": "Current ALC Japanese language/culture pool",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "course_codes",
+            "include_course_codes": [
+              "01:565:201","01:565:202","01:565:210","01:565:213","01:565:214","01:565:215","01:565:241","01:565:242","01:565:250","01:565:301","01:565:302","01:565:303","01:565:304","01:565:313","01:565:314","01:565:315","01:565:317","01:565:320","01:565:325","01:565:333","01:565:350","01:565:360","01:565:361","01:565:362","01:565:370","01:565:380","01:565:395","01:565:401","01:565:402","01:565:411","01:565:425","01:565:451","01:565:452","01:565:460","01:565:470","01:565:475","01:565:480","01:565:483","01:565:495","01:565:496","01:565:497","01:565:498"
+            ],
+            "minimum_credits": 3,
+            "label": "Current ALC Japanese courses eligible for the language/culture portion of the major"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Ten subject-565 courses are implied by the six-language plus four-culture requirements; modeled as a distinct parent pool so dual-classified courses cannot create an extra course. Review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-japanese-major-language",
+      "parent_group_id": "sasnb-japanese-major-department-total",
+      "name": "At least six of the ten subject-565 courses must satisfy the Japanese language component.",
+      "rule": "min_courses",
+      "count": 6,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-japanese-major-language-pool",
+          "source_id": "source-002",
+          "source_label": "Current ALC Japanese language courses",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "course_codes",
+            "include_course_codes": ["01:565:201","01:565:202","01:565:213","01:565:214","01:565:301","01:565:302","01:565:303","01:565:304","01:565:313","01:565:314","01:565:325","01:565:361","01:565:362","01:565:401","01:565:402","01:565:411","01:565:451","01:565:452","01:565:470","01:565:495","01:565:496","01:565:497","01:565:498"],
+            "minimum_credits": 3,
+            "label": "Japanese language courses above the 100 level"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-002","reviewer_note":"Current ALC Japanese language classification; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-japanese-major-culture",
+      "parent_group_id": "sasnb-japanese-major-department-total",
+      "name": "At least four of the ten subject-565 courses must satisfy the Japanese literature/history/culture component.",
+      "rule": "min_courses",
+      "count": 4,
+      "sort_order": 30,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-japanese-major-culture-pool",
+          "source_id": "source-002",
+          "source_label": "Current ALC Japanese culture courses",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "course_codes",
+            "include_course_codes": ["01:565:210","01:565:215","01:565:241","01:565:242","01:565:250","01:565:315","01:565:317","01:565:320","01:565:333","01:565:350","01:565:360","01:565:361","01:565:362","01:565:370","01:565:380","01:565:395","01:565:425","01:565:460","01:565:475","01:565:480","01:565:483"],
+            "minimum_credits": 3,
+            "label": "Japanese literature, history, and culture courses"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-002","reviewer_note":"Current ALC culture list plus the course-specific dual-classification of 565:361/362; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-japanese-major-east-asian-civilization",
+      "parent_group_id": null,
+      "name": "One East Asian civilization/global East Asia course.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 40,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:098:241","title":"East Asian Civilizations: Traditional Era","credits":3,"note":null},
+        {"code":"01:098:242","title":"East Asian Civilizations: Modern Era","credits":3,"note":null},
+        {"code":"01:098:250","title":"Global East Asia","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current finite East Asian civilization choice; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-japanese-major-capstone",
+      "parent_group_id": null,
+      "name": "Capstone Seminar on East Asian Studies.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 50,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [{"code":"01:098:444","title":"Capstone Seminar on East Asian Studies","credits":3,"note":null}],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current fixed capstone requirement; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": []
+}

@@ -1,0 +1,109 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-arabic-minor",
+    "name": "Arabic",
+    "school_slug": "sasnb",
+    "program_slug": "arabic",
+    "type": "minor",
+    "catalog_year": "Current official pages (catalog year not stated)",
+    "academic_program_code": "074",
+    "degree_type": null,
+    "program_family_id": "sasnb-arabic-074",
+    "source_url": "https://amesall.rutgers.edu/academics/undergraduate-program/minors",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://amesall.rutgers.edu/academics/undergraduate-program/minors",
+      "title": "AMESALL Minor Programs",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current AMESALL page states a 20-credit Arabic minor: four Arabic-language courses beyond elementary plus 01:013:201 and 01:013:221, all with grades of C or better."
+    },
+    {
+      "id": "source-002",
+      "url": "https://amesall.rutgers.edu/academics/undergraduate-program/course-descriptions",
+      "title": "AMESALL Course Descriptions",
+      "catalog_year": null,
+      "scope": "course_classification",
+      "accessed_at": 1787004300000,
+      "note": "Current course list identifies the Arabic sequence beyond elementary as Intermediate Arabic I-II (240-241) and Advanced Arabic I-II (340-341), totaling 14 credits."
+    },
+    {
+      "id": "source-003",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/arabic",
+      "title": "Arabic (Minor)",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS profile confirms SAS ownership, program code 074, no declaration prerequisite, and the AMESALL combination restriction."
+    },
+    {
+      "id": "source-004",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-restrictions",
+      "title": "SAS Major/Minor Restrictions",
+      "catalog_year": null,
+      "scope": "program_restrictions",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS restriction page confirms that AMESALL (013) majors and minors may not minor in Arabic (074)."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-arabic-language-sequence",
+      "parent_group_id": null,
+      "name": "Four Arabic language courses beyond the elementary level.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:013:240","title":"Intermediate Arabic I","credits":4,"note":null},
+        {"code":"01:013:241","title":"Intermediate Arabic II","credits":4,"note":null},
+        {"code":"01:013:340","title":"Advanced Arabic I","credits":3,"note":null},
+        {"code":"01:013:341","title":"Advanced Arabic II","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"Every course used for the Arabic minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current AMESALL four-course Arabic language requirement, with current sequence codes verified against the department course list; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-arabic-literature-core",
+      "parent_group_id": null,
+      "name": "Required AMESALL literature courses.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:013:201","title":"Crossroads: Classical Literatures of Africa, the Middle East and South Asia","credits":3,"note":null},
+        {"code":"01:013:221","title":"Introduction to the Literatures of the Middle East","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"Every course used for the Arabic minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current AMESALL fixed literature requirement; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": [
+    {
+      "key": "sasnb-arabic-no-amesall-combination",
+      "condition_type": "selected_academic_program_code_must_not_include_any",
+      "condition_value": ["013"],
+      "decision": "blocked",
+      "note": "AMESALL (013) majors and minors may not also minor in Arabic (074).",
+      "source_id": "source-004",
+      "review_status": "unreviewed",
+      "verified_at": 1787004300000
+    }
+  ]
+}

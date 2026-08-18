@@ -1,0 +1,146 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-latino-caribbean-studies-minor",
+    "name": "Latino and Caribbean Studies",
+    "school_slug": "sasnb",
+    "program_slug": "latino-and-caribbean-studies",
+    "type": "minor",
+    "catalog_year": "Current official page; requirements labeled as of Fall 2018",
+    "academic_program_code": "595",
+    "degree_type": null,
+    "program_family_id": "sasnb-latino-caribbean-studies-595",
+    "source_url": "https://latcar.rutgers.edu/undergraduate/minor",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://latcar.rutgers.edu/undergraduate/minor",
+      "title": "Latino and Caribbean Studies Minor Requirements",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current department page; states 18 credits with C or better, one of two introductory courses, five additional department courses, at least two 300/400-level courses, no outside-department substitutions, and at most one approved independent study."
+    },
+    {
+      "id": "source-002",
+      "url": "https://latcar.rutgers.edu/undergraduate/internships-and-careers",
+      "title": "Latino and Caribbean Studies Internships and Careers",
+      "catalog_year": null,
+      "scope": "program_restrictions",
+      "accessed_at": 1787004300000,
+      "note": "Current department page states that 01:595:493 and 01:595:494 internships do not count among the six courses required for the minor."
+    },
+    {
+      "id": "source-003",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/latino-and-caribbean-studies",
+      "title": "Latino and Caribbean Studies (Major, Minor) | BA",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS profile confirms SAS ownership and program code 595."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-latino-caribbean-studies-total",
+      "parent_group_id": null,
+      "name": "Six Latino and Caribbean Studies courses totaling 18 credits.",
+      "rule": "min_courses",
+      "count": 6,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-latino-caribbean-studies-total-selector",
+          "source_id": "source-001",
+          "source_label": "Latino and Caribbean Studies Minor Requirements",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["595"],
+            "course_number_min": 100,
+            "course_number_max": 499,
+            "minimum_credits": 3,
+            "exclude_course_codes": ["01:595:493", "01:595:494"],
+            "label": "Countable Latino and Caribbean Studies courses excluding internships"
+          }
+        }
+      ],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"All courses used for the minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"},
+        {"type":"minimum_total_credits","value":18,"note":"The minor consists of 18 credits.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current department total-course requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-latino-caribbean-studies-intro",
+      "parent_group_id": "sasnb-latino-caribbean-studies-total",
+      "name": "At least one introductory Latino and Caribbean Studies course.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:595:100","title":"Introduction to Caribbean Studies","credits":3,"note":null},
+        {"code":"01:595:101","title":"Introduction to Latino Studies","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current introductory-course requirement; review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-latino-caribbean-studies-upper-level",
+      "parent_group_id": "sasnb-latino-caribbean-studies-total",
+      "name": "At least two of the six courses must be at the 300 or 400 level.",
+      "rule": "min_courses",
+      "count": 2,
+      "sort_order": 30,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [
+        {
+          "key": "sasnb-latino-caribbean-studies-upper-level-selector",
+          "source_id": "source-001",
+          "source_label": "Latino and Caribbean Studies Minor Requirements",
+          "review_status": "unreviewed",
+          "reviewed_at": 1787004300000,
+          "selector": {
+            "version": 1,
+            "kind": "subject_level",
+            "school_codes": ["01"],
+            "subject_codes": ["595"],
+            "course_number_min": 300,
+            "course_number_max": 499,
+            "minimum_credits": 3,
+            "exclude_course_codes": ["01:595:493", "01:595:494"],
+            "label": "Countable 300/400-level Latino and Caribbean Studies courses"
+          }
+        }
+      ],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current upper-level distribution requirement; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": [
+    {
+      "key": "sasnb-latino-caribbean-studies-independent-study-cap",
+      "condition_type": "advisor_confirmation",
+      "condition_value": {"maximum_independent_study_courses":1,"approval_required":true},
+      "decision": "requires_approval",
+      "note": "Only one independent study course may count toward the minor and it must be approved by the Undergraduate Director; the current requirement page does not identify the independent-study course code in the rule text.",
+      "source_id": "source-001",
+      "review_status": "unreviewed",
+      "verified_at": 1787004300000
+    }
+  ]
+}

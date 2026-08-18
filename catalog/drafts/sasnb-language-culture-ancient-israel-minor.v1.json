@@ -1,0 +1,90 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-language-culture-ancient-israel-minor",
+    "name": "Language and Culture of Ancient Israel",
+    "school_slug": "sasnb",
+    "program_slug": "language-culture-ancient-israel",
+    "type": "minor",
+    "catalog_year": "Current official pages (catalog year not stated)",
+    "academic_program_code": "583",
+    "degree_type": null,
+    "program_family_id": "sasnb-language-culture-ancient-israel-583",
+    "source_url": "https://jewishstudies.rutgers.edu/academics/undergraduate/minors/1020-minor-in-language-and-culture-of-ancient-israel",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://jewishstudies.rutgers.edu/academics/undergraduate/minors/1020-minor-in-language-and-culture-of-ancient-israel",
+      "title": "Minor in Language and Culture of Ancient Israel (583)",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current Jewish Studies department page; states six three-credit courses from the listed pool and prohibits combining this minor with a Jewish Studies major."
+    },
+    {
+      "id": "source-002",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-restrictions",
+      "title": "SAS Major/Minor Restrictions",
+      "catalog_year": null,
+      "scope": "program_restrictions",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS restriction page independently confirms that Jewish Studies (563) majors may not minor in Language and Culture of Ancient Israel (583)."
+    },
+    {
+      "id": "source-003",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/list-of-majors-and-minors",
+      "title": "SAS Majors and Minors",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS directory confirms Language and Culture of Ancient Israel as an SAS minor."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-language-culture-ancient-israel-courses",
+      "parent_group_id": null,
+      "name": "Six three-credit courses from the approved Ancient Israel course list.",
+      "rule": "min_courses",
+      "count": 6,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:563:201","title":"Jewish History I: Ancient and Medieval","credits":3,"note":null},
+        {"code":"01:563:340","title":"Dead Sea Scrolls","credits":3,"note":null},
+        {"code":"01:563:141","title":"Introduction to Biblical Hebrew I","credits":3,"note":null},
+        {"code":"01:563:142","title":"Introduction to Biblical Hebrew II","credits":3,"note":null},
+        {"code":"01:563:433","title":"Readings in Biblical Hebrew Prose","credits":3,"note":null},
+        {"code":"01:563:434","title":"Readings in Biblical Hebrew Poetry","credits":3,"note":null},
+        {"code":"01:563:437","title":"Introduction to Rabbinic Literature","credits":3,"note":null},
+        {"code":"01:563:265","title":"Women in the Bible","credits":3,"note":null},
+        {"code":"01:563:145","title":"Introduction to Aramaic","credits":3,"note":null},
+        {"code":"01:563:409","title":"Introduction to Semitic Languages","credits":3,"note":null},
+        {"code":"01:563:146","title":"The Bible in Aramaic","credits":3,"note":null},
+        {"code":"01:563:405","title":"Ugaritic","credits":3,"note":null},
+        {"code":"01:563:421","title":"Hieroglyphic Egyptian I","credits":3,"note":null},
+        {"code":"01:563:422","title":"Hieroglyphic Egyptian II","credits":3,"note":null},
+        {"code":"01:563:324","title":"Ancient Near Eastern Religions","credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current finite department course list transcribed directly; review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": [
+    {
+      "key": "sasnb-language-culture-ancient-israel-no-jewish-studies-major",
+      "condition_type": "selected_academic_program_code_must_not_include_any",
+      "condition_value": ["563"],
+      "decision": "blocked",
+      "note": "A student may not major in Jewish Studies (563) and minor in Language and Culture of Ancient Israel (583) at the same time.",
+      "source_id": "source-002",
+      "review_status": "unreviewed",
+      "verified_at": 1787004300000
+    }
+  ]
+}

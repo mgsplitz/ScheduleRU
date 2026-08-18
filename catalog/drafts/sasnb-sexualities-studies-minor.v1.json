@@ -1,0 +1,119 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-sexualities-studies-minor",
+    "name": "Sexualities Studies",
+    "school_slug": "sasnb",
+    "program_slug": "sexualities-studies",
+    "type": "minor",
+    "catalog_year": "Current official page; requirements section labels itself effective 2003-2004",
+    "academic_program_code": null,
+    "degree_type": null,
+    "program_family_id": "sasnb-sexualities-studies",
+    "source_url": "https://womens-studies.rutgers.edu/academics/undergraduate/minors/94-minor-in-critical-sexualities-studies",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://womens-studies.rutgers.edu/academics/undergraduate/minors/94-minor-in-critical-sexualities-studies",
+      "title": "Minor in Sexualities Studies",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787004300000,
+      "note": "Current department page. It states six 3-credit courses, two required courses, four electives, and C-or-better grades, but the requirements subsection still says effective 2003-2004; freshness requires review before promotion."
+    },
+    {
+      "id": "source-002",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/list-of-majors-and-minors",
+      "title": "SAS Majors and Minors",
+      "catalog_year": null,
+      "scope": "program_profile",
+      "accessed_at": 1787004300000,
+      "note": "Current SAS directory confirms Sexualities Studies as an SAS minor."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-sexualities-studies-required",
+      "parent_group_id": null,
+      "name": "Required Sexualities Studies courses.",
+      "rule": "all",
+      "count": null,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:888:290","title":"Introduction to Critical Sexualities Studies","credits":3,"note":null},
+        {"code":"01:888:339","title":"Research on Sexualities","credits":3,"note":"Current source lists prerequisite 01:988:280."}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"All courses used for the Sexualities Studies minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current department page required-course transcription; freshness review pending because the page labels the requirement set effective 2003-2004.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-sexualities-studies-electives",
+      "parent_group_id": null,
+      "name": "Four electives from the approved Sexualities Studies list.",
+      "rule": "min_courses",
+      "count": 4,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [
+        {"code":"01:050:325","title":null,"credits":3,"note":null},
+        {"code":"01:050:342","title":null,"credits":3,"note":null},
+        {"code":"01:070:222","title":null,"credits":3,"note":null},
+        {"code":"01:070:371","title":null,"credits":3,"note":null},
+        {"code":"01:070:372","title":null,"credits":3,"note":null},
+        {"code":"01:070:389","title":null,"credits":3,"note":null},
+        {"code":"01:195:308","title":null,"credits":3,"note":null},
+        {"code":"01:195:326","title":null,"credits":3,"note":null},
+        {"code":"01:202:327","title":null,"credits":3,"note":null},
+        {"code":"01:351:315","title":null,"credits":3,"note":null},
+        {"code":"01:351:348","title":null,"credits":3,"note":null},
+        {"code":"01:353:346","title":null,"credits":3,"note":null},
+        {"code":"01:563:323","title":null,"credits":3,"note":null},
+        {"code":"01:563:335","title":null,"credits":3,"note":null},
+        {"code":"01:836:306","title":null,"credits":3,"note":null},
+        {"code":"01:836:326","title":null,"credits":3,"note":null},
+        {"code":"01:836:327","title":null,"credits":3,"note":null},
+        {"code":"01:830:362","title":null,"credits":3,"note":null},
+        {"code":"01:860:435","title":null,"credits":3,"note":null},
+        {"code":"01:920:422","title":null,"credits":3,"note":null},
+        {"code":"01:920:440","title":null,"credits":3,"note":null},
+        {"code":"01:888:215","title":null,"credits":3,"note":null},
+        {"code":"01:888:285","title":null,"credits":3,"note":null},
+        {"code":"01:888:291","title":null,"credits":3,"note":null},
+        {"code":"01:888:321","title":null,"credits":3,"note":null},
+        {"code":"01:888:338","title":null,"credits":3,"note":null},
+        {"code":"01:988:257","title":null,"credits":3,"note":null},
+        {"code":"01:988:259","title":null,"credits":3,"note":null},
+        {"code":"01:988:318","title":null,"credits":3,"note":null},
+        {"code":"01:988:331","title":null,"credits":3,"note":null},
+        {"code":"01:988:332","title":null,"credits":3,"note":null},
+        {"code":"01:988:392","title":null,"credits":3,"note":null}
+      ],
+      "selectors": [],
+      "conditions": [
+        {"type":"minimum_grade","value":"C","note":"All courses used for the Sexualities Studies minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}
+      ],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current department page approved-elective list transcription; freshness review pending because the page labels the requirement set effective 2003-2004.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": [
+    {
+      "key": "sasnb-sexualities-studies-freshness-review",
+      "condition_type": "advisor_confirmation",
+      "condition_value": {"reason":"requirements-page-labels-itself-effective-2003-2004"},
+      "decision": "requires_approval",
+      "note": "Do not promote to reviewed until the department confirms that the long-standing requirement list remains current.",
+      "source_id": "source-001",
+      "review_status": "unreviewed",
+      "verified_at": 1787004300000
+    }
+  ]
+}
