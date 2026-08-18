@@ -24,7 +24,7 @@ Every unresolved requirement receives a planning mode:
 - `guided_flexible`: the planner may recommend a concrete course using overlap and interests. SAS Core choices may be deferred.
 - `reserve_only`: no reviewed finite choice can be made safely; the planner reserves credits and clearly marks the slot as unresolved.
 
-A sequence-critical decision is resolved by either ranked interest or `recommend_for_me`. Ranked interest uses `interested`, `maybe`, and `avoid` buckets rather than forcing a total ordering. A delegated choice produces a concrete recommendation with an explanation and requires approval before the plan is accepted.
+A sequence-critical decision is resolved by either ranked interest or `recommend_for_me`. Ranked interest uses `interested`, `maybe`, and `avoid` buckets rather than forcing a total ordering. `Avoid` is a soft preference, not a feasibility constraint: a gateway elective may still be selected when its reviewed prerequisite closure is necessary to reach the student's intended electives. When that happens, the recommendation explains why the gateway is unavoidable. A delegated choice produces a concrete recommendation with an explanation and requires approval before the plan is accepted.
 
 Business and degree-specific electives are presented first during generation and cannot be deferred. SAS Core choices follow and offer `I'll do this later`. Deferred Core slots remain visible reserves and do not pretend to have a verified prerequisite sequence.
 
@@ -32,7 +32,7 @@ Business and degree-specific electives are presented first during generation and
 
 Opening a placeholder creates a `RequirementChoiceIntent` containing the requirement group, source program, candidate selector, and return location. The Courses page renders the intent as a persistent filter chip while retaining normal search, subject, level, credit, Core-code, and availability filters.
 
-Selecting `Use for this requirement` validates the course against the reviewed candidate set, stores the group selection, removes the matching placeholder, and returns to the plan. Wishlist remains an independent action and never resolves a requirement.
+Selecting `Use this course` validates the course against the reviewed candidate set, stores the group selection, removes the matching placeholder, and returns to the plan. While a requirement choice is active, this context-specific action replaces Wishlist so the row has one obvious next step. Outside requirement choice mode, Wishlist remains independent and never resolves a requirement. The newly changed planner card receives a short, non-persistent highlight after the return transition.
 
 ## Optimization pipeline
 

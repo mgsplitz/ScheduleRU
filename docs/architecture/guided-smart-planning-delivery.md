@@ -41,7 +41,7 @@
 - [x] Write failing tests proving that a Core placeholder creates a persistent intent, a matching course commits to the originating group, a nonmatching course is rejected, and the matching placeholder disappears from rebuilt planner input.
 - [x] Run `node --test worker/tests/requirement-choice-model.test.mjs worker/tests/catalog-page-controller.test.mjs worker/tests/planner-correctness-regression.test.mjs`; verify the new cases fail because `ScheduleRURequirementChoiceModel` is absent.
 - [x] Implement the pure model and persist only the active intent; do not use wishlist state as requirement state.
-- [x] Replace the filtered catalog’s primary `+ Wishlist` action with `Use for this requirement` while retaining a separate wishlist action.
+- [x] Replace the filtered catalog’s `+ Wishlist` action with the single context-specific label `Use this course`; retain Wishlist only outside requirement-choice mode.
 - [x] Commit the selection, rebuild planner input, return to the planner, and focus the resolved semester location.
 - [x] Run the focused tests and verify all pass.
 - [x] Commit with `git commit -m "fix(web): resolve planner choices transactionally"`.
@@ -68,6 +68,7 @@
 - [x] Extend `/api/courses` to join/filter normalized attributes and return stable badge codes.
 - [x] Render removable filter chips and keep every traditional control visible while a requirement intent is active.
 - [x] Render subtle accessible Core badges beside course titles.
+- [ ] Apply the structural attribute migration to development, republish reviewed Core definitions, and verify that badge data originates from the API rather than the active client filter.
 - [x] Run the focused catalog/API tests and commit with `git commit -m "feat(catalog): compose requirement and course filters"`.
 
 ### Task 3: Plain-language issue presentation
@@ -131,6 +132,7 @@
 **Interfaces:**
 - Consumes `Decision[]` from Task 4.
 - Produces `ChoicePreferences = { [groupId]: { interested: string[], maybe: string[], avoid: string[], mode: "ranked" | "recommend_for_me" | "deferred" } }`.
+- `avoid` is a soft ranking preference. Reviewed prerequisite closure and mandatory coverage may override it for an unavoidable gateway course, which must be explained before approval.
 
 - [ ] Write failing controller tests for Business-first ordering, interested/maybe/avoid mutation, nondeferrable business decisions, deferrable SAS Core decisions, and persisted restart behavior.
 - [ ] Render generation as a short sequence of focused cards rather than one dense modal; show candidate prerequisite burden and overlap badges in plain language.
