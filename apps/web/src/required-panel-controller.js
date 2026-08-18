@@ -19,6 +19,7 @@
     openRequirementPicker,
     showIssues,
     renderPanel,
+    userMessageModel,
   } = {}) {
     function state() { return getState?.() || {}; }
 
@@ -57,7 +58,10 @@
     function markup() {
       const current = state();
       if (current.requirementsLoading) return `<div class="empty" style="margin-top:30px;">Loading requirements from Rutgers…</div>`;
-      if (current.requirementsError) return `<div class="api-status err">Could not load degree requirements: ${escapeHtml(current.requirementsError)}</div>`;
+      if (current.requirementsError) {
+        const shown = userMessageModel.presentIssue(current.requirementsError);
+        return `<div class="api-status err"><strong>${escapeHtml(shown.title)}</strong><span>${escapeHtml(shown.message)}</span></div>`;
+      }
 
       useRequirementTree(current.majorRequirementTree);
       const programs = orderedPrograms();

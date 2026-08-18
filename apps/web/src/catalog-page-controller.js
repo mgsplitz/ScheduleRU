@@ -31,6 +31,7 @@
     courseCreditsLabel,
     formatMeeting,
     groupDisplayName,
+    userMessageModel,
   } = {}) {
     let courseRequestGeneration = 0;
     let metadataRequestGeneration = 0;
@@ -50,6 +51,7 @@
     }
 
     function connectionBarHtml(current) {
+      const connectionIssue = current.backendError ? userMessageModel.presentIssue(current.backendError) : null;
       return `
         <div class="cp-connect">
           <input id="cpUrl" placeholder="https://your-worker.workers.dev" value="${escapeHtml(current.backendUrl || "")}"/>
@@ -57,7 +59,7 @@
           ${current.backendUrl ? `<a href="${escapeHtml(current.backendUrl)}/api/sync-status" target="_blank" rel="noopener" class="cp-connect-testlink">Open ↗</a>` : ""}
           <span class="cp-connect-status ${current.backendUrl && !current.backendError ? "ok" : ""}">${
             current.backendUrl
-              ? (current.backendError ? `⚠ ${escapeHtml(current.backendError)}` : "● Connected")
+              ? (connectionIssue ? `⚠ ${escapeHtml(connectionIssue.title)}` : "● Connected")
               : "Not connected"
           }</span>
         </div>`;
@@ -313,7 +315,8 @@
       if (current.backendLoading) {
         bodyHtml = `<div class="loading">Loading courses…</div>`;
       } else if (current.backendError) {
-        bodyHtml = `<div class="api-status err">${escapeHtml(current.backendError)}</div>`;
+        const shown = userMessageModel.presentIssue(current.backendError);
+        bodyHtml = `<div class="api-status err"><strong>${escapeHtml(shown.title)}</strong><span>${escapeHtml(shown.message)}</span></div>`;
       } else if (displayedCourses.length) {
         const pages = Math.max(1, Math.ceil(current.backendTotal / pageSize));
         bodyHtml = `
@@ -405,7 +408,7 @@
         current.backendTotal = result.total ?? courses.length;
       } catch (error) {
         if (generation !== courseRequestGeneration) return;
-        current.backendError = `Couldn't reach backend: ${error.message}`;
+        current.backendError = error;
         current.backendCourses = [];
       }
       if (generation !== courseRequestGeneration) return;
@@ -427,7 +430,7 @@
           const result = await request(`/api/courses/${encodeURIComponent(id)}/sections`);
           current.sectionsCache[id] = { sections: result.sections || [] };
         } catch (error) {
-          current.sectionsCache[id] = { error: error.message };
+          current.sectionsCache[id] = { error: userMessageModel.presentIssue(error).message };
         }
         render();
       }

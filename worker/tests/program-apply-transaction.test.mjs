@@ -127,7 +127,8 @@ test("a failed requirement candidate leaves the accepted program state unchanged
   assert.deepEqual(app.state.selectedPrograms, ["bait"]);
   assert.equal(app.state.primaryProgramId, "bait");
   assert.equal(app.saves(), 0);
-  assert.match(app.feedback.at(-1).errors[0].message, /offline/);
+  assert.match(app.feedback.at(-1).errors[0].message, /requirements could not be loaded/i);
+  assert.doesNotMatch(app.feedback.at(-1).errors[0].message, /offline/);
 });
 
 test("an older warning confirmation cannot replace a newer accepted selection", async () => {

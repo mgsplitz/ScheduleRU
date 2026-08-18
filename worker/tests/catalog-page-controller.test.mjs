@@ -125,6 +125,9 @@ function fixture({ request } = {}) {
       matchesAnySelector: () => true,
     },
     filterModel: context.globalThis.ScheduleRUCatalogFilterModel,
+    userMessageModel: {
+      presentIssue: () => ({ title: "Course data unavailable", message: "Please try again." }),
+    },
     interactionLogic: { catalogViewState: () => ({
       restoreSearchFocus: false,
       selectionStart: null,

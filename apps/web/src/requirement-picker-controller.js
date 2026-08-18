@@ -27,6 +27,7 @@
     toggleWishlist,
     renderAll,
     openCourseDetails,
+    userMessageModel,
   } = {}) {
     let bound = false;
     let focusRestore = null;
@@ -124,7 +125,7 @@
         selectorState.total = Number(response?.total) || selectorState.records.length;
       } catch (error) {
         if (state().pickerSelector === selectorState && selectorState.requestGeneration === generation) {
-          selectorState.error = error?.message || "Approved courses could not be loaded.";
+          selectorState.error = userMessageModel.presentIssue(error).message;
         }
       } finally {
         if (state().pickerSelector === selectorState && selectorState.requestGeneration === generation) {

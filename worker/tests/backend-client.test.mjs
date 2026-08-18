@@ -45,7 +45,7 @@ test("backend URL persistence normalizes the value and tolerates unavailable sto
   }), "https://api.example");
 });
 
-test("backend JSON requests preserve the public error contract", async () => {
+test("backend JSON requests expose structured errors without user-facing raw bodies", async () => {
   const calls = [];
   assert.deepEqual(await client.fetchJson({
     baseUrl: "https://api.example/",
@@ -64,7 +64,10 @@ test("backend JSON requests preserve the public error contract", async () => {
       path: "/broken",
       fetchImpl: async () => ({ ok: false, status: 503, async text() { return "unavailable"; } }),
     }),
-    /HTTP 503 — unavailable/,
+    (error) => error.code === "backend_http_error"
+      && error.status === 503
+      && error.retryable === true
+      && error.detail === "unavailable",
   );
   await assert.rejects(
     client.fetchJson({
@@ -72,10 +75,26 @@ test("backend JSON requests preserve the public error contract", async () => {
       path: "/html",
       fetchImpl: async () => ({ ok: true, async text() { return "<html>"; } }),
     }),
-    /Response wasn't JSON/,
+    (error) => error.code === "invalid_response"
+      && error.status === 200
+      && error.detail === "<html>",
   );
   await assert.rejects(
     client.fetchJson({ baseUrl: "", path: "/api/programs", fetchImpl: async () => assert.fail() }),
-    /No backend URL set/,
+    (error) => error.code === "backend_not_configured" && error.retryable === false,
   );
+});
+
+test("network and not-found failures remain distinguishable", async () => {
+  await assert.rejects(client.fetchJson({
+    baseUrl: "https://api.example",
+    path: "/offline",
+    fetchImpl: async () => { throw new TypeError("Failed to fetch"); },
+  }), (error) => error.code === "backend_unavailable" && error.retryable === true);
+
+  await assert.rejects(client.fetchJson({
+    baseUrl: "https://api.example",
+    path: "/missing",
+    fetchImpl: async () => ({ ok: false, status: 404, async text() { return '{"error":"not found"}'; } }),
+  }), (error) => error.code === "backend_not_found" && error.status === 404);
 });

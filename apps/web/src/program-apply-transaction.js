@@ -71,7 +71,7 @@
       } catch (error) {
         if (generation !== state().programApplyGeneration) return { status: "stale" };
         onFeedback?.({
-          errors: [{ message: `Programs were not changed: ${error?.message || "requirements could not load"}.` }],
+          errors: [{ message: "Programs were not changed because the latest requirements could not be loaded. Please try again." }],
         });
         return { status: "rolled_back", error };
       } finally {

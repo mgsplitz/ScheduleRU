@@ -49,6 +49,9 @@ function controller(overrides = {}) {
     openRequirementPicker: () => {},
     showIssues: () => {},
     renderPanel: () => {},
+    userMessageModel: {
+      presentIssue: () => ({ title: "We couldn't connect", message: "Please try again." }),
+    },
   });
   return { app, state };
 }
@@ -76,7 +79,8 @@ test("markup distinguishes loading, errors, minor tabs, and empty reviewed progr
   assert.match(loading, /Loading requirements from Rutgers/);
 
   const failed = controller({ state: { requirementsError: "HTTP 500" } }).app.markup();
-  assert.match(failed, /Could not load degree requirements: HTTP 500/);
+  assert.match(failed, /We couldn't connect/);
+  assert.doesNotMatch(failed, /HTTP 500/);
 
   const ready = controller().app.markup();
   assert.match(ready, /program-subtab-minor/);

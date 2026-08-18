@@ -142,9 +142,10 @@ test("program onboarding has no silent BAIT default and rerenders every draft mu
 
 test("plan previews name blocking courses without flooding the modal with warnings", () => {
   assert.match(html, /function plannerIssueText\(/);
-  assert.match(html, /issue\.courseCodes\?\.join\(", "\)/);
+  assert.match(html, /ScheduleRUUserMessageModel\.presentIssue\(issue\)/);
   assert.match(html, /issue\.severity==="error"/);
-  assert.match(html, /planning notes? (?:is|are) available under Issues/i);
+  assert.match(html, /groupIssues\(blocking,\{limit:3\}\)/);
+  assert.match(html, /other note/);
 });
 
 test("planner horizon, stored completion state, and modal transitions stay safe", () => {
@@ -382,8 +383,8 @@ test("desktop polish keeps semantic overlays and visual workflow hooks", () => {
   assert.match(html, /id="appModal"[\s\S]*?role="dialog"[\s\S]*?aria-modal="true"/);
   assert.match(html, /class="program-subtab /);
   assert.match(html, /program-subtab-minor/);
-  assert.match(html, /class="planner-issue planner-issue-\$\{issue\.severity\}"/);
-  assert.match(html, /class="issue-severity issue-severity-\$\{issue\.severity\}"/);
+  assert.match(html, /ScheduleRUUserMessageModel\.groupIssues/);
+  assert.match(html, /class="issue-action"/);
   assert.match(html, /class="assistant-drawer" id="assistantDrawer" aria-label="Schedule assistant"/);
   assert.match(html, /id="onboardingSteps"[^>]*role="progressbar"[^>]*aria-label="Onboarding progress"/);
   assert.match(html, /onboardingSteps"\)\.setAttribute\("aria-valuenow",String\(step\+1\)\)/);

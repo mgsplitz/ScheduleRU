@@ -33,6 +33,16 @@
     return normalized;
   }
 
+  function requestError({ code, status = null, retryable = false, detail = null }) {
+    const error = new Error(code);
+    error.name = "ScheduleRURequestError";
+    error.code = code;
+    error.status = status;
+    error.retryable = retryable;
+    error.detail = detail;
+    return error;
+  }
+
   async function fetchJson({
     baseUrl,
     path,
@@ -40,15 +50,34 @@
     fetchImpl = root.fetch,
   } = {}) {
     const normalizedBase = String(baseUrl || "").trim().replace(/\/+$/, "");
-    if (!normalizedBase) throw new Error("No backend URL set.");
-    if (typeof fetchImpl !== "function") throw new Error("Backend requests are unavailable.");
-    const response = await fetchImpl(`${normalizedBase}${path}`, options);
+    if (!normalizedBase) throw requestError({ code: "backend_not_configured" });
+    if (typeof fetchImpl !== "function") throw requestError({ code: "backend_unavailable", retryable: true });
+    let response;
+    try {
+      response = await fetchImpl(`${normalizedBase}${path}`, options);
+    } catch (error) {
+      throw requestError({
+        code: "backend_unavailable",
+        retryable: true,
+        detail: String(error?.message || error || "Network request failed"),
+      });
+    }
     const text = await response.text();
-    if (!response.ok) throw new Error(`HTTP ${response.status} — ${text.slice(0, 150)}`);
+    if (!response.ok) throw requestError({
+      code: response.status === 404 ? "backend_not_found" : "backend_http_error",
+      status: response.status,
+      retryable: response.status === 408 || response.status === 429 || response.status >= 500,
+      detail: text.slice(0, 1000),
+    });
     try {
       return JSON.parse(text);
     } catch {
-      throw new Error(`Response wasn't JSON: ${text.slice(0, 150)}`);
+      throw requestError({
+        code: "invalid_response",
+        status: response.status || 200,
+        retryable: true,
+        detail: text.slice(0, 1000),
+      });
     }
   }
 

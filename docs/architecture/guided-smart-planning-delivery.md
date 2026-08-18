@@ -86,12 +86,12 @@
 - Produces `presentIssue(issue) -> { title, message, primaryAction, secondaryAction?, detail? }`.
 - `fetchJson` throws `{ code, status, retryable, detail }`; response bodies stay in `detail` and are never rendered by default.
 
-- [ ] Write failing tests for 404, offline, invalid response, plan capacity, prerequisite sequence, source conflict, and unknown error presentations.
-- [ ] Require every presentation to use an eighth-grade reading target, one recommended action, and no raw JSON/HTTP prefix in title or message.
-- [ ] Implement the structured backend error and presentation catalog with a safe unknown fallback.
-- [ ] Replace planner/onboarding raw error interpolation with message cards whose technical detail is collapsed and development-only.
-- [ ] Group repeated issues by recovery action and cap the initial display at three groups.
-- [ ] Run focused tests and commit with `git commit -m "feat(web): present actionable student-friendly errors"`.
+- [x] Write failing tests for 404, offline, invalid response, plan capacity, prerequisite sequence, source conflict, and unknown error presentations.
+- [x] Require every presentation to use an eighth-grade reading target, one recommended action, and no raw JSON/HTTP prefix in title or message.
+- [x] Implement the structured backend error and presentation catalog with a safe unknown fallback.
+- [x] Replace planner/onboarding raw error interpolation with message cards whose technical detail stays out of the default student view.
+- [x] Group repeated issues by recovery action and cap the initial display at three groups.
+- [x] Run focused tests and commit with `git commit -m "feat(web): present actionable student-friendly errors"`.
 
 **Release 1 checkpoint:** Manually verify Core Choose → filtered Courses → Use for requirement → placeholder removed; combine WCr with subject/search; simulate offline and 404 responses. Then run the global verification commands.
 

@@ -150,6 +150,9 @@ function fixture({ selectors = [], loadSelectorCourses } = {}) {
     toggleWishlist: (record) => calls.wishlist.push(record),
     renderAll: () => { calls.renderAll += 1; },
     openCourseDetails: (id) => calls.details.push(id),
+    userMessageModel: {
+      presentIssue: () => ({ message: "Approved courses are temporarily unavailable." }),
+    },
   });
   return { controller, document, elements, launcher, pagenav, group, state, timers, calls, actionButton, detailsButton };
 }

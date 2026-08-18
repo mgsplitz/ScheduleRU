@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+await import("../../apps/web/src/user-message-model.js");
+
 await import("../../planner-ui-logic.js");
 
 const logic = globalThis.ScheduleRUPlannerUI;
@@ -228,8 +230,8 @@ test("plan previews explain aggregate credit capacity with exact totals", () => 
     }],
   }), {
     kind: "aggregate_capacity",
-    title: "Plan exceeds four-year credit capacity",
-    message: "These selections need about 151 remaining credits, but the available semesters hold at most 144. Reduce the plan by at least 7 credits, apply completed/AP credit, or plan additional terms.",
+    title: "This plan needs more room",
+    message: "Your selections need at least 7 more credits than the current four-year plan allows.",
   });
 });
 
@@ -245,8 +247,8 @@ test("plan previews explain course-slot capacity independently of credits", () =
     }],
   }), {
     kind: "course_slot_capacity",
-    title: "Plan exceeds four-year course capacity",
-    message: "These selections need 49 required course slots, but the available semesters allow 48. Reduce the plan by at least 1 course slot, apply completed/AP credit, or plan additional terms.",
+    title: "This plan has too many course slots",
+    message: "The selected requirements cannot all fit within the current semester limits.",
   });
 });
 
@@ -262,8 +264,8 @@ test("plan previews name a proven prerequisite sequencing bottleneck", () => {
     }],
   }), {
     kind: "sequencing_capacity",
-    title: "Required sequence extends beyond four years",
-    message: "The prerequisite or standing sequence ending with 01:198:108 extends beyond the final planned semester.",
+    title: "A course sequence needs more time",
+    message: "A required prerequisite or class-standing sequence extends past the final planned semester.",
   });
 });
 
@@ -277,8 +279,8 @@ test("plan previews report an exhausted search without declaring impossibility",
     }],
   }), {
     kind: "indeterminate",
-    title: "Planner could not finish the feasibility check",
-    message: "The automatic search reached its safety limit before it could prove whether a complete eight-semester arrangement exists. Your current plan was not changed.",
+    title: "We couldn't finish checking this plan",
+    message: "The planner stopped before it could confirm a safe four-year arrangement. Your current plan has not changed.",
   });
 });
 

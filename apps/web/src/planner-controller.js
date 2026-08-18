@@ -1132,7 +1132,8 @@ function renderCore(){
     return;
   }
   if(ST.coreError){
-    pb.innerHTML=`<div class="api-status err">Could not load the Core Curriculum: ${escapeHtml(ST.coreError)}</div>`;
+    const shown=ScheduleRUUserMessageModel.presentIssue(ST.coreError);
+    pb.innerHTML=`<div class="api-status err"><strong>${escapeHtml(shown.title)}</strong><span>${escapeHtml(shown.message)}</span></div>`;
     return;
   }
   if(!ST.coreRequirementTree){
@@ -1414,7 +1415,7 @@ async function loadCoreCurriculum(){
     ST.activeCoreCurriculum=context.curriculum;
     ST.coreRequirementTree=buildRequirementTree(context.requirements);
   }catch(err){
-    ST.coreError=err.message||"Unknown error";
+    ST.coreError=err;
   }finally{
     ST.coreLoading=false;
     if(ST.tab==="core") renderPanel();
@@ -1451,7 +1452,7 @@ async function loadInitialRequirements({reloadSchools=true}={}){
     }
     updateProgramTitle();
   }catch(err){
-    ST.requirementsError=err.message||"Unknown error";
+    ST.requirementsError=err;
   }finally{
     ST.requirementsLoading=false;
     renderPanel();

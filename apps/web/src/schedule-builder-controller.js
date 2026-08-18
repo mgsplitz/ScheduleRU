@@ -16,6 +16,7 @@
     academicYearLabel,
     escapeHtml,
     openAssistant,
+    userMessageModel,
   } = {}) {
     function state() { return getState?.() || {}; }
     function sectionIsOpen(section) {
@@ -85,7 +86,7 @@
         }
         if (!entry.sections.length) entry.error = "No sections found for this course/term in the backend.";
       } catch (error) {
-        entry.error = error.message;
+        entry.error = userMessageModel.presentIssue(error).message;
       }
       entry.loading = false;
     }

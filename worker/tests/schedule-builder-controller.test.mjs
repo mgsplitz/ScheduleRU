@@ -41,6 +41,7 @@ function fixture() {
     activeBackendTerm: () => "9",
     academicYearLabel: (year) => `${year}st Year`,
     escapeHtml: (value) => String(value),
+    userMessageModel: { presentIssue: () => ({ message: "Schedule data is unavailable." }) },
   });
   return { controller, state, calls };
 }

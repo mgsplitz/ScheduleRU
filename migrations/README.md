@@ -42,6 +42,7 @@ Then apply the additive files needed by the current application:
 16. `schema_double_count_policies.sql`
 17. `schema_course_eligibility_conditions.sql`
 18. `schema_ap_equivalencies.sql`
+19. `schema_course_requirement_attributes.sql`
 
 `schema_requirement_context_and_overlap_exceptions.sql` is retained for older
 databases; its tables are already present in the current base program schema.

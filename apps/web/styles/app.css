@@ -184,6 +184,8 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
   padding:7px 10px;font-size:12px;font-family:var(--fmono);background:#fff;}
 .cp-connect-status{font-size:10.5px;color:var(--muted);white-space:nowrap;flex-shrink:0;}
 .cp-connect-status.ok{color:#3a8a3a;font-weight:700;}
+.api-status strong,.api-status span{display:block;}.api-status strong{margin-bottom:4px;}
+.issue-action{margin-top:7px;font-size:10.5px;font-weight:700;color:var(--scarlet);}.issue-count{margin-top:5px;font-size:10px;color:var(--muted);}
 .cp-connect-testlink{font-size:10.5px;color:var(--scarlet);white-space:nowrap;flex-shrink:0;text-decoration:none;}
 .cp-connect-testlink:hover{text-decoration:underline;}
 .course-list{display:flex;flex-direction:column;gap:8px;max-width:980px;}
