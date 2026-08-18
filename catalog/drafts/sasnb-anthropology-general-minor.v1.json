@@ -1,0 +1,110 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id": "sasnb-anthropology-general-minor",
+    "name": "Anthropology — General",
+    "school_slug": "sasnb",
+    "program_slug": "anthropology-general",
+    "type": "minor",
+    "catalog_year": "Current Rutgers Anthropology requirements accessed 2026-08-18",
+    "academic_program_code": "070",
+    "degree_type": null,
+    "program_family_id": "sasnb-anthropology-070",
+    "source_url": "https://anthro.rutgers.edu/academics/undergraduate/undergraduate-minors/947-minor-in-anthropology",
+    "review_status": "unreviewed",
+    "requirement_evidence_required": true
+  },
+  "sources": [
+    {
+      "id": "source-001",
+      "url": "https://anthro.rutgers.edu/academics/undergraduate/undergraduate-minors/947-minor-in-anthropology",
+      "title": "Minor in Anthropology",
+      "catalog_year": null,
+      "scope": "program_requirements",
+      "accessed_at": 1787011200000,
+      "note": "Current department page resolves the prior total-credit conflict: 19 credits, consisting of one 3-credit cultural/linguistic introduction, one 4-credit evolutionary introduction, remaining approved cultural/evolutionary electives, and at least 6 upper-level credits."
+    },
+    {
+      "id": "source-002",
+      "url": "https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/anthropology-general",
+      "title": "Anthropology — General (Major, Minor) | BA",
+      "catalog_year": null,
+      "scope": "program_identity_and_restrictions",
+      "accessed_at": 1787011200000,
+      "note": "Current SAS profile confirms SAS ownership, program code 070, minor availability, no declaration prerequisite, and combination restrictions."
+    }
+  ],
+  "requirement_groups": [
+    {
+      "id": "sasnb-anthropology-general-total",
+      "parent_group_id": null,
+      "name": "At least 19 credits from the current cultural and evolutionary anthropology minor course pools.",
+      "rule": "min_credits",
+      "count": 19,
+      "sort_order": 10,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [{
+        "key": "sasnb-anthropology-general-total-selector",
+        "source_id": "source-001",
+        "source_label": "Current Anthropology department minor course pools",
+        "review_status": "unreviewed",
+        "reviewed_at": 1787011200000,
+        "selector": {
+          "version": 1,
+          "kind": "course_codes",
+          "include_course_codes": [
+            "01:070:101", "01:070:102", "01:070:105", "01:070:108", "01:070:111", "01:070:112", "01:070:152", "01:070:161", "01:070:170", "01:070:201", "01:070:203", "01:070:204", "01:070:206", "01:070:207", "01:070:210", "01:070:212", "01:070:213", "01:070:215", "01:070:216", "01:070:217", "01:070:218", "01:070:220", "01:070:222", "01:070:223", "01:070:225", "01:070:230", "01:070:238", "01:070:240", "01:070:242", "01:070:243", "01:070:244", "01:070:246", "01:070:248", "01:070:250", "01:070:252", "01:070:293", "01:070:294", "01:070:295", "01:070:296", "01:070:297", "01:070:298", "01:070:302", "01:070:303", "01:070:304", "01:070:305", "01:070:306", "01:070:307", "01:070:308", "01:070:309", "01:070:310", "01:070:311", "01:070:312", "01:070:313", "01:070:314", "01:070:316", "01:070:317", "01:070:318", "01:070:319", "01:070:320", "01:070:321", "01:070:322", "01:070:323", "01:070:325", "01:070:326", "01:070:327", "01:070:328", "01:070:329", "01:070:330", "01:070:331", "01:070:332", "01:070:333", "01:070:334", "01:070:335", "01:070:336", "01:070:337", "01:070:338", "01:070:339", "01:070:341", "01:070:342", "01:070:345", "01:070:346", "01:070:347", "01:070:348", "01:070:349", "01:070:350", "01:070:351", "01:070:352", "01:070:354", "01:070:355", "01:070:356", "01:070:358", "01:070:359", "01:070:360", "01:070:361", "01:070:362", "01:070:367", "01:070:368", "01:070:369", "01:070:370", "01:070:371", "01:070:372", "01:070:373", "01:070:374", "01:070:376", "01:070:377", "01:070:378", "01:070:379", "01:070:380", "01:070:386", "01:070:387", "01:070:388", "01:070:389", "01:070:390", "01:070:391", "01:070:392", "01:070:393", "01:070:394", "01:070:395", "01:070:397", "01:070:398", "01:070:401", "01:070:402", "01:070:404", "01:070:406", "01:070:407", "01:070:409", "01:070:410", "01:070:415", "01:070:417", "01:070:420", "01:070:422", "01:070:426", "01:070:486", "01:070:491", "01:070:495", "01:070:497", "01:070:498", "01:119:117"
+          ],
+          "label": "Finite union of the current department's cultural and evolutionary anthropology elective lists"
+        }
+      }],
+      "conditions": [{"type":"minimum_grade","value":"C","note":"All courses applied to the minor must be completed with a grade of C or better.","source_id":"source-001","review_status":"unreviewed"}],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current department total and linked course-pool structure source-verified; independent academic review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-anthropology-general-cultural-intro",
+      "parent_group_id": "sasnb-anthropology-general-total",
+      "name": "One cultural or linguistic anthropology introduction.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 20,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [{"code":"01:070:101","title":"Culture and Social Life","credits":3,"note":null},{"code":"01:070:108","title":"Language, Culture and Society","credits":3,"note":null}],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current department 101-or-108 requirement; independent academic review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-anthropology-general-evolutionary-intro",
+      "parent_group_id": "sasnb-anthropology-general-total",
+      "name": "One evolutionary anthropology introduction.",
+      "rule": "min_courses",
+      "count": 1,
+      "sort_order": 30,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [{"code":"01:070:102","title":"Introduction to Human Evolution","credits":4,"note":null},{"code":"01:070:105","title":"Introduction to Archaeology","credits":4,"note":null}],
+      "selectors": [],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current department 102-or-105 requirement; independent academic review pending.","review_status":"unreviewed"}
+    },
+    {
+      "id": "sasnb-anthropology-general-upper-level",
+      "parent_group_id": "sasnb-anthropology-general-total",
+      "name": "At least 6 credits at the 300 level or above.",
+      "rule": "min_credits",
+      "count": 6,
+      "sort_order": 40,
+      "display_family": null,
+      "display_priority": 0,
+      "courses": [],
+      "selectors": [{"key":"sasnb-anthropology-general-upper-level-selector","source_id":"source-001","source_label":"Current Anthropology department upper-level rule","review_status":"unreviewed","reviewed_at":1787011200000,"selector":{"version":1,"kind":"course_codes","include_course_codes":["01:070:302","01:070:303","01:070:304","01:070:305","01:070:306","01:070:307","01:070:308","01:070:309","01:070:310","01:070:311","01:070:312","01:070:313","01:070:314","01:070:316","01:070:317","01:070:318","01:070:319","01:070:320","01:070:321","01:070:322","01:070:323","01:070:325","01:070:326","01:070:327","01:070:328","01:070:329","01:070:330","01:070:331","01:070:332","01:070:333","01:070:334","01:070:335","01:070:336","01:070:337","01:070:338","01:070:339","01:070:341","01:070:342","01:070:345","01:070:346","01:070:347","01:070:348","01:070:349","01:070:350","01:070:351","01:070:352","01:070:354","01:070:355","01:070:356","01:070:358","01:070:359","01:070:360","01:070:361","01:070:362","01:070:367","01:070:368","01:070:369","01:070:370","01:070:371","01:070:372","01:070:373","01:070:374","01:070:376","01:070:377","01:070:378","01:070:379","01:070:380","01:070:386","01:070:387","01:070:388","01:070:389","01:070:390","01:070:391","01:070:392","01:070:393","01:070:394","01:070:395","01:070:397","01:070:398","01:070:401","01:070:402","01:070:404","01:070:406","01:070:407","01:070:409","01:070:410","01:070:415","01:070:417","01:070:420","01:070:422","01:070:426","01:070:486","01:070:491","01:070:495","01:070:497","01:070:498"],"label":"300- and 400-level courses in the published Anthropology minor pool"}}],
+      "conditions": [],
+      "evidence": {"source_id":"source-001","reviewer_note":"Current department upper-level credit rule; independent academic review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": []
+}

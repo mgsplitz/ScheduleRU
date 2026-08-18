@@ -6,6 +6,7 @@ Working audit for the ScheduleRU SAS catalog expansion. This file is a sourcing/
 
 - `REVIEWED_EXISTING` — already present in the reviewed catalog snapshot on the `dev` baseline.
 - `DRAFT_UNREVIEWED` — an unreviewed contract-v1 draft exists on `data/program-sourcing`; it still requires local validation, tests, and independent academic review.
+- `DRAFT_SOURCE_VERIFIED` — official Rutgers sources have been reconciled and automated source-verification coverage exists; the definition is still unreviewed and non-public.
 - `BLOCKED_CONTRACT` — official Rutgers requirements are sufficiently understood, but catalog contract/runtime data cannot represent them faithfully.
 - `BLOCKED_DYNAMIC_APPROVAL` — valid completion can depend on adviser/director-approved courses, external study, semantic classifications, or other unbounded choices that cannot be safely frozen into a finite selector.
 - `BLOCKED_SOURCE` — current official Rutgers sources conflict, are incomplete, or do not establish the current rule strongly enough.
@@ -17,19 +18,24 @@ Working audit for the ScheduleRU SAS catalog expansion. This file is a sourcing/
 | Program | Code | Status | Draft |
 |---|---:|---|---|
 | Africana Studies minor | 014 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-africana-studies-minor.v1.json` |
-| Arabic minor | 013 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-arabic-minor.v1.json` |
+| Anthropology — General minor | 070 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-anthropology-general-minor.v1.json` |
+| Anthropology — Cultural minor | 070C | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-anthropology-cultural-minor.v1.json` |
+| Anthropology — Evolutionary minor | 071 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-anthropology-evolutionary-minor.v1.json` |
+| Arabic minor | 013 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-arabic-minor.v1.json` |
 | Chemistry Education minor | — | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-chemistry-education-minor.v1.json` |
-| Chinese minor | 165 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-chinese-minor.v1.json` |
-| Classics — Greek major | — | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-classics-greek-major.v1.json` |
-| Classics — Greek and Latin major | — | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-classics-greek-latin-major.v1.json` |
-| Classics — Latin major | — | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-classics-latin-major.v1.json` |
-| Comparative Literature minor | — | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-comparative-literature-minor.v1.json` |
-| Creative Writing minor | 351 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-creative-writing-minor.v1.json` |
-| Hindi minor | 013 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-hindi-minor.v1.json` |
-| Japanese major | 565 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-japanese-major.v1.json` |
-| Japanese minor | 565 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-japanese-minor.v1.json` |
-| Korean major | 574 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-korean-major.v1.json` |
-| Korean minor | 574 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-korean-minor.v1.json` |
+| Chinese major | 165 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-chinese-major.v1.json` |
+| Chinese minor | 165 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-chinese-minor.v1.json` |
+| Classics — Greek major | — | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-classics-greek-major.v1.json` |
+| Classics — Greek and Latin major | — | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-classics-greek-latin-major.v1.json` |
+| Classics — Latin major | — | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-classics-latin-major.v1.json` |
+| Comparative Literature minor | — | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-comparative-literature-minor.v1.json` |
+| Creative Writing minor | 351 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-creative-writing-minor.v1.json` |
+| Hindi minor | 013 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-hindi-minor.v1.json` |
+| History — STEM in Society minor | 519 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-history-stem-society-minor.v1.json` |
+| Japanese major | 565 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-japanese-major.v1.json` |
+| Japanese minor | 565 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-japanese-minor.v1.json` |
+| Korean major | 574 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-korean-major.v1.json` |
+| Korean minor | 574 | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-korean-minor.v1.json` |
 | Language and Culture of Ancient Israel minor | 583 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-language-culture-ancient-israel-minor.v1.json` |
 | Latino and Caribbean Studies minor | 595 | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-latino-caribbean-studies-minor.v1.json` |
 | Military Science — Aerospace Science track minor | 693N | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-military-science-aerospace-minor.v1.json` |
@@ -43,9 +49,9 @@ Working audit for the ScheduleRU SAS catalog expansion. This file is a sourcing/
 | Actuarial Mathematics major (640L) | BLOCKED_CONTRACT | Rutgers permits a passed Society of Actuaries FM exam to excuse 01:640:285. Contract v1 has no executable external-credential substitution path. |
 | African Languages minor | BLOCKED_SOURCE | Current AMESALL page includes Yoruba and a two-300-level-language-course pathway, while the current public course inventory does not expose a complete matching sequence for every listed language. |
 | American Studies | BLOCKED_SOURCE | Current live requirements contain conflicting wording about whether outside-department courses may satisfy the program; additional dynamic approval rules also appear. |
-| Anthropology minor(s) | BLOCKED_SOURCE | Current Rutgers pages conflict on 19 versus 20 total credits and introductory-credit accounting. |
+| Anthropology minor(s) | DRAFT_SOURCE_VERIFIED | Current department pages now separately establish General at 19 credits, Cultural at 18 credits, and Evolutionary at 20 credits; schema-valid source-verified drafts preserve each structure. Runtime support for their grade/grading-basis conditions remains a publication gate. |
 | Archaeology minor | BLOCKED_DYNAMIC_APPROVAL | Practicum may be an approved non-Rutgers field school, internship, or other approved advanced/graduate hands-on course, not a finite static Rutgers course set. |
-| Architectural Studies minor | BLOCKED_SOURCE | Current official pages conflict on whether two or three electives are required. |
+| Architectural Studies minor | BLOCKED_DYNAMIC_APPROVAL | Current department overview and catalog agree that the minor requires three electives, resolving the numeric conflict. The live elective page permits petitions, study abroad, outside-university courses, and internships, leaving a genuine dynamic-approval boundary. |
 | Asian American Studies | BLOCKED_DYNAMIC_APPROVAL | Approved elective list is updated yearly and the public requirements page does not expose a stable complete current pool. |
 | Asian Studies | BLOCKED_DYNAMIC_APPROVAL | Requirements rely on semantically defined/approved Asian Studies courses across departments without a complete bounded current public pool. |
 | Astrobiology minor | BLOCKED_CONTRACT | Rutgers prohibits reuse of a course between the student's major and this minor; contract v1 lacks cross-program exclusive allocation. |
@@ -53,7 +59,7 @@ Working audit for the ScheduleRU SAS catalog expansion. This file is a sourcing/
 | Biomathematics | BLOCKED_SOURCE | Current Mathematics page itself warns that its convenient requirements summary may not reflect current Degree Navigator requirements. |
 | Business & Technical Writing minor | BLOCKED_CONTRACT | A course may satisfy only one of five skill areas and at least 12/18 credits must be Writing Program credits. Runtime allocation exists, but contract v1 cannot declare allocation families/exclusive use. |
 | Cell Biology & Neuroscience | BLOCKED_DYNAMIC_APPROVAL | Additional lecture/lab courses may be accepted by individual adviser approval beyond the preapproved lists. |
-| Chinese major | BLOCKED_SOURCE | Major requires at least one course in classical Chinese; current public classification does not unambiguously say whether advanced readings 165:419/420 satisfy that specific subrequirement in addition to 165:321/322. |
+| Chinese major | DRAFT_SOURCE_VERIFIED | Current ALC titles and descriptions explicitly classify 165:321/322 and 165:419/420 as Classical Chinese; the complete major structure is preserved in a schema-valid draft. |
 | Cinema Studies | BLOCKED_DYNAMIC_APPROVAL | Elective pool changes by preregistration cycle; five courses must be outside the major and production-course use is capped. |
 | Cognitive Science minor | BLOCKED_CONTRACT | Same course cannot satisfy both formal/analytic and elective buckets, with additional department distribution caps; exclusive allocation is not exposed by contract v1. |
 | Critical Intelligence Studies | BLOCKED_CONTRACT | Track curricula include overlap limits with Political Science major/minor that require cross-program allocation. |
@@ -97,7 +103,7 @@ Working audit for the ScheduleRU SAS catalog expansion. This file is a sourcing/
 | South Asian Studies minor | BLOCKED_DYNAMIC_APPROVAL | Study-abroad approvals, discipline caps, and cross-listed courses assignable to different disciplines make the current rule set allocation/approval dependent. |
 | Spanish minor | BLOCKED_CONTRACT | Language-of-instruction, placement/residency, and upper-level requirements cannot be represented faithfully with the current selector attributes alone. |
 | Sport Management minor | BLOCKED_SOURCE | Current minor page provides a 955 elective set but also allows unspecified 377 courses “if needed”; the exact current minor-specific 377 pool is not identified there. |
-| STEM in Society minor | BLOCKED_SOURCE | Current live page says courses “including” its displayed list while older catalog wording says courses “from” a fixed list; current exhaustiveness is unclear. |
+| STEM in Society minor | DRAFT_SOURCE_VERIFIED | The 2025-2026 official catalog specifies six 3-credit courses from the listed pool; the current department page supplies the current 33-course classification. |
 | Translation Studies minor | BLOCKED_DYNAMIC_APPROVAL | Participating-department electives, advanced language study/proficiency, department caps, and overlap rules rely on dynamic approved classifications. |
 | Turkish minor | BLOCKED_SOURCE | Current minor offers a two-300-level-language-course path while current public inventory exposes only one obvious 300-level advanced Turkish course. |
 

@@ -1,0 +1,22 @@
+{
+  "contract_version": 1,
+  "program": {
+    "id":"sasnb-history-stem-society-minor","name":"History — STEM in Society","school_slug":"sasnb","program_slug":"history-stem-in-society","type":"minor","catalog_year":"Rutgers New Brunswick Undergraduate Catalog 2025-2026 with current History profile","academic_program_code":"519","degree_type":null,"program_family_id":"sasnb-history-519","source_url":"https://history.rutgers.edu/academics/undergraduate/stem-in-society-minor","review_status":"unreviewed","requirement_evidence_required":true
+  },
+  "sources": [
+    {"id":"source-001","url":"https://history.rutgers.edu/academics/undergraduate/stem-in-society-minor","title":"STEM in Society History Minor/Certificate","catalog_year":null,"scope":"current_program_requirements_and_course_pool","accessed_at":1787011200000,"note":"Current department page requires six courses for the minor and publishes the current 33-course pool."},
+    {"id":"source-002","url":"https://newbrunswick-undergrad-25-26.catalogs.rutgers.edu/","title":"2025-2026 New Brunswick Undergraduate Catalog","catalog_year":"2025-2026","scope":"catalog_requirement_reconciliation","accessed_at":1787011200000,"note":"Current official catalog describes the minor as six 3-credit courses from the listed pool, resolving the department page's nonexclusive introductory wording."},
+    {"id":"source-003","url":"https://sasundergrad.rutgers.edu/majors-and-core-curriculum/major/major-minor-details/history-stem-in-society","title":"History — STEM in Society (Minor)","catalog_year":null,"scope":"program_identity_and_restrictions","accessed_at":1787011200000,"note":"Current SAS profile confirms program code 519, no declaration prerequisite, and that History 510 majors may not add the minor."}
+  ],
+  "requirement_groups": [
+    {
+      "id":"sasnb-history-stem-society-total","parent_group_id":null,"name":"Six 3-credit courses from the current STEM in Society pool.","rule":"min_courses","count":6,"sort_order":10,"display_family":null,"display_priority":0,"courses":[],
+      "selectors":[{"key":"sasnb-history-stem-society-selector","source_id":"source-001","source_label":"Current STEM in Society course pool","review_status":"unreviewed","reviewed_at":1787011200000,"selector":{"version":1,"kind":"course_codes","include_course_codes":["01:506:226","01:506:227","01:506:233","01:506:247","01:506:249","01:506:250","01:506:251","01:506:252","01:506:253","01:506:254","01:506:255","01:506:321","01:506:322","01:506:324","01:506:325","01:508:255","01:508:328","01:508:364","01:510:248","01:512:121","01:512:210","01:512:221","01:512:229","01:512:230","01:512:235","01:512:237","01:512:321","01:512:322","01:512:323","01:512:324","01:512:329","01:880:210","01:880:212"],"minimum_credits":3,"label":"Current department STEM in Society minor list"}}],
+      "conditions":[{"type":"minimum_grade","value":"C","note":"Each course applied to the minor must be passed with a grade of C or better.","source_id":"source-002","review_status":"unreviewed"}],
+      "evidence":{"source_id":"source-002","reviewer_note":"Current catalog fixes the six-course pool boundary; independent academic review pending.","review_status":"unreviewed"}
+    }
+  ],
+  "eligibility_rules": [
+    {"key":"sasnb-history-stem-society-history-major-restriction","condition_type":"selected_program_must_not_include_any","condition_value":["sasnb-history-major"],"decision":"blocked","note":"History (510) majors may not minor in History — STEM in Society (519).","source_id":"source-003","review_status":"unreviewed","verified_at":1787011200000}
+  ]
+}

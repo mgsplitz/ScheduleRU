@@ -6,6 +6,7 @@ Status meanings:
 
 - `REVIEWED_EXISTING` — already present in the reviewed catalog snapshot at the sourcing branch baseline.
 - `DRAFT_UNREVIEWED` — contract-v1 draft exists on `data/program-sourcing`; still requires local validation/tests and independent academic review.
+- `DRAFT_SOURCE_VERIFIED` — current official Rutgers sources have been reconciled and the draft is covered by source-verification tests; it remains non-public and still requires independent academic review.
 - `DRAFT_PREEXISTING` — unreviewed draft already existed before this sourcing pass.
 - `BLOCKED_*` — current Rutgers completion rules cannot yet be represented safely or current sources are not sufficiently authoritative/consistent.
 - `JOINT_SCOPE` — joint-school SAS program intentionally surfaced for a separate ownership pass rather than silently omitted.
@@ -23,14 +24,14 @@ Status meanings:
 | American Studies major | BLOCKED_CONTRACT | Clean departmental core/electives, but double majors have an explicit cross-major overlap limit requiring cross-program allocation. |
 | American Studies minor | BLOCKED_SOURCE_AND_DYNAMIC_APPROVAL | Live page conflicts on outside-department eligibility and also relies on Undergraduate Director approval. |
 | Anthropology — Cultural major | BLOCKED_CONTRACT_AND_DYNAMIC_APPROVAL | No course may fulfill more than one requirement; approval paths also exist. |
-| Anthropology — Cultural minor | BLOCKED_SOURCE | Current Rutgers sources conflict on total/introductory credit accounting; do not guess. |
+| Anthropology — Cultural minor | DRAFT_SOURCE_VERIFIED | Current department page resolves the total as 18 credits and specifies the introductory, geographic, elective, and upper-level structure. `catalog/drafts/sasnb-anthropology-cultural-minor.v1.json` |
 | Anthropology — Evolutionary major | BLOCKED_CONTRACT_AND_DYNAMIC_APPROVAL | No course may fulfill more than one requirement; approved outside courses may count. |
-| Anthropology — Evolutionary minor | BLOCKED_SOURCE | Current Rutgers sources conflict on total/introductory credit accounting; do not guess. |
+| Anthropology — Evolutionary minor | DRAFT_SOURCE_VERIFIED | Current department page resolves the total as 20 credits and specifies the 11-credit introduction plus 9 elective credits. `catalog/drafts/sasnb-anthropology-evolutionary-minor.v1.json` |
 | Anthropology — General major | BLOCKED_CONTRACT_AND_DYNAMIC_APPROVAL | No course may fulfill more than one requirement; approved outside courses may count. |
-| Anthropology — General minor | BLOCKED_SOURCE | Current Rutgers sources conflict on total/introductory credit accounting; do not guess. |
-| Arabic minor | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-arabic-minor.v1.json` |
+| Anthropology — General minor | DRAFT_SOURCE_VERIFIED | Current department page resolves the total as 19 credits: 7 introductory credits plus 12-13 approved elective credits, including 6 upper-level credits. `catalog/drafts/sasnb-anthropology-general-minor.v1.json` |
+| Arabic minor | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-arabic-minor.v1.json` |
 | Archaeology minor | BLOCKED_DYNAMIC_APPROVAL | Practicum can be approved field school, internship, or other hands-on course, including outside Rutgers. |
-| Architectural Studies minor | BLOCKED_SOURCE | Current official pages conflict on whether two or three electives are required. |
+| Architectural Studies minor | BLOCKED_DYNAMIC_APPROVAL | Current department overview and 2024-2025 catalog agree on three electives, resolving the numeric conflict. The live elective page also permits director-approved petitions, study abroad, outside-university courses, and internships, so the remaining blocker is true dynamic approval. |
 | Art History major | BLOCKED_DYNAMIC_CLASSIFICATION_AND_CONTRACT | Degree Navigator chronological/geographic categories, study-abroad approval, and max-two distribution uses per course. |
 | Art History minor | REVIEWED_EXISTING | `sasnb-art-history-minor` |
 | Asian American Studies minor | BLOCKED_DYNAMIC_APPROVAL | Approved elective set is updated yearly and public page is not a stable exhaustive pool. |
@@ -53,25 +54,25 @@ Status meanings:
 | Chemistry — Forensic Chemistry option | BLOCKED_DYNAMIC_APPROVAL | Same department-wide individualized-program policy. |
 | Chemistry minor | BLOCKED_SOURCE | Current page omits enumeration of common core; older catalog core cannot safely be spliced into current option tables because course numbering/options changed. |
 | Chemistry Education minor | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-chemistry-education-minor.v1.json` |
-| Chinese major | BLOCKED_SOURCE | “At least one course in classical Chinese” is not publicly explicit enough to determine whether advanced readings 165:419/420 satisfy that subrequirement in addition to 321/322. |
-| Chinese minor | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-chinese-minor.v1.json` |
+| Chinese major | DRAFT_SOURCE_VERIFIED | Current ALC course titles/descriptions explicitly classify 165:321/322 as Introduction to Classical Chinese and 165:419/420 as Readings in Classical Chinese Literature, resolving the prior ambiguity. `catalog/drafts/sasnb-chinese-major.v1.json` |
+| Chinese minor | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-chinese-minor.v1.json` |
 | Cinema Studies major | BLOCKED_DYNAMIC_APPROVAL_AND_CONTRACT | Semester-specific elective flyer, director-approved additional courses, option/production limits. |
 | Cinema Studies minor | BLOCKED_DYNAMIC_APPROVAL_AND_CONTRACT | Dynamic elective flyer, five courses outside major, one-production-course cap. |
 | Classical Humanities major | BLOCKED_DYNAMIC_APPROVAL | Approved outside-department classical-humanities courses/substitutions make valid set non-static. |
 | Classical Humanities minor | REVIEWED_EXISTING | `sasnb-classical-humanities-minor` |
-| Classics — Greek and Latin major | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-classics-greek-latin-major.v1.json` |
-| Classics — Greek major | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-classics-greek-major.v1.json` |
-| Classics — Latin major | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-classics-latin-major.v1.json` |
+| Classics — Greek and Latin major | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-classics-greek-latin-major.v1.json` |
+| Classics — Greek major | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-classics-greek-major.v1.json` |
+| Classics — Latin major | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-classics-latin-major.v1.json` |
 | Cognitive Science major | BLOCKED_CONTRACT | Distribution courses cannot double-count as track electives; multi-list courses may satisfy only one requirement. |
 | Cognitive Science minor | BLOCKED_CONTRACT | Formal/analytic vs elective exclusive-use rules plus department-distribution caps. |
 | Comparative and Critical Race and Ethnic Studies (CCRES) minor | BLOCKED_DYNAMIC_APPROVAL_AND_CONTRACT | Yearly approved list, student-requested additions, and cross-major overlap cap. |
 | Comparative Literature — Advanced major | BLOCKED_DYNAMIC_APPROVAL | Individualized coherent program approved by Undergraduate Director; checklist determines completion. |
 | Comparative Literature major | BLOCKED_DYNAMIC_APPROVAL | Individualized coherent program approved by Undergraduate Director. |
-| Comparative Literature minor | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-comparative-literature-minor.v1.json` |
+| Comparative Literature minor | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-comparative-literature-minor.v1.json` |
 | Computer Science B.A. | REVIEWED_EXISTING | `sasnb-computer-science-ba` |
 | Computer Science B.S. | REVIEWED_EXISTING | `sasnb-computer-science-bs` |
 | Computer Science minor | REVIEWED_EXISTING | `sasnb-computer-science-minor` |
-| Creative Writing minor | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-creative-writing-minor.v1.json` |
+| Creative Writing minor | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-creative-writing-minor.v1.json` |
 | Criminal Justice major | BLOCKED_CONTRACT_AND_DYNAMIC_APPROVAL | Adviser-added thematic courses plus 202:307 method-vs-elective exclusive allocation. |
 | Criminology minor | REVIEWED_EXISTING | `sasnb-criminology-minor` |
 | Critical Intelligence Studies minor | BLOCKED_CONTRACT | Track curricula include explicit overlap limits with Political Science major/minor. |
@@ -108,10 +109,10 @@ Status meanings:
 | Greek — Ancient minor | REVIEWED_EXISTING | `sasnb-ancient-greek-minor` |
 | Greek — Modern minor | BLOCKED_SOURCE | Current site confirms program/course pool but not complete current distribution requirements; old catalog too stale. |
 | Health and Society minor | BLOCKED_CONTRACT | Elective overlap with major and department-level distribution caps require allocation. |
-| Hindi minor | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-hindi-minor.v1.json` |
+| Hindi minor | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-hindi-minor.v1.json` |
 | History — Ancient History and Classics major | BLOCKED_DYNAMIC_APPROVAL | Adviser substitutions, language/AP choices and topic-dependent seminars. |
 | History — Law and History minor | BLOCKED_DYNAMIC_APPROVAL | Anchor can be director-approved alternative; outside law-related course pool is not fully bounded. |
-| History — STEM in Society minor | BLOCKED_SOURCE | Live “including” wording vs older fixed-list wording leaves exhaustiveness unclear. |
+| History — STEM in Society minor | DRAFT_SOURCE_VERIFIED | The current 2025-2026 catalog specifies six 3-credit courses from the listed pool, resolving the live page's introductory “including” wording. `catalog/drafts/sasnb-history-stem-society-minor.v1.json` |
 | History major | BLOCKED_DYNAMIC_CLASSIFICATION | Selected 506/global-history, pre-1500 classifications, residency and overlap rules depend on maintained categories/advising. |
 | History minor | REVIEWED_EXISTING | `sasnb-history-minor` |
 | History/French major | BLOCKED_DYNAMIC_APPROVAL | Joint program requires advising/program approval and supports approved alternatives. |
@@ -122,13 +123,13 @@ Status meanings:
 | International and Global Studies minor | BLOCKED_DYNAMIC_CLASSIFICATION | Region/language mappings and approved course sets depend on Degree Navigator/dynamic classifications. |
 | Italian major | BLOCKED_DYNAMIC_APPROVAL_AND_LANGUAGE_CLASSIFICATION | Placement replacements, cross-department Italian Studies, instruction-language rules and UGD approval. |
 | Italian minor | BLOCKED_DYNAMIC_APPROVAL_AND_LANGUAGE_CLASSIFICATION | Placement-dependent replacements and approved Italian Studies cognates. |
-| Japanese major | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-japanese-major.v1.json` |
-| Japanese minor | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-japanese-minor.v1.json` |
+| Japanese major | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-japanese-major.v1.json` |
+| Japanese minor | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-japanese-minor.v1.json` |
 | Jewish Studies — Advanced Language major | BLOCKED_DYNAMIC_APPROVAL_AND_EXTERNAL_CREDENTIAL | Dynamic electives plus equivalent Hebrew/Yiddish options including outside institutions. |
 | Jewish Studies major | BLOCKED_DYNAMIC_CLASSIFICATION_AND_CONTRACT | Premodern/modern classifications, irregular seminar fulfillment and double-count/transfer rules. |
 | Jewish Studies minor | BLOCKED_CONTRACT | Max-two-course double count with another major/minor requires cross-program allocation. |
-| Korean major | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-korean-major.v1.json` |
-| Korean minor | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-korean-minor.v1.json` |
+| Korean major | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-korean-major.v1.json` |
+| Korean minor | DRAFT_SOURCE_VERIFIED | `catalog/drafts/sasnb-korean-minor.v1.json` |
 | Language and Culture of Ancient Israel minor | DRAFT_UNREVIEWED | `catalog/drafts/sasnb-language-culture-ancient-israel-minor.v1.json` |
 | Latin minor | REVIEWED_EXISTING | `sasnb-latin-minor` |
 | Latin American Studies major | BLOCKED_DYNAMIC_APPROVAL | Electives defined by Latin American focus and program approval; language proficiency. |

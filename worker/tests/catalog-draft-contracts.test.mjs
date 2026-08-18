@@ -18,10 +18,10 @@ async function loadDrafts() {
 
 test("portable draft definitions are valid, non-public, and distinct from reviewed programs", async () => {
   const drafts = await loadDrafts();
-  assert.deepEqual(
-    drafts.map(({ definition }) => definition.program.id),
-    ["rbsnb-fixed-income-credit-analysis-concentration", "sasnb-ppe-minor"],
-  );
+  const draftIds = drafts.map(({ definition }) => definition.program.id);
+  assert.equal(draftIds.length, new Set(draftIds).size, "draft program ids must be unique");
+  assert.ok(draftIds.includes("rbsnb-fixed-income-credit-analysis-concentration"));
+  assert.ok(draftIds.includes("sasnb-ppe-minor"));
   const reviewedIds = new Set(
     allProgramDefinitions().map(({ program }) => program.id),
   );
