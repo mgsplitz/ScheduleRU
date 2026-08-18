@@ -10,7 +10,9 @@ export const webStyles = readFileSync(
 export const webControllerSource = [
   "packages/planner/src/academic-progress-model.js",
   "packages/planner/src/course-path-model.js",
+  "packages/planner/src/course-set-optimizer.js",
   "packages/requirements/src/core-allocation-model.js",
+  "packages/requirements/src/candidate-coverage-model.js",
   "packages/requirements/src/requirement-progress-model.js",
   "packages/requirements/src/requirement-tree-builder.js",
   "packages/requirements/src/program-requirement-model.js",

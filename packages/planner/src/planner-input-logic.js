@@ -141,24 +141,43 @@
     });
   }
 
-  function candidatePrerequisiteSummaries(group, courses, planningContext = {}) {
-    return (group.members || []).map((id) => {
+  function candidatePrerequisiteSummaries(group, courses, planningContext = {}, groups = {}) {
+    return (group.members || []).flatMap((id) => {
       const course = courses[id];
-      if (!validCode(course?.code)) return null;
-      const eligibility = normalizedEligibility(course, planningContext);
-      return {
-        courseId: id,
-        code: course.code,
-        title: text(course.fullTitle || course.title || course.code),
-        credits: numericCredits(course.credits) ?? DEFAULT_ESTIMATED_CREDITS,
-        equivalenceKey: text(course.equivalenceKey) || null,
-        prerequisitePaths: eligibility.prerequisitePaths,
-        enforceablePrerequisitePaths: eligibility.enforceablePrerequisitePaths,
-        minimumPlanYear: eligibility.minimumPlanYear,
-        minimumPriorCredits: eligibility.minimumPriorCredits,
-        ruleCoverage: eligibility.ruleCoverage,
-      };
-    }).filter(Boolean).sort((left, right) => left.code.localeCompare(right.code));
+      if (!validCode(course?.code)) return [];
+      const equivalenceKey = text(course.equivalenceKey)
+        || `requirement:${text(group.sourceProgramId)}:${course.code}`;
+      return [course, ...(course.alternatives || []).map((alternative) => ({
+        ...alternative,
+        fullTitle: alternative.title,
+        equivalenceKey,
+        equivalentFor: course.code,
+      }))].filter((candidate) => validCode(candidate?.code)).map((candidate) => {
+        const eligibility = normalizedEligibility(candidate, planningContext);
+        return {
+          courseId: id,
+          code: candidate.code,
+          title: text(candidate.fullTitle || candidate.title || candidate.code),
+          credits: numericCredits(candidate.credits) ?? DEFAULT_ESTIMATED_CREDITS,
+          equivalenceKey,
+          equivalentFor: text(candidate.equivalentFor) || null,
+          prerequisitePaths: eligibility.prerequisitePaths,
+          enforceablePrerequisitePaths: eligibility.enforceablePrerequisitePaths,
+          minimumPlanYear: eligibility.minimumPlanYear,
+          minimumPriorCredits: eligibility.minimumPriorCredits,
+          ruleCoverage: eligibility.ruleCoverage,
+          attributes: unique([
+            ...(course.attributes || []),
+            ...(group.rule === "distinct" ? (group.children || []).flatMap((childId) => {
+              const child = groups[childId];
+              if (!(child?.members || []).includes(id)) return [];
+              const match = text(child.name).match(/\[([^\]]+)\]/);
+              return match?.[1] && match[1] !== "AH" ? [match[1]] : [];
+            }) : []),
+          ]),
+        };
+      });
+    }).sort((left, right) => left.code.localeCompare(right.code));
   }
 
   function placeholder(
@@ -170,6 +189,7 @@
     courses = {},
     slot = {},
     planningContext = {},
+    groups = {},
   ) {
     const credits = group.rule === "min_credits" ? Math.min(DEFAULT_ESTIMATED_CREDITS, Number(group.count) || DEFAULT_ESTIMATED_CREDITS) : DEFAULT_ESTIMATED_CREDITS;
     const total = Math.max(1, Number(slot.total) || 1);
@@ -196,11 +216,12 @@
         required: Number(group.count) || 1,
         members: [...(group.members || [])],
         memberCourseCodes: (group.members || []).map((id) => courses[id]?.code).filter(validCode),
-        candidatePrerequisiteSummaries: candidatePrerequisiteSummaries(group, courses, planningContext),
+        candidatePrerequisiteSummaries: candidatePrerequisiteSummaries(group, courses, planningContext, groups),
         children: [...(group.children || [])],
         courseSelectors: [...(group.courseSelectors || [])],
         sourceProgramIds: [...(group.sourceProgramIds || [])],
-        allocationFamily: text(group.parentId) || text(group.allocation?.allocation_family) || null,
+        allocationFamily: text(group.allocation?.allocation_family) || text(group.parentId) || null,
+        distinctAttributes: unique(slot.distinctAttributes || []),
       },
     };
   }
@@ -260,6 +281,7 @@
           courses,
           { label: meaningfulGroupLabel(group) },
           planningContext,
+          groups,
         ));
         return;
       }
@@ -308,8 +330,15 @@
               position: required - remaining + index + 1,
               total: required,
               label: meaningfulGroupLabel(group),
+              distinctAttributes: group.rule === "distinct"
+                ? (group.children || []).map((childId) => {
+                  const match = text(groups[childId]?.name).match(/\[([^\]]+)\]/);
+                  return text(match?.[1]);
+                }).filter((attribute) => attribute && attribute !== "AH")
+                : [],
             },
             planningContext,
+            groups,
           ));
         }
         // Children of a choice group partition or refine the approved option
@@ -542,5 +571,45 @@
     };
   }
 
-  root.ScheduleRUPlannerInput = { buildPlannerInput, numericCredits, standingFromText, normalizedCourse };
+  function applyApprovedCourseSet(input, optimization) {
+    if (optimization?.status !== "complete") return input;
+    const remainingAllocations = new Map();
+    (optimization.selectedCourses || []).forEach((course) => {
+      (course.coverageRequirementIds || []).forEach((id) => {
+        remainingAllocations.set(id, (remainingAllocations.get(id) || 0) + 1);
+      });
+    });
+    const unresolvedRequirements = (input.unresolvedRequirements || []).filter((requirement) => {
+      const decisionId = `${requirement.sourceType === "core" ? "core" : "program"}:${text(requirement.sourceProgram)}:${text(requirement.requirementGroupId)}`;
+      const remaining = remainingAllocations.get(decisionId) || 0;
+      if (!remaining) return true;
+      remainingAllocations.set(decisionId, remaining - 1);
+      return false;
+    });
+    const byCode = new Map((input.courses || []).map((course) => [course.code, course]));
+    (optimization.selectedCourses || []).forEach((course) => {
+      if (validCode(course?.code)) byCode.set(course.code, { ...course });
+    });
+    const prerequisitePathsByCode = { ...(input.prerequisitePathsByCode || {}) };
+    const enforceablePrerequisitePathsByCode = { ...(input.enforceablePrerequisitePathsByCode || {}) };
+    byCode.forEach((course) => {
+      if (course.prerequisitePaths?.length) prerequisitePathsByCode[course.code] = course.prerequisitePaths;
+      if (course.enforceablePrerequisitePaths?.length) {
+        enforceablePrerequisitePathsByCode[course.code] = course.enforceablePrerequisitePaths;
+      }
+    });
+    const result = {
+      ...input,
+      courses: [...byCode.values()].sort((left, right) => left.code.localeCompare(right.code)),
+      unresolvedRequirements,
+      prerequisitePathsByCode,
+      enforceablePrerequisitePathsByCode,
+    };
+    return {
+      ...result,
+      planningDecisions: root.ScheduleRURequirementChoiceLogic?.planningDecisions(result) || [],
+    };
+  }
+
+  root.ScheduleRUPlannerInput = { buildPlannerInput, applyApprovedCourseSet, numericCredits, standingFromText, normalizedCourse };
 })(globalThis);

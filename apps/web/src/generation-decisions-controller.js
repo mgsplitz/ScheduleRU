@@ -19,28 +19,36 @@
           || String(left.label || "").localeCompare(String(right.label || ""))
           || String(left.requirementGroupId || "").localeCompare(String(right.requirementGroupId || ""));
       });
+    const decisionKey = (decision) => decision.decisionId || decision.requirementGroupId;
     const known = new Map(ordered.map((decision) => [
-      decision.requirementGroupId,
+      decisionKey(decision),
       new Set((decision.candidates || []).map((candidate) => candidate.code)),
     ]));
     const preferences = {};
 
     ordered.forEach((decision) => {
-      const saved = initialPreferences?.[decision.requirementGroupId] || {};
-      const candidateCodes = known.get(decision.requirementGroupId);
+      const key = decisionKey(decision);
+      const saved = initialPreferences?.[key] || initialPreferences?.[decision.requirementGroupId] || {};
+      const candidateCodes = known.get(key);
       const preference = { interested: [], maybe: [], avoid: [], mode: "ranked" };
       BUCKETS.forEach((bucket) => {
         preference[bucket] = [...new Set((saved[bucket] || []).filter((code) => candidateCodes.has(code)))];
       });
       if (saved.mode === "recommend_for_me") preference.mode = "recommend_for_me";
       if (saved.mode === "deferred" && decision.canDefer) preference.mode = "deferred";
-      preferences[decision.requirementGroupId] = preference;
+      preferences[key] = preference;
     });
 
     const emit = () => onChange?.(copy(preferences));
-    function setInterest(groupId, courseCode, bucket) {
-      const preference = preferences[groupId];
-      if (!preference || !BUCKETS.includes(bucket) || !known.get(groupId)?.has(courseCode)) return false;
+    function resolveKey(identifier) {
+      if (preferences[identifier]) return identifier;
+      const matches = ordered.filter((item) => item.requirementGroupId === identifier);
+      return matches.length === 1 ? decisionKey(matches[0]) : null;
+    }
+    function setInterest(identifier, courseCode, bucket) {
+      const key = resolveKey(identifier);
+      const preference = preferences[key];
+      if (!preference || !BUCKETS.includes(bucket) || !known.get(key)?.has(courseCode)) return false;
       BUCKETS.forEach((name) => {
         preference[name] = preference[name].filter((code) => code !== courseCode);
       });
@@ -49,25 +57,28 @@
       emit();
       return true;
     }
-    function chooseForMe(groupId) {
-      if (!preferences[groupId]) return false;
-      preferences[groupId].mode = "recommend_for_me";
+    function chooseForMe(identifier) {
+      const key = resolveKey(identifier);
+      if (!preferences[key]) return false;
+      preferences[key].mode = "recommend_for_me";
       emit();
       return true;
     }
-    function defer(groupId) {
-      const decision = ordered.find((item) => item.requirementGroupId === groupId);
-      if (!decision?.canDefer || !preferences[groupId]) return false;
-      preferences[groupId].mode = "deferred";
+    function defer(identifier) {
+      const key = resolveKey(identifier);
+      const decision = ordered.find((item) => decisionKey(item) === key);
+      if (!decision?.canDefer || !preferences[key]) return false;
+      preferences[key].mode = "deferred";
       emit();
       return true;
     }
-    function canAdvance(groupId) {
-      const preference = preferences[groupId];
+    function canAdvance(identifier) {
+      const key = resolveKey(identifier);
+      const preference = preferences[key];
       if (!preference) return false;
       if (preference.mode === "recommend_for_me") return true;
       if (preference.mode === "deferred") {
-        return ordered.find((item) => item.requirementGroupId === groupId)?.canDefer === true;
+        return ordered.find((item) => decisionKey(item) === key)?.canDefer === true;
       }
       return BUCKETS.some((bucket) => preference[bucket].length > 0);
     }

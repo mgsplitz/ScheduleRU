@@ -185,7 +185,7 @@ programPickerController.bind();
 
 function plannerTerms(){return plannerTermsFromAcademicPosition();}
 function unresolvedPlannerRequirements(){return normalizedPlannerInputs().unresolvedRequirements;}
-function generateFourYearPlan(){const input=normalizedPlannerInputs();ST.generatedPlanPreview=ScheduleRUFourYearPlanner.generatePlan(input);savePlannerState();showPlanPreview();}
+function generateFourYearPlan(input=normalizedPlannerInputs()){ST.generatedPlanPreview=ScheduleRUFourYearPlanner.generatePlan(input);savePlannerState();showPlanPreview();}
 function confirmClearPlan(){modalController.show({title:"Clear this plan?",body:"<p>This removes every semester placement and unresolved requirement placeholder. Your completed courses, programs, and wishlist will stay saved.</p>",actions:[{label:"Keep plan",secondary:true},{label:"Clear plan",onClick:()=>{ST.schedule={};ST.planPlaceholders=[];ST.generatedPlanPreview=null;savePlannerState();renderAll();}}]});}
 document.getElementById("clearPlanBtn").addEventListener("click",confirmClearPlan);
 function acceptGeneratedPlan(preview){const accepted=ScheduleRUPlannerStateLogic.withAcceptedPlan(ST,preview);Object.assign(ST,accepted);const firstPopulated=plannerTerms().find(term=>Object.values(ST.schedule).some(entry=>entry.year===term.year&&entry.sem===term.sem)||(ST.planPlaceholders||[]).some(placeholder=>placeholder.year===term.year&&placeholder.sem===term.sem));if(firstPopulated)ST.year=firstPopulated.year;savePlannerState();renderAll();}
@@ -320,7 +320,7 @@ async function hydratePlannerDecisions(input){
 }
 const checkedGeneratePlanButton=document.getElementById("generatePlanBtn"),coreAwareGeneratePlanButton=checkedGeneratePlanButton.cloneNode(true);checkedGeneratePlanButton.replaceWith(coreAwareGeneratePlanButton);
 function finishPlanGenerationPreflight(){ST.planGenerationPending=false;coreAwareGeneratePlanButton.disabled=false;}
-function confirmPlanGenerationPreview(){
+function confirmPlanGenerationPreview(approvedInput){
   const core=corePlannerStatus();
   const decision=globalThis.ScheduleRUPlannerUI.generationPreflight({busy:false,coreIncomplete:core.incomplete});
   modalController.show({
@@ -331,7 +331,7 @@ function confirmPlanGenerationPreview(){
     canDismiss:false,
     actions:[
       {label:"Go back",secondary:true,onClick:finishPlanGenerationPreflight},
-      {label:decision==="warn"?"I understand":"Generate preview",onClick:()=>{finishPlanGenerationPreflight();generateFourYearPlan();}},
+      {label:decision==="warn"?"I understand":"Generate preview",onClick:()=>{finishPlanGenerationPreflight();generateFourYearPlan(approvedInput);}},
     ],
   });
 }
@@ -346,10 +346,52 @@ function openGenerationDecisionFlow(input){
   });
   const decisions=flow.decisions();
   if(!decisions.length){confirmPlanGenerationPreview();return;}
+  function decisionKey(decision){return decision.decisionId||decision.requirementGroupId;}
+  function optimizedCourseSet(){
+    const graph=ScheduleRUCandidateCoverageModel.buildCoverageGraph({
+      decisions,
+      policies:{
+        programs:ST.availablePrograms||[],
+        doubleCountPolicies:ST.doubleCountPolicies||[],
+        doubleCountRules:ST.doubleCountRules||[],
+        doubleCountExceptions:ST.doubleCountExceptions||[],
+      },
+    });
+    const result=ScheduleRUCourseSetOptimizer.optimizeCourseSet(graph,flow.preferences());
+    return {graph,result};
+  }
+  function renderRecommendationReview(){
+    const {graph,result}=optimizedCourseSet();
+    if(result.status!=="complete"){
+      const unresolvedIds=(result.issues||[]).filter(issue=>issue.type==="unresolved_requirements")
+        .flatMap(issue=>(issue.requirements||[]).map(item=>item.requirementId));
+      const labels=[...new Set(unresolvedIds.map(id=>graph.requirements.find(item=>item.id===id)?.label).filter(Boolean))];
+      const message=result.status==="indeterminate"
+        ? "There are too many equally valid combinations to recommend one safely. Narrow one or two preferences and try again."
+        : labels.length
+          ? `We could not complete ${labels.slice(0,3).join(", ")}${labels.length>3?", and other choices":""} from the reviewed options. Go back and mark more courses you would consider.`
+          : "Some required choices do not yet have enough reviewed options for a complete recommendation.";
+      modalController.show({title:"A complete recommendation isn’t ready",body:`<p>${html(message)}</p>`,canDismiss:false,actions:[{label:"Back",secondary:true,close:false,onClick:()=>{index=decisions.length-1;renderDecision();}}]});
+      return;
+    }
+    modalController.show({
+      title:"Review recommended courses",
+      body:ScheduleRUGenerationDecisionsView.renderRecommendations({result,requirements:graph.requirements}),
+      canDismiss:false,
+      actions:[
+        {label:"Back",secondary:true,close:false,onClick:()=>{index=decisions.length-1;renderDecision();}},
+        {label:"Use these courses",className:"push-right",close:false,onClick:()=>confirmPlanGenerationPreview(ScheduleRUPlannerInput.applyApprovedCourseSet(input,result))},
+      ],
+    });
+    document.getElementById("appModalBody")?.querySelectorAll("[data-replace-requirement]").forEach(button=>button.addEventListener("click",()=>{
+      const replacementIndex=decisions.findIndex(decision=>decisionKey(decision)===button.dataset.replaceRequirement);
+      if(replacementIndex>=0){index=replacementIndex;renderDecision();}
+    }));
+  }
   function renderDecision(){
     const previous=document.querySelector(".generation-decision")?.dataset?.decisionGroup;
     if(previous)scrollByDecision[previous]=ScheduleRUGenerationDecisionsView.captureListScroll(document);
-    const decision=decisions[index],groupId=decision.requirementGroupId;
+    const decision=decisions[index],groupId=decisionKey(decision);
     const preference=flow.preferences()[groupId]||{};
     modalController.show({
       title:"Plan your course choices",
@@ -357,8 +399,8 @@ function openGenerationDecisionFlow(input){
       canDismiss:false,
       actions:[
         {label:"Back",secondary:true,close:index===0,onClick:()=>{if(index===0)finishPlanGenerationPreflight();else{index-=1;renderDecision();}}},
-        ...(decision.canDefer?[{label:"I’ll do this later",className:"quiet-action",close:false,onClick:()=>{flow.defer(groupId);if(index===decisions.length-1)confirmPlanGenerationPreview();else{index+=1;renderDecision();}}}]:[]),
-        {label:index===decisions.length-1?"Review plan":"Next",className:"push-right",disabled:!flow.canAdvance(groupId),close:false,onClick:()=>{if(index===decisions.length-1)confirmPlanGenerationPreview();else{index+=1;renderDecision();}}},
+        ...(decision.canDefer?[{label:"I’ll do this later",className:"quiet-action",close:false,onClick:()=>{flow.defer(groupId);if(index===decisions.length-1)renderRecommendationReview();else{index+=1;renderDecision();}}}]:[]),
+        {label:index===decisions.length-1?"Review courses":"Next",className:"push-right",disabled:!flow.canAdvance(groupId),close:false,onClick:()=>{if(index===decisions.length-1)renderRecommendationReview();else{index+=1;renderDecision();}}},
       ],
     });
     ScheduleRUGenerationDecisionsView.restoreListScroll(document,scrollByDecision[groupId]);

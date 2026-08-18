@@ -95,26 +95,133 @@
 
   function optimizeCourseSet(graph = {}, preferences = {}, options = {}) {
     const requirements = [...(graph.requirements || [])].sort((left, right) => left.id.localeCompare(right.id));
-    const candidates = [...(graph.candidates || [])].map((candidate) => ({
+    const allCandidates = [...(graph.candidates || [])].map((candidate) => ({
       ...candidate,
       equivalentCourseCodes: uniqueSorted(candidate.equivalentCourseCodes || [candidate.code]),
       coverageRequirementIds: uniqueSorted(candidate.coverageRequirementIds || []),
       prerequisiteClosure: uniqueSorted(candidate.prerequisiteClosure || []),
     })).sort((left, right) => left.code.localeCompare(right.code));
+    const requirementById = new Map(requirements.map((item) => [item.id, item]));
+    function candidateBehavior(candidate) {
+      const conflictFacts = (graph.conflicts || []).filter((item) => item.candidateCode === candidate.code)
+        .map(({ candidateCode: _candidateCode, ...fact }) => fact)
+        .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+      return JSON.stringify({
+        coverage: candidate.coverageRequirementIds,
+        conflicts: conflictFacts,
+        credits: Number(candidate.credits) || 3,
+        prerequisiteClosure: candidate.prerequisiteClosure,
+        minimumPlanYear: Number(candidate.minimumPlanYear) || null,
+        minimumPriorCredits: Number(candidate.minimumPriorCredits) || null,
+        offering: candidate.offeringEvidence ? 1 : 0,
+        distinctAttributes: uniqueSorted(candidate.coverageRequirementIds.flatMap((id) => {
+          const allowed = requirementById.get(id)?.distinctAttributes || [];
+          return (candidate.attributes || []).filter((attribute) => allowed.includes(attribute));
+        })),
+        preference: candidate.coverageRequirementIds.map((id) =>
+          preferenceRank(candidate, requirementById.get(id), preferences)),
+      });
+    }
+    const behaviorGroups = new Map();
+    allCandidates.forEach((candidate) => {
+      if (!candidate.coverageRequirementIds.length) return;
+      const key = candidateBehavior(candidate);
+      const rows = behaviorGroups.get(key) || [];
+      rows.push(candidate);
+      behaviorGroups.set(key, rows);
+    });
+    const candidates = [
+      ...allCandidates.filter((candidate) => !candidate.coverageRequirementIds.length),
+      ...[...behaviorGroups.values()].flatMap((rows) => {
+        const capacity = Math.max(1, ...rows[0].coverageRequirementIds.map((id) =>
+          Number(requirementById.get(id)?.slotCount) || 1));
+        return rows.slice(0, capacity);
+      }),
+    ].sort((left, right) => left.code.localeCompare(right.code));
     const candidateByAlias = new Map();
-    candidates.forEach((candidate) => candidate.equivalentCourseCodes.forEach((code) => {
+    allCandidates.forEach((candidate) => candidate.equivalentCourseCodes.forEach((code) => {
       if (!candidateByAlias.has(code)) candidateByAlias.set(code, candidate);
     }));
     const deferredRequirements = deferredIds(requirements, preferences);
     const deferred = new Set(deferredRequirements);
     const needed = new Map(requirements.filter((item) => !deferred.has(item.id))
       .map((item) => [item.id, Math.max(1, Number(item.slotCount) || 1)]));
-    const requirementById = new Map(requirements.map((item) => [item.id, item]));
+    if (options.component !== true && needed.size > 1) {
+      const adjacency = new Map([...needed.keys()].map((id) => [id, new Set()]));
+      const connect = (ids) => ids.forEach((id) => ids.forEach((other) => {
+        if (id !== other) adjacency.get(id)?.add(other);
+      }));
+      allCandidates.forEach((candidate) => connect(candidate.coverageRequirementIds.filter((id) => needed.has(id))));
+      const prerequisiteConsumers = new Map();
+      allCandidates.forEach((candidate) => (candidate.prerequisiteClosure || []).forEach((code) => {
+        const ids = prerequisiteConsumers.get(code) || [];
+        ids.push(...candidate.coverageRequirementIds.filter((id) => needed.has(id)));
+        prerequisiteConsumers.set(code, ids);
+      }));
+      prerequisiteConsumers.forEach((ids, code) => {
+        const prerequisite = candidateByAlias.get(code);
+        connect(uniqueSorted([...ids, ...(prerequisite?.coverageRequirementIds || []).filter((id) => needed.has(id))]));
+      });
+      const components = [];
+      const unseen = new Set(needed.keys());
+      while (unseen.size) {
+        const start = [...unseen].sort()[0];
+        const component = [];
+        const queue = [start];
+        unseen.delete(start);
+        while (queue.length) {
+          const id = queue.shift();
+          component.push(id);
+          [...(adjacency.get(id) || [])].sort().forEach((other) => {
+            if (unseen.delete(other)) queue.push(other);
+          });
+        }
+        components.push(component.sort());
+      }
+      if (components.length > 1) {
+        const parts = components.map((ids) => {
+          const idSet = new Set(ids);
+          const componentCandidates = allCandidates.filter((candidate) =>
+            candidate.coverageRequirementIds.some((id) => idSet.has(id)));
+          const prerequisiteCodes = new Set(componentCandidates.flatMap((candidate) => candidate.prerequisiteClosure || []));
+          const includedCodes = new Set(componentCandidates.flatMap((candidate) => candidate.equivalentCourseCodes || [candidate.code]));
+          const supportingCandidates = allCandidates.filter((candidate) =>
+            !includedCodes.has(candidate.code)
+            && (candidate.equivalentCourseCodes || [candidate.code]).some((code) => prerequisiteCodes.has(code)));
+          const candidateCodes = new Set([...componentCandidates, ...supportingCandidates].map((candidate) => candidate.code));
+          return optimizeCourseSet({
+            requirements: requirements.filter((item) => idSet.has(item.id)),
+            candidates: [...componentCandidates, ...supportingCandidates],
+            conflicts: (graph.conflicts || []).filter((item) => candidateCodes.has(item.candidateCode)),
+          }, preferences, { ...options, component: true });
+        });
+        if (parts.some((part) => part.status === "indeterminate")) return {
+          status: "indeterminate", selectedCourses: [], deferredRequirements, explanations: [],
+          issues: parts.flatMap((part) => part.issues || []),
+        };
+        const selectedByCode = new Map();
+        parts.flatMap((part) => part.selectedCourses || []).forEach((course) => {
+          const current = selectedByCode.get(course.code);
+          if (!current) selectedByCode.set(course.code, { ...course });
+          else current.coverageRequirementIds = uniqueSorted([
+            ...(current.coverageRequirementIds || []), ...(course.coverageRequirementIds || []),
+          ]);
+        });
+        return {
+          status: parts.every((part) => part.status === "complete") ? "complete" : "incomplete",
+          selectedCourses: [...selectedByCode.values()].sort((left, right) => left.code.localeCompare(right.code)),
+          deferredRequirements,
+          explanations: parts.flatMap((part) => part.explanations || [])
+            .sort((left, right) => left.courseCode.localeCompare(right.courseCode) || left.type.localeCompare(right.type)),
+          issues: parts.flatMap((part) => part.issues || []),
+        };
+      }
+    }
     const candidateByRequirement = new Map(requirements.map((item) => [item.id, []]));
     candidates.forEach((candidate) => candidate.coverageRequirementIds.forEach((id) => {
       if (candidateByRequirement.has(id)) candidateByRequirement.get(id).push(candidate);
     }));
-    const nodeLimit = options.nodeLimit === undefined ? 50000 : Math.max(0, Number(options.nodeLimit) || 0);
+    const nodeLimit = options.nodeLimit === undefined ? 10000 : Math.max(0, Number(options.nodeLimit) || 0);
     if (nodeLimit === 0) return {
       status: "indeterminate", selectedCourses: [], deferredRequirements, explanations: [],
       issues: [{ type: "optimizer_limit", nodeLimit }],
@@ -123,6 +230,17 @@
     let nodes = 0;
     let exhausted = false;
     let best = null;
+    const seenStates = new Set();
+
+    function stateKey(state) {
+      return JSON.stringify({
+        counts: [...state.counts].sort(([left], [right]) => left.localeCompare(right)),
+        selected: [...state.selected].sort(),
+        shared: [...state.sharedCounts].sort(([left], [right]) => left.localeCompare(right)),
+        distinct: [...state.distinctUsed].sort(([left], [right]) => left.localeCompare(right))
+          .map(([id, values]) => [id, [...values].sort()]),
+      });
+    }
 
     function remainingSlots(counts) {
       return [...counts.values()].reduce((sum, count) => sum + Math.max(0, count), 0);
@@ -192,24 +310,41 @@
       if (!best || compareScore(candidate.score, best.score) < 0) best = candidate;
     }
 
-    function nextRequirement(counts, selected) {
-      return requirements.filter((item) => (counts.get(item.id) || 0) > 0)
+    function candidateCanCoverRequirement(candidate, requirement, state) {
+      if (state.selected.has(candidate.code)) return false;
+      const allowed = requirement.distinctAttributes || [];
+      if (!allowed.length) return true;
+      const used = state.distinctUsed.get(requirement.id) || new Set();
+      return (candidate.attributes || []).some((attribute) =>
+        allowed.includes(attribute) && !used.has(attribute));
+    }
+
+    function nextRequirement(state) {
+      return requirements.filter((item) => (state.counts.get(item.id) || 0) > 0)
         .sort((left, right) => {
           const optionsFor = (requirement) => (candidateByRequirement.get(requirement.id) || [])
-            .filter((candidate) => !selected.has(candidate.code)).length;
+            .filter((candidate) => candidateCanCoverRequirement(candidate, requirement, state)).length;
           return optionsFor(left) - optionsFor(right) || left.id.localeCompare(right.id);
         })[0];
     }
 
     function visit(state) {
+      const key = stateKey(state);
+      if (seenStates.has(key)) return;
+      seenStates.add(key);
       nodes += 1;
       if (nodes > nodeLimit) { exhausted = true; return; }
-      const requirement = nextRequirement(state.counts, state.selected);
+      const requirement = nextRequirement(state);
       if (!requirement) { consider(state); return; }
       const available = (candidateByRequirement.get(requirement.id) || [])
-        .filter((candidate) => !state.selected.has(candidate.code))
+        .filter((candidate) => candidateCanCoverRequirement(candidate, requirement, state))
         .sort((left, right) =>
           preferenceRank(left, requirement, preferences) - preferenceRank(right, requirement, preferences)
+          || right.coverageRequirementIds.filter((id) => (state.counts.get(id) || 0) > 0).length
+            - left.coverageRequirementIds.filter((id) => (state.counts.get(id) || 0) > 0).length
+          || left.prerequisiteClosure.length - right.prerequisiteClosure.length
+          || (Number(left.credits) || 3) - (Number(right.credits) || 3)
+          || Number(!left.offeringEvidence) - Number(!right.offeringEvidence)
           || left.code.localeCompare(right.code));
       if (!available.length) { consider(state); return; }
 
@@ -221,22 +356,47 @@
         for (const coverageIds of coverageOptions) {
           const sharedPairs = sharedProgramPairs(candidate, coverageIds, graph.conflicts || [], requirements);
           if (sharedPairs.some((item) => (state.sharedCounts.get(item.key) || 0) >= item.cap)) continue;
-          const counts = new Map(state.counts);
-          coverageIds.forEach((id) => counts.set(id, Math.max(0, (counts.get(id) || 0) - 1)));
-          const selected = new Set(state.selected);
-          selected.add(candidate.code);
-          const allocations = new Map(state.allocations);
-          allocations.set(candidate.code, coverageIds);
-          const sharedCounts = new Map(state.sharedCounts);
-          sharedPairs.forEach((item) => sharedCounts.set(item.key, (sharedCounts.get(item.key) || 0) + 1));
-          visit({ counts, selected, allocations, sharedCounts });
-          if (exhausted) return;
+          let distinctOptions = [{ used: new Map([...state.distinctUsed].map(([id, values]) => [id, new Set(values)])) }];
+          coverageIds.forEach((id) => {
+            const allowed = requirementById.get(id)?.distinctAttributes || [];
+            if (!allowed.length) return;
+            distinctOptions = distinctOptions.flatMap((option) => {
+              const used = option.used.get(id) || new Set();
+              return uniqueSorted((candidate.attributes || []).filter((attribute) =>
+                allowed.includes(attribute) && !used.has(attribute))).map((attribute) => {
+                const next = new Map([...option.used].map(([key, values]) => [key, new Set(values)]));
+                const values = new Set(next.get(id) || []);
+                values.add(attribute);
+                next.set(id, values);
+                return { used: next };
+              });
+            });
+          });
+          for (const distinctOption of distinctOptions) {
+            const counts = new Map(state.counts);
+            coverageIds.forEach((id) => counts.set(id, Math.max(0, (counts.get(id) || 0) - 1)));
+            const selected = new Set(state.selected);
+            selected.add(candidate.code);
+            const allocations = new Map(state.allocations);
+            allocations.set(candidate.code, coverageIds);
+            const sharedCounts = new Map(state.sharedCounts);
+            sharedPairs.forEach((item) => sharedCounts.set(item.key, (sharedCounts.get(item.key) || 0) + 1));
+            visit({ counts, selected, allocations, sharedCounts, distinctUsed: distinctOption.used });
+            if (exhausted) return;
+          }
         }
       }
     }
 
-    visit({ counts: needed, selected: new Set(), allocations: new Map(), sharedCounts: new Map() });
-    if (exhausted) return {
+    visit({
+      counts: needed,
+      selected: new Set(),
+      allocations: new Map(),
+      sharedCounts: new Map(),
+      distinctUsed: new Map(),
+    });
+    const bestIsComplete = best && remainingSlots(best.state.counts) === 0;
+    if (exhausted && !bestIsComplete) return {
       status: "indeterminate", selectedCourses: [], deferredRequirements, explanations: [],
       issues: [{ type: "optimizer_limit", nodeLimit }],
     };
@@ -281,7 +441,9 @@
       selectedCourses,
       deferredRequirements,
       explanations,
-      issues: unresolved.length ? [{ type: "unresolved_requirements", requirements: unresolved }] : [],
+      issues: unresolved.length
+        ? [{ type: "unresolved_requirements", requirements: unresolved }]
+        : (exhausted ? [{ type: "optimizer_limit_reached_after_complete_result", nodeLimit }] : []),
     };
   }
 

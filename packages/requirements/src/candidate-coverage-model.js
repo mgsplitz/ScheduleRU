@@ -55,6 +55,7 @@
       canDefer: decision?.canDefer === true,
       allocationFamily: text(decision?.allocationFamily) || null,
       coreAttribute: text(decision?.coreAttribute) || null,
+      distinctAttributes: uniqueSorted(decision?.distinctAttributes || []),
     };
   }
 
@@ -77,6 +78,8 @@
   }
 
   function doubleCountConflict(candidate, leftId, rightId, policies) {
+    if ((candidate.reviewedEquivalentRequirementIds || []).some((id) =>
+      [leftId, rightId].includes(candidate.requirementPrograms?.[id]))) return null;
     const programs = new Map((policies?.programs || []).map((item) => [item.id, item]));
     const pair = pairKey(leftId, rightId);
     const exceptions = (policies?.doubleCountExceptions || []).filter((item) =>
@@ -140,20 +143,31 @@
           creditsEstimated: record?.creditsEstimated === true,
           equivalentCourseCodes: [],
           coverageRequirementIds: [],
+          reviewedEquivalentRequirementIds: [],
           prerequisitePaths: [],
+          enforceablePrerequisitePaths: [],
           prerequisiteClosure: [],
           attributes: [],
           offeringEvidence: null,
+          minimumPlanYear: Number(record?.minimumPlanYear) || null,
+          minimumPriorCredits: Number(record?.minimumPriorCredits) || null,
         };
         current.equivalentCourseCodes.push(code);
         current.coverageRequirementIds.push(requirement.id);
+        if (text(record?.equivalentFor)) current.reviewedEquivalentRequirementIds.push(requirement.id);
         (record?.prerequisitePaths || []).forEach((path) => {
           const normalized = uniqueSorted((path || []).map(text));
           if (normalized.length) current.prerequisitePaths.push(normalized);
           current.prerequisiteClosure.push(...normalized);
         });
+        (record?.enforceablePrerequisitePaths || []).forEach((path) => {
+          const normalized = uniqueSorted((path || []).map(text));
+          if (normalized.length) current.enforceablePrerequisitePaths.push(normalized);
+        });
         current.attributes.push(...(record?.attributes || []).map(text));
         current.offeringEvidence ||= record?.offeringEvidence || null;
+        current.minimumPlanYear ||= Number(record?.minimumPlanYear) || null;
+        current.minimumPriorCredits ||= Number(record?.minimumPriorCredits) || null;
         if (code === canonical && text(record?.title)) current.title = text(record.title);
         current.credits = Math.min(current.credits, Number(record?.credits) > 0 ? Number(record.credits) : 3);
         current.creditsEstimated &&= record?.creditsEstimated === true;
@@ -170,7 +184,9 @@
       if (current !== candidate) {
         current.equivalentCourseCodes.push(...candidate.equivalentCourseCodes);
         current.coverageRequirementIds.push(...candidate.coverageRequirementIds);
+        current.reviewedEquivalentRequirementIds.push(...candidate.reviewedEquivalentRequirementIds);
         current.prerequisitePaths.push(...candidate.prerequisitePaths);
+        current.enforceablePrerequisitePaths.push(...candidate.enforceablePrerequisitePaths);
         current.prerequisiteClosure.push(...candidate.prerequisiteClosure);
         current.attributes.push(...candidate.attributes);
         current.credits = Math.min(current.credits, candidate.credits);
@@ -188,10 +204,15 @@
             : []),
       ]),
       coverageRequirementIds: uniqueSorted(candidate.coverageRequirementIds),
+      reviewedEquivalentRequirementIds: uniqueSorted(candidate.reviewedEquivalentRequirementIds),
       prerequisitePaths: uniqueSorted(candidate.prerequisitePaths.map((path) => path.join("\u0000")))
+        .map((path) => path.split("\u0000")),
+      enforceablePrerequisitePaths: uniqueSorted(candidate.enforceablePrerequisitePaths.map((path) => path.join("\u0000")))
         .map((path) => path.split("\u0000")),
       prerequisiteClosure: uniqueSorted(candidate.prerequisiteClosure),
       attributes: uniqueSorted(candidate.attributes),
+      requirementPrograms: Object.fromEntries(uniqueSorted(candidate.coverageRequirementIds)
+        .map((id) => [id, requirementById.get(id)?.sourceProgram || ""])),
     })).sort((left, right) => left.code.localeCompare(right.code));
 
     const conflicts = [];

@@ -117,3 +117,50 @@ test("decision-list scroll can be restored after an interest update rerenders th
   view.restoreListScroll(document, 418);
   assert.equal(after.scrollTop, 418);
 });
+
+test("same-named major and minor groups keep independent preference ownership", () => {
+  const shared = {
+    requirementGroupId: "electives", sourceType: "program",
+    label: "Electives", planningMode: "guided_flexible", canDefer: false,
+    candidates: [{ code: "01:730:103", title: "Introduction to Philosophy", prerequisitePaths: [] }],
+  };
+  const flow = modules().controller.create({
+    decisions: [
+      { ...shared, decisionId: "program:finance:electives", sourceProgram: "finance" },
+      { ...shared, decisionId: "program:philosophy-minor:electives", sourceProgram: "philosophy-minor" },
+    ],
+  });
+
+  flow.chooseForMe("program:finance:electives");
+  assert.equal(flow.preferences()["program:finance:electives"].mode, "recommend_for_me");
+  assert.equal(flow.preferences()["program:philosophy-minor:electives"].mode, "ranked");
+});
+
+test("multi-course guidance asks for as many preferences as possible", () => {
+  const html = modules().view.renderDecision({
+    decision: { ...decisions()[1], slotCount: 6 }, preference: {}, index: 0, total: 1,
+  });
+  assert.match(html, /Mark as many as you can/);
+});
+
+test("recommendation review is concise and exposes replacement before approval", () => {
+  const html = modules().view.renderRecommendations({
+    result: {
+      selectedCourses: [{
+        code: "01:198:111", title: "Introduction to Computer Science",
+        coverageRequirementIds: ["cs", "rbs"], prerequisiteOnly: false,
+      }],
+      explanations: [{
+        type: "multi_requirement_coverage", courseCode: "01:198:111",
+        requirementIds: ["cs", "rbs"],
+      }],
+    },
+    requirements: [
+      { id: "cs", label: "Computer Science electives" },
+      { id: "rbs", label: "Business computing" },
+    ],
+  });
+  assert.match(html, /Covers Computer Science electives and Business computing/);
+  assert.match(html, /data-replace-requirement="cs"/);
+  assert.doesNotMatch(html, /multi_requirement_coverage/);
+});

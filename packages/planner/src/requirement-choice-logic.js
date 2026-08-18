@@ -65,6 +65,7 @@
         courseSelectors: [...(context.courseSelectors || [])],
         sourceProgramIds: [...(context.sourceProgramIds || [])],
         allocationFamily: text(context.allocationFamily) || null,
+        distinctAttributes: [...(context.distinctAttributes || [])],
       };
       current.slotCount += 1;
       current.candidates.push(...(context.candidatePrerequisiteSummaries || []));

@@ -123,6 +123,48 @@ test("planner decisions retain candidate-specific prerequisite summaries", () =>
   assert.deepEqual(plain(decision.candidates.find((item) => item.code === "01:198:323").prerequisitePaths), [["01:640:151"]]);
 });
 
+test("reviewed alternatives become concrete optimizer candidates in one equivalence family", () => {
+  const tree = sampleTree();
+  tree.courses.electiveA.alternatives = [{
+    code: "01:198:111", title: "Introduction to Computer Science", credits: "4",
+  }];
+  const result = build({ requirementTrees: [{ id: "program", tree }] });
+  const decision = result.planningDecisions.find((item) => item.requirementGroupId === "electives");
+  const primary = decision.candidates.find((item) => item.code === "01:198:314");
+  const alternative = decision.candidates.find((item) => item.code === "01:198:111");
+
+  assert.ok(alternative);
+  assert.equal(alternative.equivalenceKey, primary.equivalenceKey);
+});
+
+test("only an approved complete recommendation replaces its covered placeholders", () => {
+  const input = build();
+  const untouched = plannerInput().applyApprovedCourseSet(input, {
+    status: "incomplete", selectedCourses: [],
+  });
+  assert.equal(untouched, input);
+
+  const applied = plannerInput().applyApprovedCourseSet(input, {
+    status: "complete",
+    selectedCourses: [
+      {
+        code: "01:198:314", title: "Principles of Programming Languages", credits: 4,
+        coverageRequirementIds: ["program:sasnb-computer-science-bs:electives"],
+        prerequisitePaths: [["01:198:111"]], enforceablePrerequisitePaths: [["01:198:111"]],
+      },
+      {
+        code: "01:198:323", title: "Numerical Analysis", credits: 4,
+        coverageRequirementIds: ["program:sasnb-computer-science-bs:electives"],
+        prerequisitePaths: [], enforceablePrerequisitePaths: [],
+      },
+    ],
+  });
+
+  assert.equal(applied.unresolvedRequirements.filter((item) => item.requirementGroupId === "electives").length, 0);
+  assert.equal(applied.courses.some((item) => item.code === "01:198:314"), true);
+  assert.deepEqual(plain(applied.prerequisitePathsByCode["01:198:314"]), [["01:198:111"]]);
+});
+
 test("a completed approved alternative satisfies the canonical requirement course", () => {
   const result = build({ completedCourseCodes: ["01:640:135"] });
   assert.ok(result.completedCourseCodes.includes("01:640:151"));
@@ -473,6 +515,10 @@ test("distinct Core goal pools remain placeholders until a goal is explicitly ch
   assert.ok(result.unresolvedRequirements.every((item) => item.candidateSelectionContext.sourceType === "core"));
   assert.ok(result.unresolvedRequirements.every((item) => item.candidateSelectionContext.requirementGroupId === "humanities"));
   assert.deepEqual(
+    plain(result.unresolvedRequirements[0].candidateSelectionContext.distinctAttributes),
+    [],
+  );
+  assert.deepEqual(
     plain(result.unresolvedRequirements[0].candidateSelectionContext.memberCourseCodes),
     ["01:510:101", "01:510:102", "01:195:101", "01:195:102"]
   );
@@ -529,6 +575,16 @@ test("a selected Arts and Humanities child goal resolves its parent slot and eve
   assert.deepEqual(plain(result.courses.map((course) => course.code)), ["01:730:104"]);
   assert.equal(result.unresolvedRequirements.some((item) => item.requirementGroupId === "ccd"), false);
   assert.equal(result.unresolvedRequirements.filter((item) => item.requirementGroupId === "ah").length, 1);
+  assert.deepEqual(
+    plain(result.unresolvedRequirements.find((item) => item.requirementGroupId === "ah")
+      .candidateSelectionContext.distinctAttributes),
+    ["AHp", "AHo"],
+  );
+  assert.deepEqual(
+    plain(result.planningDecisions.find((item) => item.requirementGroupId === "ah")
+      .candidates[0].attributes),
+    ["AHp"],
+  );
 });
 
 test("selector-backed minor decisions retain ownership and remain guideable before candidates load", () => {

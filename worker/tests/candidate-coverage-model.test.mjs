@@ -42,7 +42,10 @@ test("a reviewed equivalent CS course also covers the RBS computing requirement"
   const graph = model().buildCoverageGraph({
     decisions: [
       decision("cs-elective", "sasnb-computer-science-minor", [candidate("01:198:111")]),
-      decision("rbs-computing", "rbsnb-foundational-core", [candidate("01:198:170")]),
+      decision("rbs-computing", "rbsnb-foundational-core", [
+        candidate("01:198:170"),
+        candidate("01:198:111", { equivalentFor: "01:198:170" }),
+      ]),
     ],
     equivalencies: [{
       program_id: "rbsnb-foundational-core",
@@ -55,6 +58,7 @@ test("a reviewed equivalent CS course also covers the RBS computing requirement"
   const intro = graph.candidates.find((item) => item.code === "01:198:111");
   assert.deepEqual(plain(intro.coverageRequirementIds), ["cs-elective", "rbs-computing"]);
   assert.deepEqual(plain(intro.equivalentCourseCodes), ["01:198:111", "01:198:170"]);
+  assert.equal(graph.conflicts.length, 0);
 });
 
 test("a course can cover Core and program work and two different Core families", () => {
@@ -189,4 +193,3 @@ test("equivalent catalog codes form one credit-bearing candidate", () => {
   assert.equal(graph.candidates[0].credits, 3);
   assert.deepEqual(plain(graph.candidates[0].equivalentCourseCodes), ["01:960:211", "01:960:285"]);
 });
-

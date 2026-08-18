@@ -147,6 +147,24 @@ test("a multi-slot requirement selects distinct courses and asks for all slots",
   assert.equal(result.selectedCourses.length, 2);
 });
 
+test("a distinct Core requirement uses different reviewed subgoals", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("ah", {
+      sourceType: "core", slotCount: 2, distinctAttributes: ["AHo", "AHp", "AHq", "AHr"],
+    })],
+    candidates: [
+      candidate("01:730:103", ["ah"], { attributes: ["AHo"] }),
+      candidate("01:730:104", ["ah"], { attributes: ["AHo", "WCr"] }),
+      candidate("01:730:218", ["ah"], { attributes: ["AHp"] }),
+    ],
+    conflicts: [],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.selectedCourses.some((item) => item.code === "01:730:218"), true);
+  assert.equal(result.selectedCourses.filter((item) => ["01:730:103", "01:730:104"].includes(item.code)).length, 1);
+});
+
 test("identical inputs produce byte-equivalent results", () => {
   const graph = {
     requirements: [requirement("elective")],
@@ -170,3 +188,42 @@ test("returns indeterminate rather than a partial guess when its safety limit is
   assert.deepEqual(plain(result.selectedCourses), []);
 });
 
+test("keeps a complete policy-valid result found before the optimizer safety limit", () => {
+  const { optimizeCourseSet } = optimizer();
+  const requirements = Array.from({ length: 6 }, (_, index) => ({
+    id: `r${index + 1}`, requirementGroupId: `g${index + 1}`, slotCount: 1,
+  }));
+  const candidates = Array.from({ length: 18 }, (_, index) => ({
+    code: `01:000:${String(index + 1).padStart(3, "0")}`,
+    title: `Course ${index + 1}`,
+    credits: 3,
+    offeringEvidence: true,
+    equivalentCourseCodes: [`01:000:${String(index + 1).padStart(3, "0")}`],
+    coverageRequirementIds: [`r${(index % 6) + 1}`],
+    prerequisiteClosure: [`01:999:${String(index + 1).padStart(3, "0")}`],
+  }));
+  const result = optimizeCourseSet(
+    { requirements, candidates, conflicts: [] }, {}, { nodeLimit: 10, component: true },
+  );
+  assert.equal(result.status, "complete");
+  assert.equal(result.selectedCourses.filter((item) => !item.prerequisiteOnly).length, 6);
+  assert.equal(result.issues[0]?.type, "optimizer_limit_reached_after_complete_result");
+});
+
+test("collapses redundant large pools while preserving a later interested choice", () => {
+  const requirements = Array.from({ length: 8 }, (_, index) => requirement(`r${index}`));
+  const candidates = requirements.flatMap((item, requirementIndex) =>
+    Array.from({ length: 100 }, (_, index) => candidate(
+      `01:${String(100 + requirementIndex).padStart(3, "0")}:${String(100 + index).padStart(3, "0")}`,
+      [item.id],
+    )));
+  const preferred = candidates.find((item) => item.coverageRequirementIds[0] === "r7" && item.code.endsWith(":199"));
+  const result = optimizer().optimizeCourseSet(
+    { requirements, candidates, conflicts: [] },
+    { r7: { interested: [preferred.code], maybe: [], avoid: [] } },
+    { nodeLimit: 1000 },
+  );
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.selectedCourses.some((item) => item.code === preferred.code), true);
+});

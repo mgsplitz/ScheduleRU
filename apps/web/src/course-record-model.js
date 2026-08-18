@@ -68,6 +68,7 @@
         restrictions: cleanText?.(course.restrictions) || "",
         requirementNotes: [],
         prereqs: [],
+        attributes: Array.isArray(course.attributes) ? [...course.attributes] : [],
         eligibility: current.courseEligibilityByCode?.[code] || null,
         catalogRecordAvailable: true,
       };
