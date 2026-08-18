@@ -38,3 +38,27 @@ test("every formerly repaired reviewed group now owns durable course titles", ()
     assert.equal(programDefinition(programId).program.review_status, "reviewed");
   }
 });
+
+test("reviewed Computer Science choice pools keep titles when courses are absent from the active term", () => {
+  for (const [programId, groupId] of [
+    ["sasnb-computer-science-ba", "sasnb-computer-science-ba-cs-electives"],
+    ["sasnb-computer-science-bs", "sasnb-computer-science-bs-cs-electives"],
+    ["sasnb-computer-science-minor", "sasnb-computer-science-minor-approved-courses"],
+  ]) {
+    const courses = requirementGroup(programId, groupId).courses;
+    assert.ok(courses.length > 0, `${groupId} must retain its reviewed choices`);
+    assert.ok(
+      courses.every(({ code, title }) => title?.trim() && title.trim() !== code),
+      `${groupId} contains a course whose only label is its code`,
+    );
+  }
+
+  const minorTitles = new Map(
+    requirementGroup(
+      "sasnb-computer-science-minor",
+      "sasnb-computer-science-minor-approved-courses",
+    ).courses.map(({ code, title }) => [code, title]),
+  );
+  assert.equal(minorTitles.get("01:198:442"), "Topics in Computer Science");
+  assert.equal(minorTitles.get("01:198:452"), "Formal Languages and Automata");
+});
