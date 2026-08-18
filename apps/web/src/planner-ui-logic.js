@@ -115,6 +115,10 @@
     return coreIncomplete ? "warn" : "confirm";
   }
 
+  function approvedGenerationPreflight({ coreIncomplete = false } = {}) {
+    return coreIncomplete ? "warn" : "generate";
+  }
+
   function canAcceptGeneratedPlan(preview = {}) {
     return preview?.status === "complete"
       && !(preview?.issues || []).some((issue) => issue?.severity === "error");
@@ -193,6 +197,7 @@
     requirementProgressCourseIds,
     coursePathState,
     generationPreflight,
+    approvedGenerationPreflight,
     canAcceptGeneratedPlan,
     previewResult,
     shouldAutoCollapseSharedGroup,

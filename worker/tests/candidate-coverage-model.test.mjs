@@ -193,3 +193,19 @@ test("equivalent catalog codes form one credit-bearing candidate", () => {
   assert.equal(graph.candidates[0].credits, 3);
   assert.deepEqual(plain(graph.candidates[0].equivalentCourseCodes), ["01:960:211", "01:960:285"]);
 });
+
+test("canonical prerequisite records keep prerequisite-only recommendations readable", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [{
+      ...decision("advanced", "sasnb-example", [candidate("01:730:424", {
+        title: "Logic of Decision",
+        prerequisitePaths: [["01:730:407"]],
+      })]),
+      prerequisiteCourses: [{ code: "01:730:407", title: "Intermediate Logic I", credits: 3 }],
+    }],
+  });
+
+  const prerequisite = graph.candidates.find((course) => course.code === "01:730:407");
+  assert.equal(prerequisite.title, "Intermediate Logic I");
+  assert.deepEqual(plain(prerequisite.coverageRequirementIds), []);
+});

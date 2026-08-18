@@ -5,9 +5,16 @@
   const pairKey = (left, right) => [left, right].filter(Boolean).sort().join("|");
 
   function preferenceFor(requirement, preferences) {
-    return preferences?.[requirement.id]
+    const local = preferences?.[requirement.id]
       || preferences?.[requirement.requirementGroupId]
       || {};
+    const global = preferences?.__global || {};
+    return {
+      ...local,
+      interested: [...new Set([...(global.interested || []), ...(local.interested || [])])],
+      maybe: [...new Set([...(global.maybe || []), ...(local.maybe || [])])],
+      avoid: [...new Set([...(global.avoid || []), ...(local.avoid || [])])],
+    };
   }
 
   function preferenceRank(candidate, requirement, preferences) {
@@ -102,6 +109,10 @@
       prerequisiteClosure: uniqueSorted(candidate.prerequisiteClosure || []),
     })).sort((left, right) => left.code.localeCompare(right.code));
     const requirementById = new Map(requirements.map((item) => [item.id, item]));
+    const unlockCounts = new Map();
+    allCandidates.forEach((candidate) => (candidate.prerequisiteClosure || []).forEach((code) => {
+      unlockCounts.set(code, (unlockCounts.get(code) || 0) + 1);
+    }));
     function candidateBehavior(candidate) {
       const conflictFacts = (graph.conflicts || []).filter((item) => item.candidateCode === candidate.code)
         .map(({ candidateCode: _candidateCode, ...fact }) => fact)
@@ -290,6 +301,7 @@
         remainingSlots(state.counts),
         credits,
         -(coverageUnits - state.selected.size),
+        -records.reduce((sum, item) => sum + (unlockCounts.get(item.code) || 0), 0),
         interest,
         prerequisiteCount,
         unavailable,
@@ -342,6 +354,7 @@
           preferenceRank(left, requirement, preferences) - preferenceRank(right, requirement, preferences)
           || right.coverageRequirementIds.filter((id) => (state.counts.get(id) || 0) > 0).length
             - left.coverageRequirementIds.filter((id) => (state.counts.get(id) || 0) > 0).length
+          || (unlockCounts.get(right.code) || 0) - (unlockCounts.get(left.code) || 0)
           || left.prerequisiteClosure.length - right.prerequisiteClosure.length
           || (Number(left.credits) || 3) - (Number(right.credits) || 3)
           || Number(!left.offeringEvidence) - Number(!right.offeringEvidence)

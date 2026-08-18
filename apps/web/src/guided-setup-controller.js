@@ -308,7 +308,7 @@ async function hydratePlannerDecisions(input){
   });
   const codes=[...new Set(decisions.flatMap(decision=>(decision.candidates||[]).map(candidate=>candidate.code)).filter(Boolean))];
   for(let index=0;index<codes.length;index+=25)await loadCourseEligibilityForCodes(codes.slice(index,index+25));
-  return {...input,planningDecisions:decisions.map(decision=>({
+  const normalizedDecisions=decisions.map(decision=>({
     ...decision,
     candidates:(decision.candidates||[]).map(candidate=>({
       ...ScheduleRUPlannerInput.normalizedCourse({
@@ -316,7 +316,8 @@ async function hydratePlannerDecisions(input){
       }),
       attributes:[...(candidate.attributes||[])],
     })),
-  }))};
+  }));
+  return {...input,planningDecisions:await ScheduleRUPlanningDecisionLoader.hydratePrerequisiteMetadata({decisions:normalizedDecisions,request:backendFetch})};
 }
 const checkedGeneratePlanButton=document.getElementById("generatePlanBtn"),coreAwareGeneratePlanButton=checkedGeneratePlanButton.cloneNode(true);checkedGeneratePlanButton.replaceWith(coreAwareGeneratePlanButton);
 function finishPlanGenerationPreflight(){ST.planGenerationPending=false;coreAwareGeneratePlanButton.disabled=false;}
@@ -335,9 +336,27 @@ function confirmPlanGenerationPreview(approvedInput){
     ],
   });
 }
+function generateApprovedCourseSet(approvedInput){
+  const decision=globalThis.ScheduleRUPlannerUI.approvedGenerationPreflight({coreIncomplete:corePlannerStatus().incomplete});
+  if(decision==="generate"){
+    finishPlanGenerationPreflight();
+    generateFourYearPlan(approvedInput);
+    return;
+  }
+  modalController.show({
+    title:"Core choices are incomplete",
+    body:"<p>Accuracy improves when Core choices are completed. Your approved program courses will be used, and unresolved Core areas will remain clearly marked.</p>",
+    canDismiss:false,
+    actions:[
+      {label:"Go back",secondary:true,onClick:finishPlanGenerationPreflight},
+      {label:"I understand",onClick:()=>{finishPlanGenerationPreflight();generateFourYearPlan(approvedInput);}},
+    ],
+  });
+}
 function openGenerationDecisionFlow(input){
   let index=0;
   const scrollByDecision={};
+  const displayByDecision={};
   const flow=ScheduleRUGenerationDecisionsController.create({
     decisions:input.planningDecisions||[],
     programs:ST.availablePrograms||[],
@@ -347,6 +366,13 @@ function openGenerationDecisionFlow(input){
   const decisions=flow.decisions();
   if(!decisions.length){confirmPlanGenerationPreview();return;}
   function decisionKey(decision){return decision.decisionId||decision.requirementGroupId;}
+  function moveDecision(direction){
+    let next=index+direction;
+    while(next>=0&&next<decisions.length&&direction>0&&flow.unratedCandidates(decisionKey(decisions[next])).length===0)next+=direction;
+    if(next>=decisions.length){renderRecommendationReview();return;}
+    if(next<0){finishPlanGenerationPreflight();modalController.hide?.();return;}
+    index=next;renderDecision();
+  }
   function optimizedCourseSet(){
     const graph=ScheduleRUCandidateCoverageModel.buildCoverageGraph({
       decisions,
@@ -380,7 +406,7 @@ function openGenerationDecisionFlow(input){
       canDismiss:false,
       actions:[
         {label:"Back",secondary:true,close:false,onClick:()=>{index=decisions.length-1;renderDecision();}},
-        {label:"Use these courses",className:"push-right",close:false,onClick:()=>confirmPlanGenerationPreview(ScheduleRUPlannerInput.applyApprovedCourseSet(input,result))},
+        {label:"Use these courses",className:"push-right",close:false,onClick:()=>generateApprovedCourseSet(ScheduleRUPlannerInput.applyApprovedCourseSet(input,result))},
       ],
     });
     document.getElementById("appModalBody")?.querySelectorAll("[data-replace-requirement]").forEach(button=>button.addEventListener("click",()=>{
@@ -393,14 +419,15 @@ function openGenerationDecisionFlow(input){
     if(previous)scrollByDecision[previous]=ScheduleRUGenerationDecisionsView.captureListScroll(document);
     const decision=decisions[index],groupId=decisionKey(decision);
     const preference=flow.preferences()[groupId]||{};
+    const display=displayByDecision[groupId]||{expanded:false,search:""};
     modalController.show({
       title:"Plan your course choices",
-      body:ScheduleRUGenerationDecisionsView.renderDecision({decision,preference,index,total:decisions.length}),
+      body:ScheduleRUGenerationDecisionsView.renderDecision({decision,preference,globalPreference:flow.preferences().__global,index,total:decisions.length,...display}),
       canDismiss:false,
       actions:[
-        {label:"Back",secondary:true,close:index===0,onClick:()=>{if(index===0)finishPlanGenerationPreflight();else{index-=1;renderDecision();}}},
-        ...(decision.canDefer?[{label:"I’ll do this later",className:"quiet-action",close:false,onClick:()=>{flow.defer(groupId);if(index===decisions.length-1)renderRecommendationReview();else{index+=1;renderDecision();}}}]:[]),
-        {label:index===decisions.length-1?"Review courses":"Next",className:"push-right",disabled:!flow.canAdvance(groupId),close:false,onClick:()=>{if(index===decisions.length-1)renderRecommendationReview();else{index+=1;renderDecision();}}},
+        {label:"Back",secondary:true,close:index===0,onClick:()=>{if(index===0)finishPlanGenerationPreflight();else moveDecision(-1);}},
+        ...(decision.canDefer?[{label:"I’ll do this later",className:"quiet-action",close:false,onClick:()=>{flow.defer(groupId);moveDecision(1);}}]:[]),
+        {label:index===decisions.length-1?"Review courses":"Next",className:"push-right",disabled:!flow.canAdvance(groupId),close:false,onClick:()=>moveDecision(1)},
       ],
     });
     ScheduleRUGenerationDecisionsView.restoreListScroll(document,scrollByDecision[groupId]);
@@ -410,6 +437,12 @@ function openGenerationDecisionFlow(input){
       renderDecision();
     }));
     body.querySelector("[data-decision-recommend]")?.addEventListener("click",()=>{flow.chooseForMe(groupId);renderDecision();});
+    body.querySelector("[data-decision-expand]")?.addEventListener("click",()=>{displayByDecision[groupId]={...display,expanded:!display.expanded};renderDecision();});
+    body.querySelector("[data-decision-search]")?.addEventListener("input",event=>{
+      displayByDecision[groupId]={expanded:true,search:event.target.value};renderDecision();
+      const search=document.getElementById("appModalBody")?.querySelector("[data-decision-search]");
+      if(search){search.focus();search.setSelectionRange(search.value.length,search.value.length);}
+    });
   }
   renderDecision();
 }

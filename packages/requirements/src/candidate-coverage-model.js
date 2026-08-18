@@ -130,6 +130,27 @@
     const families = equivalenceFamilies(allCodes, equivalencies);
     const byCanonical = new Map();
 
+    decisions.flatMap((decision) => decision?.prerequisiteCourses || []).forEach((record) => {
+      const code = text(record?.code);
+      if (!code || byCanonical.has(code)) return;
+      byCanonical.set(code, {
+        code,
+        title: text(record?.title) || "Course title unavailable",
+        credits: Number(record?.credits) > 0 ? Number(record.credits) : 3,
+        creditsEstimated: !(Number(record?.credits) > 0),
+        equivalentCourseCodes: [code],
+        coverageRequirementIds: [],
+        reviewedEquivalentRequirementIds: [],
+        prerequisitePaths: [],
+        enforceablePrerequisitePaths: [],
+        prerequisiteClosure: [],
+        attributes: [],
+        offeringEvidence: null,
+        minimumPlanYear: null,
+        minimumPriorCredits: null,
+      });
+    });
+
     decisions.forEach((decision, index) => {
       const requirement = normalizedRequirement(decision, index);
       (decision?.candidates || []).forEach((record) => {

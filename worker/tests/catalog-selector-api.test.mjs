@@ -30,6 +30,78 @@ test("catalog exposes reviewed leaf Core attributes for the standard filter", as
   assert.match(db.calls[0].sql, /SELECT DISTINCT attribute_code/);
 });
 
+test("catalog resolves canonical metadata for a bounded set of course codes", async () => {
+  const db = catalogDb([
+    { course_code: "01:730:407", title: "Intermediate Logic I", credits: "3" },
+    { course_code: "01:730:408", title: "Intermediate Logic II", credits: "3" },
+  ]);
+  const response = await worker.fetch(
+    new Request("https://example.test/api/course-metadata?codes=01%3A730%3A407%2C01%3A730%3A408"),
+    { DB: db },
+    {},
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { courses: [
+    { course_code: "01:730:407", title: "Intermediate Logic I", credits: "3" },
+    { course_code: "01:730:408", title: "Intermediate Logic II", credits: "3" },
+  ] });
+  assert.match(db.calls[0].sql, /FROM course_reference/);
+  assert.match(db.calls[0].sql, /json_each\(\?\)/);
+  assert.deepEqual(JSON.parse(db.calls[0].values[0]), ["01:730:407", "01:730:408"]);
+});
+
+test("catalog rejects malformed or oversized canonical metadata requests", async () => {
+  const malformed = catalogDb();
+  const malformedResponse = await worker.fetch(
+    new Request("https://example.test/api/course-metadata?codes=01%3A730%3A407%2Cbad"),
+    { DB: malformed },
+    {},
+  );
+  assert.equal(malformedResponse.status, 400);
+  assert.equal(malformed.calls.length, 0);
+
+  const oversized = catalogDb();
+  const codes = Array.from({ length: 101 }, (_, index) => `01:198:${String(index).padStart(3, "0")}`);
+  const oversizedResponse = await worker.fetch(
+    new Request(`https://example.test/api/course-metadata?codes=${encodeURIComponent(codes.join(","))}`),
+    { DB: oversized },
+    {},
+  );
+  assert.equal(oversizedResponse.status, 400);
+  assert.equal(oversized.calls.length, 0);
+});
+
+test("development admins can seed canonical metadata from any Rutgers term without section writes", async () => {
+  const calls = [];
+  const batches = [];
+  const db = {
+    prepare(sql) {
+      return { bind(...values) { const row = { sql, values }; calls.push(row); return row; } };
+    },
+    async batch(statements) { batches.push(statements); return statements.map(() => ({ success: true })); },
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify([
+    { offeringUnitCode: "01", subject: "730", courseNumber: "407", expandedTitle: "Intermediate Logic I", credits: 3 },
+    { offeringUnitCode: "01", subject: "730", courseNumber: "408", expandedTitle: "Intermediate Logic II", credits: 3 },
+  ]));
+  try {
+    const response = await worker.fetch(
+      new Request("https://example.test/api/admin/course-reference/sync?secret=secret&year=2024&term=9", { method: "POST" }),
+      { DB: db, ADMIN_SECRET: "secret" },
+      {},
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, year: 2024, term: "9", courses: 2 });
+    assert.equal(batches.length, 1);
+    assert.equal(calls.every((call) => call.sql.includes("course_reference")), true);
+    assert.deepEqual(calls[0].values.slice(0, 3), ["01:730:407", "Intermediate Logic I", "3"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("catalog selector filtering happens in D1 before limit and offset", async () => {
   const db = catalogDb([{ id: "01:640:300:2026:9", school: "01", subject_code: "640", course_number: "300" }]);
   const selector = {

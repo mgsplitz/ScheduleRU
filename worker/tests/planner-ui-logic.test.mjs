@@ -204,6 +204,8 @@ test("plan generation preflight requires acknowledgement only for incomplete Cor
   assert.equal(logic.generationPreflight({ busy: true, coreIncomplete: true }), "ignore");
   assert.equal(logic.generationPreflight({ busy: false, coreIncomplete: true }), "warn");
   assert.equal(logic.generationPreflight({ busy: false, coreIncomplete: false }), "confirm");
+  assert.equal(logic.approvedGenerationPreflight({ coreIncomplete: false }), "generate");
+  assert.equal(logic.approvedGenerationPreflight({ coreIncomplete: true }), "warn");
 });
 
 test("only complete generated plans can replace the accepted plan", () => {

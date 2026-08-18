@@ -459,6 +459,45 @@ function groupContentStatements(
   ];
 }
 
+function courseReferenceStatements(
+  database: CatalogDatabase,
+  definition: ProgramDefinition,
+  groups: RequirementGroupDefinition[],
+  publishedAt: number,
+): CatalogPreparedStatement[] {
+  const byCode = new Map<string, [string, string, string | null]>();
+  for (const group of groups) {
+    for (const course of group.courses) {
+      const title = course.title?.trim();
+      if (!title || byCode.has(course.code)) continue;
+      byCode.set(course.code, [course.code, title, course.credits === null ? null : String(course.credits)]);
+    }
+  }
+  if (!byCode.size) return [];
+  const rows = [...byCode.values()].sort((left, right) => left[0].localeCompare(right[0]));
+  const columns = ["course_code", "title", "credits", "source_kind", "source_url", "updated_at"];
+  const rowsPerStatement = Math.max(1, Math.floor(100 / columns.length));
+  const statements: CatalogPreparedStatement[] = [];
+  for (let offset = 0; offset < rows.length; offset += rowsPerStatement) {
+    const chunk = rows.slice(offset, offset + rowsPerStatement);
+    const placeholders = chunk.map(() => "(?, ?, ?, ?, ?, ?)").join(", ");
+    statements.push(statement(
+      database,
+      `INSERT INTO course_reference (${columns.join(", ")}) VALUES ${placeholders}
+       ON CONFLICT(course_code) DO UPDATE SET
+         title = CASE WHEN excluded.title <> '' THEN excluded.title ELSE course_reference.title END,
+         credits = COALESCE(excluded.credits, course_reference.credits),
+         source_kind = excluded.source_kind,
+         source_url = excluded.source_url,
+         updated_at = excluded.updated_at`,
+      ...chunk.flatMap(([code, title, credits]) => [
+        code, title, credits, "reviewed_program", definition.program.source_url, publishedAt,
+      ]),
+    ));
+  }
+  return statements;
+}
+
 function eligibilityStatements(
   database: CatalogDatabase,
   definition: ProgramDefinition,
@@ -528,6 +567,7 @@ export async function publishProgramDefinition(
   ];
   const contentRows = groupContentRows(definition, sources, groups);
   statements.push(...groupContentStatements(database, contentRows));
+  statements.push(...courseReferenceStatements(database, definition, groups, options.published_at));
   statements.push(...courseAttributeStatements(database, definition, groups));
   statements.push(...eligibilityStatements(database, definition, sources));
 

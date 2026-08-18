@@ -72,5 +72,27 @@
     }));
   }
 
-  root.ScheduleRUPlanningDecisionLoader = { hydrate, normalizedSelectors, mergeCandidates };
+  async function hydratePrerequisiteMetadata({ decisions = [], request } = {}) {
+    if (typeof request !== "function") throw new TypeError("request must be a function");
+    const codes = [...new Set((decisions || []).flatMap((decision) =>
+      (decision.candidates || []).flatMap((candidate) =>
+        [...(candidate.prerequisitePaths || []), ...(candidate.enforceablePrerequisitePaths || [])].flat()
+      )
+    ).filter(Boolean))].sort();
+    const records = [];
+    for (let offset = 0; offset < codes.length; offset += 100) {
+      const params = new URLSearchParams({ codes: codes.slice(offset, offset + 100).join(",") });
+      const response = await request(`/api/course-metadata?${params.toString()}`);
+      records.push(...(Array.isArray(response?.courses) ? response.courses : []));
+    }
+    const prerequisiteCourses = records.map((record) => ({
+      code: record.course_code || record.code,
+      title: record.title,
+      credits: Number(record.credits) > 0 ? Number(record.credits) : 3,
+    })).filter((record) => record.code && record.title)
+      .sort((left, right) => left.code.localeCompare(right.code));
+    return (decisions || []).map((decision) => ({ ...copy(decision, {}), prerequisiteCourses: copy(prerequisiteCourses) }));
+  }
+
+  root.ScheduleRUPlanningDecisionLoader = { hydrate, hydratePrerequisiteMetadata, normalizedSelectors, mergeCandidates };
 })(globalThis);

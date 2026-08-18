@@ -93,3 +93,32 @@ test("explicit Mathematics choices merge with every reviewed selector candidate"
   assert.equal(hydrated[0].candidates.some(({ code }) => code === "01:640:244"), true);
   assert.equal(hydrated[0].candidates.some(({ code }) => code === "01:640:327"), true);
 });
+
+test("canonical prerequisite metadata is attached once for every decision", async () => {
+  const decisions = [{
+    decisionId: "program:example:advanced",
+    candidates: [{
+      code: "01:730:424",
+      title: "Logic of Decision",
+      prerequisitePaths: [["01:730:407", "01:730:408"]],
+    }],
+  }];
+  const paths = [];
+  const hydrated = await loader().hydratePrerequisiteMetadata({
+    decisions,
+    request: async (path) => {
+      paths.push(path);
+      return { courses: [
+        { course_code: "01:730:407", title: "Intermediate Logic I", credits: "3" },
+        { course_code: "01:730:408", title: "Intermediate Logic II", credits: "3" },
+      ] };
+    },
+  });
+
+  assert.equal(paths.length, 1);
+  assert.match(paths[0], /course-metadata/);
+  assert.deepEqual(plain(hydrated[0].prerequisiteCourses), [
+    { code: "01:730:407", title: "Intermediate Logic I", credits: 3 },
+    { code: "01:730:408", title: "Intermediate Logic II", credits: 3 },
+  ]);
+});
