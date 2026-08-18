@@ -13,6 +13,24 @@
     }).filter(Boolean);
   }
 
+  function mergeCandidateRecords(left = {}, right = {}) {
+    const merged = { ...left };
+    Object.entries(right || {}).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === "") return;
+      if (Array.isArray(value) && !value.length && Array.isArray(merged[key]) && merged[key].length) return;
+      merged[key] = value;
+    });
+    return merged;
+  }
+
+  function mergeCandidates(...lists) {
+    const byCode = new Map();
+    lists.flat().filter((course) => course?.code).forEach((course) => {
+      byCode.set(course.code, mergeCandidateRecords(byCode.get(course.code), course));
+    });
+    return [...byCode.values()].sort((left, right) => left.code.localeCompare(right.code));
+  }
+
   async function hydrate({ decisions = [], request, normalizeCandidate = (value) => value } = {}) {
     if (typeof request !== "function") throw new TypeError("request must be a function");
     const cache = new Map();
@@ -46,10 +64,13 @@
     }
 
     return Promise.all((decisions || []).map(async (decision) => {
-      if ((decision.candidates || []).length || !(decision.courseSelectors || []).length) return copy(decision, {});
-      return { ...copy(decision, {}), candidates: await candidatesFor(decision.courseSelectors) };
+      if (!(decision.courseSelectors || []).length) return copy(decision, {});
+      return {
+        ...copy(decision, {}),
+        candidates: mergeCandidates(decision.candidates || [], await candidatesFor(decision.courseSelectors)),
+      };
     }));
   }
 
-  root.ScheduleRUPlanningDecisionLoader = { hydrate, normalizedSelectors };
+  root.ScheduleRUPlanningDecisionLoader = { hydrate, normalizedSelectors, mergeCandidates };
 })(globalThis);

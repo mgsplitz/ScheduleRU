@@ -59,3 +59,37 @@ test("identical reviewed selector pools are fetched once and reused", async () =
   assert.equal(hydrated[0].candidates.length, 1);
   assert.equal(hydrated[1].candidates.length, 1);
 });
+
+test("explicit Mathematics choices merge with every reviewed selector candidate", async () => {
+  const explicit = [
+    { code: "01:640:244", title: "Differential Equations for Engineering and Physics" },
+    { code: "01:640:252", title: "Elementary Differential Equations" },
+  ];
+  const selectorCourses = Array.from({ length: 28 }, (_, index) => ({
+    code: `01:640:${String(300 + index).padStart(3, "0")}`,
+    title: `Mathematics elective ${index + 1}`,
+  }));
+  const hydrated = await loader().hydrate({
+    decisions: [{
+      decisionId: "program:sasnb-mathematics-minor:electives",
+      candidates: explicit,
+      courseSelectors: [{
+        selector_json: JSON.stringify({
+          version: 1,
+          kind: "subject_level",
+          school_codes: ["01"],
+          subject_codes: ["640"],
+          course_number_min: 300,
+          course_number_max: 499,
+          minimum_credits: 3,
+        }),
+      }],
+    }],
+    request: async () => ({ total: 28, courses: selectorCourses }),
+    normalizeCandidate: (course) => ({ ...course, prerequisitePaths: [] }),
+  });
+
+  assert.equal(hydrated[0].candidates.length, 30);
+  assert.equal(hydrated[0].candidates.some(({ code }) => code === "01:640:244"), true);
+  assert.equal(hydrated[0].candidates.some(({ code }) => code === "01:640:327"), true);
+});
