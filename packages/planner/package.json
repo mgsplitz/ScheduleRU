@@ -6,6 +6,7 @@
   "exports": {
     "./academic-progress": "./src/academic-progress-model.js",
     "./course-path": "./src/course-path-model.js",
+    "./course-set-optimizer": "./src/course-set-optimizer.js",
     "./eligibility": "./src/eligibility-logic.js",
     "./four-year": "./src/four-year-planner-logic.js",
     "./input": "./src/planner-input-logic.js",
@@ -13,6 +14,6 @@
     "./state": "./src/planner-state-logic.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/academic-progress-model.test.mjs ../../worker/tests/course-path-model.test.mjs ../../worker/tests/eligibility-logic.test.mjs ../../worker/tests/four-year-planner-logic.test.mjs ../../worker/tests/planner-input-logic.test.mjs ../../worker/tests/planner-state-logic.test.mjs"
+    "test": "node --test ../../worker/tests/academic-progress-model.test.mjs ../../worker/tests/course-path-model.test.mjs ../../worker/tests/course-set-optimizer.test.mjs ../../worker/tests/eligibility-logic.test.mjs ../../worker/tests/four-year-planner-logic.test.mjs ../../worker/tests/planner-input-logic.test.mjs ../../worker/tests/planner-state-logic.test.mjs"
   }
 }
