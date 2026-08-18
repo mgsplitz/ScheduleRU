@@ -205,7 +205,7 @@ test("wishlist actions add and remove the canonical course code", () => {
   assert.equal(app.calls.saves, 1);
 });
 
-test("an active requirement choice has a distinct commit action without losing wishlist access", async () => {
+test("an active requirement choice replaces Wishlist with one themed course action", async () => {
   const app = fixture({ request: async () => ({
     courses: [{ id: "c1", code: "01:355:201", title: "Research in the Disciplines", credits: 3 }],
     total: 1,
@@ -226,8 +226,8 @@ test("an active requirement choice has a distinct commit action without losing w
 
   await app.controller.loadCourses();
 
-  assert.match(app.elements.coursesRoot.innerHTML, /Use for this requirement/);
-  assert.match(app.elements.coursesRoot.innerHTML, /\+ Wishlist/);
+  assert.match(app.elements.coursesRoot.innerHTML, /class="cr-wish cr-use"[^>]*>Use this course</);
+  assert.doesNotMatch(app.elements.coursesRoot.innerHTML, /\+ Wishlist/);
   assert.match(app.elements.coursesRoot.innerHTML, /id="cpSubject"/);
   assert.match(app.elements.coursesRoot.innerHTML, /id="cpLevel"/);
   assert.match(app.elements.coursesRoot.innerHTML, /WCr/);
@@ -254,6 +254,16 @@ test("course rows render stable Core attribute badges", async () => {
 
   await app.controller.loadCourses();
 
-  assert.match(app.elements.coursesRoot.innerHTML, /class="core-badge"[^>]*>WCr</);
-  assert.match(app.elements.coursesRoot.innerHTML, /class="core-badge"[^>]*>AH</);
+  assert.match(app.elements.coursesRoot.innerHTML, /class="core-badge"[^>]*data-core-filter="WCr"[^>]*>WCr</);
+  assert.match(app.elements.coursesRoot.innerHTML, /class="core-badge"[^>]*data-core-filter="AH"[^>]*>AH</);
+});
+
+test("clicking a Core badge adds an API-backed Core filter chip", async () => {
+  const app = fixture({ request: async () => ({ courses: [], total: 0 }) });
+
+  await app.controller.filterByCore("WCr");
+
+  assert.deepEqual([...app.state.backendCoreCodes], ["WCr"]);
+  assert.match(app.calls.requests[0], /core=WCr/);
+  assert.match(app.elements.coursesRoot.innerHTML, /Core: WCr/);
 });

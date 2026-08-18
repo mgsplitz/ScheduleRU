@@ -1245,6 +1245,7 @@ function useCatalogCourseForRequirement(record){
   savePlannerState();
   setTopLevelPage(committed.returnPage);
   renderAll();
+  ScheduleRURequirementChoiceFeedback.highlightCourse({document,courseCode:record.code});
   return {status:"committed"};
 }
 

@@ -116,11 +116,12 @@
           <span class="cr-arrow${isOpen ? " open" : ""}">▶</span>
           <span class="cr-code">${escapeHtml(code)}</span>
           ${cleanText(course.prereqs) ? `<span class="prereq-hint" onclick="event.stopPropagation()">Prereqs listed<span class="tip">${escapeHtml(cleanText(course.prereqs))}</span></span>` : ""}
-          <span class="cr-title">${escapeHtml(course.title)}${(course.attributes || []).map((code) => `<span class="core-badge" aria-label="Fulfills Core goal ${escapeHtml(code)}">${escapeHtml(code)}</span>`).join("")}<span class="sub"> ${escapeHtml(course.subject_description || "")}</span></span>
+          <span class="cr-title">${escapeHtml(course.title)}${(course.attributes || []).map((code) => `<button class="core-badge" type="button" data-core-filter="${escapeHtml(code)}" aria-label="Show courses fulfilling Core goal ${escapeHtml(code)}">${escapeHtml(code)}</button>`).join("")}<span class="sub"> ${escapeHtml(course.subject_description || "")}</span></span>
           <span class="cr-credits">${escapeHtml(courseCreditsLabel(course.credits, true))}</span>
           <span class="cr-sections" style="color:${openCount > 0 ? "#3a8a3a" : "var(--grayt)"}">${openCount}/${totalCount} open</span>
-          ${choice ? `<button class="cr-use" data-cuse="${escapeHtml(code)}">Use for this requirement</button>` : ""}
-          <button class="cr-wish${wishlistAction.remove ? " selected" : ""}" data-wadd="${escapeHtml(code)}" aria-pressed="${wishlistAction.remove}">${wishlistAction.label}</button>
+          ${choice
+            ? `<button class="cr-wish cr-use" data-cuse="${escapeHtml(code)}">Use this course</button>`
+            : `<button class="cr-wish${wishlistAction.remove ? " selected" : ""}" data-wadd="${escapeHtml(code)}" aria-pressed="${wishlistAction.remove}">${wishlistAction.label}</button>`}
         </div>
         <div class="course-row-body${isOpen ? " open" : ""}">${bodyHtml}</div>
       </div>`;
@@ -172,6 +173,15 @@
       return useForRequirement?.(backendCourseRecord(course)) || { status: "unavailable" };
     }
 
+    function filterByCore(code) {
+      const current = state();
+      const normalized = String(code || "").trim();
+      if (!normalized) return Promise.resolve();
+      current.backendCoreCodes = [...new Set([...(current.backendCoreCodes || []), normalized])];
+      current.backendPage = 1;
+      return loadCourses();
+    }
+
     function wireControls() {
       const current = state();
       const connectButton = document.getElementById("cpConnect");
@@ -216,8 +226,19 @@
       document.getElementById("cpClearSelector")?.addEventListener("click", () => void clearSelector());
       document.querySelectorAll("[data-filter-clear]").forEach((button) => button.addEventListener("click", () => {
         const key = button.dataset.filterClear;
-        if (key === "requirement" || key === "core") {
+        if (key === "requirement") {
           void clearSelector();
+          return;
+        }
+        if (key.startsWith("core:")) {
+          const code = key.slice(5);
+          if ((current.backendCoreCodes || []).includes(code)) {
+            current.backendCoreCodes = current.backendCoreCodes.filter((item) => item !== code);
+            current.backendPage = 1;
+            void loadCourses();
+          } else {
+            void clearSelector();
+          }
           return;
         }
         if (key === "levels") current.backendLevels = [];
@@ -245,6 +266,10 @@
       document.querySelectorAll("[data-cuse]").forEach((button) => button.addEventListener("click", (event) => {
         event.stopPropagation();
         commitRequirementChoice(button.dataset.cuse);
+      }));
+      document.querySelectorAll("[data-core-filter]").forEach((button) => button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        void filterByCore(button.dataset.coreFilter);
       }));
     }
 
@@ -299,7 +324,7 @@
       ])];
       const activeChips = [
         ...(filter ? [{ label: `Requirement: ${groupDisplayName(filter.group)}`, key: "requirement" }] : []),
-        ...activeCoreCodes.map((code) => ({ label: `Core: ${code}`, key: "core" })),
+        ...activeCoreCodes.map((code) => ({ label: `Core: ${code}`, key: `core:${code}` })),
         ...(current.backendLevels || []).map((level) => ({ label: `${level}-level`, key: "levels" })),
         ...(current.backendCredits || []).map((credits) => ({ label: `${credits} credits`, key: "credits" })),
         ...(current.backendAvailability === "open" ? [{ label: "Open sections", key: "availability" }] : []),
@@ -333,7 +358,7 @@
       container.innerHTML = `
         <div class="cp-header"><h1>Course Catalog</h1><div class="cp-sub">${statusLine}</div></div>
         ${connectionBar}
-        ${filter ? `<div class="choice-summary">Choosing for <b>${escapeHtml(groupDisplayName(filter.group))}</b>: ${escapeHtml(selectorDescription)}. Select <b>Use for this requirement</b> to apply a course directly.</div>` : ""}
+        ${filter ? `<div class="choice-summary">Choosing for <b>${escapeHtml(groupDisplayName(filter.group))}</b>. Pick <b>Use this course</b> to update your plan.</div>` : ""}
         <div class="cp-controls">
           <input id="cpSearch" placeholder="Search by title or course code…" value="${escapeHtml(current.backendSearch || "")}"/>
           <select id="cpSubject">${subjectOptions}</select>
@@ -454,6 +479,7 @@
       clearSelector,
       toggleCourseExpand,
       toggleWishlist,
+      filterByCore,
       useForRequirement: commitRequirementChoice,
     };
   }
