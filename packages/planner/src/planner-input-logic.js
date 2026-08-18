@@ -141,6 +141,26 @@
     });
   }
 
+  function candidatePrerequisiteSummaries(group, courses, planningContext = {}) {
+    return (group.members || []).map((id) => {
+      const course = courses[id];
+      if (!validCode(course?.code)) return null;
+      const eligibility = normalizedEligibility(course, planningContext);
+      return {
+        courseId: id,
+        code: course.code,
+        title: text(course.fullTitle || course.title || course.code),
+        credits: numericCredits(course.credits) ?? DEFAULT_ESTIMATED_CREDITS,
+        equivalenceKey: text(course.equivalenceKey) || null,
+        prerequisitePaths: eligibility.prerequisitePaths,
+        enforceablePrerequisitePaths: eligibility.enforceablePrerequisitePaths,
+        minimumPlanYear: eligibility.minimumPlanYear,
+        minimumPriorCredits: eligibility.minimumPriorCredits,
+        ruleCoverage: eligibility.ruleCoverage,
+      };
+    }).filter(Boolean).sort((left, right) => left.code.localeCompare(right.code));
+  }
+
   function placeholder(
     group,
     sourceProgram,
@@ -176,6 +196,7 @@
         required: Number(group.count) || 1,
         members: [...(group.members || [])],
         memberCourseCodes: (group.members || []).map((id) => courses[id]?.code).filter(validCode),
+        candidatePrerequisiteSummaries: candidatePrerequisiteSummaries(group, courses, planningContext),
         children: [...(group.children || [])],
         courseSelectors: [...(group.courseSelectors || [])],
         sourceProgramIds: [...(group.sourceProgramIds || [])],
@@ -478,7 +499,7 @@
     const lockedPlacements = Object.fromEntries(pinnedScheduleEntries
       .map((entry) => [entry.code, { ...entry, locked: true, userPinned: true }]));
 
-    return {
+    const result = {
       terms: Array.isArray(input.terms) ? input.terms : [],
       courses: [...normalizedByCode.values()].sort((left, right) => left.code.localeCompare(right.code)),
       completedCourseCodes: [...completed].sort(),
@@ -488,6 +509,10 @@
       unresolvedRequirements,
       confirmedCredits: Number.isFinite(Number(input.confirmedCredits)) ? Math.max(0, Number(input.confirmedCredits)) : 0,
       issues,
+    };
+    return {
+      ...result,
+      planningDecisions: root.ScheduleRURequirementChoiceLogic?.planningDecisions(result) || [],
     };
   }
 

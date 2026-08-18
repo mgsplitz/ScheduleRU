@@ -74,6 +74,11 @@ test("round-trips the complete device-local planner state without runtime-only d
       returnPage: "nav",
       returnPlacement: { year: 2, sem: "fall" },
     },
+    choicePreferences: {
+      "cs-electives": {
+        interested: ["01:198:213"], maybe: [], avoid: ["01:198:111"], mode: "ranked",
+      },
+    },
     backendCourses: [{ code: "must-not-persist" }],
   };
 
@@ -90,6 +95,7 @@ test("round-trips the complete device-local planner state without runtime-only d
   assert.equal(restored.homeSchoolSlug, "rbs-new-brunswick");
   assert.deepEqual(restored.planPlaceholders, [{ id: "core-slot", year: 2, sem: "fall" }]);
   assert.equal(restored.activeRequirementChoice.requirementGroupId, "core-wcr");
+  assert.deepEqual(restored.choicePreferences, state.choicePreferences);
 });
 
 test("loads supported legacy state while sanitizing browser-controlled fields", () => {

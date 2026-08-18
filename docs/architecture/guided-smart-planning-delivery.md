@@ -68,7 +68,7 @@
 - [x] Extend `/api/courses` to join/filter normalized attributes and return stable badge codes.
 - [x] Render removable filter chips and keep every traditional control visible while a requirement intent is active.
 - [x] Render subtle accessible Core badges beside course titles.
-- [ ] Apply the structural attribute migration to development, republish reviewed Core definitions, and verify that badge data originates from the API rather than the active client filter.
+- [x] Apply the structural attribute migration to development, republish reviewed Core definitions, and verify that badge data originates from the API rather than the active client filter.
 - [x] Run the focused catalog/API tests and commit with `git commit -m "feat(catalog): compose requirement and course filters"`.
 
 ### Task 3: Plain-language issue presentation
@@ -113,10 +113,10 @@
 - Produces `classifyRequirement(group, candidates) -> "fixed" | "sequence_critical" | "guided_flexible" | "reserve_only"`.
 - Produces `planningDecisions(plannerInput) -> Decision[]`, where each decision includes candidate prerequisite summaries and `canDefer`.
 
-- [ ] Write failing cases showing that finite major electives with differing prerequisite closures are sequence-critical, equivalent paths are fixed, SAS Core pools are guided-flexible, and unreviewed open text is reserve-only.
-- [ ] Implement deterministic classification from reviewed data only.
-- [ ] Add classified decisions to planner input without changing current plan generation behavior.
-- [ ] Run focused tests and commit with `git commit -m "feat(planner): classify unresolved planning decisions"`.
+- [x] Write failing cases showing that finite major electives with differing prerequisite closures are sequence-critical, equivalent paths are fixed, SAS Core pools are guided-flexible, and unreviewed open text is reserve-only.
+- [x] Implement deterministic classification from reviewed data only.
+- [x] Add classified decisions to planner input without changing current plan generation behavior.
+- [x] Run focused tests and commit with `git commit -m "feat(planner): classify unresolved planning decisions"`.
 
 ### Task 5: Generation decision dialog
 
@@ -134,12 +134,12 @@
 - Produces `ChoicePreferences = { [groupId]: { interested: string[], maybe: string[], avoid: string[], mode: "ranked" | "recommend_for_me" | "deferred" } }`.
 - `avoid` is a soft ranking preference. Reviewed prerequisite closure and mandatory coverage may override it for an unavoidable gateway course, which must be explained before approval.
 
-- [ ] Write failing controller tests for Business-first ordering, interested/maybe/avoid mutation, nondeferrable business decisions, deferrable SAS Core decisions, and persisted restart behavior.
-- [ ] Render generation as a short sequence of focused cards rather than one dense modal; show candidate prerequisite burden and overlap badges in plain language.
-- [ ] Require a ranked preference or `Choose for me` for degree-specific decisions.
-- [ ] Show `I'll do this later` only for `canDefer` Core decisions.
-- [ ] Persist draft preferences locally and allow Back without losing work.
-- [ ] Run focused tests and commit with `git commit -m "feat(web): guide elective decisions during generation"`.
+- [x] Write failing controller tests for Business-first ordering, interested/maybe/avoid mutation, nondeferrable business decisions, deferrable SAS Core decisions, and persisted restart behavior.
+- [x] Render generation as a short sequence of focused cards rather than one dense modal; show candidate prerequisite burden in plain language. (Cross-program overlap badges follow the reviewed coverage graph in Task 6.)
+- [x] Require a ranked preference or `Choose for me` for degree-specific decisions.
+- [x] Show `I'll do this later` only for `canDefer` Core decisions.
+- [x] Persist draft preferences locally and allow Back without losing work.
+- [x] Run focused tests and commit with `git commit -m "feat(web): guide elective decisions during generation"`.
 
 ---
 

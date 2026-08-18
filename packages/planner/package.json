@@ -9,6 +9,7 @@
     "./eligibility": "./src/eligibility-logic.js",
     "./four-year": "./src/four-year-planner-logic.js",
     "./input": "./src/planner-input-logic.js",
+    "./requirement-choice": "./src/requirement-choice-logic.js",
     "./state": "./src/planner-state-logic.js"
   },
   "scripts": {

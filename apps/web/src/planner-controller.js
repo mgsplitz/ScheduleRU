@@ -66,6 +66,7 @@ const ST = {
   sectionsCache: {},        // course id -> { sections } | { error }, lazy-loaded
   pickerSelector:null,      // selector-backed requirement modal state
   activeRequirementChoice:null,
+  choicePreferences:{},
   requiredRootOpen:{}, nestedGroupOpen:{},
   builder: null,            // { year, sem, pool:[{code,title,credits,sections,checked,loading,error}], permutations, permIndex } | null
 };

@@ -19,6 +19,13 @@ const academicCreditUrl = new URL(
   import.meta.url,
 );
 vm.runInNewContext(fs.readFileSync(academicCreditUrl, "utf8"), context);
+const requirementChoiceUrl = new URL(
+  "../../packages/planner/src/requirement-choice-logic.js",
+  import.meta.url,
+);
+if (fs.existsSync(requirementChoiceUrl)) {
+  vm.runInNewContext(fs.readFileSync(requirementChoiceUrl, "utf8"), context);
+}
 const moduleUrl = new URL(
   "../../packages/planner/src/planner-input-logic.js",
   import.meta.url,
@@ -99,6 +106,21 @@ test("fixed courses stay concrete while elective and one-of choices stay typed",
     "electives", "electives", "science",
   ]);
   assert.equal(result.unresolvedRequirements.find((item) => item.requirementGroupId === "science").kind, "choice_placeholder");
+  assert.equal(result.planningDecisions.find((item) => item.requirementGroupId === "electives").planningMode, "guided_flexible");
+  assert.equal(result.planningDecisions.find((item) => item.requirementGroupId === "electives").slotCount, 2);
+});
+
+test("planner decisions retain candidate-specific prerequisite summaries", () => {
+  const tree = sampleTree();
+  tree.courses.electiveA.catalogPrereqs = "01:198:111";
+  tree.courses.electiveB.catalogPrereqs = "01:640:151";
+
+  const result = build({ requirementTrees: [{ id: "sasnb-computer-science-bs", tree }] });
+  const decision = result.planningDecisions.find((item) => item.requirementGroupId === "electives");
+
+  assert.equal(decision.planningMode, "sequence_critical");
+  assert.deepEqual(plain(decision.candidates.find((item) => item.code === "01:198:314").prerequisitePaths), [["01:198:111"]]);
+  assert.deepEqual(plain(decision.candidates.find((item) => item.code === "01:198:323").prerequisitePaths), [["01:640:151"]]);
 });
 
 test("a completed approved alternative satisfies the canonical requirement course", () => {

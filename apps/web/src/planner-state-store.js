@@ -21,6 +21,7 @@
     "planPlaceholders",
     "issueDismissals",
     "activeRequirementChoice",
+    "choicePreferences",
   ];
 
   const savedObject = (value) => (

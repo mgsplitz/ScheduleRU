@@ -104,6 +104,16 @@ test("planner generation derives concrete inputs from immutable program and Core
   assert.doesNotMatch(html, /courses:Object\.values\(COURSES\)/);
 });
 
+test("plan generation collects focused elective decisions before previewing semesters", () => {
+  assert.match(html, /apps\/web\/src\/generation-decisions-controller\.js/);
+  assert.match(html, /apps\/web\/src\/generation-decisions-view\.js/);
+  assert.match(html, /function openGenerationDecisionFlow\(/);
+  assert.match(html, /input\.planningDecisions/);
+  assert.match(html, /ST\.choicePreferences=flow\.preferences\(\)/);
+  assert.match(html, /data-decision-bucket/);
+  assert.match(html, /confirmPlanGenerationPreview\(\)/);
+});
+
 test("program roles, grouped Issues, and closed sections have explicit UI contracts", () => {
   const html = webApplicationSource;
   assert.match(html, /id="programOv"[^>]*aria-hidden/);
