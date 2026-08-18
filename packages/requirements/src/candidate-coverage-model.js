@@ -172,6 +172,7 @@
           offeringEvidence: null,
           minimumPlanYear: Number(record?.minimumPlanYear) || null,
           minimumPriorCredits: Number(record?.minimumPriorCredits) || null,
+          optionFamily: text(record?.optionFamily) || null,
         };
         current.equivalentCourseCodes.push(code);
         current.coverageRequirementIds.push(requirement.id);
@@ -189,6 +190,7 @@
         current.offeringEvidence ||= record?.offeringEvidence || null;
         current.minimumPlanYear ||= Number(record?.minimumPlanYear) || null;
         current.minimumPriorCredits ||= Number(record?.minimumPriorCredits) || null;
+        current.optionFamily ||= text(record?.optionFamily) || null;
         if (code === canonical && text(record?.title)) current.title = text(record.title);
         current.credits = Math.min(current.credits, Number(record?.credits) > 0 ? Number(record.credits) : 3);
         current.creditsEstimated &&= record?.creditsEstimated === true;

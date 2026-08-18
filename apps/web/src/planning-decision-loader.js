@@ -65,9 +65,19 @@
 
     return Promise.all((decisions || []).map(async (decision) => {
       if (!(decision.courseSelectors || []).length) return copy(decision, {});
+      const explicit = decision.candidates || [];
+      const selected = await candidatesFor(decision.courseSelectors);
+      const selectedCodes = new Set(selected.map((candidate) => candidate.code));
+      const supplemental = explicit.filter((candidate) => !selectedCodes.has(candidate.code));
+      const optionFamily = supplemental.length > 1
+        ? `${decision.decisionId || decision.requirementGroupId}:explicit-alternatives`
+        : null;
       return {
         ...copy(decision, {}),
-        candidates: mergeCandidates(decision.candidates || [], await candidatesFor(decision.courseSelectors)),
+        candidates: mergeCandidates(explicit, selected).map((candidate) =>
+          optionFamily && supplemental.some((record) => record.code === candidate.code)
+            ? { ...candidate, optionFamily }
+            : candidate),
       };
     }));
   }

@@ -46,7 +46,7 @@
       <section class="generation-decision" data-decision-group="${escapeHtml(decision.decisionId || decision.requirementGroupId)}">
         <div class="generation-progress">Choice ${index + 1} of ${total}</div>
         <h2>${escapeHtml(decision.label || "Choose courses")}</h2>
-        <p>${Number(decision.slotCount) > 1 ? "Mark as many as you can. More preferences help us build a better path." : "Mark what sounds useful. We’ll balance your interests with prerequisites and degree progress."}</p>
+        <p>${decision.guidanceOnly ? "These courses fill the same role. Mark the one you prefer, or skip this path." : Number(decision.slotCount) > 1 ? "Mark as many as you can. More preferences help us build a better path." : "Mark what sounds useful. We’ll balance your interests with prerequisites and degree progress."}</p>
         <p class="generation-guidance">Avoid is a preference; a course may still be needed to unlock the path you choose.</p>
         ${available.length > 8 ? `<div class="generation-candidate-tools"><strong>Best matches</strong><input type="search" data-decision-search value="${escapeHtml(search)}" placeholder="Search ${available.length} courses" aria-label="Search course choices"><button type="button" class="quiet-action" data-decision-expand>${expanded ? "Show best matches" : `Show all ${available.length}`}</button></div>` : ""}
         <div class="generation-candidates">${candidates || `<p class="generation-empty">${query ? "No courses match that search." : "Your earlier ratings already cover these choices."}</p>`}</div>

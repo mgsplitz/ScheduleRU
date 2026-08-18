@@ -92,6 +92,11 @@ test("explicit Mathematics choices merge with every reviewed selector candidate"
   assert.equal(hydrated[0].candidates.length, 30);
   assert.equal(hydrated[0].candidates.some(({ code }) => code === "01:640:244"), true);
   assert.equal(hydrated[0].candidates.some(({ code }) => code === "01:640:327"), true);
+  assert.equal(hydrated[0].candidates.find(({ code }) => code === "01:640:244").optionFamily,
+    "program:sasnb-mathematics-minor:electives:explicit-alternatives");
+  assert.equal(hydrated[0].candidates.find(({ code }) => code === "01:640:252").optionFamily,
+    "program:sasnb-mathematics-minor:electives:explicit-alternatives");
+  assert.equal(hydrated[0].candidates.find(({ code }) => code === "01:640:327").optionFamily, undefined);
 });
 
 test("canonical prerequisite metadata is attached once for every decision", async () => {

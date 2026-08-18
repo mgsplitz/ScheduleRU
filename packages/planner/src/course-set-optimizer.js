@@ -125,6 +125,7 @@
         minimumPlanYear: Number(candidate.minimumPlanYear) || null,
         minimumPriorCredits: Number(candidate.minimumPriorCredits) || null,
         offering: candidate.offeringEvidence ? 1 : 0,
+        optionFamily: candidate.optionFamily || null,
         distinctAttributes: uniqueSorted(candidate.coverageRequirementIds.flatMap((id) => {
           const allowed = requirementById.get(id)?.distinctAttributes || [];
           return (candidate.attributes || []).filter((attribute) => allowed.includes(attribute));
@@ -324,6 +325,8 @@
 
     function candidateCanCoverRequirement(candidate, requirement, state) {
       if (state.selected.has(candidate.code)) return false;
+      if (candidate.optionFamily && [...state.selected].some((code) =>
+        candidateByAlias.get(code)?.optionFamily === candidate.optionFamily)) return false;
       const allowed = requirement.distinctAttributes || [];
       if (!allowed.length) return true;
       const used = state.distinctUsed.get(requirement.id) || new Set();

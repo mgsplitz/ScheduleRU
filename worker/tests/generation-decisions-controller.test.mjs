@@ -74,6 +74,27 @@ test("a restrictive subset is guided before the broader total for one program", 
   assert.deepEqual(plain(flow.decisions().map((item) => item.requirementGroupId)), ["upper", "total"]);
 });
 
+test("interchangeable alternatives receive a focused screen before the remaining elective pool", () => {
+  const family = "math-electives:explicit-alternatives";
+  const flow = modules().controller.create({ decisions: [{
+    decisionId: "math-electives", requirementGroupId: "math-electives",
+    sourceProgram: "mathematics", sourceType: "program", label: "Four Mathematics electives",
+    planningMode: "guided_flexible", slotCount: 4,
+    candidates: [
+      { code: "01:640:244", title: "Differential Equations for Engineering", optionFamily: family },
+      { code: "01:640:252", title: "Elementary Differential Equations", optionFamily: family },
+      { code: "01:640:300", title: "Introduction to Mathematical Reasoning" },
+    ],
+  }] });
+  const ordered = flow.decisions();
+
+  assert.equal(ordered.length, 2);
+  assert.equal(ordered[0].guidanceOnly, true);
+  assert.equal(ordered[0].canSkip, true);
+  assert.deepEqual(plain(ordered[0].candidates.map(({ code }) => code)), ["01:640:244", "01:640:252"]);
+  assert.deepEqual(plain(ordered[1].candidates.map(({ code }) => code)), ["01:640:300"]);
+});
+
 test("interest buckets are exclusive and persist through a restarted flow", () => {
   const first = modules().controller.create({ decisions: decisions(), programs: [] });
   first.setInterest("cs-electives", "01:198:111", "interested");

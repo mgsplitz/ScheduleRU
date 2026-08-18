@@ -375,7 +375,7 @@ function openGenerationDecisionFlow(input){
   }
   function optimizedCourseSet(){
     const graph=ScheduleRUCandidateCoverageModel.buildCoverageGraph({
-      decisions,
+      decisions:input.planningDecisions||[],
       policies:{
         programs:ST.availablePrograms||[],
         doubleCountPolicies:ST.doubleCountPolicies||[],
@@ -426,7 +426,7 @@ function openGenerationDecisionFlow(input){
       canDismiss:false,
       actions:[
         {label:"Back",secondary:true,close:index===0,onClick:()=>{if(index===0)finishPlanGenerationPreflight();else moveDecision(-1);}},
-        ...(decision.canDefer?[{label:"I’ll do this later",className:"quiet-action",close:false,onClick:()=>{flow.defer(groupId);moveDecision(1);}}]:[]),
+        ...(decision.canDefer||decision.canSkip?[{label:decision.canSkip?"Skip":"I’ll do this later",className:"quiet-action",close:false,onClick:()=>{flow.defer(groupId);moveDecision(1);}}]:[]),
         {label:index===decisions.length-1?"Review courses":"Next",className:"push-right",disabled:!flow.canAdvance(groupId),close:false,onClick:()=>moveDecision(1)},
       ],
     });
