@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./academic-credit": "./src/academic-credit-logic.js",
+    "./candidate-coverage": "./src/candidate-coverage-model.js",
     "./core-allocation": "./src/core-allocation-model.js",
     "./course-selector": "./src/course-selector-logic.js",
     "./groups": "./src/requirement-group-logic.js",
@@ -13,6 +14,6 @@
     "./program-requirement-model": "./src/program-requirement-model.js"
   },
   "scripts": {
-    "test": "node --test ../../worker/tests/academic-credit-logic.test.mjs ../../worker/tests/core-allocation-model.test.mjs ../../worker/tests/course-selector-logic.test.mjs ../../worker/tests/requirement-group-logic.test.mjs ../../worker/tests/requirement-progress-model.test.mjs ../../worker/tests/requirement-tree-builder.test.mjs ../../worker/tests/program-requirement-model.test.mjs"
+    "test": "node --test ../../worker/tests/academic-credit-logic.test.mjs ../../worker/tests/candidate-coverage-model.test.mjs ../../worker/tests/core-allocation-model.test.mjs ../../worker/tests/course-selector-logic.test.mjs ../../worker/tests/requirement-group-logic.test.mjs ../../worker/tests/requirement-progress-model.test.mjs ../../worker/tests/requirement-tree-builder.test.mjs ../../worker/tests/program-requirement-model.test.mjs"
   }
 }
