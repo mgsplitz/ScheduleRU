@@ -151,8 +151,9 @@ test("render keeps browsing, degree metadata, draft roles, and close behavior in
   assert.match(app.elements.programSchoolNav.innerHTML, /RBS New Brunswick/);
   assert.match(app.elements.programList.innerHTML, /Finance/);
   assert.match(app.elements.programList.innerHTML, /B\.S\./);
-  assert.match(app.elements.programRoleControls.innerHTML, /Primary: Business Analytics/);
-  assert.match(app.elements.programRoleControls.innerHTML, /Make primary: Finance/);
+  assert.match(app.elements.programRoleControls.innerHTML, /Primary major/);
+  assert.match(app.elements.programRoleControls.innerHTML, /Secondary major/);
+  assert.match(app.elements.programRoleControls.innerHTML, /Make primary/);
 
   app.controller.open();
   app.controller.close();

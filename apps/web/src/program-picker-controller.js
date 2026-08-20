@@ -83,7 +83,7 @@
       current.programDraft = view.selectedIds;
       current.programDraftPrimaryId = view.primaryId;
       controls.innerHTML = view.majorIds.length
-        ? `<div class="onboarding-note"><b>Major roles</b><br/>${view.majorIds.map((id) => `<button class="choice-btn secondary" data-draft-primary="${escapeHtml(id)}" ${id === view.primaryId ? "disabled" : ""}>${id === view.primaryId ? "Primary: " : "Make primary: "}${escapeHtml(byId.get(id)?.name || id)}</button>`).join(" ")}<br/>The first selected major is primary by default; choose another to swap roles.</div>`
+        ? `<div class="onboarding-note program-role-summary"><b>Major roles</b>${view.majorIds.map((id) => `<div class="program-role-row"><span><strong>${escapeHtml(byId.get(id)?.name || id)}</strong><small>${id === view.primaryId ? "Primary major" : "Secondary major"}</small></span>${id === view.primaryId ? "" : `<button class="program-role-action" data-draft-primary="${escapeHtml(id)}">Make primary</button>`}</div>`).join("")}</div>`
         : "";
       controls.querySelectorAll("[data-draft-primary]").forEach((button) => button.addEventListener("click", () => {
         current.programDraftPrimaryId = button.dataset.draftPrimary;

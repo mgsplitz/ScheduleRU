@@ -251,16 +251,24 @@ test("small choose-one requirements and full sequence choices have explicit plan
 
 test("guest onboarding is the approved compact five-step workflow", () => {
   assert.match(html, /Array\.from\(\{length:5\}/);
-  assert.match(html, /Account functionality is not enabled yet\. Continue as a guest for now\./);
+  assert.match(html, /Create account · Coming soon/);
+  assert.match(html, /Continue locally/);
   assert.doesNotMatch(html, /Set your academic position/);
+  assert.match(html, /ScheduleRUOnboardingFlowModel\.stepAt\(step\)/);
+  assert.match(html, /if\(activeStep==="programs"\)/);
+  assert.match(html, /if\(activeStep==="coursework"\)/);
+  assert.match(html, /if\(activeStep==="ap"\)/);
   assert.match(html, /data-onboarding-ap=/);
   assert.match(html, /Scores of 4 or 5/);
+  assert.match(html, /AP score report upload · Coming soon/);
+  assert.match(html, /Transcript upload · Coming soon/);
   assert.match(html, /id="recordCourseSearch"/);
+  assert.match(html, /id="recordCourseTerm"/);
   assert.doesNotMatch(html, /id="recordTitle"/);
   assert.doesNotMatch(html, /id="recordGrade"/);
   assert.match(html, /id="onboardingHomeSchool"/);
   assert.match(html, /Add program of study/);
-  assert.match(html, /Try the four-year auto-planner/);
+  assert.match(html, /Generate a prerequisite-aware four-year draft/);
   assert.match(html, /function renderOnboardingContent\(/);
   assert.match(html, /function renderOnboarding\(/);
   assert.doesNotMatch(html, /legacyRenderOnboarding|baseSetOnboardingOpen/);
