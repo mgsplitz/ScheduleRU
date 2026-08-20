@@ -4,7 +4,11 @@ import test from "node:test";
 import vm from "node:vm";
 
 const moduleUrl = new URL("../../apps/web/src/course-details-controller.js", import.meta.url);
-const context = { globalThis: {} };
+const professorModuleUrl = new URL("../../apps/web/src/professor-link-model.js", import.meta.url);
+const context = { globalThis: {}, URLSearchParams };
+if (fs.existsSync(professorModuleUrl)) {
+  vm.runInNewContext(fs.readFileSync(professorModuleUrl, "utf8"), context);
+}
 if (fs.existsSync(moduleUrl)) {
   vm.runInNewContext(fs.readFileSync(moduleUrl, "utf8"), context);
 }
@@ -135,6 +139,7 @@ function fixture({
     cleanText: (value) => String(value || ""),
     courseCreditsLabel: (credits) => `${credits} credits`,
     resumeRequirementPicker: () => { calls.resume += 1; return resumeResult; },
+    professorLinkModel: context.globalThis.ScheduleRUProfessorLinkModel,
   });
   return { controller, document, elements, launcher, pagenav, state, calls };
 }
@@ -154,6 +159,25 @@ test("opening course details presents the course and moves focus into the dialog
   assert.equal(app.elements.app.inert, true);
   assert.equal(app.elements["page-courses"].inert, true);
   assert.equal(app.pagenav.inert, true);
+});
+
+test("course details show distinct external ratings links only for named instructors", () => {
+  const named = fixture({
+    courseOverrides: {
+      instructor: "Jane Doe",
+      sections: [{ instructor: "Jane Doe" }, { instructor: "Staff / TBA" }],
+    },
+  });
+  named.controller.open("c1");
+
+  assert.match(named.elements.prBody.innerHTML, /Instructors/);
+  assert.match(named.elements.prBody.innerHTML, /Jane Doe ↗/);
+  assert.match(named.elements.prBody.innerHTML, /target="_blank" rel="noopener noreferrer"/);
+  assert.doesNotMatch(named.elements.prBody.innerHTML, /Staff \/ TBA ↗/);
+
+  const generic = fixture({ courseOverrides: { instructor: "Staff / TBA" } });
+  generic.controller.open("c1");
+  assert.doesNotMatch(generic.elements.prBody.innerHTML, /<h3>Instructors<\/h3>/);
 });
 
 test("Escape closes course details once and resumes the suspended requirement picker", () => {

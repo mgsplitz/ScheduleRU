@@ -42,6 +42,7 @@ const courseDetailsDialogController=ScheduleRUCourseDetailsController.create({
   standingRequirement,courseEligibilityNotice,academicYearLabel,
   plannerUI:ScheduleRUPlannerUI,escapeHtml:html,cleanText:cleanApiText,courseCreditsLabel,
   resumeRequirementPicker:()=>requirementPickerDialogController.resume(),
+  professorLinkModel:ScheduleRUProfessorLinkModel,
 });
 installCourseDetailsController(courseDetailsDialogController);
 courseDetailsDialogController.bind();
@@ -67,6 +68,7 @@ const scheduleBuilderPresentation=ScheduleRUScheduleBuilderView.create({
   dayIndex,meetingTimeRange,formatClock,academicYearLabel,
   sortSections:ScheduleRUCourseInteractionLogic.sortSections,
   calendarBlockGeometry:ScheduleRUCourseInteractionLogic.calendarBlockGeometry,
+  professorLinkModel:ScheduleRUProfessorLinkModel,
   handlers:{
     close:closeBuilder,openAssistant:openScheduleAssistant,
     setIncludeClosed:setBuilderIncludeClosed,add:addToBuilderPool,remove:removeFromBuilderPool,

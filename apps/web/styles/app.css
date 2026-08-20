@@ -297,6 +297,9 @@ body{font-family:var(--ff);background:var(--paper);color:var(--black);height:100
 .detail-section{margin:12px 0;}
 .detail-section h3{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:5px;}
 .detail-section p{font-size:12px;line-height:1.5;}
+.external-professor-links{display:flex;flex-wrap:wrap;gap:7px;}
+.external-professor-link{color:var(--red);text-decoration:none;font-weight:700;}
+.external-professor-link:hover,.external-professor-link:focus-visible{text-decoration:underline;}
 .detail-chips{display:flex;flex-wrap:wrap;gap:6px;}
 .detail-chip{background:#f9f7f0;border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:11px;line-height:1.3;}
 .detail-chip code{font-family:var(--fmono);font-size:9.5px;color:var(--scarlet);display:block;margin-top:2px;}

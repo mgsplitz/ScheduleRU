@@ -4,7 +4,9 @@ import test from "node:test";
 import vm from "node:vm";
 
 const moduleUrl = new URL("../../apps/web/src/schedule-builder-view.js", import.meta.url);
-const context = { globalThis: {} };
+const professorModuleUrl = new URL("../../apps/web/src/professor-link-model.js", import.meta.url);
+const context = { globalThis: {}, URLSearchParams };
+if (fs.existsSync(professorModuleUrl)) vm.runInNewContext(fs.readFileSync(professorModuleUrl, "utf8"), context);
 if (fs.existsSync(moduleUrl)) vm.runInNewContext(fs.readFileSync(moduleUrl, "utf8"), context);
 
 function view(builder = null) {
@@ -22,6 +24,7 @@ function view(builder = null) {
     academicYearLabel: () => "1st Year",
     sortSections: (sections) => sections,
     calendarBlockGeometry: () => ({ top: 124, height: 48 }),
+    professorLinkModel: context.globalThis.ScheduleRUProfessorLinkModel,
   });
 }
 
@@ -56,6 +59,25 @@ test("closed sections stay in markup but remain hidden until requested", () => {
   builder.includeClosed = true;
   const visibleMarkup = app.poolCourseMarkup(course);
   assert.doesNotMatch(visibleMarkup, /pool-sec-row" hidden/);
+});
+
+test("named section instructors link externally while staff placeholders stay plain", () => {
+  const app = view({ includeClosed: true });
+  const markup = app.poolCourseMarkup({
+    code: "01:198:111",
+    title: "Intro Computer Science",
+    enabled: true,
+    checked: new Set(),
+    sections: [
+      { index_number: "10001", instructor: "Jane Doe", open_status: true, meetings: [] },
+      { index_number: "10002", instructor: "Staff / TBA", open_status: true, meetings: [] },
+    ],
+  });
+
+  assert.match(markup, /href="https:\/\/www\.ratemyprofessors\.com\/search\/professors\/825\?q=Jane\+Doe"/);
+  assert.match(markup, /target="_blank" rel="noopener noreferrer"/);
+  assert.match(markup, />Jane Doe ↗<\/a>/);
+  assert.doesNotMatch(markup, /q=Staff/);
 });
 
 test("builder markup keeps verified schedule navigation and assistant controls together", () => {

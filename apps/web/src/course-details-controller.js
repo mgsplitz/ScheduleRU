@@ -17,6 +17,7 @@
     cleanText,
     courseCreditsLabel,
     resumeRequirementPicker,
+    professorLinkModel,
   } = {}) {
     let bound = false;
     let currentCourseId = null;
@@ -160,6 +161,10 @@
       const available = prerequisiteEligibility.status !== "blocked"
         && (!standing || detailsTerm.year >= standing.year);
       const eligibilityNotice = courseEligibilityNotice(course, detailsTerm);
+      const instructors = professorLinkModel?.distinctNamedInstructors(course) || [];
+      const instructorLinks = instructors.map((name) => (
+        `<a class="external-professor-link" href="${escapeHtml(professorLinkModel.ratingsSearchUrl(name))}" target="_blank" rel="noopener noreferrer" aria-label="View ratings for ${escapeHtml(name)} on Rate My Professors">${escapeHtml(name)} ↗</a>`
+      )).join("");
       const status = completedAlternative
         ? `This requirement is already fulfilled by ${completedAlternative.title || completedAlternative.code || completedAlternative.equivalent_course_code}.`
         : prerequisiteEligibility.status === "blocked"
@@ -176,6 +181,7 @@
           <div class="detail-status${available || completedAlternative ? " ready" : ""}">${escapeHtml(status)}</div>
         </div>
         <div class="detail-section"><h3>${standing ? "When you can take it" : "Enrollment"}</h3><p>${escapeHtml(compactRestriction(course, standing))}</p></div>
+        ${instructorLinks ? `<div class="detail-section"><h3>Instructors</h3><div class="external-professor-links">${instructorLinks}</div><p class="src-note">Opens an external professor search. Ratings are not verified by ScheduleRU.</p></div>` : ""}
         ${eligibilityNotice ? `<div class="detail-section"><h3>Planning eligibility</h3><p>${escapeHtml(eligibilityNotice)}</p></div>` : ""}
         ${alternativeDetails ? `<div class="detail-section"><h3>Also accepted for this requirement</h3><div class="detail-chips">${alternativeDetails}</div><p class="src-note">This reviewed equivalency comes from the degree-audit rule recorded for this requirement.</p></div>` : ""}
         ${prerequisiteDetailsHtml(prerequisiteEligibility, course)}

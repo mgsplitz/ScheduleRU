@@ -228,6 +228,7 @@
           sectionId: section.id,
           index_number: section.index_number,
           section_number: section.section_number,
+          instructor: section.instructor || "",
           meetings: section.meetings || [],
           locked: true,
           userPinned: true,

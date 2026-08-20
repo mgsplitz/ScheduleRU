@@ -39,6 +39,7 @@
     academicYearLabel,
     sortSections,
     calendarBlockGeometry,
+    professorLinkModel,
     handlers = {},
   } = {}) {
     function builder() { return getBuilder?.() || null; }
@@ -70,12 +71,17 @@
         const open = section.open_status === true || section.open_status === 1 || section.open_status === "1";
         const checked = course.checked?.has(section.index_number);
         const meetings = (section.meetings || []).map(formatMeeting).join(", ") || "—";
-        const instructor = escapeHtml(section.instructor || "Staff / TBA");
+        const instructorName = professorLinkModel?.instructorName(section.instructor) || "";
+        const instructor = escapeHtml(instructorName || section.instructor || "Staff / TBA");
+        const ratingsUrl = instructorName ? professorLinkModel.ratingsSearchUrl(instructorName) : "";
+        const instructorMarkup = ratingsUrl
+          ? `<a class="pool-sec-instr external-professor-link" href="${escapeHtml(ratingsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="View ratings for ${instructor} on Rate My Professors" title="${instructor}">${instructor} ↗</a>`
+          : `<span class="pool-sec-instr" title="${instructor}">${instructor}</span>`;
         return `<label class="pool-sec-row" ${!open && !current?.includeClosed ? "hidden" : ""}>
           <input type="checkbox" data-poolsec="${escapeHtml(course.code)}|${escapeHtml(section.index_number)}" ${checked ? "checked" : ""}/>
           <span style="width:36px;flex-shrink:0;">${escapeHtml(section.section_number || section.index_number || "")}</span>
           <span class="pool-sec-meet">${escapeHtml(meetings)}</span>
-          <span class="pool-sec-instr" title="${instructor}">${instructor}</span>
+          ${instructorMarkup}
           <span class="pool-sec-status ${open ? "status-open" : "status-closed"}">${open ? "OPEN" : "CLOSED"}</span>
         </label>`;
       }).join("");

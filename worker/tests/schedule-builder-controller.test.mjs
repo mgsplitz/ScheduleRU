@@ -93,7 +93,7 @@ test("confirming a permutation writes one pinned semester schedule and exits", (
   app.controller.open("fall");
   app.state.builder.permutations = [[{
     code: "01:198:111", title: "Intro Computer Science", credits: 4,
-    index_number: "12345", section_number: "01", meetings: [],
+    index_number: "12345", section_number: "01", instructor: "Jane Doe", meetings: [],
   }]];
 
   assert.equal(app.controller.confirm(), true);
@@ -101,6 +101,7 @@ test("confirming a permutation writes one pinned semester schedule and exits", (
   assert.equal(app.state.schedule["01:198:111"].year, 1);
   assert.equal(app.state.schedule["01:198:111"].sem, "fall");
   assert.equal(app.state.schedule["01:198:111"].userPinned, true);
+  assert.equal(app.state.schedule["01:198:111"].instructor, "Jane Doe");
   assert.equal(app.state.builder, null);
   assert.equal(app.calls.renderAll, 1);
 });
