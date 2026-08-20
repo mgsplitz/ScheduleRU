@@ -15,11 +15,13 @@
     cardHtml,
     attachCardEvents,
     shouldAutoCollapseSharedGroup,
+    groupFulfilled,
     expansionOpen,
     openRequirementPicker,
     showIssues,
     renderPanel,
     userMessageModel,
+    programRequirementModel,
   } = {}) {
     function state() { return getState?.() || {}; }
 
@@ -47,6 +49,11 @@
         || treeIncludesSourceProgram(state().requirementTrees?.[programId], group.sourceProgramId);
     }
 
+    function isSharedGroup(group) {
+      return !!String(group?.display_family || "").trim()
+        || (Array.isArray(group?.sourceProgramIds) && group.sourceProgramIds.length > 1);
+    }
+
     function rootGroupMarkup(group, collapsed) {
       if (group.rule !== "all") return groupHtml(group.id);
       const applied = groupAppliedCourseIds(group);
@@ -64,25 +71,46 @@
       }
 
       useRequirementTree(current.majorRequirementTree);
-      const programs = orderedPrograms();
-      if (!current.requiredProgramTab || !programs.some((program) => program.id === current.requiredProgramTab)) {
-        current.requiredProgramTab = programs[0]?.id || "";
-      }
+      const programs = orderedPrograms().map((program) => ({
+        ...program,
+        role: program.id === current.primaryProgramId
+          ? "primary"
+          : program.id === current.secondaryProgramId ? "secondary" : undefined,
+      }));
       const count = issueList().length;
-      const subtabs = programs.map((program) => `<button class="program-subtab ${program.id === current.requiredProgramTab ? "active" : ""} ${program.type === "minor" ? "program-subtab-minor" : ""}" data-required-program="${escapeHtml(program.id)}">${escapeHtml(program.name)}</button>`).join("");
       const requirementState = getRequirementState();
+      const rootGroups = requirementState.rootGroupIds.map((id) => requirementState.groups[id]).filter(Boolean);
+      const sharedGroups = rootGroups.filter(isSharedGroup);
+      const homeSchool = (current.availableSchools || []).find((school) => school.slug === current.homeSchoolSlug)
+        || { slug: current.homeSchoolSlug };
+      const tabs = programRequirementModel.requirementTabs({ homeSchool, programs, sharedRoots: sharedGroups });
+      if (!current.requiredProgramTab || !tabs.some((tab) => tab.id === current.requiredProgramTab)) {
+        current.requiredProgramTab = tabs[0]?.id || "";
+      }
+      const activeTab = tabs.find((tab) => tab.id === current.requiredProgramTab);
+      const subtabs = tabs.map((tab) => `<button class="program-subtab ${tab.id === current.requiredProgramTab ? "active" : ""} ${tab.minor ? "program-subtab-minor" : ""}" data-required-program="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("");
       const selectedMajorIds = programs.filter((program) => program.type === "major").map((program) => program.id);
-      const groups = requirementState.rootGroupIds
-        .map((id) => requirementState.groups[id])
-        .filter(Boolean)
-        .filter((group) => groupBelongsToProgram(group, current.requiredProgramTab));
+      const groups = rootGroups.filter((group) => activeTab?.kind === "shared"
+        ? isSharedGroup(group)
+        : !isSharedGroup(group) && groupBelongsToProgram(group, current.requiredProgramTab));
+      const actions = programRequirementModel.nextActions(groups.map((group, index) => ({
+        id: group.id,
+        label: groupDisplayName(group),
+        complete: groupFulfilled?.(group.id) === true,
+        priority: index,
+      })));
+      const firstActionableId = actions[0]?.id || "";
       let content = groups.map((group) => {
-        const defaultOpen = !shouldAutoCollapseSharedGroup({ group, selectedMajorIds });
+        const defaultOpen = group.id === firstActionableId
+          && !shouldAutoCollapseSharedGroup({ group, selectedMajorIds });
         const open = expansionOpen({ stored: current.requiredRootOpen[group.id], defaultOpen });
         return rootGroupMarkup(group, !open);
       }).join("");
       if (!content) content = `<div class="empty" style="margin-top:30px;">No reviewed requirements are available for this program yet.</div>`;
-      return `<div class="required-tools"><span class="leg">Reviewed requirements for this program.</span><button class="issues-btn" id="issuesBtn">Issues · ${count}</button></div><div class="subtabs">${subtabs}</div>${content}<div class="planning-disclaimer">ScheduleRU is a planning aid, not an official degree audit.</div>`;
+      const nextUp = actions.length
+        ? `<section class="required-next"><strong>Next up</strong><ol>${actions.map((action) => `<li>${escapeHtml(action.label)}</li>`).join("")}</ol></section>`
+        : `<section class="required-next complete"><strong>You're caught up here</strong><span>No unfinished reviewed requirement is visible in this tab.</span></section>`;
+      return `<div class="required-tools"><button class="issues-btn" id="issuesBtn">Issues · ${count}</button></div><div class="subtabs">${subtabs}</div>${nextUp}${content}<div class="planning-disclaimer">ScheduleRU is a planning aid, not an official degree audit.</div>`;
     }
 
     function setProgram(programId) {
@@ -135,7 +163,7 @@
       if (!state().requirementsLoading && !state().requirementsError) bind(panel);
     }
 
-    return { render, markup, orderedPrograms, groupBelongsToProgram, setProgram };
+    return { render, markup, orderedPrograms, groupBelongsToProgram, isSharedGroup, setProgram };
   }
 
   root.ScheduleRURequiredPanelController = { create };

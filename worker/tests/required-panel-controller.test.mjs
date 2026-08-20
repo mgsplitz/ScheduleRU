@@ -4,7 +4,10 @@ import test from "node:test";
 import vm from "node:vm";
 
 const moduleUrl = new URL("../../apps/web/src/required-panel-controller.js", import.meta.url);
-const context = { globalThis: {} };
+await import("../../packages/requirements/src/requirement-group-logic.js");
+const context = { globalThis: { ScheduleRURequirementLogic: globalThis.ScheduleRURequirementLogic } };
+const modelUrl = new URL("../../packages/requirements/src/program-requirement-model.js", import.meta.url);
+if (fs.existsSync(modelUrl)) vm.runInNewContext(fs.readFileSync(modelUrl, "utf8"), context);
 if (fs.existsSync(moduleUrl)) vm.runInNewContext(fs.readFileSync(moduleUrl, "utf8"), context);
 
 function controller(overrides = {}) {
@@ -21,6 +24,8 @@ function controller(overrides = {}) {
     groupSelections: {},
     requirementTrees: {},
     majorRequirementTree: {},
+    homeSchoolSlug: "rbsnb",
+    availableSchools: [{ slug: "rbsnb", name: "RBS New Brunswick", core_label: "Business Core" }],
     ...overrides.state,
   };
   const programs = overrides.programs || [
@@ -45,12 +50,22 @@ function controller(overrides = {}) {
     cardHtml: (id) => `<div>${id}</div>`,
     attachCardEvents: () => {},
     shouldAutoCollapseSharedGroup: () => false,
+    groupFulfilled: (id) => id === "done",
     expansionOpen: ({ stored, defaultOpen }) => stored ?? defaultOpen,
     openRequirementPicker: () => {},
     showIssues: () => {},
     renderPanel: () => {},
     userMessageModel: {
       presentIssue: () => ({ title: "We couldn't connect", message: "Please try again." }),
+    },
+    programRequirementModel: context.globalThis.ScheduleRUProgramRequirementModel || {
+      requirementTabs: ({ programs }) => programs.map((program) => ({
+        id: program.id,
+        label: program.name,
+        kind: "program",
+        minor: program.type === "minor",
+      })),
+      nextActions: (progress) => progress.filter((item) => !item.complete).slice(0, 3),
     },
   });
   return { app, state };
@@ -86,4 +101,49 @@ test("markup distinguishes loading, errors, minor tabs, and empty reviewed progr
   assert.match(ready, /program-subtab-minor/);
   assert.match(ready, /No reviewed requirements are available for this program yet/);
   assert.match(ready, /ScheduleRU is a planning aid/);
+});
+
+test("shared school requirements render once and Next up stays concise", () => {
+  const groups = {
+    shared: {
+      id: "shared",
+      label: "Business Core",
+      rule: "all",
+      display_family: "rbsnb-business-core",
+      sourceProgramIds: ["primary", "secondary"],
+      members: [],
+      children: [],
+    },
+    finance: {
+      id: "finance",
+      label: "Finance electives",
+      rule: "all",
+      sourceProgramIds: ["primary"],
+      members: [],
+      children: [],
+    },
+    done: {
+      id: "done",
+      label: "Completed group",
+      rule: "all",
+      sourceProgramIds: ["primary"],
+      members: [],
+      children: [],
+    },
+  };
+  const { app, state } = controller({ groups });
+
+  const sharedMarkup = app.markup();
+  assert.equal(state.requiredProgramTab, "school:rbsnb");
+  assert.match(sharedMarkup, /Business Core/);
+  assert.doesNotMatch(sharedMarkup, /Finance electives/);
+  assert.match(sharedMarkup, /required-root-body open/);
+
+  app.setProgram("primary");
+  const financeMarkup = app.markup();
+  assert.doesNotMatch(financeMarkup, /data-required-root-toggle="shared"/);
+  assert.match(financeMarkup, /Finance electives/);
+  assert.match(financeMarkup, /Next up/);
+  assert.doesNotMatch(financeMarkup, /Completed group<\/li>/);
+  assert.match(financeMarkup, /required-root-body"/);
 });

@@ -152,9 +152,11 @@ const requiredPanelPresentationController=ScheduleRURequiredPanelController.crea
   issueList,escapeHtml:html,groupHtml,groupDisplayName,groupAppliedCourseIds,
   selectorGuidanceHtml,cardHtml,attachCardEvents,
   shouldAutoCollapseSharedGroup:ScheduleRUPlannerUI.shouldAutoCollapseSharedGroup,
+  groupFulfilled:id=>requirementProgressModel.groupFulfilled(id),
   expansionOpen:ScheduleRUCourseInteractionLogic.expansionOpen,
   openRequirementPicker,showIssues,renderPanel,
   userMessageModel:ScheduleRUUserMessageModel,
+  programRequirementModel,
 });
 installRequiredPanelController(requiredPanelPresentationController);
 

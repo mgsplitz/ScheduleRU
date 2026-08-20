@@ -195,10 +195,57 @@
     };
   }
 
+  function requirementTabs({ homeSchool, programs, sharedRoots } = {}) {
+    const rows = Array.isArray(programs) ? programs : [];
+    const roleRank = { primary: 0, secondary: 1 };
+    const majors = rows
+      .filter((program) => program?.type === "major")
+      .map((program, index) => ({ program, index }))
+      .sort((left, right) => {
+        const leftRank = roleRank[left.program?.role] ?? 2;
+        const rightRank = roleRank[right.program?.role] ?? 2;
+        return leftRank - rightRank || left.index - right.index;
+      })
+      .map(({ program }) => program);
+    const minors = rows.filter((program) => program?.type === "minor");
+    const other = rows.filter((program) => !["major", "minor"].includes(program?.type));
+    const tabs = [];
+    if ((sharedRoots || []).length) {
+      const slug = String(homeSchool?.slug || "school").trim() || "school";
+      tabs.push({
+        id: `school:${slug}`,
+        label: homeSchool?.core_label || homeSchool?.coreLabel || "Shared requirements",
+        kind: "shared",
+        minor: false,
+      });
+    }
+    for (const program of [...majors, ...other, ...minors]) {
+      tabs.push({
+        id: program.id,
+        label: program.name || "Program",
+        kind: "program",
+        minor: program.type === "minor",
+      });
+    }
+    return tabs;
+  }
+
+  function nextActions(progress) {
+    return (progress || [])
+      .map((item, index) => ({ ...item, _index: index }))
+      .filter((item) => item?.id && item?.label && item.complete !== true)
+      .sort((left, right) => (Number(left.priority) || 0) - (Number(right.priority) || 0)
+        || left._index - right._index)
+      .slice(0, 3)
+      .map(({ _index, ...item }) => item);
+  }
+
   root.ScheduleRUProgramRequirementModel = {
     rootSignature,
     normalizeProgramTrees,
     requirementsForDisplay,
     computeDoubleCount,
+    requirementTabs,
+    nextActions,
   };
 })(globalThis);

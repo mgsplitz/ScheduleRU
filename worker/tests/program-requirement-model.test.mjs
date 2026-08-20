@@ -170,3 +170,37 @@ test("double-count analysis excludes shared families and enforces the matching p
   });
   assert.deepEqual(result.unscoped, []);
 });
+
+test("requirement workspace tabs put shared school work before majors and minors", () => {
+  const tabs = plain(model().requirementTabs({
+    homeSchool: { slug: "rbsnb", name: "RBS New Brunswick", core_label: "Business Core" },
+    programs: [
+      { id: "cs-minor", name: "Computer Science", type: "minor" },
+      { id: "finance", name: "Finance", type: "major", role: "primary" },
+      { id: "bait", name: "BAIT", type: "major", role: "secondary" },
+      { id: "math-minor", name: "Mathematics", type: "minor" },
+    ],
+    sharedRoots: [{ id: "business-core", display_family: "rbsnb-business-core" }],
+  }));
+
+  assert.deepEqual(tabs.map((tab) => [tab.id, tab.kind, tab.minor]), [
+    ["school:rbsnb", "shared", false],
+    ["finance", "program", false],
+    ["bait", "program", false],
+    ["cs-minor", "program", true],
+    ["math-minor", "program", true],
+  ]);
+  assert.equal(tabs[0].label, "Business Core");
+});
+
+test("next actions omit completed work and cap guidance at three items", () => {
+  const actions = plain(model().nextActions([
+    { id: "done", label: "Business Core", complete: true },
+    { id: "one", label: "Choose a finance elective", complete: false, priority: 20 },
+    { id: "two", label: "Complete Foundations", complete: false, priority: 5 },
+    { id: "three", label: "Choose a philosophy course", complete: false, priority: 30 },
+    { id: "four", label: "Choose a math course", complete: false, priority: 40 },
+  ]));
+
+  assert.deepEqual(actions.map((action) => action.id), ["two", "one", "three"]);
+});
