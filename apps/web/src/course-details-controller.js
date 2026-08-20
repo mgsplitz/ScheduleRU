@@ -113,7 +113,7 @@
         return `<div class="detail-section"><h3>Course path</h3>${paths}${sourceNote ? `<p class="src-note">${sourceNote} A green course is completed or scheduled in an earlier semester.</p>` : ""}</div>`;
       }
       if (plan.references?.length) {
-        return `<div class="detail-section"><h3>Course path</h3><div class="detail-chips">${plan.references.map((reference) => prerequisiteChipHtml(reference.course_code, null, plan)).join("")}</div><p class="src-note">Rutgers lists additional wording or alternatives that the app cannot safely turn into an automatic rule. Verify the official catalog before registration.</p></div>`;
+        return `<div class="detail-section"><h3>Course path</h3><div class="detail-chips">${plan.references.map((reference) => prerequisiteChipHtml(reference.course_code, null, plan)).join("")}</div><p class="src-note">This requirement includes official placement or alternative-course wording. Review the catalog details below before registration.</p></div>`;
       }
       const presentation = plannerUI.coursePathState({
         plan,
@@ -172,7 +172,7 @@
           : available
         ? (prerequisiteEligibility.plan.paths?.length
           ? "Available based on prerequisite courses completed or planned in earlier semesters."
-          : "No verified prerequisite rule is blocking this course in the app.")
+          : "Available based on the official course facts used for this plan.")
         : `Not yet available in the ${academicYearLabel(detailsTerm.year)} plan year because ${standing?.label?.toLowerCase() || "of an enrollment restriction"}.`;
       document.getElementById("prBody").innerHTML = `
         <div class="detail-overview">
@@ -181,7 +181,7 @@
           <div class="detail-status${available || completedAlternative ? " ready" : ""}">${escapeHtml(status)}</div>
         </div>
         <div class="detail-section"><h3>${standing ? "When you can take it" : "Enrollment"}</h3><p>${escapeHtml(compactRestriction(course, standing))}</p></div>
-        ${instructorLinks ? `<div class="detail-section"><h3>Instructors</h3><div class="external-professor-links">${instructorLinks}</div><p class="src-note">Opens an external professor search. Ratings are not verified by ScheduleRU.</p></div>` : ""}
+        ${instructorLinks ? `<div class="detail-section"><h3>Instructors</h3><div class="external-professor-links">${instructorLinks}</div><p class="src-note">Opens the instructor's external Rate My Professors profile or search.</p></div>` : ""}
         ${eligibilityNotice ? `<div class="detail-section"><h3>Planning eligibility</h3><p>${escapeHtml(eligibilityNotice)}</p></div>` : ""}
         ${alternativeDetails ? `<div class="detail-section"><h3>Also accepted for this requirement</h3><div class="detail-chips">${alternativeDetails}</div><p class="src-note">This reviewed equivalency comes from the degree-audit rule recorded for this requirement.</p></div>` : ""}
         ${prerequisiteDetailsHtml(prerequisiteEligibility, course)}

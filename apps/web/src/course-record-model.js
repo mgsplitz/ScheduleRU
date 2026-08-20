@@ -63,13 +63,13 @@
         fullTitle: title,
         credits: course.credits ?? "",
         description: cleanText?.(course.description) || "",
-        catalogPrereqs: cleanText?.(course.prereqs) || "",
+        catalogPrereqs: cleanText?.(course.catalog_prereqs || course.prereqs) || "",
         subjectNotes: cleanText?.(course.subject_notes) || "",
-        restrictions: cleanText?.(course.restrictions) || "",
+        restrictions: cleanText?.(course.catalog_restrictions || course.restrictions) || "",
         requirementNotes: [],
         prereqs: [],
         attributes: Array.isArray(course.attributes) ? [...course.attributes] : [],
-        eligibility: current.courseEligibilityByCode?.[code] || null,
+        eligibility: current.courseEligibilityByCode?.[code] || course.eligibility || null,
         catalogRecordAvailable: true,
       };
     }

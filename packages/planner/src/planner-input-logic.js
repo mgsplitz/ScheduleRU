@@ -11,6 +11,13 @@
   const unique = (values) => [...new Set(values)];
   const validCode = (value) => COURSE_CODE.test(text(value));
 
+  function normalizedCoursePaths(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((path) => unique(
+      (Array.isArray(path) ? path : []).map(text).filter(validCode),
+    )).filter((path) => path.length);
+  }
+
   function numericCredits(value) {
     const match = text(value).match(/\d+(?:\.\d+)?/);
     const number = match ? Number(match[0]) : NaN;
@@ -47,10 +54,18 @@
       ? campusCatalogPaths.filter((path) => path.every((code) =>
         knownCourseCodes.has(code) || completedCourseCodes?.has?.(code)))
       : campusCatalogPaths;
-    const prerequisitePaths = reviewedNoConditions
+    const authoritativePrerequisitePaths = normalizedCoursePaths(course?.prerequisitePaths);
+    const authoritativeEnforceablePaths = normalizedCoursePaths(course?.enforceablePrerequisitePaths);
+    const authoritativeCorequisitePaths = normalizedCoursePaths(course?.corequisitePaths);
+    const hasAuthoritativeCoverage = ["reviewed", "catalog_parsed"].includes(text(course?.ruleCoverage));
+    const prerequisitePaths = hasAuthoritativeCoverage
+      ? authoritativePrerequisitePaths
+      : reviewedNoConditions
       ? []
       : reviewedPaths.length ? reviewedPaths : directPaths[0]?.length ? directPaths : catalog.reviewable ? campusCatalogPaths : [];
-    const enforceablePrerequisitePaths = reviewedNoConditions
+    const enforceablePrerequisitePaths = hasAuthoritativeCoverage
+      ? authoritativeEnforceablePaths.length ? authoritativeEnforceablePaths : authoritativePrerequisitePaths
+      : reviewedNoConditions
       ? []
       : reviewedPaths.length ? reviewedPaths : directPaths[0]?.length ? directPaths : catalog.reviewable ? enforceableCatalogPaths : [];
     const minimumYearCondition = conditions.find((condition) => condition.type === "minimum_plan_year");
@@ -59,10 +74,14 @@
     return {
       prerequisitePaths,
       enforceablePrerequisitePaths,
-      minimumPlanYear: minimumYearCondition?.minimum_year || standingFromText(course),
-      minimumPriorCredits: priorCreditsCondition?.minimum_credits ?? null,
-      corequisitePaths: corequisiteConditions.map((condition) => condition.any_of_course_codes),
-      ruleCoverage: reviewed
+      minimumPlanYear: Number(course?.minimumPlanYear) || minimumYearCondition?.minimum_year || standingFromText(course),
+      minimumPriorCredits: Number(course?.minimumPriorCredits) || priorCreditsCondition?.minimum_credits || null,
+      corequisitePaths: authoritativeCorequisitePaths.length
+        ? authoritativeCorequisitePaths
+        : corequisiteConditions.map((condition) => condition.any_of_course_codes),
+      ruleCoverage: hasAuthoritativeCoverage
+        ? text(course.ruleCoverage)
+        : reviewed
         ? "reviewed"
         : enforceablePrerequisitePaths.length || standingFromText(course)
           ? "catalog_parsed"
@@ -91,6 +110,17 @@
       ruleCoverage: eligibility.ruleCoverage,
       prerequisitePaths: eligibility.prerequisitePaths,
       enforceablePrerequisitePaths: eligibility.enforceablePrerequisitePaths,
+      optionFamily: text(course?.optionFamily) || undefined,
+      creditExclusionFamilies: unique(
+        [
+          ...(Array.isArray(course?.creditExclusionFamilies) ? course.creditExclusionFamilies : []),
+          ...(Array.isArray(course?.eligibility?.credit_exclusions)
+            ? course.eligibility.credit_exclusions.map((policy) => policy?.policy_key)
+            : []),
+        ]
+          .map(text)
+          .filter(Boolean),
+      ),
     };
   }
 

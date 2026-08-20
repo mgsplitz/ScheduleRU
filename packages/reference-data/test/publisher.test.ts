@@ -63,6 +63,8 @@ test("replaces every managed dataset in one ordered batch", async () => {
     ap_equivalencies: 1,
     course_eligibility_reviews: 1,
     course_eligibility_conditions: 1,
+    course_credit_exclusion_policies: 1,
+    course_credit_exclusion_members: 2,
   });
   const sql = database.batches[0]!.map(({ sql }) => sql);
   assert.ok(
@@ -76,6 +78,8 @@ test("replaces every managed dataset in one ordered batch", async () => {
   assert.match(sql.join("\n"), /INSERT INTO ap_equivalencies/);
   assert.match(sql.join("\n"), /INSERT INTO course_eligibility_reviews/);
   assert.match(sql.join("\n"), /INSERT INTO course_eligibility_conditions/);
+  assert.match(sql.join("\n"), /INSERT INTO course_credit_exclusion_policies/);
+  assert.match(sql.join("\n"), /INSERT INTO course_credit_exclusion_members/);
 });
 
 test("serializes JSON values once and produces idempotent statements", async () => {

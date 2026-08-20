@@ -23,6 +23,8 @@ export interface ReferenceDataPublishResult {
     ap_equivalencies: number;
     course_eligibility_reviews: number;
     course_eligibility_conditions: number;
+    course_credit_exclusion_policies: number;
+    course_credit_exclusion_members: number;
   };
   statement_count: number;
 }
@@ -47,6 +49,8 @@ export async function publishReferenceDataBundle(
 ): Promise<ReferenceDataPublishResult> {
   const bundle = assertReferenceDataBundle(value);
   const statements: ReferenceDataPreparedStatement[] = [
+    statement(database, "DELETE FROM course_credit_exclusion_members"),
+    statement(database, "DELETE FROM course_credit_exclusion_policies"),
     statement(database, "DELETE FROM course_eligibility_conditions"),
     statement(database, "DELETE FROM course_eligibility_reviews"),
     statement(database, "DELETE FROM ap_equivalencies"),
@@ -253,6 +257,34 @@ export async function publishReferenceDataBundle(
       row.reviewed_at,
     ));
   }
+  for (const row of ordered(bundle.course_credit_exclusion_policies)) {
+    statements.push(statement(
+      database,
+      `INSERT INTO course_credit_exclusion_policies (
+         policy_key, campus_slug, catalog_year, max_courses, note, source_url,
+         source_label, source_date, review_status, reviewed_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      row.policy_key,
+      row.campus_slug,
+      row.catalog_year,
+      row.max_courses,
+      row.note,
+      row.source_url,
+      row.source_label,
+      row.source_date,
+      row.review_status,
+      row.reviewed_at,
+    ));
+  }
+  for (const row of ordered(bundle.course_credit_exclusion_members)) {
+    statements.push(statement(
+      database,
+      `INSERT INTO course_credit_exclusion_members (policy_key, course_code)
+       VALUES (?, ?)`,
+      row.policy_key,
+      row.course_code,
+    ));
+  }
 
   await database.batch(statements);
   return {
@@ -269,6 +301,8 @@ export async function publishReferenceDataBundle(
       ap_equivalencies: bundle.ap_equivalencies.length,
       course_eligibility_reviews: bundle.course_eligibility_reviews.length,
       course_eligibility_conditions: bundle.course_eligibility_conditions.length,
+      course_credit_exclusion_policies: bundle.course_credit_exclusion_policies.length,
+      course_credit_exclusion_members: bundle.course_credit_exclusion_members.length,
     },
     statement_count: statements.length,
   };

@@ -2,6 +2,8 @@ import type {
   ApEquivalency,
   CourseEligibilityCondition,
   CourseEligibilityReview,
+  CourseCreditExclusionMember,
+  CourseCreditExclusionPolicy,
   DoubleCountException,
   DoubleCountPolicy,
   DoubleCountRule,
@@ -95,6 +97,8 @@ export async function exportReferenceDataBundle(
     apEquivalencyRows,
     courseEligibilityReviewRows,
     courseEligibilityConditionRows,
+    courseCreditExclusionPolicyRows,
+    courseCreditExclusionMemberRows,
   ] = await Promise.all([
     allRows(
       database,
@@ -188,6 +192,21 @@ export async function exportReferenceDataBundle(
               source_date, reviewed_at
        FROM course_eligibility_conditions
        ORDER BY course_code, condition_key`,
+    ),
+    allRows(
+      database,
+      `/* reference-data-export:course-credit-exclusion-policies */
+       SELECT policy_key, campus_slug, catalog_year, max_courses, note,
+              source_url, source_label, source_date, review_status, reviewed_at
+       FROM course_credit_exclusion_policies
+       ORDER BY policy_key`,
+    ),
+    allRows(
+      database,
+      `/* reference-data-export:course-credit-exclusion-members */
+       SELECT policy_key, course_code
+       FROM course_credit_exclusion_members
+       ORDER BY policy_key, course_code`,
     ),
   ]);
 
@@ -328,6 +347,24 @@ export async function exportReferenceDataBundle(
       source_date: nullableString(row.source_date),
       reviewed_at: nullableNumber(row.reviewed_at),
     }));
+  const courseCreditExclusionPolicies: CourseCreditExclusionPolicy[] =
+    courseCreditExclusionPolicyRows.map((row) => ({
+      policy_key: stringValue(row.policy_key),
+      campus_slug: stringValue(row.campus_slug),
+      catalog_year: nullableString(row.catalog_year),
+      max_courses: integerValue(row.max_courses),
+      note: stringValue(row.note),
+      source_url: stringValue(row.source_url),
+      source_label: stringValue(row.source_label),
+      source_date: nullableString(row.source_date),
+      review_status: stringValue(row.review_status) as CourseCreditExclusionPolicy["review_status"],
+      reviewed_at: nullableNumber(row.reviewed_at),
+    }));
+  const courseCreditExclusionMembers: CourseCreditExclusionMember[] =
+    courseCreditExclusionMemberRows.map((row) => ({
+      policy_key: stringValue(row.policy_key),
+      course_code: stringValue(row.course_code),
+    }));
 
   const value = {
     contract_version: 1,
@@ -342,6 +379,8 @@ export async function exportReferenceDataBundle(
     ap_equivalencies: apEquivalencies,
     course_eligibility_reviews: courseEligibilityReviews,
     course_eligibility_conditions: courseEligibilityConditions,
+    course_credit_exclusion_policies: courseCreditExclusionPolicies,
+    course_credit_exclusion_members: courseCreditExclusionMembers,
   };
   const result = validateReferenceDataBundle(value);
   if (!result.ok) throw new ReferenceDataExportValidationError(result.issues);

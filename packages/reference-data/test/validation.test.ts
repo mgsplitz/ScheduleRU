@@ -89,6 +89,41 @@ test("validates reviewed course eligibility facts and condition values", () => {
   );
 });
 
+test("credit exclusions require a reviewed policy, valid members, and a usable cap", () => {
+  const value = bundle();
+  const policies = value.course_credit_exclusion_policies as Array<Record<string, unknown>>;
+  const members = value.course_credit_exclusion_members as Array<Record<string, unknown>>;
+  policies[0]!.max_courses = 0;
+  members[0]!.course_code = "bad-code";
+  members[1]!.policy_key = "missing-policy";
+
+  const result = validateReferenceDataBundle(value);
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.deepEqual(
+    result.issues.map(({ path }) => path),
+    [
+      "course_credit_exclusion_policies[0].max_courses",
+      "course_credit_exclusion_members[0].course_code",
+      "course_credit_exclusion_members[1].policy_key",
+    ],
+  );
+});
+
+test("credit exclusions cannot publish without enough distinct member courses", () => {
+  const value = bundle();
+  const members = value.course_credit_exclusion_members as Array<Record<string, unknown>>;
+  members.splice(1);
+
+  const result = validateReferenceDataBundle(value);
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.deepEqual(result.issues.map(({ path, code }) => ({ path, code })), [{
+    path: "course_credit_exclusion_policies[0]",
+    code: "incomplete_credit_exclusion",
+  }]);
+});
+
 test("validates AP score bands and decoded equivalency arrays", () => {
   const value = bundle();
   const rows = value.ap_equivalencies as Array<Record<string, unknown>>;

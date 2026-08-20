@@ -145,6 +145,7 @@
         enforceablePrerequisitePaths: [],
         prerequisiteClosure: [],
         attributes: [],
+        creditExclusionFamilies: [],
         offeringEvidence: null,
         minimumPlanYear: null,
         minimumPriorCredits: null,
@@ -169,6 +170,7 @@
           enforceablePrerequisitePaths: [],
           prerequisiteClosure: [],
           attributes: [],
+          creditExclusionFamilies: [],
           offeringEvidence: null,
           minimumPlanYear: Number(record?.minimumPlanYear) || null,
           minimumPriorCredits: Number(record?.minimumPriorCredits) || null,
@@ -187,6 +189,7 @@
           if (normalized.length) current.enforceablePrerequisitePaths.push(normalized);
         });
         current.attributes.push(...(record?.attributes || []).map(text));
+        current.creditExclusionFamilies.push(...(record?.creditExclusionFamilies || []).map(text));
         current.offeringEvidence ||= record?.offeringEvidence || null;
         current.minimumPlanYear ||= Number(record?.minimumPlanYear) || null;
         current.minimumPriorCredits ||= Number(record?.minimumPriorCredits) || null;
@@ -212,6 +215,7 @@
         current.enforceablePrerequisitePaths.push(...candidate.enforceablePrerequisitePaths);
         current.prerequisiteClosure.push(...candidate.prerequisiteClosure);
         current.attributes.push(...candidate.attributes);
+        current.creditExclusionFamilies.push(...candidate.creditExclusionFamilies);
         current.credits = Math.min(current.credits, candidate.credits);
       }
       merged.set(canonical, current);
@@ -234,6 +238,7 @@
         .map((path) => path.split("\u0000")),
       prerequisiteClosure: uniqueSorted(candidate.prerequisiteClosure),
       attributes: uniqueSorted(candidate.attributes),
+      creditExclusionFamilies: uniqueSorted(candidate.creditExclusionFamilies),
       requirementPrograms: Object.fromEntries(uniqueSorted(candidate.coverageRequirementIds)
         .map((id) => [id, requirementById.get(id)?.sourceProgram || ""])),
     })).sort((left, right) => left.code.localeCompare(right.code));

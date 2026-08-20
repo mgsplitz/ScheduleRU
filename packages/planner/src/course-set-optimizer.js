@@ -107,6 +107,7 @@
       equivalentCourseCodes: uniqueSorted(candidate.equivalentCourseCodes || [candidate.code]),
       coverageRequirementIds: uniqueSorted(candidate.coverageRequirementIds || []),
       prerequisiteClosure: uniqueSorted(candidate.prerequisiteClosure || []),
+      creditExclusionFamilies: uniqueSorted(candidate.creditExclusionFamilies || []),
     })).sort((left, right) => left.code.localeCompare(right.code));
     const requirementById = new Map(requirements.map((item) => [item.id, item]));
     const unlockCounts = new Map();
@@ -126,6 +127,7 @@
         minimumPriorCredits: Number(candidate.minimumPriorCredits) || null,
         offering: candidate.offeringEvidence ? 1 : 0,
         optionFamily: candidate.optionFamily || null,
+        creditExclusionFamilies: candidate.creditExclusionFamilies,
         distinctAttributes: uniqueSorted(candidate.coverageRequirementIds.flatMap((id) => {
           const allowed = requirementById.get(id)?.distinctAttributes || [];
           return (candidate.attributes || []).filter((attribute) => allowed.includes(attribute));
@@ -164,6 +166,13 @@
         if (id !== other) adjacency.get(id)?.add(other);
       }));
       allCandidates.forEach((candidate) => connect(candidate.coverageRequirementIds.filter((id) => needed.has(id))));
+      const exclusionRequirements = new Map();
+      allCandidates.forEach((candidate) => (candidate.creditExclusionFamilies || []).forEach((family) => {
+        const ids = exclusionRequirements.get(family) || [];
+        ids.push(...candidate.coverageRequirementIds.filter((id) => needed.has(id)));
+        exclusionRequirements.set(family, ids);
+      }));
+      exclusionRequirements.forEach((ids) => connect(uniqueSorted(ids)));
       const prerequisiteConsumers = new Map();
       allCandidates.forEach((candidate) => (candidate.prerequisiteClosure || []).forEach((code) => {
         const ids = prerequisiteConsumers.get(code) || [];
@@ -327,6 +336,9 @@
       if (state.selected.has(candidate.code)) return false;
       if (candidate.optionFamily && [...state.selected].some((code) =>
         candidateByAlias.get(code)?.optionFamily === candidate.optionFamily)) return false;
+      if ((candidate.creditExclusionFamilies || []).some((family) =>
+        [...state.selected].some((code) =>
+          (candidateByAlias.get(code)?.creditExclusionFamilies || []).includes(family)))) return false;
       const allowed = requirement.distinctAttributes || [];
       if (!allowed.length) return true;
       const used = state.distinctUsed.get(requirement.id) || new Set();

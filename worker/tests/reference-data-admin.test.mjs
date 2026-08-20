@@ -22,6 +22,8 @@ function bundle() {
     ap_equivalencies: [],
     course_eligibility_reviews: [],
     course_eligibility_conditions: [],
+    course_credit_exclusion_policies: [],
+    course_credit_exclusion_members: [],
   };
 }
 

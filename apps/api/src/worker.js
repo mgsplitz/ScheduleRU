@@ -190,19 +190,46 @@ async function syncCourseReferenceTerm(env, year, term) {
     const code = `${school}:${subject}:${number}`;
     const title = String(course.expandedTitle || course.title || "").trim();
     if (!COURSE_CODE_PATTERN.test(code) || !title) continue;
-    rows.set(code, { code, title, credits: String(course.credits ?? course.creditsObject?.value ?? "") });
+    const restrictions = [...new Set((course.sections || []).flatMap((section) => [
+      section.sectionEligibility,
+      section.openToText,
+    ]).map((value) => String(value || "").trim()).filter(Boolean))].join(" · ");
+    rows.set(code, {
+      code,
+      title,
+      credits: String(course.credits ?? course.creditsObject?.value ?? ""),
+      catalogPrereqs: String(course.preReqNotes || "").trim(),
+      catalogRestrictions: restrictions,
+    });
   }
   const statements = [...rows.values()].sort((left, right) => left.code.localeCompare(right.code)).map((course) =>
     env.DB.prepare(
-      `INSERT INTO course_reference (course_code, title, credits, source_kind, source_url, updated_at)
-       VALUES (?, ?, ?, 'schedule_archive', ?, ?)
+      `INSERT INTO course_reference (
+         course_code, title, credits, catalog_prereqs, catalog_restrictions,
+         source_year, source_term,
+         source_kind, source_url, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'schedule_archive', ?, ?)
        ON CONFLICT(course_code) DO UPDATE SET
          title = excluded.title,
          credits = CASE WHEN excluded.credits <> '' THEN excluded.credits ELSE course_reference.credits END,
+         catalog_prereqs = excluded.catalog_prereqs,
+         catalog_restrictions = excluded.catalog_restrictions,
+         source_year = excluded.source_year,
+         source_term = excluded.source_term,
          source_kind = excluded.source_kind,
          source_url = excluded.source_url,
          updated_at = excluded.updated_at`
-    ).bind(course.code, course.title, course.credits, `${RUTGERS_BASE}/courses.json?year=${year}&term=${term}&campus=NB`, updatedAt)
+    ).bind(
+      course.code,
+      course.title,
+      course.credits,
+      course.catalogPrereqs,
+      course.catalogRestrictions,
+      year,
+      term,
+      `${RUTGERS_BASE}/courses.json?year=${year}&term=${term}&campus=NB`,
+      updatedAt,
+    )
   );
   for (let offset = 0; offset < statements.length; offset += 400) {
     await env.DB.batch(statements.slice(offset, offset + 400));
@@ -321,14 +348,32 @@ function courseStatements(env, mapped) {
          prereqs=excluded.prereqs, subject_notes=excluded.subject_notes, synced_at=excluded.synced_at`
     ).bind(c.id, c.school, c.subject_code, c.subject_description, c.course_number, c.year, c.term, c.title, c.credits, c.description, c.prereqs, c.subject_notes, c.synced_at),
     env.DB.prepare(
-      `INSERT INTO course_reference (course_code, title, credits, source_kind, source_url, updated_at)
-       VALUES (?, ?, ?, 'schedule', NULL, ?)
+      `INSERT INTO course_reference (
+         course_code, title, credits, catalog_prereqs, catalog_restrictions,
+         source_year, source_term,
+         source_kind, source_url, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'schedule', ?, ?)
        ON CONFLICT(course_code) DO UPDATE SET
          title = excluded.title,
          credits = CASE WHEN excluded.credits <> '' THEN excluded.credits ELSE course_reference.credits END,
+         catalog_prereqs = excluded.catalog_prereqs,
+         catalog_restrictions = excluded.catalog_restrictions,
+         source_year = excluded.source_year,
+         source_term = excluded.source_term,
          source_kind = excluded.source_kind,
+         source_url = excluded.source_url,
          updated_at = excluded.updated_at`
-    ).bind(`${c.school}:${c.subject_code}:${c.course_number}`, c.title, c.credits, c.synced_at),
+    ).bind(
+      `${c.school}:${c.subject_code}:${c.course_number}`,
+      c.title,
+      c.credits,
+      c.prereqs,
+      [...new Set(mapped.sections.map((section) => section.restrictions).filter(Boolean))].join(" · "),
+      c.year,
+      c.term,
+      `${RUTGERS_BASE}/courses.json?year=${c.year}&term=${c.term}&campus=NB`,
+      c.synced_at,
+    ),
   ];
   for (const sec of mapped.sections) {
     stmts.push(
@@ -525,7 +570,9 @@ async function handleApi(request, env, ctx) {
       return json({ error: "invalid course codes" }, 400);
     }
     const { results } = await env.DB.prepare(
-      `SELECT course_code, title, credits
+      `SELECT course_code, title, credits, catalog_prereqs,
+              catalog_restrictions, source_kind, source_url, source_year,
+              source_term, updated_at
        FROM course_reference
        WHERE course_code IN (SELECT value FROM json_each(?))
        ORDER BY course_code`
@@ -567,20 +614,27 @@ async function handleApi(request, env, ctx) {
       mgmt: ["management"], management: ["mgmt"],
     };
     const meaningfulTerms = q.toLowerCase().match(/[a-z0-9]+/g)?.filter((term) => !["and", "of", "the", "to", "for"].includes(term)) || [];
-    let where = ` WHERE 1=1`;
     const binds = [];
+    let where = ` WHERE 1=1`;
+    const planningYear = Number(env.CURRENT_YEAR);
+    const planningTerm = String(env.CURRENT_TERM || "");
+    if (Number.isInteger(planningYear) && ["0", "1", "7", "9"].includes(planningTerm)) {
+      where += " AND c.year = ? AND c.term = ?";
+      binds.push(planningYear, planningTerm);
+    }
     if (subject) { where += ` AND subject_code = ?`; binds.push(subject.padStart(3, "0")); }
     if (q) {
+      const searchBinds = [];
       const tokenClauses = meaningfulTerms.map((term) => {
         const variants = [...new Set([term, ...(searchAliases[term] || [])])];
         const fields = variants.flatMap(() => ["LOWER(title) LIKE ?", "LOWER(course_number) LIKE ?", "LOWER(subject_code) LIKE ?", "LOWER(id) LIKE ?"]);
-        for (const variant of variants) for (let i = 0; i < 4; i++) binds.push(`%${variant}%`);
+        for (const variant of variants) for (let i = 0; i < 4; i++) searchBinds.push(`%${variant}%`);
         return `(${fields.join(" OR ")})`;
       });
       // Preserve direct course-code searches (01:198:111) as one exact
       // substring match while natural-language searches use every word.
       where += ` AND (LOWER(id) LIKE ?${tokenClauses.length ? ` OR (${tokenClauses.join(" AND ")})` : ""})`;
-      binds.splice(subject ? 1 : 0, 0, `%${q.toLowerCase()}%`);
+      binds.push(`%${q.toLowerCase()}%`, ...searchBinds);
     }
     if (levels.length) {
       const clauses = levels.map((level) => {

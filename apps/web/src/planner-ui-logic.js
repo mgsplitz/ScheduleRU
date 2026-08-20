@@ -105,8 +105,8 @@
       };
     }
     return {
-      kind: "unreviewed",
-      message: "A machine-readable prerequisite path is not available yet. Verify the official catalog before registration.",
+      kind: "catalog_detail",
+      message: "Review the official prerequisite wording below before registration.",
     };
   }
 

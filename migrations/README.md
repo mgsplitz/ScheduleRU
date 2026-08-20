@@ -43,6 +43,7 @@ Then apply the additive files needed by the current application:
 17. `schema_course_eligibility_conditions.sql`
 18. `schema_ap_equivalencies.sql`
 19. `schema_course_requirement_attributes.sql`
+20. `schema_course_credit_exclusions.sql`
 
 `schema_requirement_context_and_overlap_exceptions.sql` is retained for older
 databases; its tables are already present in the current base program schema.
@@ -59,6 +60,7 @@ schemas already contain:
 - `migrate_program_academic_metadata.sql`
 - `migrate_requirement_display_families.sql`
 - `migrate_requirement_import_source_kinds.sql`
+- `migrate_course_reference_academic_facts.sql`
 
 Apply an existing-database migration only after checking the target schema.
 SQLite `ALTER TABLE ... ADD COLUMN` is intentionally not replay-safe when the

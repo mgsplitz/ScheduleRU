@@ -47,6 +47,9 @@ test("catalog resolves canonical metadata for a bounded set of course codes", as
     { course_code: "01:730:408", title: "Intermediate Logic II", credits: "3" },
   ] });
   assert.match(db.calls[0].sql, /FROM course_reference/);
+  assert.match(db.calls[0].sql, /catalog_prereqs/);
+  assert.match(db.calls[0].sql, /catalog_restrictions/);
+  assert.match(db.calls[0].sql, /source_url/);
   assert.match(db.calls[0].sql, /json_each\(\?\)/);
   assert.deepEqual(JSON.parse(db.calls[0].values[0]), ["01:730:407", "01:730:408"]);
 });
@@ -83,7 +86,12 @@ test("development admins can seed canonical metadata from any Rutgers term witho
   };
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify([
-    { offeringUnitCode: "01", subject: "730", courseNumber: "407", expandedTitle: "Intermediate Logic I", credits: 3 },
+    {
+      offeringUnitCode: "01", subject: "730", courseNumber: "407",
+      expandedTitle: "Intermediate Logic I", credits: 3,
+      preReqNotes: "01:730:201",
+      sections: [{ sectionEligibility: "JUNIORS AND SENIORS" }],
+    },
     { offeringUnitCode: "01", subject: "730", courseNumber: "408", expandedTitle: "Intermediate Logic II", credits: 3 },
   ]));
   try {
@@ -97,6 +105,13 @@ test("development admins can seed canonical metadata from any Rutgers term witho
     assert.equal(batches.length, 1);
     assert.equal(calls.every((call) => call.sql.includes("course_reference")), true);
     assert.deepEqual(calls[0].values.slice(0, 3), ["01:730:407", "Intermediate Logic I", "3"]);
+    assert.match(calls[0].sql, /catalog_prereqs/);
+    assert.match(calls[0].sql, /catalog_restrictions/);
+    assert.match(calls[0].sql, /source_year/);
+    assert.match(calls[0].sql, /source_term/);
+    assert.deepEqual(calls[0].values.slice(3, 7), [
+      "01:730:201", "JUNIORS AND SENIORS", 2024, "9",
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -120,6 +135,20 @@ test("catalog selector filtering happens in D1 before limit and offset", async (
   assert.match(db.calls[1].sql, /LIMIT \? OFFSET \?$/);
   assert.deepEqual(db.calls[0].values, ["01", "640", 300, 499, '["01:640:491"]']);
   assert.deepEqual(db.calls[1].values, ["01", "640", 300, 499, '["01:640:491"]', 25, 0]);
+});
+
+test("catalog and guided selectors use only the configured planning term", async () => {
+  const db = catalogDb([]);
+  const response = await worker.fetch(
+    new Request("https://example.test/api/courses?limit=25&offset=0"),
+    { DB: db, CURRENT_YEAR: "2026", CURRENT_TERM: "9" },
+    {},
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(db.calls[0].sql, /c\.year = \? AND c\.term = \?/);
+  assert.deepEqual(db.calls[0].values, [2026, "9"]);
+  assert.deepEqual(db.calls[1].values, [2026, "9", 25, 0]);
 });
 
 test("catalog selector queries reject malformed rules before querying D1", async () => {

@@ -627,6 +627,58 @@
     }
   ],
   "contract_version": 1,
+  "course_credit_exclusion_members": [
+    {
+      "course_code": "01:355:101",
+      "policy_key": "rutgers-nb-college-writing-credit"
+    },
+    {
+      "course_code": "01:355:103",
+      "policy_key": "rutgers-nb-college-writing-credit"
+    },
+    {
+      "course_code": "01:355:104",
+      "policy_key": "rutgers-nb-college-writing-credit"
+    },
+    {
+      "course_code": "01:640:244",
+      "policy_key": "rutgers-nb-differential-equations-credit"
+    },
+    {
+      "course_code": "01:640:252",
+      "policy_key": "rutgers-nb-differential-equations-credit"
+    },
+    {
+      "course_code": "01:640:292",
+      "policy_key": "rutgers-nb-differential-equations-credit"
+    }
+  ],
+  "course_credit_exclusion_policies": [
+    {
+      "campus_slug": "new-brunswick",
+      "catalog_year": null,
+      "max_courses": 1,
+      "note": "Students may receive degree credit for only one of College Writing, Exposition and Argument, or College Writing Extended.",
+      "policy_key": "rutgers-nb-college-writing-credit",
+      "review_status": "reviewed",
+      "reviewed_at": 1787205600000,
+      "source_date": "2026-08-20",
+      "source_label": "Rutgers Writing Program: College Writing",
+      "source_url": "https://wp.rutgers.edu/academics/undergraduate/courses/355-101"
+    },
+    {
+      "campus_slug": "new-brunswick",
+      "catalog_year": null,
+      "max_courses": 1,
+      "note": "Students may receive degree credit for only one differential-equations course in this published family.",
+      "policy_key": "rutgers-nb-differential-equations-credit",
+      "review_status": "reviewed",
+      "reviewed_at": 1787205600000,
+      "source_date": "2026-08-20",
+      "source_label": "Rutgers Mathematics: Elementary Differential Equations",
+      "source_url": "https://www.math.rutgers.edu/academics/undergraduate/course-descriptions/950-01-640-252-elementary-differential-equations"
+    }
+  ],
   "course_eligibility_conditions": [
     {
       "condition_key": "calculus-ii",

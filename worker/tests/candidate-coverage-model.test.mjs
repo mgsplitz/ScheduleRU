@@ -38,6 +38,20 @@ const decision = (id, program, candidates, extras = {}) => ({
   ...extras,
 });
 
+test("canonical coverage preserves reviewed credit-exclusion families", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [decision("math-elective", "sasnb-mathematics-minor", [
+      candidate("01:640:252", {
+        creditExclusionFamilies: ["rutgers-nb-differential-equations-credit"],
+      }),
+    ])],
+  });
+
+  assert.deepEqual(plain(graph.candidates[0].creditExclusionFamilies), [
+    "rutgers-nb-differential-equations-credit",
+  ]);
+});
+
 test("a reviewed equivalent CS course also covers the RBS computing requirement", () => {
   const graph = model().buildCoverageGraph({
     decisions: [

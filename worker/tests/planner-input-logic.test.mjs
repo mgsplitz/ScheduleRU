@@ -44,6 +44,53 @@ const plannerInput = () => {
 };
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
+test("normalizing an authoritative course fact record is lossless", () => {
+  const normalized = plannerInput().normalizedCourse({
+    code: "33:390:440",
+    title: "Advanced Corporate Finance",
+    credits: 3,
+    prerequisitePaths: [["33:390:400"]],
+    enforceablePrerequisitePaths: [["33:390:400"]],
+    corequisitePaths: [["33:390:300"]],
+    minimumPlanYear: 3,
+    minimumPriorCredits: 60,
+    ruleCoverage: "reviewed",
+    optionFamily: "finance:advanced-elective-alternatives",
+    creditExclusionFamilies: ["finance:advanced-elective-alternatives"],
+  });
+
+  assert.deepEqual(plain(normalized.prerequisitePaths), [["33:390:400"]]);
+  assert.deepEqual(plain(normalized.enforceablePrerequisitePaths), [["33:390:400"]]);
+  assert.deepEqual(plain(normalized.corequisitePaths), [["33:390:300"]]);
+  assert.equal(normalized.minimumPlanYear, 3);
+  assert.equal(normalized.minimumPriorCredits, 60);
+  assert.equal(normalized.ruleCoverage, "reviewed");
+  assert.equal(normalized.optionFamily, "finance:advanced-elective-alternatives");
+  assert.deepEqual(plain(normalized.creditExclusionFamilies), [
+    "finance:advanced-elective-alternatives",
+  ]);
+});
+
+test("reviewed credit exclusions become planner constraint families", () => {
+  const normalized = plannerInput().normalizedCourse({
+    code: "01:640:252",
+    title: "Elementary Differential Equations",
+    credits: 3,
+    eligibility: {
+      review: null,
+      conditions: [],
+      credit_exclusions: [{
+        policy_key: "rutgers-nb-differential-equations-credit",
+        max_courses: 1,
+      }],
+    },
+  });
+
+  assert.deepEqual(plain(normalized.creditExclusionFamilies), [
+    "rutgers-nb-differential-equations-credit",
+  ]);
+});
+
 function sampleTree() {
   return {
     roots: ["root"],

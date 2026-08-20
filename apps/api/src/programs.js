@@ -258,7 +258,7 @@ async function getReviewedCourseEligibility(env, rawCodes) {
   for (let offset = 0; offset < codes.length; offset += COURSE_ELIGIBILITY_BATCH_SIZE) {
     const batch = codes.slice(offset, offset + COURSE_ELIGIBILITY_BATCH_SIZE);
     const placeholders = batch.map(() => "?").join(",");
-    const [reviews, conditions] = await env.DB.batch([
+    const [reviews, conditions, creditExclusions] = await env.DB.batch([
       env.DB.prepare(
         `SELECT course_code, review_status, no_known_conditions, source_url, source_label, source_date
          FROM course_eligibility_reviews
@@ -270,10 +270,38 @@ async function getReviewedCourseEligibility(env, rawCodes) {
          WHERE review_status = 'reviewed' AND course_code IN (${placeholders})
          ORDER BY course_code, condition_key`
       ).bind(...batch),
+      env.DB.prepare(
+        `SELECT member.course_code, policy.policy_key, policy.max_courses,
+                policy.note, policy.source_url, policy.source_label,
+                policy.source_date
+         FROM course_credit_exclusion_members member
+         INNER JOIN course_credit_exclusion_policies policy
+           ON policy.policy_key = member.policy_key
+         WHERE policy.review_status = 'reviewed'
+           AND member.course_code IN (${placeholders})
+         ORDER BY member.course_code, policy.policy_key`
+      ).bind(...batch),
     ]);
-    for (const review of reviews.results || []) output[review.course_code] = { review, conditions: [] };
+    for (const review of reviews.results || []) {
+      output[review.course_code] = { review, conditions: [], credit_exclusions: [] };
+    }
     for (const condition of conditions.results || []) {
       if (output[condition.course_code]) output[condition.course_code].conditions.push(condition);
+    }
+    for (const exclusion of creditExclusions.results || []) {
+      const course = output[exclusion.course_code] ||= {
+        review: null,
+        conditions: [],
+        credit_exclusions: [],
+      };
+      course.credit_exclusions.push({
+        policy_key: exclusion.policy_key,
+        max_courses: exclusion.max_courses,
+        note: exclusion.note,
+        source_url: exclusion.source_url,
+        source_label: exclusion.source_label,
+        source_date: exclusion.source_date,
+      });
     }
   }
   return output;
@@ -360,32 +388,46 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
     for (const selector of selectors || []) (selectorsByGroup[selector.group_id] ||= []).push(selector);
   }
   const { results: courses } = visibleGroupIds.length ? await env.DB.prepare(
-    `SELECT rc.*, g.program_id as owner_program_id, c.title as catalog_title, c.credits as catalog_credits,
-            c.description as catalog_description, c.prereqs as catalog_prereqs,
+    `SELECT rc.*, g.program_id as owner_program_id,
+            COALESCE(cr.title, c.title) as catalog_title,
+            COALESCE(NULLIF(cr.credits, ''), c.credits) as catalog_credits,
+            c.description as catalog_description,
+            cr.catalog_prereqs as catalog_prereqs,
             c.subject_notes as catalog_subject_notes,
-            (
+            COALESCE(NULLIF(cr.catalog_restrictions, ''), (
               SELECT GROUP_CONCAT(DISTINCT s.restrictions)
               FROM sections s
               WHERE s.course_id = c.id AND NULLIF(TRIM(s.restrictions), '') IS NOT NULL
-            ) as section_restrictions
+            )) as section_restrictions
      FROM requirement_courses rc
      INNER JOIN requirement_groups g ON g.id = rc.group_id
-     LEFT JOIN courses c ON c.school || ':' || c.subject_code || ':' || c.course_number = rc.course_code
+     LEFT JOIN course_reference cr ON cr.course_code = rc.course_code
+     LEFT JOIN courses c ON c.id = (
+       SELECT c2.id
+       FROM courses c2
+       WHERE c2.school || ':' || c2.subject_code || ':' || c2.course_number = rc.course_code
+       ORDER BY c2.year DESC, CAST(c2.term AS INTEGER) DESC
+       LIMIT 1
+     )
      WHERE rc.group_id IN (${visibleGroupIds.map(() => "?").join(",")})`
   ).bind(...visibleGroupIds).all() : { results: [] };
-  const eligibilityByCode = await getReviewedCourseEligibility(env, courses.map((course) => course.course_code));
-
   // Alternatives are scoped to the requirement-set/program that owns the
   // course row. This lets Degree Navigator-only families be entered once as
   // reviewed data and avoids a frontend exception for any particular course.
   const { results: alternatives } = await env.DB.prepare(
-    `SELECT e.*, c.title as catalog_title, c.credits as catalog_credits
+    `SELECT e.*, cr.title as catalog_title, cr.credits as catalog_credits,
+            cr.catalog_prereqs as catalog_prereqs
      FROM requirement_course_equivalencies e
-     LEFT JOIN courses c ON c.school || ':' || c.subject_code || ':' || c.course_number = e.equivalent_course_code
+     LEFT JOIN course_reference cr ON cr.course_code = e.equivalent_course_code
      WHERE e.program_id IN (${placeholders}) AND e.review_status = 'reviewed'`
   ).bind(...ownerIds).all();
+  const eligibilityByCode = await getReviewedCourseEligibility(env, [
+    ...courses.map((course) => course.course_code),
+    ...alternatives.map((course) => course.equivalent_course_code),
+  ]);
   const alternativesByRequirement = {};
   for (const alternative of alternatives) {
+    alternative.eligibility = eligibilityByCode[alternative.equivalent_course_code] || null;
     const key = `${alternative.program_id}::${alternative.requirement_course_code}`;
     (alternativesByRequirement[key] ||= []).push(alternative);
   }

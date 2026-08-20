@@ -164,6 +164,34 @@ test("one plan never selects two interchangeable courses from the same option fa
   assert.equal(result.selectedCourses.some((course) => course.code === "01:640:300"), true);
 });
 
+test("one plan respects authoritative credit-exclusion families across requirements", () => {
+  const family = "rutgers-nb-college-writing-credit";
+  const result = optimizer().optimizeCourseSet({
+    requirements: [
+      requirement("college-writing"),
+      requirement("writing-elective"),
+    ],
+    candidates: [
+      candidate("01:355:101", ["college-writing"], {
+        creditExclusionFamilies: [family],
+      }),
+      candidate("01:355:103", ["writing-elective"], {
+        creditExclusionFamilies: [family],
+      }),
+      candidate("01:355:201", ["writing-elective"]),
+    ],
+    conflicts: [],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.equal(
+    result.selectedCourses.filter((course) =>
+      course.creditExclusionFamilies?.includes(family)).length,
+    1,
+  );
+  assert.equal(result.selectedCourses.some(({ code }) => code === "01:355:201"), true);
+});
+
 test("a distinct Core requirement uses different reviewed subgoals", () => {
   const result = optimizer().optimizeCourseSet({
     requirements: [requirement("ah", {

@@ -142,6 +142,24 @@ export interface CourseEligibilityCondition {
   reviewed_at: number | null;
 }
 
+export interface CourseCreditExclusionPolicy {
+  policy_key: string;
+  campus_slug: string;
+  catalog_year: string | null;
+  max_courses: number;
+  note: string;
+  source_url: string;
+  source_label: string;
+  source_date: string | null;
+  review_status: CourseEligibilityReviewStatus;
+  reviewed_at: number | null;
+}
+
+export interface CourseCreditExclusionMember {
+  policy_key: string;
+  course_code: string;
+}
+
 export interface ReferenceDataBundle {
   contract_version: 1;
   school_profiles: SchoolProfile[];
@@ -155,6 +173,8 @@ export interface ReferenceDataBundle {
   ap_equivalencies: ApEquivalency[];
   course_eligibility_reviews: CourseEligibilityReview[];
   course_eligibility_conditions: CourseEligibilityCondition[];
+  course_credit_exclusion_policies: CourseCreditExclusionPolicy[];
+  course_credit_exclusion_members: CourseCreditExclusionMember[];
 }
 
 export interface ValidationIssue {

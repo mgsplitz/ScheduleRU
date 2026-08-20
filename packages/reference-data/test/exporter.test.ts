@@ -162,6 +162,25 @@ function rows(): Record<string, Row[]> {
       source_date: "2026-08-01",
       reviewed_at: 1785542400000,
     }],
+    "course-credit-exclusion-policies": [{
+      policy_key: "example-overlapping-course-options",
+      campus_slug: "new-brunswick",
+      catalog_year: "2026-2027",
+      max_courses: 1,
+      note: "Credit is granted for only one course in this family.",
+      source_url: "https://example.rutgers.edu/course",
+      source_label: "Example course page",
+      source_date: "2026-08-01",
+      review_status: "reviewed",
+      reviewed_at: 1785542400000,
+    }],
+    "course-credit-exclusion-members": [{
+      policy_key: "example-overlapping-course-options",
+      course_code: "01:999:201",
+    }, {
+      policy_key: "example-overlapping-course-options",
+      course_code: "01:999:202",
+    }],
   };
 }
 
@@ -187,6 +206,11 @@ test("exports all cross-program datasets and decodes stored JSON", async () => {
     value.course_eligibility_conditions[0]!.condition_value,
     { any_of_course_codes: ["01:999:101"] },
   );
+  assert.equal(value.course_credit_exclusion_policies[0]!.max_courses, 1);
+  assert.deepEqual(
+    value.course_credit_exclusion_members.map(({ course_code }) => course_code),
+    ["01:999:201", "01:999:202"],
+  );
   assert.deepEqual(database.calls, [
     "school-profiles",
     "curriculum-modules",
@@ -199,6 +223,8 @@ test("exports all cross-program datasets and decodes stored JSON", async () => {
     "ap-equivalencies",
     "course-eligibility-reviews",
     "course-eligibility-conditions",
+    "course-credit-exclusion-policies",
+    "course-credit-exclusion-members",
   ]);
 });
 

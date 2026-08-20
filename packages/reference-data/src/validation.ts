@@ -575,6 +575,71 @@ class Validator {
         return code && conditionKey ? `${code}:${conditionKey}` : null;
       },
     );
+
+    const creditExclusionPolicies = new Set<string>();
+    this.array(
+      value.course_credit_exclusion_policies,
+      "course_credit_exclusion_policies",
+      (row, path) => {
+        const policyKey = this.identifier(row.policy_key, `${path}.policy_key`)
+          ? String(row.policy_key)
+          : "";
+        if (policyKey) creditExclusionPolicies.add(policyKey);
+        this.identifier(row.campus_slug, `${path}.campus_slug`);
+        this.nullableString(row.catalog_year, `${path}.catalog_year`);
+        this.integer(row.max_courses, `${path}.max_courses`, 1);
+        this.string(row.note, `${path}.note`);
+        this.sourceUrl(row.source_url, `${path}.source_url`);
+        this.string(row.source_label, `${path}.source_label`);
+        this.nullableString(row.source_date, `${path}.source_date`);
+        if (!COURSE_ELIGIBILITY_STATUSES.includes(String(row.review_status))) {
+          this.issue(`${path}.review_status`, "invalid_review_status", "must be draft, reviewed, or stale");
+        }
+        this.timestamp(row.reviewed_at, `${path}.reviewed_at`, true);
+        return policyKey || null;
+      },
+    );
+    this.array(
+      value.course_credit_exclusion_members,
+      "course_credit_exclusion_members",
+      (row, path) => {
+        const policyKey = typeof row.policy_key === "string" ? row.policy_key : "";
+        if (!creditExclusionPolicies.has(policyKey)) {
+          this.issue(`${path}.policy_key`, "missing_policy", "must reference a credit-exclusion policy");
+        }
+        const courseCode = typeof row.course_code === "string" && COURSE_CODE_RE.test(row.course_code)
+          ? row.course_code
+          : "";
+        if (!courseCode) {
+          this.issue(`${path}.course_code`, "invalid_course_code", "must use NN:NNN:NNN");
+        }
+        return policyKey && courseCode ? `${policyKey}:${courseCode}` : null;
+      },
+    );
+    const exclusionPolicies = value.course_credit_exclusion_policies;
+    const exclusionMembers = value.course_credit_exclusion_members;
+    if (Array.isArray(exclusionPolicies) && Array.isArray(exclusionMembers)) {
+      exclusionPolicies.forEach((policy, index) => {
+        if (!isRecord(policy) || typeof policy.policy_key !== "string") return;
+        const memberCodes = new Set(
+          exclusionMembers
+            .filter(isRecord)
+            .filter((member) => member.policy_key === policy.policy_key)
+            .map((member) => member.course_code)
+            .filter((code): code is string => typeof code === "string"),
+        );
+        if (
+          typeof policy.max_courses === "number"
+          && memberCodes.size <= policy.max_courses
+        ) {
+          this.issue(
+            `course_credit_exclusion_policies[${index}]`,
+            "incomplete_credit_exclusion",
+            "must contain more distinct member courses than the allowed maximum",
+          );
+        }
+      });
+    }
   }
 }
 

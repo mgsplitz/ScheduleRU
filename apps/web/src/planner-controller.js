@@ -402,7 +402,7 @@ function selectionLimitSummary(){
 }
 function programCoverageLabel(program){
   return program?.requirements_available===false || program?.coverage_status==="catalog_listed"
-    ? "Catalog-listed · requirements under review"
+    ? "Official catalog listing"
     : "Reviewed requirements";
 }
 function showProgramPolicyFeedback(check){
@@ -1120,7 +1120,7 @@ function catalogListedProgramsBannerHtml(){
   const listed=selectedProgramRows().filter(program=>program?.requirements_available===false||program?.coverage_status==="catalog_listed");
   if(!listed.length) return "";
   const names=listed.map(program=>program.name).join(", ");
-  return `<div class="dc-banner warn"><b>Requirements under review</b><div>${escapeHtml(names)} ${listed.length===1?"is":"are"} selectable from the official SAS catalog, but ScheduleRU is not yet showing a program-specific requirement audit. Use the linked catalog entry and SAS advising to confirm progress while we import the rules.</div></div>`;
+  return `<div class="dc-banner warn"><b>Requirements could not load</b><div>Reopen Programs and refresh ${escapeHtml(names)} before building your plan.</div></div>`;
 }
 
 /* ============================================================
@@ -1138,7 +1138,7 @@ function renderCore(){
     return;
   }
   if(!ST.coreRequirementTree){
-    pb.innerHTML=`<div class="empty" style="margin-top:30px;">The reviewed ${escapeHtml(activeCoreLabel())} is not available yet.</div>`;
+    pb.innerHTML=`<div class="api-status err"><strong>Core requirements could not load</strong><span>Refresh the page before building your plan.</span></div>`;
     return;
   }
   useRequirementTree(ST.coreRequirementTree);

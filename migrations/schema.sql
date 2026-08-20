@@ -39,6 +39,10 @@ CREATE TABLE IF NOT EXISTS courses (
   term TEXT,                    -- "0" Winter, "1" Spring, "7" Summer, "9" Fall
   title TEXT,
   credits TEXT,
+  catalog_prereqs TEXT NOT NULL DEFAULT '',
+  catalog_restrictions TEXT NOT NULL DEFAULT '',
+  source_year INTEGER,
+  source_term TEXT,
   description TEXT,
   prereqs TEXT,
   subject_notes TEXT,           -- e.g. "NO SPECIAL PERMISSION WILL BE GRANTED FOR..." (subjectNotes field)

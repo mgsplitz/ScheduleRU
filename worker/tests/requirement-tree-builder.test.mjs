@@ -73,6 +73,12 @@ test("builder merges repeated course metadata and deduplicates reviewed alternat
       alternatives: [{
         equivalent_course_code: "01:198:110",
         source_title: "Alternative A",
+        catalog_prereqs: "01:198:109",
+        eligibility: {
+          review: null,
+          conditions: [],
+          credit_exclusions: [{ policy_key: "intro-computing-credit" }],
+        },
       }],
     }],
     children: [{
@@ -111,6 +117,12 @@ test("builder merges repeated course metadata and deduplicates reviewed alternat
     credits: "4",
     note: "",
     sourceLabel: "",
+    catalogPrereqs: "01:198:109",
+    eligibility: {
+      review: null,
+      conditions: [],
+      credit_exclusions: [{ policy_key: "intro-computing-credit" }],
+    },
   }]);
   assert.deepEqual(tree.groups.root.members, ["01198111"]);
   assert.deepEqual(tree.groups.nested.members, ["01198111"]);

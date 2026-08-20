@@ -86,6 +86,8 @@
             credits: cleanText(alternative.catalog_credits),
             note: cleanText(alternative.note),
             sourceLabel: cleanText(alternative.source_label),
+            catalogPrereqs: cleanText(alternative.catalog_prereqs),
+            eligibility: alternative.eligibility || null,
           })),
         ];
         courses[id] = {
@@ -110,10 +112,17 @@
           ].filter(Boolean))],
           prereqs: existing?.prereqs || [],
           eligibility: row.eligibility || existing?.eligibility || null,
-          alternatives: [...new Map(
-            alternatives.filter((alternative) => alternative.code)
-              .map((alternative) => [alternative.code, alternative]),
-          ).values()],
+          alternatives: [...alternatives.filter((alternative) => alternative.code)
+            .reduce((byCode, alternative) => {
+              const previous = byCode.get(alternative.code) || {};
+              byCode.set(alternative.code, Object.fromEntries(
+                Object.entries({ ...previous, ...alternative }).map(([key, value]) => [
+                  key,
+                  value === "" || value === null || value === undefined ? previous[key] ?? value : value,
+                ]),
+              ));
+              return byCode;
+            }, new Map()).values()],
         };
         group.members.push(id);
         courseRows.push({ id, row });

@@ -23,6 +23,12 @@ test("course eligibility lookups stay within D1's 100-variable query limit", () 
   assert.match(worker, /const COURSE_ELIGIBILITY_BATCH_SIZE = 100;/);
 });
 
+test("requirement trees read stable prerequisite evidence without term-duplicate joins", () => {
+  assert.match(worker, /LEFT JOIN course_reference cr ON cr\.course_code = rc\.course_code/);
+  assert.match(worker, /cr\.catalog_prereqs as catalog_prereqs/);
+  assert.match(worker, /ORDER BY c2\.year DESC, CAST\(c2\.term AS INTEGER\) DESC/);
+});
+
 test("the browser migrates v1 state and evaluates the selected target term", async () => {
   assert.match(
     frontend,
