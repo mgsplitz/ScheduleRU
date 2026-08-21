@@ -581,14 +581,22 @@ async function handleApi(request, env, ctx) {
        WHERE course_code IN (SELECT value FROM json_each(?))
        ORDER BY course_code`
     ).bind(JSON.stringify(codes)).all();
-    return json({ courses: (results || []).map((course) => ({
-      ...course,
-      compiled_rules: compilePublicCourseRules({
+    const eligibilityByCode = typeof env.DB.batch === "function"
+      ? await getReviewedCourseEligibility(env, codes)
+      : {};
+    return json({ courses: (results || []).map((course) => {
+      const eligibility = eligibilityByCode[course.course_code] || null;
+      return {
         ...course,
-        catalog_title: course.title,
-        catalog_record_available: true,
-      }),
-    })) });
+        eligibility,
+        compiled_rules: compilePublicCourseRules({
+          ...course,
+          catalog_title: course.title,
+          catalog_record_available: true,
+          eligibility,
+        }),
+      };
+    }) });
   }
 
   if (path === "/api/admin/course-reference/sync" && request.method === "POST") {
