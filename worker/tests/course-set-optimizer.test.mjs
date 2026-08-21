@@ -192,6 +192,52 @@ test("one plan respects authoritative credit-exclusion families across requireme
   assert.equal(result.selectedCourses.some(({ code }) => code === "01:355:201"), true);
 });
 
+test("completed equivalent credit blocks every duplicate option before optimization", () => {
+  const writingFamily = "rutgers-nb-college-writing-credit";
+  const differentialFamily = "rutgers-nb-differential-equations-credit";
+  const result = optimizer().optimizeCourseSet({
+    requirements: [
+      requirement("writing-elective"),
+      requirement("mathematics"),
+    ],
+    candidates: [
+      candidate("01:355:103", ["writing-elective"], {
+        creditExclusionFamilies: [writingFamily],
+      }),
+      candidate("01:355:201", ["writing-elective"]),
+      candidate("01:640:244", ["mathematics"], {
+        creditExclusionFamilies: [differentialFamily],
+      }),
+      candidate("01:640:300", ["mathematics"]),
+    ],
+    conflicts: [],
+    completedCourseCodes: ["01:355:101", "01:640:252"],
+    completedCreditExclusionFamilies: [writingFamily, differentialFamily],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(
+    plain(result.selectedCourses.map((course) => course.code)),
+    ["01:355:201", "01:640:300"],
+  );
+});
+
+test("a completed alias blocks the same canonical candidate", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("computing")],
+    candidates: [
+      candidate("01:198:111", ["computing"], {
+        equivalentCourseCodes: ["01:198:110", "01:198:111"],
+      }),
+      candidate("01:198:112", ["computing"]),
+    ],
+    conflicts: [],
+    completedCourseCodes: ["01:198:110"],
+  });
+
+  assert.deepEqual(plain(result.selectedCourses.map((course) => course.code)), ["01:198:112"]);
+});
+
 test("a distinct Core requirement uses different reviewed subgoals", () => {
   const result = optimizer().optimizeCourseSet({
     requirements: [requirement("ah", {

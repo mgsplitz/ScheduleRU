@@ -125,9 +125,15 @@
         const closed = course.open_status === false || course.open_status === 0;
         const location = [meeting.building, meeting.room].filter(Boolean).join(" ") || (campus === "ONLINE" ? "Online" : "");
         const time = `${formatClock(range.start)} – ${formatClock(range.end)}`;
+        const sectionFacts = [
+          course.section_number ? `Section ${course.section_number}` : "",
+          course.index_number ? `Index ${course.index_number}` : "",
+          Number(course.credits) > 0 ? `${Number(course.credits)} credits` : "",
+        ].filter(Boolean).join(" · ");
+        const locationFacts = [location, campus !== "OTHER/UNKNOWN" && campus !== "ONLINE" ? campus : ""].filter(Boolean).join(" · ");
         dayCells += `<div class="cal-block${closed ? " cal-block-closed" : ""}" style="left:calc(${day * 20}% + 2px);width:calc(20% - 4px);top:${geometry.top}px;height:${geometry.height}px;background:${color.fill};border-color:${color.border};">
           <b>${escapeHtml(course.code)}</b><span class="cal-course-title">${escapeHtml(course.title || course.code)}</span>
-          <span class="cal-detail">${escapeHtml(time)}</span><span class="cal-detail">${escapeHtml(location)}</span></div>`;
+          <span class="cal-detail">${escapeHtml(sectionFacts)}</span><span class="cal-detail">${escapeHtml(time)}</span><span class="cal-detail">${escapeHtml(locationFacts)}</span></div>`;
       }));
       return `<div class="calendar-scroll"><div class="builder-cal minute-scale">${timeLabels}<div class="cal-days">${dayCells}</div></div></div>
         ${outside.length ? `<div class="cal-outside"><b>Weekend, online, or untimed meetings</b><br/>${escapeHtml(outside.join(" · "))}</div>` : ""}`;

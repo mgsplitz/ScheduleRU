@@ -42,7 +42,11 @@
  * GET /api/sync-log if anything looks off after deploying.
  */
 
-import { handleProgramsApi } from "./programs.js";
+import {
+  compilePublicCourseRules,
+  getReviewedCourseEligibility,
+  handleProgramsApi,
+} from "./programs.js";
 import {
   handleScheduleAssistantRequest,
 } from "./schedule-assistant.js";
@@ -666,6 +670,8 @@ async function handleApi(request, env, ctx) {
     const total = countRow ? countRow.n : 0;
 
     const sql = `SELECT c.*,
+                   COALESCE(NULLIF(cr.catalog_prereqs, ''), c.prereqs, '') as canonical_prereqs,
+                   COALESCE(cr.catalog_restrictions, '') as canonical_restrictions,
                    (SELECT COUNT(*) FROM sections s WHERE s.course_id = c.id) as section_count,
                    (SELECT COUNT(*) FROM sections s WHERE s.course_id = c.id AND s.open_status = 1) as open_count,
                    COALESCE((SELECT json_group_array(attribute_code) FROM (
@@ -674,13 +680,45 @@ async function handleApi(request, env, ctx) {
                      WHERE course_attribute.course_code = (c.school || ':' || c.subject_code || ':' || c.course_number)
                      ORDER BY attribute_code
                    )), '[]') as attributes_json
-                 FROM courses c${where} ORDER BY subject_code, course_number LIMIT ? OFFSET ?`;
+                 FROM courses c
+                 LEFT JOIN course_reference cr
+                   ON cr.course_code = (c.school || ':' || c.subject_code || ':' || c.course_number)
+                 ${where} ORDER BY subject_code, course_number LIMIT ? OFFSET ?`;
     const { results } = await env.DB.prepare(sql).bind(...binds, limit, offset).all();
+    const codes = results.map((course) => [course.school, course.subject_code, course.course_number].join(":"));
+    const eligibilityByCode = typeof env.DB.batch === "function"
+      ? await getReviewedCourseEligibility(env, codes)
+      : {};
     const courses = results.map((course) => {
       let attributes = [];
       try { attributes = JSON.parse(course.attributes_json || "[]"); } catch (_) { attributes = []; }
-      const { attributes_json: _attributesJson, ...record } = course;
-      return { ...record, attributes };
+      const {
+        attributes_json: _attributesJson,
+        canonical_prereqs: canonicalPrereqs,
+        canonical_restrictions: canonicalRestrictions,
+        ...record
+      } = course;
+      const courseCode = [course.school, course.subject_code, course.course_number].join(":");
+      const eligibility = eligibilityByCode[courseCode] || null;
+      const compiledRules = compilePublicCourseRules({
+        course_code: courseCode,
+        catalog_record_available: true,
+        catalog_prereqs: canonicalPrereqs,
+        catalog_restrictions: canonicalRestrictions,
+        eligibility,
+      });
+      const academicRules = compiledRules.ruleCoverage !== "unresolved"
+        || compiledRules.creditExclusionFamilies.length
+        ? compiledRules
+        : {};
+      return {
+        ...record,
+        catalog_prereqs: canonicalPrereqs || record.prereqs || "",
+        catalog_restrictions: canonicalRestrictions || "",
+        attributes,
+        eligibility,
+        ...academicRules,
+      };
     });
     return json({ courses, count: courses.length, total, limit, offset });
   }

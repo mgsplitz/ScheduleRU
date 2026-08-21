@@ -99,7 +99,7 @@ test("markup distinguishes loading, errors, minor tabs, and empty reviewed progr
 
   const ready = controller().app.markup();
   assert.match(ready, /program-subtab-minor/);
-  assert.match(ready, /No reviewed requirements are available for this program yet/);
+  assert.match(ready, /We couldn't display these requirements/);
   assert.match(ready, /ScheduleRU is a planning aid/);
 });
 
@@ -138,6 +138,8 @@ test("shared school requirements render once and Next up stays concise", () => {
   assert.match(sharedMarkup, /Business Core/);
   assert.doesNotMatch(sharedMarkup, /Finance electives/);
   assert.match(sharedMarkup, /required-root-body open/);
+  assert.match(sharedMarkup, /data-required-next-tab="primary"/);
+  assert.match(sharedMarkup, /Required Finance courses/);
 
   app.setProgram("primary");
   const financeMarkup = app.markup();

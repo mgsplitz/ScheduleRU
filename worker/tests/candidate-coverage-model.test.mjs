@@ -52,6 +52,25 @@ test("canonical coverage preserves reviewed credit-exclusion families", () => {
   ]);
 });
 
+test("completed course facts become optimizer-wide duplicate constraints", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [decision("writing", "core", [
+      candidate("01:355:103", {
+        creditExclusionFamilies: ["rutgers-nb-college-writing-credit"],
+      }),
+    ])],
+    completedCourses: [{
+      code: "01:355:101",
+      creditExclusionFamilies: ["rutgers-nb-college-writing-credit"],
+    }],
+  });
+
+  assert.deepEqual(plain(graph.completedCourseCodes), ["01:355:101"]);
+  assert.deepEqual(plain(graph.completedCreditExclusionFamilies), [
+    "rutgers-nb-college-writing-credit",
+  ]);
+});
+
 test("a reviewed equivalent CS course also covers the RBS computing requirement", () => {
   const graph = model().buildCoverageGraph({
     decisions: [

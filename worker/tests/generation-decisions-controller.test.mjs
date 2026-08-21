@@ -54,8 +54,41 @@ test("Business decisions come first and Core decisions come last", () => {
   assert.deepEqual(plain(flow.decisions().map((item) => item.requirementGroupId)), [
     "business-electives",
     "cs-electives",
+    "core-strategy",
     "core-ah",
   ]);
+});
+
+test("Core guidance begins with one consolidated optimization choice", () => {
+  const flow = modules().controller.create({ decisions: decisions(), programs: [] });
+  const coreStrategy = flow.decisions().find((item) => item.coreStrategy);
+
+  assert.ok(coreStrategy);
+  assert.equal(coreStrategy.label, "How should we handle Core courses?");
+  assert.equal(flow.preferences()[coreStrategy.decisionId].mode, "recommend_for_me");
+  assert.equal(flow.canAdvance(coreStrategy.decisionId), true);
+  assert.equal(flow.setMode(coreStrategy.decisionId, "ranked"), true);
+  assert.equal(flow.preferences()[coreStrategy.decisionId].mode, "ranked");
+});
+
+test("Core strategy view explains overlap optimization without listing courses", () => {
+  const html = modules().view.renderDecision({
+    decision: {
+      decisionId: "core-strategy",
+      requirementGroupId: "core-strategy",
+      coreStrategy: true,
+      label: "How should we handle Core courses?",
+      candidates: [],
+    },
+    preference: { mode: "recommend_for_me" },
+    index: 2,
+    total: 4,
+  });
+
+  assert.match(html, /maximize overlap/i);
+  assert.match(html, /Optimize them for me/);
+  assert.match(html, /Let me choose/);
+  assert.doesNotMatch(html, /generation-candidate/);
 });
 
 test("a restrictive subset is guided before the broader total for one program", () => {
@@ -91,6 +124,7 @@ test("interchangeable alternatives receive a focused screen before the remaining
   assert.equal(ordered.length, 2);
   assert.equal(ordered[0].guidanceOnly, true);
   assert.equal(ordered[0].canSkip, true);
+  assert.equal(ordered[0].label, "Choose one Differential Equations course");
   assert.deepEqual(plain(ordered[0].candidates.map(({ code }) => code)), ["01:640:244", "01:640:252"]);
   assert.deepEqual(plain(ordered[1].candidates.map(({ code }) => code)), ["01:640:300"]);
 });
@@ -161,11 +195,34 @@ test("decision-list scroll can be restored after an interest update rerenders th
   const { view } = modules();
   const before = { scrollTop: 418 };
   const after = { scrollTop: 0 };
-  const document = { querySelector: () => after };
+  const queried = [];
+  const document = { querySelector: (selector) => { queried.push(selector); return after; } };
 
-  assert.equal(view.captureListScroll({ querySelector: () => before }), 418);
+  assert.equal(view.captureListScroll({ querySelector: (selector) => {
+    queried.push(selector);
+    return before;
+  } }), 418);
   view.restoreListScroll(document, 418);
   assert.equal(after.scrollTop, 418);
+  assert.deepEqual(queried, [".app-modal-card", ".app-modal-card"]);
+});
+
+test("generic requirement labels become concise program-specific guidance", () => {
+  const flow = modules().controller.create({
+    decisions: [{
+      decisionId: "finance:electives",
+      requirementGroupId: "finance-electives",
+      sourceProgram: "rbsnb-finance-major",
+      sourceType: "program",
+      label: "Course 1 of 4 for Elective Courses",
+      slotCount: 4,
+      planningMode: "guided_flexible",
+      candidates: [{ code: "33:390:380", title: "Investment Analysis" }],
+    }],
+    programs: [{ id: "rbsnb-finance-major", name: "Finance", type: "major" }],
+  });
+
+  assert.equal(flow.decisions()[0].label, "Choose four Finance electives");
 });
 
 test("same-named major and minor groups keep independent preference ownership", () => {
@@ -210,8 +267,34 @@ test("large guidance pools open with eight best matches and an expandable search
   assert.equal((collapsed.match(/class="generation-candidate"/g) || []).length, 8);
   assert.match(collapsed, /Best matches/);
   assert.match(collapsed, /Show all 20/);
+  assert.ok(collapsed.indexOf("Show all 20") > collapsed.indexOf("class=\"generation-candidates\""));
   assert.match(expanded, /Course 19/);
   assert.doesNotMatch(expanded, /Course 18/);
+});
+
+test("courses without prerequisites use definitive official-catalog language", () => {
+  const html = modules().view.renderDecision({
+    decision: {
+      ...decisions()[1],
+      candidates: [{ code: "33:390:380", title: "Investment Analysis", prerequisitePaths: [] }],
+    },
+    preference: {}, index: 0, total: 1,
+  });
+
+  assert.match(html, /No prerequisites listed in the official catalog/);
+  assert.doesNotMatch(html, /No known course prerequisites/);
+});
+
+test("Choose for me stays visibly selected", () => {
+  const html = modules().view.renderDecision({
+    decision: decisions()[1],
+    preference: { mode: "recommend_for_me" },
+    index: 0,
+    total: 1,
+  });
+
+  assert.match(html, /data-decision-recommend[^>]+selected/);
+  assert.match(html, /aria-pressed="true"/);
 });
 
 test("best matches put gateway courses that unlock the pool first", () => {

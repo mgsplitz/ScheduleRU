@@ -42,6 +42,28 @@
     return rules[rule] || "all";
   }
 
+  function compiledRuleFields(raw) {
+    const rules = raw?.compiled_rules || raw?.compiledRules;
+    if (!rules || typeof rules !== "object") return {};
+    const paths = (value) => Array.isArray(value)
+      ? value.map((path) => Array.isArray(path) ? path.map(cleanText).filter(Boolean) : [])
+        .filter((path) => path.length)
+      : [];
+    return {
+      prerequisitePaths: paths(rules.prerequisitePaths),
+      enforceablePrerequisitePaths: paths(rules.enforceablePrerequisitePaths),
+      corequisitePaths: paths(rules.corequisitePaths),
+      minimumPlanYear: Number(rules.minimumPlanYear) || null,
+      minimumPriorCredits: Number(rules.minimumPriorCredits) || null,
+      creditExclusionFamilies: [...new Set(
+        (Array.isArray(rules.creditExclusionFamilies) ? rules.creditExclusionFamilies : [])
+          .map(cleanText)
+          .filter(Boolean),
+      )],
+      ruleCoverage: cleanText(rules.ruleCoverage) || "unresolved",
+    };
+  }
+
   function build(requirements) {
     const courses = {};
     const groups = {};
@@ -88,6 +110,7 @@
             sourceLabel: cleanText(alternative.source_label),
             catalogPrereqs: cleanText(alternative.catalog_prereqs),
             eligibility: alternative.eligibility || null,
+            ...compiledRuleFields(alternative),
           })),
         ];
         courses[id] = {
@@ -112,6 +135,7 @@
           ].filter(Boolean))],
           prereqs: existing?.prereqs || [],
           eligibility: row.eligibility || existing?.eligibility || null,
+          ...compiledRuleFields(row),
           alternatives: [...alternatives.filter((alternative) => alternative.code)
             .reduce((byCode, alternative) => {
               const previous = byCode.get(alternative.code) || {};

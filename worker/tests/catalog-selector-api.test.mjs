@@ -127,7 +127,23 @@ test("catalog selector filtering happens in D1 before limit and offset", async (
   const response = await worker.fetch(request, { DB: db }, {});
 
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).courses, [{ id: "01:640:300:2026:9", school: "01", subject_code: "640", course_number: "300", attributes: [] }]);
+  assert.deepEqual((await response.json()).courses, [{
+    id: "01:640:300:2026:9",
+    school: "01",
+    subject_code: "640",
+    course_number: "300",
+    catalog_prereqs: "",
+    catalog_restrictions: "",
+    attributes: [],
+    eligibility: null,
+    prerequisitePaths: [],
+    enforceablePrerequisitePaths: [],
+    corequisitePaths: [],
+    minimumPlanYear: null,
+    minimumPriorCredits: null,
+    creditExclusionFamilies: [],
+    ruleCoverage: "catalog_parsed",
+  }]);
   assert.equal(db.calls.length, 2);
   assert.match(db.calls[0].sql, /FROM courses c WHERE/);
   assert.match(db.calls[0].sql, /CAST\(c\.course_number AS INTEGER\) BETWEEN \? AND \?/);
@@ -135,6 +151,31 @@ test("catalog selector filtering happens in D1 before limit and offset", async (
   assert.match(db.calls[1].sql, /LIMIT \? OFFSET \?$/);
   assert.deepEqual(db.calls[0].values, ["01", "640", 300, 499, '["01:640:491"]']);
   assert.deepEqual(db.calls[1].values, ["01", "640", 300, 499, '["01:640:491"]', 25, 0]);
+});
+
+test("catalog candidates expose the same compiled prerequisite and standing facts as the planner", async () => {
+  const db = catalogDb([{
+    id: "33:390:440:2026:9",
+    school: "33",
+    subject_code: "390",
+    course_number: "440",
+    title: "ADV CORP FINANCE",
+    canonical_prereqs: "33:390:400 CORPORATE FINANCE",
+    canonical_restrictions: "FINANCE MAJORS ONLY; JUNIORS AND SENIORS",
+    attributes_json: "[]",
+  }]);
+  const response = await worker.fetch(
+    new Request("https://example.test/api/courses?limit=25&offset=0"),
+    { DB: db },
+    {},
+  );
+
+  assert.equal(response.status, 200);
+  const [course] = (await response.json()).courses;
+  assert.deepEqual(course.prerequisitePaths, [["33:390:400"]]);
+  assert.deepEqual(course.enforceablePrerequisitePaths, [["33:390:400"]]);
+  assert.equal(course.minimumPlanYear, 3);
+  assert.equal(course.ruleCoverage, "catalog_parsed");
 });
 
 test("catalog and guided selectors use only the configured planning term", async () => {

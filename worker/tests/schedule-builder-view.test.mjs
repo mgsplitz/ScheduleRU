@@ -98,3 +98,19 @@ test("builder markup keeps verified schedule navigation and assistant controls t
   assert.match(markup, /Use this schedule for Fall 1st Year/);
   assert.match(markup, /Include closed sections/);
 });
+
+test("calendar blocks show section identity, credits, time, and campus context", () => {
+  const builder = {
+    permIndex: 0,
+    permutations: [[{
+      code: "01:198:111", title: "Intro Computer Science", credits: 4,
+      section_number: "03", index_number: "12345", open_status: true,
+      meetings: [{ day_of_week: "M", building: "TIL", room: "232" }],
+    }]],
+  };
+
+  const markup = view(builder).calendarMarkup();
+  assert.match(markup, /Section 03 · Index 12345 · 4 credits/);
+  assert.match(markup, /10:00 AM – 11:00 AM/);
+  assert.match(markup, /TIL 232 · LIVINGSTON/);
+});
