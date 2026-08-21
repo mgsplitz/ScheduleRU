@@ -26,7 +26,7 @@ function model() {
 
 const candidate = (code, extras = {}) => ({
   code,
-  title: code,
+  title: `Course ${code}`,
   credits: 3,
   prerequisitePaths: [],
   ...extras,
@@ -321,6 +321,32 @@ test("publication readiness excludes a selectable course when every prerequisite
     missingCourseCodes: ["01:830:300"],
     type: "candidate_not_publication_ready",
   }]);
+});
+
+test("publication readiness treats a course-code placeholder as missing academic content", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [{
+      ...decision("math", "mathematics", [candidate("01:640:135", {
+        title: "Calculus I for the Life and Social Sciences",
+        prerequisitePaths: [["01:640:025"]],
+        enforceablePrerequisitePaths: [["01:640:025"]],
+        ruleCoverage: "catalog_parsed",
+      })]),
+      prerequisiteCourses: [{
+        code: "01:640:025",
+        title: "01:640:025",
+        credits: 3,
+        prerequisitePaths: [],
+        enforceablePrerequisitePaths: [],
+        ruleCoverage: "catalog_parsed",
+      }],
+    }],
+  });
+
+  assert.equal(graph.candidates.some((course) => course.code === "01:640:135"), false);
+  assert.equal(graph.candidates.some((course) => course.code === "01:640:025"), false);
+  assert.equal(graph.publicationIssues.some((issue) =>
+    issue.candidateCode === "01:640:135" && issue.missingCourseCodes.includes("01:640:025")), true);
 });
 
 test("canonical prerequisite records preserve their own recursive academic rules", () => {

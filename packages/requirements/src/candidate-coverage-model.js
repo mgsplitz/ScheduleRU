@@ -8,6 +8,11 @@
   const uniqueSorted = (values) => [...new Set(values.filter(Boolean))].sort();
   const pairKey = (left, right) => [left, right].filter(Boolean).sort().join("|");
   const ruleCoverageRank = (value) => ({ unresolved: 0, catalog_parsed: 1, reviewed: 2 }[text(value)] || 0);
+  const courseCodePattern = /^\d{2}:\d{3}:\d{3}$/;
+  const studentReadyTitle = (value) => {
+    const title = text(value);
+    return Boolean(title) && title !== "Course title unavailable" && !courseCodePattern.test(title);
+  };
 
   function reviewedEquivalencies(equivalencies) {
     return (Array.isArray(equivalencies) ? equivalencies : []).filter((item) =>
@@ -294,7 +299,7 @@
       const normalizedCode = text(code);
       if (completedCodeSet.has(normalizedCode)) return true;
       const candidate = candidateByCode.get(normalizedCode);
-      if (!candidate) return false;
+      if (!candidate || !studentReadyTitle(candidate.title)) return false;
       if (readiness.has(candidate.code)) return readiness.get(candidate.code);
       if (visiting.has(candidate.code)) return false;
       const nextVisiting = new Set(visiting).add(candidate.code);
