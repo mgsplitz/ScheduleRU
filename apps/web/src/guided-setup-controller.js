@@ -139,7 +139,7 @@ function plannerIssueText(issue){
 }
 function issueList(){
   const issues=[]; if(ST.requirementsError){const shown=ScheduleRUUserMessageModel.presentIssue(ST.requirementsError);issues.push({group:"Requirements",severity:"error",title:shown.title,text:shown.message,action:shown.primaryAction});}
-  (ST.programEligibilityRules||[]).filter(rule=>ST.selectedPrograms.includes(rule.program_id)).forEach(rule=>issues.push({group:"Advising and program policy",severity:"advising",title:"Confirm with advising",text:rule.advisory_message||rule.note||"Confirm this reviewed program policy with advising.",action:"Ask advising"}));
+  (ST.programEligibilityRules||[]).filter(rule=>ST.selectedPrograms.includes(rule.program_id)).forEach(rule=>issues.push({group:"Advising and program policy",severity:"advising",title:"Confirm with advising",text:rule.advisory_message||rule.note||"Confirm this program policy with advising.",action:"Ask advising"}));
   const overlap=ST.doubleCount;if(overlap){(overlap.scopeResults||[]).filter(item=>item.violates||item.codes?.length).forEach(item=>issues.push({group:"Double-count policy",severity:item.violates?"warning":"info",title:item.violates?"Some courses cannot count twice":"Shared courses found",text:item.violates?doubleCountMeaning(item):`${item.codes.length} potential shared course overlap${item.codes.length===1?"":"s"} found.`,action:item.violates?"Review shared courses":"Close"}));(overlap.unscoped||[]).forEach(item=>issues.push({group:"Double-count policy",severity:"warning",title:"Confirm this shared course",text:`Confirm whether ${item.code||"this overlap"} may count toward both programs.`,action:"Ask advising"}));}
   const previewIssues=ST.generatedPlanPreview?.issues||[],eligibility=previewIssues.filter(issue=>issue.code==="eligibility_rule_unresolved"),otherPreviewIssues=previewIssues.filter(issue=>issue.code!=="eligibility_rule_unresolved");
   if(eligibility.length){const shown=ScheduleRUUserMessageModel.presentIssue(eligibility[0]);issues.push({group:"Plan preview",severity:"warning",title:shown.title,text:`Check enrollment conditions for ${eligibility.map(issue=>issue.courseCode).filter(Boolean).join(", ")}.`,action:shown.primaryAction});}
@@ -226,7 +226,7 @@ function renderOnboardingContent(){
   }
   if(activeStep==="ap"){
     const choices=AP.length?AP.map(ap=>{const score=ap.minimumScore===ap.maximumScore?String(ap.minimumScore):`${ap.minimumScore}-${ap.maximumScore}`;return `<label class="onboarding-record"><span><input type="checkbox" data-onboarding-ap="${html(ap.id)}" ${ST.apOn?.[ap.id]?"checked":""}/> ${html(ap.name)} (${html(score)})</span><span>${html(ap.credits)} credits</span></label>`;}).join(""):"<div class=\"onboarding-note\">Reviewed AP choices are loading.</div>";
-    return layout("Add AP credit","Scores of 4 or 5 may count when a reviewed Rutgers equivalency applies.",`<button class="choice-btn secondary onboarding-coming-soon" type="button" disabled>Upload AP score report (not working)</button><div class="onboarding-records onboarding-records-scroll">${choices}</div>`,{skip:true});
+    return layout("Add AP credit","Scores of 4 or 5 may count when a Rutgers equivalency applies.",`<button class="choice-btn secondary onboarding-coming-soon" type="button" disabled>Upload AP score report (not working)</button><div class="onboarding-records onboarding-records-scroll">${choices}</div>`,{skip:true});
   }
   return layout("Review your setup","Confirm the basics before opening your planner.",`<div class="onboarding-review"><div><strong>Home school</strong><span>${html(activeHomeSchoolLabel())}</span></div><div><strong>Programs</strong><span>${html(selectedProgramRows().length)} selected</span></div><div><strong>Completed courses</strong><span>${html(records.filter(record=>record.type!=="ap").length)} added</span></div><div><strong>AP exams</strong><span>${html(AP.filter(ap=>ST.apOn?.[ap.id]).length)} selected</span></div></div><ul class="onboarding-feature-list"><li>Generate a prerequisite-aware four-year draft.</li><li>Build a semester schedule from verified Rutgers sections.</li><li>Refine schedules with natural-language preferences.</li></ul>`,{next:"Open my planner"});
 }
@@ -438,7 +438,7 @@ function openGenerationDecisionFlow(input){
       const message=result.status==="indeterminate"
         ? "There are too many equally valid combinations to recommend one safely. Narrow one or two preferences and try again."
         : labels.length
-          ? `We could not complete ${labels.slice(0,3).join(", ")}${labels.length>3?", and other choices":""} from the reviewed options. Go back and mark more courses you would consider.`
+          ? `We could not complete ${labels.slice(0,3).join(", ")}${labels.length>3?", and other choices":""} from the available options. Go back and mark more courses you would consider.`
           : "Choose a few more courses you would consider so we can build a complete path.";
       modalController.show({title:"Choose a few more courses",body:`<p>${html(message)}</p>`,canDismiss:false,actions:[{label:"Back",secondary:true,close:false,onClick:()=>{index=decisions.length-1;renderDecision();}}]});
       return;
@@ -496,10 +496,10 @@ async function beginPlanGenerationPreflight(){
   if(!ST.coreRequirementTree&&!ST.coreLoading)await loadCoreCurriculum();
   if(!ST.coreRequirementTree){
     finishPlanGenerationPreflight();
-    modalController.show({title:"Core requirements unavailable",body:"<p>The reviewed Core requirements could not be loaded, so ScheduleRU did not generate an incomplete plan. Try again after the connection recovers.</p>",actions:[{label:"Close",secondary:true}]});
+    modalController.show({title:"Core requirements could not load",body:"<p>ScheduleRU kept your current plan unchanged. Check your connection and try again.</p>",actions:[{label:"Close",secondary:true}]});
     return;
   }
-  modalController.show({title:"Preparing your choices",body:"<p>Loading the reviewed courses for your selected programs…</p>",actions:[],canDismiss:false});
+  modalController.show({title:"Preparing your choices",body:"<p>Loading courses for your selected programs…</p>",actions:[],canDismiss:false});
   try{
     openGenerationDecisionFlow(await hydratePlannerDecisions(normalizedPlannerInputs()));
   }catch(error){
