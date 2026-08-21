@@ -393,17 +393,15 @@ function activeHomeSchoolLabel(){
 }
 function selectionLimitSummary(){
   const limits=ST.programSelectionPolicies?.limits||[];
-  if(!limits.length) return "No reviewed program-count limits are available yet for this home school.";
+  if(!limits.length) return "";
   const phrases=limits.map(limit=>{
     const count=Number(limit.max_selected);
     return `up to ${count} ${programTypeLabel(limit.program_type).toLowerCase()}${count===1?"":"s"}`;
   });
-  return `Reviewed ${activeHomeSchoolLabel()} selection limits: ${phrases.join(", ")}.`;
+  return `For ${activeHomeSchoolLabel()}, choose ${phrases.join(", ")}.`;
 }
 function programCoverageLabel(program){
-  return program?.requirements_available===false || program?.coverage_status==="catalog_listed"
-    ? "Official catalog listing"
-    : "Reviewed requirements";
+  return "";
 }
 function showProgramPolicyFeedback(check){
   const node=document.getElementById("programPolicyFeedback");

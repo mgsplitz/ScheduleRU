@@ -6,6 +6,7 @@ const sources = await Promise.all([
   "../../apps/web/src/course-details-controller.js",
   "../../apps/web/src/planner-ui-logic.js",
   "../../apps/web/src/planner-controller.js",
+  "../../apps/web/src/program-picker-controller.js",
 ].map((path) => readFile(new URL(path, import.meta.url), "utf8")));
 
 test("released academic planning UI never exposes implementation-readiness disclaimers", () => {
@@ -15,5 +16,8 @@ test("released academic planning UI never exposes implementation-readiness discl
     "machine-readable prerequisite path is not available yet",
     "Requirements under review",
     "is not available yet",
+    "Only reviewed programs",
+    "Reviewed requirements",
+    "No reviewed program-count limits",
   ].forEach((message) => assert.doesNotMatch(source, new RegExp(message, "i")));
 });
