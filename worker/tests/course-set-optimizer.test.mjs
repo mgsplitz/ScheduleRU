@@ -174,6 +174,28 @@ test("chooses the prerequisite route with the smallest transitive course burden"
   ]);
 });
 
+test("prefers a fully modeled prerequisite route over a code-only alternative", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("differential-equations")],
+    candidates: [
+      candidate("01:640:251", [], { title: "Multivariable Calculus", credits: 4 }),
+      candidate("01:640:244", ["differential-equations"], {
+        title: "Differential Equations for Engineering and Physics",
+        prerequisitePaths: [["01:640:243"], ["01:640:251"]],
+        prerequisiteClosure: ["01:640:243", "01:640:251"],
+      }),
+    ],
+    conflicts: [],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), [
+    "01:640:244",
+    "01:640:251",
+  ]);
+  assert.equal(result.selectedCourses.every((course) => course.title !== course.code), true);
+});
+
 test("explicitly deferred Core work remains deferred instead of receiving a guessed course", () => {
   const result = optimizer().optimizeCourseSet({
     requirements: [requirement("cco", { sourceType: "core", canDefer: true })],

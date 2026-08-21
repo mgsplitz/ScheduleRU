@@ -316,11 +316,14 @@
             index,
             expanded,
             additions: uniqueSorted(additions),
+            unresolved: uniqueSorted(additions).filter((prerequisiteCode) =>
+              !candidateByAlias.has(prerequisiteCode)).length,
             credits: uniqueSorted(additions).reduce((sum, prerequisiteCode) =>
               sum + (Number(candidateByAlias.get(prerequisiteCode)?.credits) || 3), 0),
           };
         }).sort((left, right) =>
-          left.additions.length - right.additions.length
+          left.unresolved - right.unresolved
+          || left.additions.length - right.additions.length
           || left.credits - right.credits
           || left.path.length - right.path.length
           || left.path.join("\u0000").localeCompare(right.path.join("\u0000"))
