@@ -218,7 +218,8 @@
         const parts = components.map((ids) => {
           const idSet = new Set(ids);
           const componentCandidates = allCandidates.filter((candidate) =>
-            candidate.coverageRequirementIds.some((id) => idSet.has(id)));
+            candidate.coverageRequirementIds.some((id) => idSet.has(id))
+            || candidate.equivalentCourseCodes.some((code) => plannedCourseCodes.has(code)));
           const includedCodes = new Set(componentCandidates.flatMap((candidate) => candidate.equivalentCourseCodes || [candidate.code]));
           const supportingCandidates = [];
           const prerequisiteQueue = componentCandidates
@@ -349,6 +350,14 @@
           || left.index - right.index);
         options[0]?.expanded?.forEach((candidateCode) => selected.add(candidateCode));
       }
+      const plannedCanonicalCodes = new Set();
+      [...plannedCourseCodes].sort().forEach((code) => {
+        const candidate = candidateByAlias.get(code);
+        const canonical = candidate?.code || code;
+        plannedCanonicalCodes.add(canonical);
+        expandCandidate(candidate, canonical, new Set(), result, true);
+      });
+      plannedCanonicalCodes.forEach((code) => result.delete(code));
       [...selectedCodes].sort().forEach((code) => {
         const candidate = candidateByAlias.get(code);
         expandCandidate(candidate, candidate?.code || code, new Set(), result, true);

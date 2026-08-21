@@ -216,6 +216,30 @@ test("reuses a course already in the four-year plan instead of adding a duplicat
   assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), ["01:640:152"]);
 });
 
+test("adds missing prerequisite support for fixed courses already required by the degree", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("writing")],
+    candidates: [
+      candidate("01:355:101", ["writing"], { title: "College Writing" }),
+      candidate("01:640:115", [], { title: "Precalculus College Mathematics" }),
+      candidate("01:640:151", [], {
+        title: "Calculus I",
+        prerequisitePaths: [["01:640:115"]],
+        prerequisiteClosure: ["01:640:115"],
+      }),
+    ],
+    conflicts: [],
+    plannedCourseCodes: ["01:640:151"],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), [
+    "01:355:101",
+    "01:640:115",
+  ]);
+  assert.equal(result.selectedCourses.find((item) => item.code === "01:640:115")?.prerequisiteOnly, true);
+});
+
 test("does not auto-enroll a student in an unrequested honors shortcut", () => {
   const graph = {
     requirements: [requirement("differential-equations")],
