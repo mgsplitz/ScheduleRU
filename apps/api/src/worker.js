@@ -213,16 +213,7 @@ async function syncCourseReferenceTerm(env, year, term) {
          source_year, source_term,
          source_kind, source_url, updated_at
        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'schedule_archive', ?, ?)
-       ON CONFLICT(course_code) DO UPDATE SET
-         title = excluded.title,
-         credits = CASE WHEN excluded.credits <> '' THEN excluded.credits ELSE course_reference.credits END,
-         catalog_prereqs = excluded.catalog_prereqs,
-         catalog_restrictions = excluded.catalog_restrictions,
-         source_year = excluded.source_year,
-         source_term = excluded.source_term,
-         source_kind = excluded.source_kind,
-         source_url = excluded.source_url,
-         updated_at = excluded.updated_at`
+       ON CONFLICT(course_code) DO NOTHING`
     ).bind(
       course.code,
       course.title,

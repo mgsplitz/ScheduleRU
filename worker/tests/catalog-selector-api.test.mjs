@@ -157,6 +157,8 @@ test("development admins can seed canonical metadata from any Rutgers term witho
     assert.match(calls[0].sql, /catalog_restrictions/);
     assert.match(calls[0].sql, /source_year/);
     assert.match(calls[0].sql, /source_term/);
+    assert.match(calls[0].sql, /ON CONFLICT\(course_code\) DO NOTHING/);
+    assert.doesNotMatch(calls[0].sql, /DO UPDATE SET/);
     assert.deepEqual(calls[0].values.slice(3, 7), [
       "01:730:201", "JUNIORS AND SENIORS", 2024, "9",
     ]);
