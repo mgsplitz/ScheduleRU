@@ -114,7 +114,7 @@ function fixture() {
     cleanText: (value) => String(value || "").trim(),
     getProgramTypeSections: () => [{ type: "major", label: "Majors", singular: "Major" }],
     programTypeLabel: () => "Major",
-    programCoverageLabel: () => "Reviewed requirements",
+    programCoverageLabel: () => "",
     selectionLimitSummary: () => "Up to two majors.",
     showFeedback: () => { feedbackCalls += 1; },
     onApply: () => { applyCalls += 1; },

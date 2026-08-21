@@ -149,7 +149,7 @@
       current.programDraftPrimaryId = current.primaryProgramId;
       current.programSearch = "";
       current.programBrowseSchoolSlug = "";
-      document.getElementById("programPickerNote").textContent = `Choose a school, then select its majors and minors. Only reviewed programs show a requirement tree. ${selectionLimitSummary()} Your home school stays unchanged.`;
+      document.getElementById("programPickerNote").textContent = `Choose a school, then select its majors and minors. ${selectionLimitSummary()} Your home school stays unchanged.`;
       showFeedback?.(null);
       const search = document.getElementById("programSearch");
       search.value = "";
