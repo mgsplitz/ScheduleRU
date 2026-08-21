@@ -222,7 +222,26 @@ test("generic requirement labels become concise program-specific guidance", () =
     programs: [{ id: "rbsnb-finance-major", name: "Finance", type: "major" }],
   });
 
-  assert.equal(flow.decisions()[0].label, "Choose four Finance electives");
+  assert.equal(flow.decisions()[0].label, "Four Finance electives");
+});
+
+test("numbered requirement artifacts are removed from student-facing guidance", () => {
+  const flow = modules().controller.create({
+    decisions: [{
+      decisionId: "mathematics:electives",
+      requirementGroupId: "mathematics-electives",
+      sourceProgram: "sasnb-mathematics-minor",
+      sourceType: "program",
+      label: "Course 1 of 4 for Four additional 3-credit Mathematics courses.",
+      slotCount: 4,
+      planningMode: "guided_flexible",
+      candidates: [{ code: "01:640:300", title: "Introduction to Mathematical Reasoning" }],
+    }],
+    programs: [{ id: "sasnb-mathematics-minor", name: "Mathematics", type: "minor" }],
+  });
+
+  assert.equal(flow.decisions()[0].label, "Four additional 3-credit Mathematics courses");
+  assert.doesNotMatch(flow.decisions()[0].label, /^Course \d+ of \d+/);
 });
 
 test("same-named major and minor groups keep independent preference ownership", () => {
@@ -348,4 +367,19 @@ test("recommendation summaries normalize source-label punctuation", () => {
 
   assert.match(html, /Fulfills Four mathematics electives\./);
   assert.doesNotMatch(html, /electives\.\./);
+});
+
+test("recommendation summaries remove numbered requirement artifacts", () => {
+  const html = modules().view.renderRecommendations({
+    result: {
+      selectedCourses: [{
+        code: "01:640:300", title: "Introduction to Mathematical Reasoning",
+        coverageRequirementIds: ["math"], prerequisiteOnly: false,
+      }],
+    },
+    requirements: [{ id: "math", label: "Course 1 of 4 for Four additional 3-credit Mathematics courses." }],
+  });
+
+  assert.match(html, /Fulfills Four additional 3-credit Mathematics courses\./);
+  assert.doesNotMatch(html, /Course 1 of 4/);
 });

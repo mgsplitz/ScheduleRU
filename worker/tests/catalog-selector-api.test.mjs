@@ -42,16 +42,39 @@ test("catalog resolves canonical metadata for a bounded set of course codes", as
   );
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { courses: [
+  const payload = await response.json();
+  assert.deepEqual(payload.courses.map(({ course_code, title, credits }) => ({ course_code, title, credits })), [
     { course_code: "01:730:407", title: "Intermediate Logic I", credits: "3" },
     { course_code: "01:730:408", title: "Intermediate Logic II", credits: "3" },
-  ] });
+  ]);
+  assert.equal(payload.courses.every((course) => course.compiled_rules?.ruleCoverage === "catalog_parsed"), true);
   assert.match(db.calls[0].sql, /FROM course_reference/);
   assert.match(db.calls[0].sql, /catalog_prereqs/);
   assert.match(db.calls[0].sql, /catalog_restrictions/);
   assert.match(db.calls[0].sql, /source_url/);
   assert.match(db.calls[0].sql, /json_each\(\?\)/);
   assert.deepEqual(JSON.parse(db.calls[0].values[0]), ["01:730:407", "01:730:408"]);
+});
+
+test("canonical metadata exposes the exact planner rule contract", async () => {
+  const db = catalogDb([{
+    course_code: "33:390:440",
+    title: "Advanced Corporate Finance",
+    credits: "3",
+    catalog_prereqs: "33:390:400 CORPORATE FINANCE",
+    catalog_restrictions: "FINANCE MAJORS ONLY; JUNIORS AND SENIORS",
+  }]);
+  const response = await worker.fetch(
+    new Request("https://example.test/api/course-metadata?codes=33%3A390%3A440"),
+    { DB: db },
+    {},
+  );
+  const [course] = (await response.json()).courses;
+
+  assert.deepEqual(course.compiled_rules.prerequisitePaths, [["33:390:400"]]);
+  assert.deepEqual(course.compiled_rules.enforceablePrerequisitePaths, [["33:390:400"]]);
+  assert.equal(course.compiled_rules.minimumPlanYear, 3);
+  assert.equal(course.compiled_rules.ruleCoverage, "catalog_parsed");
 });
 
 test("catalog rejects malformed or oversized canonical metadata requests", async () => {

@@ -122,8 +122,49 @@ test("canonical prerequisite metadata is attached once for every decision", asyn
 
   assert.equal(paths.length, 1);
   assert.match(paths[0], /course-metadata/);
-  assert.deepEqual(plain(hydrated[0].prerequisiteCourses), [
+  assert.deepEqual(plain(hydrated[0].prerequisiteCourses.map(({ code, title, credits }) => ({ code, title, credits }))), [
     { code: "01:730:407", title: "Intermediate Logic I", credits: 3 },
     { code: "01:730:408", title: "Intermediate Logic II", credits: 3 },
   ]);
+});
+
+test("canonical prerequisite metadata follows every prerequisite layer for fixed and guided courses", async () => {
+  const requestedBatches = [];
+  const hydrated = await loader().hydratePrerequisiteMetadata({
+    decisions: [{
+      decisionId: "program:example:elective",
+      candidates: [{
+        code: "01:640:244",
+        title: "Differential Equations for Engineering and Physics",
+        prerequisitePaths: [["01:640:251", "01:640:250"]],
+      }],
+    }],
+    seedCourses: [{
+      code: "01:640:151",
+      title: "Calculus I",
+      prerequisitePaths: [["01:640:112"]],
+    }],
+    request: async (path) => {
+      const codes = new URL(`https://example.test${path}`).searchParams.get("codes").split(",");
+      requestedBatches.push(codes);
+      const rows = {
+        "01:640:112": { course_code: "01:640:112", title: "Precalculus Part II", credits: "2", compiled_rules: { prerequisitePaths: [["01:640:111"]], enforceablePrerequisitePaths: [["01:640:111"]], ruleCoverage: "catalog_parsed" } },
+        "01:640:111": { course_code: "01:640:111", title: "Precalculus Part I", credits: "2", compiled_rules: { prerequisitePaths: [], enforceablePrerequisitePaths: [], ruleCoverage: "catalog_parsed" } },
+        "01:640:250": { course_code: "01:640:250", title: "Introductory Linear Algebra", credits: "3", compiled_rules: { prerequisitePaths: [["01:640:112"]], enforceablePrerequisitePaths: [["01:640:112"]], ruleCoverage: "catalog_parsed" } },
+        "01:640:251": { course_code: "01:640:251", title: "Multivariable Calculus", credits: "4", compiled_rules: { prerequisitePaths: [["01:640:152"]], enforceablePrerequisitePaths: [["01:640:152"]], ruleCoverage: "catalog_parsed" } },
+        "01:640:152": { course_code: "01:640:152", title: "Calculus II", credits: "4", compiled_rules: { prerequisitePaths: [["01:640:151"]], enforceablePrerequisitePaths: [["01:640:151"]], ruleCoverage: "catalog_parsed" } },
+        "01:640:151": { course_code: "01:640:151", title: "Calculus I", credits: "4", compiled_rules: { prerequisitePaths: [["01:640:112"]], enforceablePrerequisitePaths: [["01:640:112"]], ruleCoverage: "catalog_parsed" } },
+      };
+      return { courses: codes.map((code) => rows[code]).filter(Boolean) };
+    },
+  });
+
+  assert.equal(requestedBatches.length >= 2, true);
+  assert.deepEqual(plain(hydrated[0].prerequisiteCourses.map((course) => course.code)), [
+    "01:640:111", "01:640:112", "01:640:151", "01:640:152", "01:640:250", "01:640:251",
+  ]);
+  assert.deepEqual(
+    plain(hydrated[0].prerequisiteCourses.find((course) => course.code === "01:640:112").prerequisitePaths),
+    [["01:640:111"]],
+  );
 });

@@ -12,7 +12,10 @@
       7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve",
     })[Number(value)] || String(value);
     function semanticLabel(decision) {
-      const label = String(decision?.label || "").replace(/[.]+$/, "").trim();
+      const label = String(decision?.label || "")
+        .replace(/[.]+$/, "")
+        .replace(/^course\s+\d+\s+of\s+\d+\s+for\s+/i, "")
+        .trim();
       if (decision?.sourceType === "core") return label;
       const programName = String(programById.get(decision?.sourceProgram)?.name || "").trim();
       const generic = /^(?:course\s+\d+\s+of\s+\d+\s+for\s+)?(?:elective courses?|choose\s+\d+|courses?)$/i.test(label);
@@ -22,7 +25,7 @@
         return `Choose ${candidates.map((candidate) => candidate.title || candidate.code).join(" or ")}`;
       }
       const count = Math.max(1, Number(decision?.slotCount) || 1);
-      return `Choose ${numberWord(count)} ${programName} elective${count === 1 ? "" : "s"}`;
+      return `${numberWord(count)[0].toUpperCase()}${numberWord(count).slice(1)} ${programName} elective${count === 1 ? "" : "s"}`;
     }
     function sharedCoursePhrase(candidates) {
       const tokenRows = (candidates || []).map((candidate) => String(candidate.title || "")
