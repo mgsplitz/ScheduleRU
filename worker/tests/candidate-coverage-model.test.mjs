@@ -427,3 +427,15 @@ test("the coverage-to-optimizer boundary keeps prerequisite alternatives exclusi
     "01:730:410",
   ]);
 });
+
+test("the browser-to-optimizer boundary preserves courses already placed in the plan", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [decision("calculus-two", "sasnb-mathematics-minor", [candidate("01:640:152", {
+      title: "Calculus II",
+      prerequisitePaths: [["01:640:151"]],
+    })])],
+    plannedCourseCodes: ["01:640:151"],
+  });
+
+  assert.deepEqual(plain(graph.plannedCourseCodes), ["01:640:151"]);
+});

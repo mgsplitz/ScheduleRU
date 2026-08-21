@@ -425,6 +425,7 @@ function openGenerationDecisionFlow(input){
     const graph=ScheduleRUCandidateCoverageModel.buildCoverageGraph({
       decisions:input.planningDecisions||[],
       completedCourses,
+      plannedCourseCodes:(input.courses||[]).map(course=>course?.code).filter(Boolean),
       policies:{
         programs:ST.availablePrograms||[],
         doubleCountPolicies:ST.doubleCountPolicies||[],
