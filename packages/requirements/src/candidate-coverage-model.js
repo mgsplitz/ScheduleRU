@@ -7,6 +7,7 @@
   const text = (value) => String(value ?? "").trim();
   const uniqueSorted = (values) => [...new Set(values.filter(Boolean))].sort();
   const pairKey = (left, right) => [left, right].filter(Boolean).sort().join("|");
+  const ruleCoverageRank = (value) => ({ unresolved: 0, catalog_parsed: 1, reviewed: 2 }[text(value)] || 0);
 
   function reviewedEquivalencies(equivalencies) {
     return (Array.isArray(equivalencies) ? equivalencies : []).filter((item) =>
@@ -184,7 +185,23 @@
           minimumPlanYear: Number(record?.minimumPlanYear) || null,
           minimumPriorCredits: Number(record?.minimumPriorCredits) || null,
           optionFamily: text(record?.optionFamily) || null,
+          ruleCoverage: "unresolved",
+          corequisitePaths: [],
         };
+        const incomingCoverage = text(record?.ruleCoverage) || "unresolved";
+        if (ruleCoverageRank(incomingCoverage) > ruleCoverageRank(current.ruleCoverage)) {
+          // A reviewed fact is authoritative even when it deliberately says
+          // that no condition exists. Never retain a raw catalog fallback just
+          // because the reviewed arrays are empty.
+          current.prerequisitePaths = [];
+          current.enforceablePrerequisitePaths = [];
+          current.prerequisiteClosure = [];
+          current.corequisitePaths = [];
+          current.creditExclusionFamilies = [];
+          current.minimumPlanYear = null;
+          current.minimumPriorCredits = null;
+          current.ruleCoverage = incomingCoverage;
+        }
         current.equivalentCourseCodes.push(code);
         current.coverageRequirementIds.push(requirement.id);
         if (text(record?.equivalentFor)) current.reviewedEquivalentRequirementIds.push(requirement.id);
@@ -197,11 +214,18 @@
           const normalized = uniqueSorted((path || []).map(text));
           if (normalized.length) current.enforceablePrerequisitePaths.push(normalized);
         });
+        (record?.corequisitePaths || []).forEach((path) => {
+          const normalized = uniqueSorted((path || []).map(text));
+          if (normalized.length) current.corequisitePaths.push(normalized);
+        });
         current.attributes.push(...(record?.attributes || []).map(text));
         current.creditExclusionFamilies.push(...(record?.creditExclusionFamilies || []).map(text));
         current.offeringEvidence ||= record?.offeringEvidence || null;
         current.minimumPlanYear ||= Number(record?.minimumPlanYear) || null;
         current.minimumPriorCredits ||= Number(record?.minimumPriorCredits) || null;
+        if (ruleCoverageRank(incomingCoverage) > ruleCoverageRank(current.ruleCoverage)) {
+          current.ruleCoverage = incomingCoverage;
+        }
         current.optionFamily ||= text(record?.optionFamily) || null;
         if (code === canonical && text(record?.title)) current.title = text(record.title);
         current.credits = Math.min(current.credits, Number(record?.credits) > 0 ? Number(record.credits) : 3);
@@ -225,6 +249,10 @@
         current.prerequisiteClosure.push(...candidate.prerequisiteClosure);
         current.attributes.push(...candidate.attributes);
         current.creditExclusionFamilies.push(...candidate.creditExclusionFamilies);
+        current.corequisitePaths.push(...(candidate.corequisitePaths || []));
+        if (ruleCoverageRank(candidate.ruleCoverage) > ruleCoverageRank(current.ruleCoverage)) {
+          current.ruleCoverage = candidate.ruleCoverage;
+        }
         current.credits = Math.min(current.credits, candidate.credits);
       }
       merged.set(canonical, current);
@@ -248,6 +276,8 @@
       prerequisiteClosure: uniqueSorted(candidate.prerequisiteClosure),
       attributes: uniqueSorted(candidate.attributes),
       creditExclusionFamilies: uniqueSorted(candidate.creditExclusionFamilies),
+      corequisitePaths: uniqueSorted((candidate.corequisitePaths || []).map((path) => path.join("\u0000")))
+        .map((path) => path.split("\u0000")),
       requirementPrograms: Object.fromEntries(uniqueSorted(candidate.coverageRequirementIds)
         .map((id) => [id, requirementById.get(id)?.sourceProgram || ""])),
     })).sort((left, right) => left.code.localeCompare(right.code));

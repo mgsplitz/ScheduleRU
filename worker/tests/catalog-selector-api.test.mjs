@@ -77,6 +77,31 @@ test("canonical metadata exposes the exact planner rule contract", async () => {
   assert.equal(course.compiled_rules.ruleCoverage, "catalog_parsed");
 });
 
+test("canonical metadata gives a reviewed no-condition fact precedence over raw catalog prerequisites", async () => {
+  const db = catalogDb([{
+    course_code: "01:355:101",
+    title: "College Writing",
+    credits: "3",
+    catalog_prereqs: "01:355:100 BASIC COMPOSITION",
+    catalog_restrictions: "",
+  }]);
+  db.batch = async () => [
+    { results: [{ course_code: "01:355:101", review_status: "reviewed", no_known_conditions: 1 }] },
+    { results: [] },
+    { results: [] },
+  ];
+  const response = await worker.fetch(
+    new Request("https://example.test/api/course-metadata?codes=01%3A355%3A101"),
+    { DB: db },
+    {},
+  );
+  const [course] = (await response.json()).courses;
+
+  assert.deepEqual(course.compiled_rules.prerequisitePaths, []);
+  assert.deepEqual(course.compiled_rules.enforceablePrerequisitePaths, []);
+  assert.equal(course.compiled_rules.ruleCoverage, "reviewed");
+});
+
 test("catalog rejects malformed or oversized canonical metadata requests", async () => {
   const malformed = catalogDb();
   const malformedResponse = await worker.fetch(

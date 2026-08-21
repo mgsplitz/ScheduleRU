@@ -248,6 +248,33 @@ test("canonical prerequisite records keep prerequisite-only recommendations read
   assert.deepEqual(plain(prerequisite.coverageRequirementIds), []);
 });
 
+test("a reviewed candidate with no prerequisites replaces a raw metadata fallback", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [{
+      ...decision("writing", "sas-core", [candidate("01:355:101", {
+        title: "College Writing",
+        prerequisitePaths: [],
+        enforceablePrerequisitePaths: [],
+        ruleCoverage: "reviewed",
+      })]),
+      prerequisiteCourses: [{
+        code: "01:355:101",
+        title: "College Writing",
+        credits: 3,
+        prerequisitePaths: [["01:355:100"]],
+        enforceablePrerequisitePaths: [["01:355:100"]],
+        ruleCoverage: "catalog_parsed",
+      }],
+    }],
+  });
+
+  const collegeWriting = graph.candidates.find((course) => course.code === "01:355:101");
+  assert.deepEqual(plain(collegeWriting.prerequisitePaths), []);
+  assert.deepEqual(plain(collegeWriting.enforceablePrerequisitePaths), []);
+  assert.deepEqual(plain(collegeWriting.prerequisiteClosure), []);
+  assert.equal(collegeWriting.ruleCoverage, "reviewed");
+});
+
 test("canonical prerequisite records preserve their own recursive academic rules", () => {
   const graph = model().buildCoverageGraph({
     decisions: [{
