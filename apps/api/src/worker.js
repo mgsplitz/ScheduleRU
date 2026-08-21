@@ -631,13 +631,13 @@ async function handleApi(request, env, ctx) {
       const searchBinds = [];
       const tokenClauses = meaningfulTerms.map((term) => {
         const variants = [...new Set([term, ...(searchAliases[term] || [])])];
-        const fields = variants.flatMap(() => ["LOWER(title) LIKE ?", "LOWER(course_number) LIKE ?", "LOWER(subject_code) LIKE ?", "LOWER(id) LIKE ?"]);
+        const fields = variants.flatMap(() => ["LOWER(c.title) LIKE ?", "LOWER(c.course_number) LIKE ?", "LOWER(c.subject_code) LIKE ?", "LOWER(c.id) LIKE ?"]);
         for (const variant of variants) for (let i = 0; i < 4; i++) searchBinds.push(`%${variant}%`);
         return `(${fields.join(" OR ")})`;
       });
       // Preserve direct course-code searches (01:198:111) as one exact
       // substring match while natural-language searches use every word.
-      where += ` AND (LOWER(id) LIKE ?${tokenClauses.length ? ` OR (${tokenClauses.join(" AND ")})` : ""})`;
+      where += ` AND (LOWER(c.id) LIKE ?${tokenClauses.length ? ` OR (${tokenClauses.join(" AND ")})` : ""})`;
       binds.push(`%${q.toLowerCase()}%`, ...searchBinds);
     }
     if (levels.length) {
@@ -683,7 +683,7 @@ async function handleApi(request, env, ctx) {
                  FROM courses c
                  LEFT JOIN course_reference cr
                    ON cr.course_code = (c.school || ':' || c.subject_code || ':' || c.course_number)
-                 ${where} ORDER BY subject_code, course_number LIMIT ? OFFSET ?`;
+                 ${where} ORDER BY c.subject_code, c.course_number LIMIT ? OFFSET ?`;
     const { results } = await env.DB.prepare(sql).bind(...binds, limit, offset).all();
     const codes = results.map((course) => [course.school, course.subject_code, course.course_number].join(":"));
     const eligibilityByCode = typeof env.DB.batch === "function"
