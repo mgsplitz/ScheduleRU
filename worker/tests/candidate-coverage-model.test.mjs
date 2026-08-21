@@ -375,6 +375,36 @@ test("canonical prerequisite records preserve their own recursive academic rules
   ]);
 });
 
+test("optimizer components preserve canonical facts through every prerequisite layer", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [
+      {
+        ...decision("advanced", "sasnb-example", [candidate("01:640:251", {
+          title: "Multivariable Calculus",
+          prerequisitePaths: [["01:640:152"]],
+          enforceablePrerequisitePaths: [["01:640:152"]],
+        })]),
+        prerequisiteCourses: [
+          { code: "01:640:152", title: "Calculus II", credits: 4, prerequisitePaths: [["01:640:151"]], enforceablePrerequisitePaths: [["01:640:151"]], ruleCoverage: "catalog_parsed" },
+          { code: "01:640:151", title: "Calculus I", credits: 4, prerequisitePaths: [["01:640:115"]], enforceablePrerequisitePaths: [["01:640:115"]], ruleCoverage: "catalog_parsed" },
+          { code: "01:640:115", title: "Precalculus College Mathematics", credits: 4, prerequisitePaths: [], enforceablePrerequisitePaths: [], ruleCoverage: "catalog_parsed" },
+        ],
+      },
+      decision("independent", "sasnb-example", [candidate("01:730:103", { title: "Introduction to Philosophy" })]),
+    ],
+  });
+
+  const result = context.globalThis.ScheduleRUCourseSetOptimizer.optimizeCourseSet(graph);
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses.map(({ code, title }) => ({ code, title }))), [
+    { code: "01:640:115", title: "Precalculus College Mathematics" },
+    { code: "01:640:151", title: "Calculus I" },
+    { code: "01:640:152", title: "Calculus II" },
+    { code: "01:640:251", title: "Multivariable Calculus" },
+    { code: "01:730:103", title: "Introduction to Philosophy" },
+  ]);
+});
+
 test("the coverage-to-optimizer boundary keeps prerequisite alternatives exclusive", () => {
   const graph = model().buildCoverageGraph({
     decisions: [{
