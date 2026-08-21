@@ -258,7 +258,7 @@
       merged.set(canonical, current);
     }
 
-    const candidates = [...merged.values()].map((candidate) => ({
+    const normalizedCandidates = [...merged.values()].map((candidate) => ({
       ...candidate,
       equivalentCourseCodes: uniqueSorted([
         ...candidate.equivalentCourseCodes,
@@ -281,6 +281,68 @@
       requirementPrograms: Object.fromEntries(uniqueSorted(candidate.coverageRequirementIds)
         .map((id) => [id, requirementById.get(id)?.sourceProgram || ""])),
     })).sort((left, right) => left.code.localeCompare(right.code));
+
+    const completedCourseCodes = uniqueSorted(completedCourses.map((course) => text(course?.code)));
+    const completedCodeSet = new Set(completedCourseCodes);
+    const candidateByCode = new Map();
+    normalizedCandidates.forEach((candidate) => {
+      candidateByCode.set(candidate.code, candidate);
+      candidate.equivalentCourseCodes.forEach((code) => candidateByCode.set(code, candidate));
+    });
+    const readiness = new Map();
+    const courseIsPublicationReady = (code, visiting = new Set()) => {
+      const normalizedCode = text(code);
+      if (completedCodeSet.has(normalizedCode)) return true;
+      const candidate = candidateByCode.get(normalizedCode);
+      if (!candidate) return false;
+      if (readiness.has(candidate.code)) return readiness.get(candidate.code);
+      if (visiting.has(candidate.code)) return false;
+      const nextVisiting = new Set(visiting).add(candidate.code);
+      const prerequisiteReady = !candidate.prerequisitePaths.length
+        || candidate.prerequisitePaths.some((path) => path.every((item) => courseIsPublicationReady(item, nextVisiting)));
+      const corequisiteReady = !(candidate.corequisitePaths || []).length
+        || candidate.corequisitePaths.some((path) => path.every((item) => courseIsPublicationReady(item, nextVisiting)));
+      const ready = prerequisiteReady && corequisiteReady;
+      readiness.set(candidate.code, ready);
+      return ready;
+    };
+
+    const publicationIssues = [];
+    const candidates = normalizedCandidates.flatMap((candidate) => {
+      const validPrerequisitePaths = candidate.prerequisitePaths.filter((path) =>
+        path.every((code) => courseIsPublicationReady(code, new Set([candidate.code]))));
+      const validCorequisitePaths = (candidate.corequisitePaths || []).filter((path) =>
+        path.every((code) => courseIsPublicationReady(code, new Set([candidate.code]))));
+      const missingCourseCodes = uniqueSorted([
+        ...candidate.prerequisitePaths.filter((path) => !validPrerequisitePaths.includes(path)).flat(),
+        ...(candidate.corequisitePaths || []).filter((path) => !validCorequisitePaths.includes(path)).flat(),
+      ].filter((code) => !courseIsPublicationReady(code)));
+      const incompleteRequiredPath = (candidate.prerequisitePaths.length && !validPrerequisitePaths.length)
+        || ((candidate.corequisitePaths || []).length && !validCorequisitePaths.length);
+      if (!courseIsPublicationReady(candidate.code) || incompleteRequiredPath) {
+        publicationIssues.push({
+          type: "candidate_not_publication_ready",
+          candidateCode: candidate.code,
+          missingCourseCodes,
+        });
+        return [];
+      }
+      if (missingCourseCodes.length) {
+        publicationIssues.push({
+          type: "incomplete_prerequisite_alternative",
+          candidateCode: candidate.code,
+          missingCourseCodes,
+        });
+      }
+      return [{
+        ...candidate,
+        prerequisitePaths: validPrerequisitePaths,
+        enforceablePrerequisitePaths: candidate.enforceablePrerequisitePaths.filter((path) =>
+          path.every((code) => courseIsPublicationReady(code, new Set([candidate.code])))),
+        prerequisiteClosure: uniqueSorted(validPrerequisitePaths.flat()),
+        corequisitePaths: validCorequisitePaths,
+      }];
+    });
 
     const conflicts = [];
     candidates.forEach((candidate) => {
@@ -320,7 +382,9 @@
       requirements,
       candidates,
       conflicts,
-      completedCourseCodes: uniqueSorted(completedCourses.map((course) => text(course?.code))),
+      publicationIssues: publicationIssues.sort((left, right) =>
+        left.candidateCode.localeCompare(right.candidateCode) || left.type.localeCompare(right.type)),
+      completedCourseCodes,
       completedCreditExclusionFamilies: uniqueSorted(completedCourses.flatMap((course) =>
         Array.isArray(course?.creditExclusionFamilies) ? course.creditExclusionFamilies.map(text) : [])),
     };

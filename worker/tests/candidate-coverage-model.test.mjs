@@ -275,6 +275,54 @@ test("a reviewed candidate with no prerequisites replaces a raw metadata fallbac
   assert.equal(collegeWriting.ruleCoverage, "reviewed");
 });
 
+test("publication readiness removes unresolved prerequisite alternatives without hiding valid paths", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [{
+      ...decision("math", "mathematics", [candidate("01:640:244", {
+        title: "Differential Equations for Engineering and Physics",
+        prerequisitePaths: [["01:640:191"], ["01:640:251"]],
+        enforceablePrerequisitePaths: [["01:640:191"], ["01:640:251"]],
+        ruleCoverage: "catalog_parsed",
+      })]),
+      prerequisiteCourses: [{
+        code: "01:640:251",
+        title: "Multivariable Calculus",
+        credits: 4,
+        prerequisitePaths: [],
+        enforceablePrerequisitePaths: [],
+        ruleCoverage: "catalog_parsed",
+      }],
+    }],
+  });
+
+  const differentialEquations = graph.candidates.find((course) => course.code === "01:640:244");
+  assert.deepEqual(plain(differentialEquations.prerequisitePaths), [["01:640:251"]]);
+  assert.deepEqual(plain(differentialEquations.prerequisiteClosure), ["01:640:251"]);
+  assert.deepEqual(plain(graph.publicationIssues), [{
+    candidateCode: "01:640:244",
+    missingCourseCodes: ["01:640:191"],
+    type: "incomplete_prerequisite_alternative",
+  }]);
+});
+
+test("publication readiness excludes a selectable course when every prerequisite path is incomplete", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [decision("writing", "sas-core", [candidate("01:830:322", {
+      title: "Social Psychology Lab",
+      prerequisitePaths: [["01:830:300"]],
+      enforceablePrerequisitePaths: [["01:830:300"]],
+      ruleCoverage: "catalog_parsed",
+    })])],
+  });
+
+  assert.equal(graph.candidates.some((course) => course.code === "01:830:322"), false);
+  assert.deepEqual(plain(graph.publicationIssues), [{
+    candidateCode: "01:830:322",
+    missingCourseCodes: ["01:830:300"],
+    type: "candidate_not_publication_ready",
+  }]);
+});
+
 test("canonical prerequisite records preserve their own recursive academic rules", () => {
   const graph = model().buildCoverageGraph({
     decisions: [{
@@ -284,6 +332,7 @@ test("canonical prerequisite records preserve their own recursive academic rules
       prerequisiteCourses: [
         { code: "01:640:251", title: "Multivariable Calculus", credits: 4, prerequisitePaths: [["01:640:152"]], enforceablePrerequisitePaths: [["01:640:152"]], ruleCoverage: "catalog_parsed" },
         { code: "01:640:152", title: "Calculus II", credits: 4, prerequisitePaths: [["01:640:151"]], enforceablePrerequisitePaths: [["01:640:151"]], ruleCoverage: "catalog_parsed" },
+        { code: "01:640:151", title: "Calculus I", credits: 4, prerequisitePaths: [], enforceablePrerequisitePaths: [], ruleCoverage: "catalog_parsed" },
       ],
     }],
   });
