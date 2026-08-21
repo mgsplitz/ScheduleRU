@@ -120,6 +120,60 @@ test("an avoided gateway can be added when it is necessary for an interested cou
   }]);
 });
 
+test("selects one prerequisite alternative instead of every OR branch", () => {
+  const graph = {
+    requirements: [requirement("advanced-writing")],
+    candidates: [
+      candidate("01:355:101", [], { title: "College Writing" }),
+      candidate("01:355:103", [], { title: "Exposition and Argument" }),
+      candidate("01:355:104", [], { title: "College Writing Extended" }),
+      candidate("01:730:410", ["advanced-writing"], {
+        title: "History of Analytic Philosophy",
+        prerequisitePaths: [
+          ["01:355:101"],
+          ["01:355:103"],
+          ["01:355:104"],
+        ],
+        prerequisiteClosure: ["01:355:101", "01:355:103", "01:355:104"],
+      }),
+    ],
+    conflicts: [],
+  };
+
+  const result = optimizer().optimizeCourseSet(graph);
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), [
+    "01:355:101",
+    "01:730:410",
+  ]);
+});
+
+test("chooses the prerequisite route with the smallest transitive course burden", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("advanced")],
+    candidates: [
+      candidate("01:100:100", [], {
+        prerequisitePaths: [["01:100:090", "01:100:091"]],
+        prerequisiteClosure: ["01:100:090", "01:100:091"],
+      }),
+      candidate("01:100:101", []),
+      candidate("01:100:090", []),
+      candidate("01:100:091", []),
+      candidate("01:200:400", ["advanced"], {
+        prerequisitePaths: [["01:100:100"], ["01:100:101"]],
+        prerequisiteClosure: ["01:100:100", "01:100:101"],
+      }),
+    ],
+    conflicts: [],
+  });
+
+  assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), [
+    "01:100:101",
+    "01:200:400",
+  ]);
+});
+
 test("explicitly deferred Core work remains deferred instead of receiving a guessed course", () => {
   const result = optimizer().optimizeCourseSet({
     requirements: [requirement("cco", { sourceType: "core", canDefer: true })],

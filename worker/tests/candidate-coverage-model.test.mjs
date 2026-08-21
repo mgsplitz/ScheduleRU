@@ -9,6 +9,11 @@ const moduleUrl = new URL(
 );
 const context = { globalThis: {} };
 if (fs.existsSync(moduleUrl)) vm.runInNewContext(fs.readFileSync(moduleUrl, "utf8"), context);
+const optimizerUrl = new URL(
+  "../../packages/planner/src/course-set-optimizer.js",
+  import.meta.url,
+);
+if (fs.existsSync(optimizerUrl)) vm.runInNewContext(fs.readFileSync(optimizerUrl, "utf8"), context);
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
 function model() {
@@ -241,4 +246,27 @@ test("canonical prerequisite records keep prerequisite-only recommendations read
   const prerequisite = graph.candidates.find((course) => course.code === "01:730:407");
   assert.equal(prerequisite.title, "Intermediate Logic I");
   assert.deepEqual(plain(prerequisite.coverageRequirementIds), []);
+});
+
+test("the coverage-to-optimizer boundary keeps prerequisite alternatives exclusive", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [{
+      ...decision("advanced", "sasnb-example", [candidate("01:730:410", {
+        title: "History of Analytic Philosophy",
+        prerequisitePaths: [["01:355:101"], ["01:355:103"], ["01:355:104"]],
+      })]),
+      prerequisiteCourses: [
+        { code: "01:355:101", title: "College Writing", credits: 3 },
+        { code: "01:355:103", title: "Exposition and Argument", credits: 3 },
+        { code: "01:355:104", title: "College Writing Extended", credits: 4.5 },
+      ],
+    }],
+  });
+
+  const result = context.globalThis.ScheduleRUCourseSetOptimizer.optimizeCourseSet(graph);
+
+  assert.deepEqual(plain(result.selectedCourses.map((course) => course.code)), [
+    "01:355:101",
+    "01:730:410",
+  ]);
 });

@@ -2,6 +2,9 @@
 (function exposeCourseSetOptimizer(root) {
   const text = (value) => String(value ?? "").trim();
   const uniqueSorted = (values) => [...new Set(values.filter(Boolean))].sort();
+  const normalizedPaths = (value) => uniqueSorted((Array.isArray(value) ? value : [])
+    .map((path) => uniqueSorted(Array.isArray(path) ? path.map(text) : []).join("\u0000"))
+    .filter(Boolean)).map((path) => path.split("\u0000"));
   const pairKey = (left, right) => [left, right].filter(Boolean).sort().join("|");
 
   function preferenceFor(requirement, preferences) {
@@ -110,6 +113,8 @@
       ...candidate,
       equivalentCourseCodes: uniqueSorted(candidate.equivalentCourseCodes || [candidate.code]),
       coverageRequirementIds: uniqueSorted(candidate.coverageRequirementIds || []),
+      prerequisitePaths: normalizedPaths(candidate.prerequisitePaths),
+      enforceablePrerequisitePaths: normalizedPaths(candidate.enforceablePrerequisitePaths),
       prerequisiteClosure: uniqueSorted(candidate.prerequisiteClosure || []),
       creditExclusionFamilies: uniqueSorted(candidate.creditExclusionFamilies || []),
     })).filter((candidate) =>
@@ -129,6 +134,8 @@
         coverage: candidate.coverageRequirementIds,
         conflicts: conflictFacts,
         credits: Number(candidate.credits) || 3,
+        prerequisitePaths: candidate.prerequisitePaths,
+        enforceablePrerequisitePaths: candidate.enforceablePrerequisitePaths,
         prerequisiteClosure: candidate.prerequisiteClosure,
         minimumPlanYear: Number(candidate.minimumPlanYear) || null,
         minimumPriorCredits: Number(candidate.minimumPriorCredits) || null,
@@ -276,20 +283,54 @@
       return [...counts.values()].reduce((sum, count) => sum + Math.max(0, count), 0);
     }
 
+    function candidateIsCompleted(candidate, code) {
+      return (candidate?.equivalentCourseCodes || [code]).some((alias) => completedCourseCodes.has(alias));
+    }
+
     function selectedWithPrerequisites(selectedCodes) {
-      const result = new Set(selectedCodes);
-      const queue = [...selectedCodes];
-      while (queue.length) {
-        const current = candidateByAlias.get(queue.shift());
-        (current?.prerequisiteClosure || []).forEach((code) => {
-          const prerequisite = candidateByAlias.get(code);
-          const selectedCode = prerequisite?.code || code;
-          if (!result.has(selectedCode)) {
-            result.add(selectedCode);
-            queue.push(selectedCode);
-          }
-        });
+      const result = new Set();
+      function expandCandidate(candidate, code, ancestors, selected) {
+        const selectedCode = candidate?.code || code;
+        if (!selectedCode || candidateIsCompleted(candidate, selectedCode)) return;
+        selected.add(selectedCode);
+        if (!candidate || ancestors.has(selectedCode)) return;
+        const nextAncestors = new Set(ancestors);
+        nextAncestors.add(selectedCode);
+        const explicitPaths = candidate.enforceablePrerequisitePaths?.length
+          ? candidate.enforceablePrerequisitePaths
+          : candidate.prerequisitePaths;
+        const paths = explicitPaths?.length
+          ? explicitPaths
+          : candidate.prerequisiteClosure?.length ? [candidate.prerequisiteClosure] : [];
+        if (!paths.length) return;
+        const options = paths.map((path, index) => {
+          const expanded = new Set(selected);
+          path.forEach((prerequisiteCode) => {
+            const prerequisite = candidateByAlias.get(prerequisiteCode);
+            const canonical = prerequisite?.code || prerequisiteCode;
+            expandCandidate(prerequisite, canonical, nextAncestors, expanded);
+          });
+          const additions = [...expanded].filter((candidateCode) => !selected.has(candidateCode));
+          return {
+            path,
+            index,
+            expanded,
+            additions: uniqueSorted(additions),
+            credits: uniqueSorted(additions).reduce((sum, prerequisiteCode) =>
+              sum + (Number(candidateByAlias.get(prerequisiteCode)?.credits) || 3), 0),
+          };
+        }).sort((left, right) =>
+          left.additions.length - right.additions.length
+          || left.credits - right.credits
+          || left.path.length - right.path.length
+          || left.path.join("\u0000").localeCompare(right.path.join("\u0000"))
+          || left.index - right.index);
+        options[0]?.expanded?.forEach((candidateCode) => selected.add(candidateCode));
       }
+      [...selectedCodes].sort().forEach((code) => {
+        const candidate = candidateByAlias.get(code);
+        expandCandidate(candidate, candidate?.code || code, new Set(), result);
+      });
       return result;
     }
 
@@ -454,7 +495,7 @@
       if (!avoided) return;
       const unlocks = selectedCourses.filter((course) =>
         !course.prerequisiteOnly
-        && (course.prerequisiteClosure || []).some((code) => aliases.includes(code)))
+        && [...selectedWithPrerequisites([course.code])].some((code) => aliases.includes(code)))
         .map((course) => course.code).sort();
       explanations.push({
         type: "preference_override",
