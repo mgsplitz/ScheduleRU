@@ -80,3 +80,18 @@ test("an official catalog record with no listed rules is a complete no-condition
   assert.deepEqual(result.prerequisitePaths, []);
   assert.equal(result.ruleCoverage, "catalog_parsed");
 });
+
+test("official requirement notes supply prerequisite paths when the catalog archive is empty", () => {
+  const result = compileCourseRules({
+    code: "33:136:487",
+    catalogRecordAvailable: true,
+    catalogPrereqs: "",
+    requirementNotes: ["pre-reqs: 33:136:370 or 33:010:458"],
+  });
+
+  assert.deepEqual(result.prerequisitePaths, [
+    ["33:136:370"],
+    ["33:010:458"],
+  ]);
+  assert.equal(result.ruleCoverage, "catalog_parsed");
+});
