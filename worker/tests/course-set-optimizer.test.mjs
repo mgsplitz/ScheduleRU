@@ -196,6 +196,69 @@ test("chooses the prerequisite route with the smallest transitive course burden"
   ]);
 });
 
+test("reuses a course already in the four-year plan instead of adding a duplicate prerequisite route", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("calculus-two")],
+    candidates: [
+      candidate("01:640:135", [], { title: "Calculus I for Life and Social Sciences" }),
+      candidate("01:640:151", [], { title: "Calculus I for Mathematical and Physical Sciences" }),
+      candidate("01:640:152", ["calculus-two"], {
+        title: "Calculus II for Mathematical and Physical Sciences",
+        prerequisitePaths: [["01:640:135"], ["01:640:151"]],
+        prerequisiteClosure: ["01:640:135", "01:640:151"],
+      }),
+    ],
+    conflicts: [],
+    plannedCourseCodes: ["01:640:151"],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), ["01:640:152"]);
+});
+
+test("does not auto-enroll a student in an unrequested honors shortcut", () => {
+  const graph = {
+    requirements: [requirement("differential-equations")],
+    candidates: [
+      candidate("01:640:151", [], { title: "Calculus I" }),
+      candidate("01:640:152", [], {
+        title: "Calculus II",
+        prerequisitePaths: [["01:640:151"]],
+        prerequisiteClosure: ["01:640:151"],
+      }),
+      candidate("01:640:251", [], {
+        title: "Multivariable Calculus",
+        prerequisitePaths: [["01:640:152"]],
+        prerequisiteClosure: ["01:640:152"],
+      }),
+      candidate("01:640:291", [], { title: "Honors Calculus III" }),
+      candidate("01:640:244", ["differential-equations"], {
+        title: "Differential Equations for Engineering and Physics",
+        prerequisitePaths: [["01:640:251"], ["01:640:291"]],
+        prerequisiteClosure: ["01:640:251", "01:640:291"],
+      }),
+    ],
+    conflicts: [],
+  };
+
+  const result = optimizer().optimizeCourseSet(graph);
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), [
+    "01:640:151",
+    "01:640:152",
+    "01:640:244",
+    "01:640:251",
+  ]);
+
+  const honorsRequested = optimizer().optimizeCourseSet(graph, {
+    "differential-equations": { interested: ["01:640:291"], maybe: [], avoid: [] },
+  });
+  assert.deepEqual(plain(honorsRequested.selectedCourses.map((item) => item.code)), [
+    "01:640:244",
+    "01:640:291",
+  ]);
+});
+
 test("prefers a fully modeled prerequisite route over a code-only alternative", () => {
   const result = optimizer().optimizeCourseSet({
     requirements: [requirement("differential-equations")],

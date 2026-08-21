@@ -132,6 +132,7 @@
     equivalencies = [],
     policies = {},
     completedCourses = [],
+    plannedCourseCodes = [],
   } = {}) {
     const requirements = decisions.map(normalizedRequirement)
       .sort((left, right) => left.id.localeCompare(right.id));
@@ -390,6 +391,7 @@
       publicationIssues: publicationIssues.sort((left, right) =>
         left.candidateCode.localeCompare(right.candidateCode) || left.type.localeCompare(right.type)),
       completedCourseCodes,
+      plannedCourseCodes: uniqueSorted(plannedCourseCodes.map(text)),
       completedCreditExclusionFamilies: uniqueSorted(completedCourses.flatMap((course) =>
         Array.isArray(course?.creditExclusionFamilies) ? course.creditExclusionFamilies.map(text) : [])),
     };

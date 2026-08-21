@@ -106,6 +106,7 @@
   function optimizeCourseSet(graph = {}, preferences = {}, options = {}) {
     const requirements = [...(graph.requirements || [])].sort((left, right) => left.id.localeCompare(right.id));
     const completedCourseCodes = new Set((graph.completedCourseCodes || []).map(text).filter(Boolean));
+    const plannedCourseCodes = new Set((graph.plannedCourseCodes || []).map(text).filter(Boolean));
     const completedCreditExclusionFamilies = new Set(
       (graph.completedCreditExclusionFamilies || []).map(text).filter(Boolean),
     );
@@ -236,6 +237,7 @@
             candidates: [...componentCandidates, ...supportingCandidates],
             conflicts: (graph.conflicts || []).filter((item) => candidateCodes.has(item.candidateCode)),
             completedCourseCodes: [...completedCourseCodes],
+            plannedCourseCodes: [...plannedCourseCodes],
             completedCreditExclusionFamilies: [...completedCreditExclusionFamilies],
           }, preferences, { ...options, component: true });
         });
@@ -294,11 +296,16 @@
       return (candidate?.equivalentCourseCodes || [code]).some((alias) => completedCourseCodes.has(alias));
     }
 
+    function candidateIsPlanned(candidate, code) {
+      return (candidate?.equivalentCourseCodes || [code]).some((alias) => plannedCourseCodes.has(alias));
+    }
+
     function selectedWithPrerequisites(selectedCodes) {
       const result = new Set();
-      function expandCandidate(candidate, code, ancestors, selected) {
+      function expandCandidate(candidate, code, ancestors, selected, forceSelected = false) {
         const selectedCode = candidate?.code || code;
         if (!selectedCode || candidateIsCompleted(candidate, selectedCode)) return;
+        if (!forceSelected && candidateIsPlanned(candidate, selectedCode)) return;
         selected.add(selectedCode);
         if (!candidate || ancestors.has(selectedCode)) return;
         const nextAncestors = new Set(ancestors);
@@ -315,7 +322,7 @@
           path.forEach((prerequisiteCode) => {
             const prerequisite = candidateByAlias.get(prerequisiteCode);
             const canonical = prerequisite?.code || prerequisiteCode;
-            expandCandidate(prerequisite, canonical, nextAncestors, expanded);
+            expandCandidate(prerequisite, canonical, nextAncestors, expanded, false);
           });
           const additions = [...expanded].filter((candidateCode) => !selected.has(candidateCode));
           return {
@@ -325,11 +332,16 @@
             additions: uniqueSorted(additions),
             unresolved: uniqueSorted(additions).filter((prerequisiteCode) =>
               !candidateByAlias.has(prerequisiteCode)).length,
+            unrequestedHonors: uniqueSorted(additions).filter((prerequisiteCode) => {
+              const record = candidateByAlias.get(prerequisiteCode);
+              return /\bHONORS?\b/i.test(text(record?.title)) && globalPreferenceRank(prerequisiteCode) >= 2;
+            }).length,
             credits: uniqueSorted(additions).reduce((sum, prerequisiteCode) =>
               sum + (Number(candidateByAlias.get(prerequisiteCode)?.credits) || 3), 0),
           };
         }).sort((left, right) =>
           left.unresolved - right.unresolved
+          || left.unrequestedHonors - right.unrequestedHonors
           || left.additions.length - right.additions.length
           || left.credits - right.credits
           || left.path.length - right.path.length
@@ -339,7 +351,7 @@
       }
       [...selectedCodes].sort().forEach((code) => {
         const candidate = candidateByAlias.get(code);
-        expandCandidate(candidate, candidate?.code || code, new Set(), result);
+        expandCandidate(candidate, candidate?.code || code, new Set(), result, true);
       });
       return result;
     }
