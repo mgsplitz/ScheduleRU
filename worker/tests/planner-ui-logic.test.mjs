@@ -180,7 +180,7 @@ test("every course resolves to an honest path presentation state", () => {
     catalogPrerequisites: "",
   }), {
     kind: "none",
-    message: "No reviewed prerequisite is recorded for this course.",
+    message: "No prerequisite courses are listed for this course.",
   });
   assert.deepEqual(logic.coursePathState({
     plan: { paths: [], references: [] },

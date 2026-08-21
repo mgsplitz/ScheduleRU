@@ -191,13 +191,13 @@ function courseEligibilityForTerm(course,term){
   });
 }
 function plannerEligibilityLabel(result){
-  if(result.status==="eligible_now") return "Eligible based on completed credit and reviewed rules";
+  if(result.status==="eligible_now") return "Eligible based on completed credit and course requirements";
   if(result.status==="planned_assumption") return "Works in this plan if earlier planned courses are completed";
   const missing=result.missing?.[0];
   if(missing?.type==="minimum_prior_credits") return "Requires "+missing.minimum_credits+" previously completed credits";
   if(missing?.type==="minimum_plan_year") return "Available starting in plan year "+missing.minimum_year;
-  if(missing?.type==="corequisite_course") return "A reviewed co-requisite must be scheduled in the same term";
-  if(missing?.type==="prerequisite_course") return "A reviewed prerequisite must be completed first";
+  if(missing?.type==="corequisite_course") return "A co-requisite must be scheduled in the same term";
+  if(missing?.type==="prerequisite_course") return "A prerequisite must be completed first";
   return "Check this course's Rutgers enrollment conditions before registration";
 }
 function reviewedEligibilityForCourse(course){
@@ -337,11 +337,11 @@ function selectorGuidanceHtml(g){
   const selectors=reviewedGroupSelectors(g);
   const descriptions=selectors.map(selector=>engine.selectorDescription(selector));
   const corrected=selectors.length===raw.length;
-  const rule=descriptions.length ? descriptions.join("; ") : "this reviewed course rule";
+  const rule=descriptions.length ? descriptions.join("; ") : "this course rule";
   const action=corrected
     ? `<div class="choice-actions"><button class="choice-btn" data-gbrowse="${escapeHtml(g.id)}">Browse matching courses</button></div>`
     : "";
-  return `<div class="choice-summary">Scheduled and completed courses matching ${escapeHtml(rule)} apply here automatically. Browse the matching catalog, add a course to your wishlist, then place it in your plan.${corrected?"":" A reviewed course rule needs correction before it can be applied."}</div>${action}`;
+  return `<div class="choice-summary">Scheduled and completed courses matching ${escapeHtml(rule)} apply here automatically. Browse the matching catalog, add a course to your wishlist, then place it in your plan.</div>${action}`;
 }
 
 /* ============================================================
@@ -423,7 +423,7 @@ function renderProgramSchoolSelector(){
   select.value=ST.homeSchoolSlug;
   select.disabled=schools.length<2;
   help.textContent=schools.length<2
-    ? "More Rutgers schools will appear here only after their curriculum and policy data are reviewed."
+    ? "Choose a home school to view its programs."
     : "Changing your home school re-evaluates your program requirements. Your planned courses stay in your browser.";
   select.onchange=()=>changeHomeSchool(select.value);
 }
@@ -434,7 +434,7 @@ async function loadHomeSchoolCandidate(nextSchool){
     requirementDataLoader.loadCoreCurriculum({homeSchoolSlug:nextSchool.slug,label:schoolContext.coreFallbackLabel}),
   ]);
   const availablePrograms=ScheduleRUProgramPickerLogic.availableProgramsForSchool(programContext.programs,nextSchool.slug);
-  if(!availablePrograms.length)throw new Error("No reviewed program is available for that home school.");
+  if(!availablePrograms.length)throw new Error("No programs are available for that home school.");
   const curriculum=coreContext.curriculum;
   const selectedPrograms=ScheduleRUProgramPickerLogic.initialProgramIds({
     restoredIds:[],
@@ -974,7 +974,7 @@ function allocationSummaryHtml(g){
   const selected=applied.length
     ? `${applied.length} completed course${applied.length===1?" is":"s are"} allocated to this group.`
     : "No completed course is allocated to this group.";
-  return `<div class="choice-summary">${selected} This reviewed ${escapeHtml(allocation.allocation_family)} allocation permits each course to count in up to ${maxUses} group${maxUses===1?"":"s"}; other eligible choices remain visible.</div>`;
+  return `<div class="choice-summary">${selected} This ${escapeHtml(allocation.allocation_family)} allocation permits each course to count in up to ${maxUses} group${maxUses===1?"":"s"}; other eligible choices remain visible.</div>`;
 }
 function pickerSummaryHtml(gk){
   const g=GROUPS[gk];
@@ -1130,7 +1130,7 @@ function catalogListedProgramsBannerHtml(){
 function renderCore(){
   const pb=document.getElementById("pb");
   if(ST.coreLoading){
-    pb.innerHTML=`<div class="empty" style="margin-top:30px;">Loading the reviewed ${escapeHtml(activeCoreLabel())}…</div>`;
+    pb.innerHTML=`<div class="empty" style="margin-top:30px;">Loading ${escapeHtml(activeCoreLabel())}…</div>`;
     return;
   }
   if(ST.coreError){
@@ -1279,9 +1279,9 @@ function programEligibilityBannerHtml(){
   const programsById=Object.fromEntries((ST.availablePrograms||[]).map(program=>[program.id,program]));
   const facts=rules.map(rule=>{
     const name=programsById[rule.program_id]?.name||"Selected program";
-    return `<li><strong>${escapeHtml(name)}:</strong> ${escapeHtml(rule.advisory_message||rule.note||"Confirm this reviewed program policy with advising.")}</li>`;
+    return `<li><strong>${escapeHtml(name)}:</strong> ${escapeHtml(rule.advisory_message||rule.note||"Confirm this program policy with advising.")}</li>`;
   }).join("");
-  return `<div class="dc-banner warn"><b>Planning notices</b><ul style="margin:5px 0 0;padding-left:18px;">${facts}</ul><span>Planning notices from reviewed program sources. ScheduleRU does not verify grades, residency, transfer credit, formal applications, or school approvals.</span></div>`;
+  return `<div class="dc-banner warn"><b>Planning notices</b><ul style="margin:5px 0 0;padding-left:18px;">${facts}</ul><span>ScheduleRU does not verify grades, residency, transfer credit, formal applications, or school approvals.</span></div>`;
 }
 function overlapProgramPairsHtml(overlaps,programsById){
   const byPrograms=new Map();

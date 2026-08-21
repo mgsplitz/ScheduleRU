@@ -95,7 +95,7 @@
     if (verifiedNoPrerequisites) {
       return {
         kind: "none",
-        message: "No reviewed prerequisite is recorded for this course.",
+        message: "No prerequisite courses are listed for this course.",
       };
     }
     if (catalogRecordAvailable && !String(catalogPrerequisites || "").trim()) {

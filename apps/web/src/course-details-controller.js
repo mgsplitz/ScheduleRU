@@ -108,7 +108,7 @@
         const sourceNote = plan.source === "catalog"
           ? "These paths are read from the official catalog."
           : plan.source === "reviewed_conditions"
-            ? "These paths come from a reviewed Rutgers prerequisite record."
+            ? "These paths come from a Rutgers prerequisite record."
             : "";
         return `<div class="detail-section"><h3>Course path</h3>${paths}${sourceNote ? `<p class="src-note">${sourceNote} A green course is completed or scheduled in an earlier semester.</p>` : ""}</div>`;
       }
@@ -183,7 +183,7 @@
         <div class="detail-section"><h3>${standing ? "When you can take it" : "Enrollment"}</h3><p>${escapeHtml(compactRestriction(course, standing))}</p></div>
         ${instructorLinks ? `<div class="detail-section"><h3>Instructors</h3><div class="external-professor-links">${instructorLinks}</div><p class="src-note">Opens the instructor's external Rate My Professors profile or search.</p></div>` : ""}
         ${eligibilityNotice ? `<div class="detail-section"><h3>Planning eligibility</h3><p>${escapeHtml(eligibilityNotice)}</p></div>` : ""}
-        ${alternativeDetails ? `<div class="detail-section"><h3>Also accepted for this requirement</h3><div class="detail-chips">${alternativeDetails}</div><p class="src-note">This reviewed equivalency comes from the degree-audit rule recorded for this requirement.</p></div>` : ""}
+        ${alternativeDetails ? `<div class="detail-section"><h3>Also accepted for this requirement</h3><div class="detail-chips">${alternativeDetails}</div><p class="src-note">This equivalency comes from the degree-audit rule recorded for this requirement.</p></div>` : ""}
         ${prerequisiteDetailsHtml(prerequisiteEligibility, course)}
         ${course.description ? `<div class="detail-section"><h3>About this course</h3><p>${escapeHtml(cleanText(course.description))}</p></div>` : ""}
         ${course.catalogPrereqs || course.subjectNotes || requirementNotes || course.restrictions ? `<details class="detail-advanced"><summary>Official catalog details</summary><div class="detail-advanced-body">

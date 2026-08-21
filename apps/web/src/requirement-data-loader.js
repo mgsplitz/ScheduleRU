@@ -19,7 +19,7 @@
         (school) => school && typeof school.slug === "string" && school.slug,
       );
       if (!schools.length) {
-        throw new Error("No reviewed Rutgers school profiles are available yet.");
+        throw new Error("Rutgers school profiles could not be loaded.");
       }
       return schools;
     }
@@ -71,7 +71,7 @@
       const data = await request(`/api/core-curricula?school=${school}`);
       const curricula = array(data?.curricula);
       const curriculum = curricula[0];
-      if (!curriculum?.id) throw new Error(`No reviewed ${label} is available yet.`);
+      if (!curriculum?.id) throw new Error(`${label} could not be loaded.`);
       const detail = await request(`/api/programs/${encodeURIComponent(curriculum.id)}/requirements`);
       return {
         curricula,

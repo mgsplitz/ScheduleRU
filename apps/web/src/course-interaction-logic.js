@@ -99,13 +99,13 @@
     if (prerequisiteBlocked) {
       warnings.push({
         kind: "prerequisite",
-        reason: String(prerequisiteReason || "A reviewed prerequisite must be completed first."),
+        reason: String(prerequisiteReason || "A prerequisite must be completed first."),
       });
     }
     if (standingBlocked) {
       warnings.push({
         kind: "standing",
-        reason: String(standingReason || "A reviewed standing rule is not met in this semester."),
+        reason: String(standingReason || "The standing requirement is not met in this semester."),
       });
     }
     return warnings;

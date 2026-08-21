@@ -21,7 +21,7 @@ const createLoader = (request) => {
   return context.globalThis.ScheduleRURequirementDataLoader.create({ request });
 };
 
-test("school loading rejects an empty reviewed catalog and filters malformed profiles", async () => {
+test("school loading rejects an empty catalog and filters malformed profiles", async () => {
   const loader = createLoader(async () => ({
     schools: [null, {}, { slug: "" }, { slug: "rbsnb", name: "RBS" }],
   }));
@@ -30,7 +30,7 @@ test("school loading rejects an empty reviewed catalog and filters malformed pro
   const emptyLoader = createLoader(async () => ({ schools: [{ name: "Missing slug" }] }));
   await assert.rejects(
     emptyLoader.loadSchools(),
-    /No reviewed Rutgers school profiles are available yet/,
+    /Rutgers school profiles could not be loaded/,
   );
 });
 
@@ -115,7 +115,7 @@ test("empty and single-program reference loads avoid unnecessary requirement req
   ]);
 });
 
-test("Core loading resolves the first reviewed curriculum and its requirement detail", async () => {
+test("Core loading resolves the first published curriculum and its requirement detail", async () => {
   const requests = [];
   const loader = createLoader(async (path) => {
     requests.push(path);
@@ -140,6 +140,6 @@ test("Core loading resolves the first reviewed curriculum and its requirement de
   const missing = createLoader(async () => ({ curricula: [] }));
   await assert.rejects(
     missing.loadCoreCurriculum({ homeSchoolSlug: "sasnb", label: "Core Curriculum" }),
-    /No reviewed Core Curriculum is available yet/,
+    /Core Curriculum could not be loaded/,
   );
 });

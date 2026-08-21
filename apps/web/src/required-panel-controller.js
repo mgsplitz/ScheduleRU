@@ -113,7 +113,7 @@
         ? `<section class="required-next"><button type="button" data-required-next-tab="${escapeHtml(nextTab.id)}"><strong>Next up</strong><span>Required ${escapeHtml(nextTab.label)} courses</span><span aria-hidden="true">→</span></button></section>`
         : actions.length
           ? `<section class="required-next"><strong>Next up</strong><ol>${actions.map((action) => `<li>${escapeHtml(action.label)}</li>`).join("")}</ol></section>`
-        : `<section class="required-next complete"><strong>You're caught up here</strong><span>No unfinished reviewed requirement is visible in this tab.</span></section>`;
+        : `<section class="required-next complete"><strong>You're caught up here</strong><span>No unfinished requirement is visible in this tab.</span></section>`;
       return `<div class="required-tools"><button class="issues-btn" id="issuesBtn">Issues · ${count}</button></div><div class="subtabs">${subtabs}</div>${nextUp}${content}<div class="planning-disclaimer">ScheduleRU is a planning aid, not an official degree audit.</div>`;
     }
 
