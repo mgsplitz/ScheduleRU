@@ -36,3 +36,18 @@ test("program API gives reviewed facts precedence over raw catalog text", () => 
   assert.deepEqual(rules.creditExclusionFamilies, ["rutgers-nb-differential-equations-credit"]);
   assert.equal(rules.ruleCoverage, "reviewed");
 });
+
+test("program API uses an official prerequisite note when archived catalog metadata is empty", () => {
+  const rules = compilePublicCourseRules({
+    course_code: "33:136:487",
+    catalog_title: "LARGE-SCALE BUSINESS DATA ANALYSIS",
+    catalog_prereqs: "",
+    note: "pre-reqs: 33:136:370 or 33:010:458",
+    eligibility: null,
+  });
+
+  assert.deepEqual(rules.prerequisitePaths, [
+    ["33:136:370"],
+    ["33:010:458"],
+  ]);
+});

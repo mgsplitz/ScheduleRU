@@ -122,6 +122,23 @@ function parsedCatalogPaths(raw: string): string[][] {
   }
 }
 
+function parsedRequirementNotePaths(notes: string[]): string[][] {
+  const prerequisiteNotes = notes
+    .map(cleanText)
+    .filter((note) => /\b(?:pre[- ]?reqs?|prerequisites?)\b/i.test(note))
+    .map(parsedCatalogPaths)
+    .filter((paths) => paths.length);
+  if (!prerequisiteNotes.length) return [];
+  try {
+    return deduplicatePaths(prerequisiteNotes.reduce(
+      (paths, notePaths) => combinePaths(paths, notePaths),
+      [[]] as string[][],
+    ));
+  } catch {
+    return [];
+  }
+}
+
 function campusForCourse(code: string): "new_brunswick" | "newark" | "camden" | "" {
   if (!COURSE_CODE.test(code)) return "";
   const school = code.slice(0, 2);
@@ -195,6 +212,10 @@ export function compileCourseRules(input: CompileCourseRulesInput = {}): Compile
   const reviewedPrerequisites = pathsFromReviewedConditions(conditions, "prerequisite_course");
   const reviewedCorequisites = pathsFromReviewedConditions(conditions, "corequisite_course");
   const catalogPaths = campusRelevantPaths(String(input.code || ""), parsedCatalogPaths(input.catalogPrereqs || ""));
+  const requirementNotePaths = campusRelevantPaths(
+    String(input.code || ""),
+    parsedRequirementNotePaths(input.requirementNotes || []),
+  );
   const restrictions = [input.catalogRestrictions, ...(input.requirementNotes || [])].map(cleanText).join(" ");
   const minimumPlanYear = numericCondition(conditions, "minimum_plan_year", "minimum_year")
     || minimumYearFromText(restrictions);
@@ -204,7 +225,7 @@ export function compileCourseRules(input: CompileCourseRulesInput = {}): Compile
     && conditions.length === 0;
   const prerequisitePaths = reviewedPrerequisites.length
     ? reviewedPrerequisites
-    : verifiedNoConditions ? [] : catalogPaths;
+    : verifiedNoConditions ? [] : catalogPaths.length ? catalogPaths : requirementNotePaths;
   const creditExclusionFamilies = unique((eligibility?.credit_exclusions || [])
     .map((policy) => cleanText(policy.policy_key))
     .filter(Boolean))
