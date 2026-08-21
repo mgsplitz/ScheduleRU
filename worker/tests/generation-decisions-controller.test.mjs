@@ -334,3 +334,18 @@ test("recommendation review is concise and exposes replacement before approval",
   assert.match(html, /data-replace-requirement="cs"/);
   assert.doesNotMatch(html, /multi_requirement_coverage/);
 });
+
+test("recommendation summaries normalize source-label punctuation", () => {
+  const html = modules().view.renderRecommendations({
+    result: {
+      selectedCourses: [{
+        code: "01:640:252", title: "Elementary Differential Equations",
+        coverageRequirementIds: ["math"], prerequisiteOnly: false,
+      }],
+    },
+    requirements: [{ id: "math", label: "Four mathematics electives." }],
+  });
+
+  assert.match(html, /Fulfills Four mathematics electives\./);
+  assert.doesNotMatch(html, /electives\.\./);
+});

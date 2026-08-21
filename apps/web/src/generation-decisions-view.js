@@ -69,7 +69,8 @@
     const requirementById = new Map((requirements || []).map((item) => [item.id, item]));
     const explanationByCourse = new Map((result.explanations || []).map((item) => [item.courseCode, item]));
     const cards = (result.selectedCourses || []).map((course) => {
-      const covered = (course.coverageRequirementIds || []).map((id) => requirementById.get(id)?.label || id);
+      const covered = (course.coverageRequirementIds || []).map((id) =>
+        String(requirementById.get(id)?.label || id).replace(/[.\s]+$/, ""));
       const explanation = explanationByCourse.get(course.code);
       let summary = course.prerequisiteOnly
         ? "Needed to unlock a recommended course."
