@@ -218,11 +218,18 @@
           const idSet = new Set(ids);
           const componentCandidates = allCandidates.filter((candidate) =>
             candidate.coverageRequirementIds.some((id) => idSet.has(id)));
-          const prerequisiteCodes = new Set(componentCandidates.flatMap((candidate) => candidate.prerequisiteClosure || []));
           const includedCodes = new Set(componentCandidates.flatMap((candidate) => candidate.equivalentCourseCodes || [candidate.code]));
-          const supportingCandidates = allCandidates.filter((candidate) =>
-            !includedCodes.has(candidate.code)
-            && (candidate.equivalentCourseCodes || [candidate.code]).some((code) => prerequisiteCodes.has(code)));
+          const supportingCandidates = [];
+          const prerequisiteQueue = componentCandidates
+            .flatMap((candidate) => candidate.prerequisiteClosure || []);
+          while (prerequisiteQueue.length) {
+            const prerequisiteCode = prerequisiteQueue.shift();
+            const supporting = candidateByAlias.get(prerequisiteCode);
+            if (!supporting || includedCodes.has(supporting.code)) continue;
+            supportingCandidates.push(supporting);
+            (supporting.equivalentCourseCodes || [supporting.code]).forEach((code) => includedCodes.add(code));
+            prerequisiteQueue.push(...(supporting.prerequisiteClosure || []));
+          }
           const candidateCodes = new Set([...componentCandidates, ...supportingCandidates].map((candidate) => candidate.code));
           return optimizeCourseSet({
             requirements: requirements.filter((item) => idSet.has(item.id)),
