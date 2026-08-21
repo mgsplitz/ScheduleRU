@@ -12,12 +12,12 @@ function model() {
   return context.globalThis.ScheduleRUOnboardingFlowModel;
 }
 
-test("onboarding follows programs, coursework, AP, then review", () => {
-  assert.deepEqual(Array.from(model().steps()), ["welcome", "programs", "coursework", "ap", "review"]);
+test("onboarding captures academic position before coursework, AP, and review", () => {
+  assert.deepEqual(Array.from(model().steps()), ["welcome", "programs", "position", "coursework", "ap", "review"]);
   assert.equal(model().stepAt(-1), "welcome");
   assert.equal(model().stepAt(99), "review");
   assert.equal(model().move(1, "back"), 0);
-  assert.equal(model().move(3, "next"), 4);
+  assert.equal(model().move(4, "next"), 5);
 });
 
 test("program summaries identify primary, secondary, and minor roles", () => {

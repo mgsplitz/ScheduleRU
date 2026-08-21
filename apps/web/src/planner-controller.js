@@ -198,7 +198,7 @@ function plannerEligibilityLabel(result){
   if(missing?.type==="minimum_plan_year") return "Available starting in plan year "+missing.minimum_year;
   if(missing?.type==="corequisite_course") return "A reviewed co-requisite must be scheduled in the same term";
   if(missing?.type==="prerequisite_course") return "A reviewed prerequisite must be completed first";
-  return "Eligibility needs review; verify with Rutgers before registration";
+  return "Check this course's Rutgers enrollment conditions before registration";
 }
 function reviewedEligibilityForCourse(course){
   return academicProgressModel.reviewedEligibility(course);
@@ -579,15 +579,18 @@ function wishlistRecords(){
    SCHEDULE
    ============================================================ */
 function academicYearLabel(year){const value=Number(year),suffix=value%100>=11&&value%100<=13?"th":value%10===1?"st":value%10===2?"nd":value%10===3?"rd":"th";return Number.isInteger(value)&&value>0?`${value}${suffix} Year`:"Selected Year";}
-function plannerDisplayMaxYear(){const year=Math.min(4,Math.max(1,Number(ST.academicPosition?.year)||1)),startingSemester=ST.academicPosition?.startingSemester==="spring"?"spring":"fall";return year+(startingSemester==="spring"?4:3);}
-document.getElementById("yPrev").addEventListener("click", ()=>{if(ST.year>1){ST.year--;renderAll();}});
+function plannerDisplayMinYear(){return Math.min(4,Math.max(1,Number(ST.academicPosition?.year)||1));}
+function plannerDisplayMaxYear(){return 4;}
+document.getElementById("yPrev").addEventListener("click", ()=>{if(ST.year>plannerDisplayMinYear()){ST.year--;renderAll();}});
 document.getElementById("yNext").addEventListener("click", ()=>{if(ST.year<plannerDisplayMaxYear()){ST.year++;renderAll();}});
 
 function renderSchedule(){
+  const displayMinYear=plannerDisplayMinYear();
   const displayMaxYear=plannerDisplayMaxYear();
+  if(ST.year<displayMinYear)ST.year=displayMinYear;
   if(ST.year>displayMaxYear)ST.year=displayMaxYear;
   document.getElementById("yLabel").textContent = academicYearLabel(ST.year);
-  document.getElementById("yPrev").disabled = ST.year===1;
+  document.getElementById("yPrev").disabled = ST.year===displayMinYear;
   document.getElementById("yNext").disabled = ST.year===displayMaxYear;
   const currentTerm=currentPlannerTerm();
   ["fall","spring"].forEach(sem => {
@@ -1337,7 +1340,7 @@ function doubleCountBannerHtml(){
       return `<div style="margin-top:6px;"><strong>${label}</strong><ul style="margin:3px 0 4px;padding-left:18px;">${overlapProgramPairsHtml(item.codes,programsById)}</ul><strong>What this means:</strong> ${escapeHtml(doubleCountMeaning(item))}</div>`;
     }).join("");
     if(unscoped.length){
-      content+=`<div style="margin-top:6px;"><strong>Policy confirmation needed</strong><ul style="margin:3px 0 4px;padding-left:18px;">${overlapProgramPairsHtml(unscoped,programsById)}</ul>ScheduleRU does not yet have a reviewed rule for this program combination, so confirm with advising before relying on the same course twice.</div>`;
+      content+=`<div style="margin-top:6px;"><strong>Confirm this overlap with advising</strong><ul style="margin:3px 0 4px;padding-left:18px;">${overlapProgramPairsHtml(unscoped,programsById)}</ul>Rutgers does not publish a rule ScheduleRU can apply to this program combination, so confirm before relying on the same course twice.</div>`;
     }
   }
   const title=violates?"Plan adjustment needed":"Course-overlap check";

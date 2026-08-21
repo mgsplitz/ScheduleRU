@@ -121,7 +121,12 @@
     };
   }
 
-  function buildCoverageGraph({ decisions = [], equivalencies = [], policies = {} } = {}) {
+  function buildCoverageGraph({
+    decisions = [],
+    equivalencies = [],
+    policies = {},
+    completedCourses = [],
+  } = {}) {
     const requirements = decisions.map(normalizedRequirement)
       .sort((left, right) => left.id.localeCompare(right.id));
     const requirementById = new Map(requirements.map((item) => [item.id, item]));
@@ -277,7 +282,14 @@
       left.candidateCode.localeCompare(right.candidateCode)
       || left.type.localeCompare(right.type)
       || JSON.stringify(left).localeCompare(JSON.stringify(right)));
-    return { requirements, candidates, conflicts };
+    return {
+      requirements,
+      candidates,
+      conflicts,
+      completedCourseCodes: uniqueSorted(completedCourses.map((course) => text(course?.code))),
+      completedCreditExclusionFamilies: uniqueSorted(completedCourses.flatMap((course) =>
+        Array.isArray(course?.creditExclusionFamilies) ? course.creditExclusionFamilies.map(text) : [])),
+    };
   }
 
   root.ScheduleRUCandidateCoverageModel = { buildCoverageGraph };

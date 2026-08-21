@@ -6,7 +6,7 @@
 
   function prerequisiteNote(candidate) {
     const sizes = (candidate.prerequisitePaths || []).map((path) => path.length).filter((size) => size > 0);
-    if (!sizes.length) return "No known course prerequisites";
+    if (!sizes.length) return "No prerequisites listed in the official catalog";
     const count = Math.min(...sizes);
     return `Builds on ${count} course${count === 1 ? "" : "s"}`;
   }
@@ -28,6 +28,16 @@
   }
 
   function renderDecision({ decision = {}, preference = {}, globalPreference = {}, index = 0, total = 1, expanded = false, search = "" } = {}) {
+    if (decision.coreStrategy) return `
+      <section class="generation-decision generation-core-strategy" data-decision-group="${escapeHtml(decision.decisionId || decision.requirementGroupId)}">
+        <div class="generation-progress">Choice ${index + 1} of ${total}</div>
+        <h2>${escapeHtml(decision.label)}</h2>
+        <p>We can maximize overlap with your majors and minors so you have more room for courses you care about.</p>
+        <div class="generation-core-options" role="radiogroup" aria-label="Core course planning preference">
+          <button type="button" data-core-mode="recommend_for_me" class="choice-btn secondary ${preference.mode === "recommend_for_me" ? "selected" : ""}" role="radio" aria-checked="${preference.mode === "recommend_for_me"}"><strong>Optimize them for me</strong><span>Prioritize courses that complete the most requirements.</span></button>
+          <button type="button" data-core-mode="ranked" class="choice-btn secondary ${preference.mode === "ranked" ? "selected" : ""}" role="radio" aria-checked="${preference.mode === "ranked"}"><strong>Let me choose</strong><span>Show the remaining Core areas after program choices.</span></button>
+        </div>
+      </section>`;
     const selected = (code, bucket) => (preference[bucket] || []).includes(code);
     const locallyRated = new Set(["interested", "maybe", "avoid"].flatMap((bucket) => preference[bucket] || []));
     const globallyRated = new Set(["interested", "maybe", "avoid"].flatMap((bucket) => globalPreference[bucket] || []));
@@ -48,9 +58,10 @@
         <h2>${escapeHtml(decision.label || "Choose courses")}</h2>
         <p>${decision.guidanceOnly ? "These courses fill the same role. Mark the one you prefer, or skip this path." : Number(decision.slotCount) > 1 ? "Mark as many as you can. More preferences help us build a better path." : "Mark what sounds useful. We’ll balance your interests with prerequisites and degree progress."}</p>
         <p class="generation-guidance">Avoid is a preference; a course may still be needed to unlock the path you choose.</p>
-        ${available.length > 8 ? `<div class="generation-candidate-tools"><strong>Best matches</strong><input type="search" data-decision-search value="${escapeHtml(search)}" placeholder="Search ${available.length} courses" aria-label="Search course choices"><button type="button" class="quiet-action" data-decision-expand>${expanded ? "Show best matches" : `Show all ${available.length}`}</button></div>` : ""}
+        ${available.length > 8 ? `<div class="generation-candidate-tools"><strong>Best matches</strong><input type="search" data-decision-search value="${escapeHtml(search)}" placeholder="Search ${available.length} courses" aria-label="Search course choices"></div>` : ""}
         <div class="generation-candidates">${candidates || `<p class="generation-empty">${query ? "No courses match that search." : "Your earlier ratings already cover these choices."}</p>`}</div>
-        <div class="generation-delegate"><button type="button" data-decision-recommend class="choice-btn secondary">Choose for me</button></div>
+        ${available.length > 8 ? `<div class="generation-expand"><button type="button" class="quiet-action" data-decision-expand>${expanded ? "Show best matches" : `Show all ${available.length}`}</button></div>` : ""}
+        <div class="generation-delegate"><button type="button" data-decision-recommend class="choice-btn secondary ${preference.mode === "recommend_for_me" ? "selected" : ""}" aria-pressed="${preference.mode === "recommend_for_me"}">Choose for me</button></div>
       </section>`;
   }
 
@@ -76,11 +87,11 @@
   }
 
   function captureListScroll(document) {
-    return Number(document?.querySelector?.(".generation-candidates")?.scrollTop) || 0;
+    return Number(document?.querySelector?.(".app-modal-card")?.scrollTop) || 0;
   }
 
   function restoreListScroll(document, scrollTop) {
-    const list = document?.querySelector?.(".generation-candidates");
+    const list = document?.querySelector?.(".app-modal-card");
     if (list) list.scrollTop = Math.max(0, Number(scrollTop) || 0);
   }
 

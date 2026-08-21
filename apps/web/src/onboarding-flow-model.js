@@ -1,6 +1,6 @@
 /* Pure ordering and labeling rules for the local guest onboarding flow. */
 (function exposeOnboardingFlowModel(root) {
-  const STEP_IDS = Object.freeze(["welcome", "programs", "coursework", "ap", "review"]);
+  const STEP_IDS = Object.freeze(["welcome", "programs", "position", "coursework", "ap", "review"]);
   const COURSEWORK_TERMS = Object.freeze(["Fall", "Spring", "Summer", "Winter"]);
 
   function steps() { return [...STEP_IDS]; }

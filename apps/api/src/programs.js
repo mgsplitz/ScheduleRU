@@ -79,8 +79,20 @@ import {
 import {
   createProgramScrapeRepository,
 } from "./programs/storage/program-scrape-repository.js";
+import { compileCourseRules } from "../../../packages/catalog/src/course-rule-compiler.ts";
 
 export { parseBizTable, groupAppliesToSelection, allocationForConditions };
+
+export function compilePublicCourseRules(row = {}) {
+  return compileCourseRules({
+    code: row.course_code || row.equivalent_course_code,
+    catalogRecordAvailable: !!(row.catalog_title || row.catalog_record_available),
+    catalogPrereqs: row.catalog_prereqs,
+    catalogRestrictions: row.section_restrictions || row.catalog_restrictions,
+    requirementNotes: [row.note].filter(Boolean),
+    reviewedEligibility: row.eligibility,
+  });
+}
 
 function normalizedCatalogText(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -252,7 +264,7 @@ function reviewedCourseCodes(values) {
     .filter((code) => COURSE_ELIGIBILITY_CODE.test(code)))];
 }
 
-async function getReviewedCourseEligibility(env, rawCodes) {
+export async function getReviewedCourseEligibility(env, rawCodes) {
   const codes = reviewedCourseCodes(rawCodes);
   const output = {};
   for (let offset = 0; offset < codes.length; offset += COURSE_ELIGIBILITY_BATCH_SIZE) {
@@ -307,11 +319,28 @@ async function getReviewedCourseEligibility(env, rawCodes) {
   return output;
 }
 
-async function programHasCompleteRequirementEvidence(env, program) {
-  if (Number(program?.requirement_evidence_required) !== 1) return true;
-  const [groupsResult, coursesResult, evidenceResult] = await env.DB.batch([
+export function programRequirementStructureComplete({ groups = [], courses = [], selectors = [] } = {}) {
+  if (!groups.length) return false;
+  const parentIds = new Set(groups.map((group) => group.parent_group_id).filter(Boolean));
+  const leafIds = groups.map((group) => group.id).filter((id) => id && !parentIds.has(id));
+  if (!leafIds.length) return false;
+  const candidateGroupIds = new Set([
+    ...courses.map((course) => course.group_id),
+    ...selectors.map((selector) => selector.group_id),
+  ].filter(Boolean));
+  return leafIds.every((id) => candidateGroupIds.has(id));
+}
+
+export async function programHasCompleteRequirementEvidence(env, program) {
+  const [groupsResult, selectorsResult, coursesResult, evidenceResult] = await env.DB.batch([
     env.DB.prepare(
-      "SELECT id FROM requirement_groups WHERE program_id = ?"
+      "SELECT id, parent_group_id FROM requirement_groups WHERE program_id = ?"
+    ).bind(program.id),
+    env.DB.prepare(
+      `SELECT selector.group_id
+       FROM requirement_course_selectors selector
+       INNER JOIN requirement_groups group_row ON group_row.id = selector.group_id
+       WHERE group_row.program_id = ? AND selector.review_status = 'reviewed'`
     ).bind(program.id),
     env.DB.prepare(
       `SELECT rc.group_id, rc.course_code
@@ -326,6 +355,13 @@ async function programHasCompleteRequirementEvidence(env, program) {
        WHERE program_id = ?`
     ).bind(program.id),
   ]);
+  const structureComplete = programRequirementStructureComplete({
+    groups: groupsResult.results || [],
+    courses: coursesResult.results || [],
+    selectors: selectorsResult.results || [],
+  });
+  if (!structureComplete) return false;
+  if (Number(program?.requirement_evidence_required) !== 1) return true;
   return requirementEvidenceComplete({
     required: true,
     groups: groupsResult.results || [],
@@ -416,7 +452,8 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
   // reviewed data and avoids a frontend exception for any particular course.
   const { results: alternatives } = await env.DB.prepare(
     `SELECT e.*, cr.title as catalog_title, cr.credits as catalog_credits,
-            cr.catalog_prereqs as catalog_prereqs
+            cr.catalog_prereqs as catalog_prereqs,
+            cr.catalog_restrictions as catalog_restrictions
      FROM requirement_course_equivalencies e
      LEFT JOIN course_reference cr ON cr.course_code = e.equivalent_course_code
      WHERE e.program_id IN (${placeholders}) AND e.review_status = 'reviewed'`
@@ -428,6 +465,7 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
   const alternativesByRequirement = {};
   for (const alternative of alternatives) {
     alternative.eligibility = eligibilityByCode[alternative.equivalent_course_code] || null;
+    alternative.compiled_rules = compilePublicCourseRules(alternative);
     const key = `${alternative.program_id}::${alternative.requirement_course_code}`;
     (alternativesByRequirement[key] ||= []).push(alternative);
   }
@@ -436,6 +474,7 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
   for (const c of courses) {
     c.alternatives = alternativesByRequirement[`${c.owner_program_id}::${c.course_code}`] || [];
     c.eligibility = eligibilityByCode[c.course_code] || null;
+    c.compiled_rules = compilePublicCourseRules(c);
     (byGroup[c.group_id] ||= []).push(c);
   }
   const allocationsByGroup = Object.fromEntries(visibleGroups.map((group) => [

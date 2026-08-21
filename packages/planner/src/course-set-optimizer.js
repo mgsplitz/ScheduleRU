@@ -102,13 +102,20 @@
 
   function optimizeCourseSet(graph = {}, preferences = {}, options = {}) {
     const requirements = [...(graph.requirements || [])].sort((left, right) => left.id.localeCompare(right.id));
+    const completedCourseCodes = new Set((graph.completedCourseCodes || []).map(text).filter(Boolean));
+    const completedCreditExclusionFamilies = new Set(
+      (graph.completedCreditExclusionFamilies || []).map(text).filter(Boolean),
+    );
     const allCandidates = [...(graph.candidates || [])].map((candidate) => ({
       ...candidate,
       equivalentCourseCodes: uniqueSorted(candidate.equivalentCourseCodes || [candidate.code]),
       coverageRequirementIds: uniqueSorted(candidate.coverageRequirementIds || []),
       prerequisiteClosure: uniqueSorted(candidate.prerequisiteClosure || []),
       creditExclusionFamilies: uniqueSorted(candidate.creditExclusionFamilies || []),
-    })).sort((left, right) => left.code.localeCompare(right.code));
+    })).filter((candidate) =>
+      !candidate.equivalentCourseCodes.some((code) => completedCourseCodes.has(code))
+      && !candidate.creditExclusionFamilies.some((family) => completedCreditExclusionFamilies.has(family)))
+      .sort((left, right) => left.code.localeCompare(right.code));
     const requirementById = new Map(requirements.map((item) => [item.id, item]));
     const unlockCounts = new Map();
     allCandidates.forEach((candidate) => (candidate.prerequisiteClosure || []).forEach((code) => {
@@ -214,6 +221,8 @@
             requirements: requirements.filter((item) => idSet.has(item.id)),
             candidates: [...componentCandidates, ...supportingCandidates],
             conflicts: (graph.conflicts || []).filter((item) => candidateCodes.has(item.candidateCode)),
+            completedCourseCodes: [...completedCourseCodes],
+            completedCreditExclusionFamilies: [...completedCreditExclusionFamilies],
           }, preferences, { ...options, component: true });
         });
         if (parts.some((part) => part.status === "indeterminate")) return {

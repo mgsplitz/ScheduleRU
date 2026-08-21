@@ -159,7 +159,7 @@ test("plan previews name blocking courses without flooding the modal with warnin
 });
 
 test("planner horizon, stored completion state, and modal transitions stay safe", () => {
-  assert.match(html, /function plannerTermsFromAcademicPosition\([\s\S]*?terms\.length<8/);
+  assert.match(html, /function plannerTermsFromAcademicPosition\([\s\S]*?year<=4/);
   assert.match(html, /schedule:ST\.schedule\|\|\{\}/);
   assert.match(html, /concrete=sourceType==="core"\?selected/);
   assert.match(html, /function storedCompletedAcademicCodes\([\s\S]*?ST\.completed[\s\S]*?ST\.apOn/);
@@ -174,32 +174,25 @@ test("planner horizon, stored completion state, and modal transitions stay safe"
   assert.match(html, /refreshApFulfillment\(\);[\s\S]*?rerenderOnboardingApStep\(\);[\s\S]*?renderSchedule\(\)/);
 });
 
-test("planner horizon always contains eight consecutive Fall/Spring terms from Year 2 Fall", () => {
+test("planner horizon ends at fourth-year spring from Year 2 Fall", () => {
   const terms = plannerTermsFor({ year: 2, startingSemester: "fall" });
-  assert.equal(terms.length, 8);
+  assert.equal(terms.length, 6);
   assert.deepEqual(JSON.parse(JSON.stringify(terms)), [
     { year: 2, sem: "fall" }, { year: 2, sem: "spring" },
     { year: 3, sem: "fall" }, { year: 3, sem: "spring" },
     { year: 4, sem: "fall" }, { year: 4, sem: "spring" },
-    { year: 5, sem: "fall" }, { year: 5, sem: "spring" },
   ]);
 });
 
-test("planner horizon always contains eight consecutive Fall/Spring terms from Year 4 Spring", () => {
+test("planner horizon contains only the remaining fourth-year spring term", () => {
   const terms = plannerTermsFor({ year: 4, startingSemester: "spring" });
-  assert.equal(terms.length, 8);
-  assert.deepEqual(JSON.parse(JSON.stringify(terms)), [
-    { year: 4, sem: "spring" }, { year: 5, sem: "fall" },
-    { year: 5, sem: "spring" }, { year: 6, sem: "fall" },
-    { year: 6, sem: "spring" }, { year: 7, sem: "fall" },
-    { year: 7, sem: "spring" }, { year: 8, sem: "fall" },
-  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(terms)), [{ year: 4, sem: "spring" }]);
   assert.match(html, /function academicYearLabel\(year\)/);
   assert.doesNotMatch(html, /YL\[term\.year\]/);
   const context = { ST: { academicPosition: { year: 4, startingSemester: "spring" } }, globalThis: {} };
-  vm.runInNewContext(`${functionSource("academicYearLabel")}; ${functionSource("plannerDisplayMaxYear")}; globalThis.labels = [4, 5, 6, 7, 8].map(academicYearLabel); globalThis.maximum = plannerDisplayMaxYear();`, context);
-  assert.deepEqual(JSON.parse(JSON.stringify(context.globalThis.labels)), ["4th Year", "5th Year", "6th Year", "7th Year", "8th Year"]);
-  assert.equal(context.globalThis.maximum, 8);
+  vm.runInNewContext(`${functionSource("academicYearLabel")}; ${functionSource("plannerDisplayMaxYear")}; globalThis.labels = [1, 2, 3, 4].map(academicYearLabel); globalThis.maximum = plannerDisplayMaxYear();`, context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.globalThis.labels)), ["1st Year", "2nd Year", "3rd Year", "4th Year"]);
+  assert.equal(context.globalThis.maximum, 4);
 });
 
 test("semester titles expose schedule-builder buttons", () => {
@@ -249,19 +242,21 @@ test("small choose-one requirements and full sequence choices have explicit plan
   assert.match(html, /function focusPlanPlaceholder\(/);
 });
 
-test("guest onboarding is the approved compact five-step workflow", () => {
-  assert.match(html, /Array\.from\(\{length:5\}/);
-  assert.match(html, /Create account · Coming soon/);
+test("guest onboarding captures the planning horizon in a compact six-step workflow", () => {
+  assert.match(html, /ScheduleRUOnboardingFlowModel\.steps\(\)/);
+  assert.match(html, /Create account \(not working\)/);
   assert.match(html, /Continue locally/);
-  assert.doesNotMatch(html, /Set your academic position/);
+  assert.match(html, /if\(activeStep==="position"\)/);
+  assert.match(html, /id="onboardingAcademicYear"/);
+  assert.match(html, /id="onboardingStartingSemester"/);
   assert.match(html, /ScheduleRUOnboardingFlowModel\.stepAt\(step\)/);
   assert.match(html, /if\(activeStep==="programs"\)/);
   assert.match(html, /if\(activeStep==="coursework"\)/);
   assert.match(html, /if\(activeStep==="ap"\)/);
   assert.match(html, /data-onboarding-ap=/);
   assert.match(html, /Scores of 4 or 5/);
-  assert.match(html, /AP score report upload · Coming soon/);
-  assert.match(html, /Transcript upload · Coming soon/);
+  assert.match(html, /Upload AP score report \(not working\)/);
+  assert.match(html, /Upload transcript \(not working\)/);
   assert.match(html, /id="recordCourseSearch"/);
   assert.match(html, /id="recordCourseTerm"/);
   assert.doesNotMatch(html, /id="recordTitle"/);

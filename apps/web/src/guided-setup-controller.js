@@ -20,7 +20,7 @@ const requirementPickerDialogController=ScheduleRURequirementPickerController.cr
   courseRecordFromId,plannerUI:ScheduleRUPlannerUI,escapeHtml:html,courseCreditsLabel,
   userMessageModel:ScheduleRUUserMessageModel,
   constraintViolation:parentSelectionConstraintViolation,
-  showSelectionReview:message=>modalController.show({title:"Selection needs review",body:`<p>${html(message)}</p>`,actions:[{label:"Close",secondary:true}]}),
+  showSelectionReview:message=>modalController.show({title:"Check this selection",body:`<p>${html(message)}</p>`,actions:[{label:"Close",secondary:true}]}),
   commitSelection:(groupId,selectedIds,record)=>{
     ST.groupSelections[groupId]=selectedIds;
     if(record?.code)addToWishlist(record.code,record);else savePlannerState();
@@ -139,11 +139,10 @@ function plannerIssueText(issue){
 }
 function issueList(){
   const issues=[]; if(ST.requirementsError){const shown=ScheduleRUUserMessageModel.presentIssue(ST.requirementsError);issues.push({group:"Requirements",severity:"error",title:shown.title,text:shown.message,action:shown.primaryAction});}
-  selectedProgramRows().filter(row=>row.requirements_available===false||row.coverage_status==="catalog_listed").forEach(row=>issues.push({group:"Requirements",severity:"warning",title:"Requirements are still under review",text:`${row.name} is available to select, but its full requirement list is not ready yet.`,action:"Review official requirements"}));
   (ST.programEligibilityRules||[]).filter(rule=>ST.selectedPrograms.includes(rule.program_id)).forEach(rule=>issues.push({group:"Advising and program policy",severity:"advising",title:"Confirm with advising",text:rule.advisory_message||rule.note||"Confirm this reviewed program policy with advising.",action:"Ask advising"}));
-  const overlap=ST.doubleCount;if(overlap){(overlap.scopeResults||[]).filter(item=>item.violates||item.codes?.length).forEach(item=>issues.push({group:"Double-count policy",severity:item.violates?"warning":"info",title:item.violates?"Some courses cannot count twice":"Shared courses reviewed",text:item.violates?doubleCountMeaning(item):`${item.codes.length} potential shared course overlap${item.codes.length===1?"":"s"} reviewed.`,action:item.violates?"Review shared courses":"Close"}));(overlap.unscoped||[]).forEach(item=>issues.push({group:"Double-count policy",severity:"warning",title:"Double-counting needs review",text:`Confirm whether ${item.code||"this overlap"} may count toward both programs.`,action:"Ask advising"}));}
+  const overlap=ST.doubleCount;if(overlap){(overlap.scopeResults||[]).filter(item=>item.violates||item.codes?.length).forEach(item=>issues.push({group:"Double-count policy",severity:item.violates?"warning":"info",title:item.violates?"Some courses cannot count twice":"Shared courses found",text:item.violates?doubleCountMeaning(item):`${item.codes.length} potential shared course overlap${item.codes.length===1?"":"s"} found.`,action:item.violates?"Review shared courses":"Close"}));(overlap.unscoped||[]).forEach(item=>issues.push({group:"Double-count policy",severity:"warning",title:"Confirm this shared course",text:`Confirm whether ${item.code||"this overlap"} may count toward both programs.`,action:"Ask advising"}));}
   const previewIssues=ST.generatedPlanPreview?.issues||[],eligibility=previewIssues.filter(issue=>issue.code==="eligibility_rule_unresolved"),otherPreviewIssues=previewIssues.filter(issue=>issue.code!=="eligibility_rule_unresolved");
-  if(eligibility.length){const shown=ScheduleRUUserMessageModel.presentIssue(eligibility[0]);issues.push({group:"Plan preview",severity:"warning",title:shown.title,text:`Eligibility details need review for ${eligibility.map(issue=>issue.courseCode).filter(Boolean).join(", ")}.`,action:shown.primaryAction});}
+  if(eligibility.length){const shown=ScheduleRUUserMessageModel.presentIssue(eligibility[0]);issues.push({group:"Plan preview",severity:"warning",title:shown.title,text:`Check enrollment conditions for ${eligibility.map(issue=>issue.courseCode).filter(Boolean).join(", ")}.`,action:shown.primaryAction});}
   otherPreviewIssues.forEach(issue=>{const shown=ScheduleRUUserMessageModel.presentIssue(issue);issues.push({group:"Plan preview",severity:issue.severity||"warning",title:shown.title,text:shown.message,action:shown.primaryAction});});
   return issues;
 }
@@ -209,26 +208,30 @@ let onboardingFocusRestore=null;
 function setOnboardingOpen(open,wasOpen=document.getElementById("onboarding").classList.contains("open")){const root=document.getElementById("onboarding");root.classList.toggle("open",open);root.setAttribute("aria-hidden",String(!open));[document.getElementById("app"),document.getElementById("page-courses"),document.querySelector(".pagenav")].filter(Boolean).forEach(node=>{node.inert=open;});if(open){if(!wasOpen)onboardingFocusRestore=document.activeElement;requestAnimationFrame(()=>root.querySelector("#onboardingContent button:not([disabled]), #onboardingContent input, #onboardingContent select, #onboardingContent textarea, #onboardingContent [tabindex]")?.focus());}else if(wasOpen){const restore=onboardingFocusRestore;onboardingFocusRestore=null;requestAnimationFrame(()=>{if(restore?.isConnected&&restore!==document.body)restore.focus();else document.getElementById("restartSetup")?.focus();});}}
 
 function renderOnboardingContent(){
-  const onboarding=ST.onboarding||{completed:false,step:0},root=document.getElementById("onboarding"),content=document.getElementById("onboardingContent"),step=Math.max(0,Math.min(4,Number(onboarding.step)||0)),activeStep=ScheduleRUOnboardingFlowModel.stepAt(step);
-  root.classList.toggle("open",!onboarding.completed);document.getElementById("onboardingSteps").setAttribute("aria-valuenow",String(step+1));document.getElementById("onboardingSteps").innerHTML=Array.from({length:5},(_,index)=>`<i class="onboarding-step-dot ${index<=step?"active":""}"></i>`).join("");
+  const onboarding=ST.onboarding||{completed:false,step:0},root=document.getElementById("onboarding"),content=document.getElementById("onboardingContent"),steps=ScheduleRUOnboardingFlowModel.steps(),step=Math.max(0,Math.min(steps.length-1,Number(onboarding.step)||0)),activeStep=ScheduleRUOnboardingFlowModel.stepAt(step);
+  root.classList.toggle("open",!onboarding.completed);document.getElementById("onboardingSteps").setAttribute("aria-valuemax",String(steps.length));document.getElementById("onboardingSteps").setAttribute("aria-valuenow",String(step+1));document.getElementById("onboardingSteps").innerHTML=steps.map((_,index)=>`<i class="onboarding-step-dot ${index<=step?"active":""}"></i>`).join("");
   const records=academicRecords(),layout=(title,text,body,options={})=>{content.innerHTML=`<h1 id="onboardingTitle">${title}</h1><p>${text}</p>${body}<div class="onboarding-actions"><button class="choice-btn secondary" id="onboardingBack" ${step===0?"disabled":""}>Back</button><div class="right">${options.skip?'<button class="choice-btn secondary" id="onboardingSkip">Skip</button>':""}<button class="choice-btn" id="onboardingNext">${options.next||"Continue"}</button></div></div>`;document.getElementById("onboardingBack").onclick=()=>{ST.onboarding.step=ScheduleRUOnboardingFlowModel.move(step,"back");savePlannerState();renderOnboarding();};document.getElementById("onboardingSkip")?.addEventListener("click",()=>{ST.onboarding.step=ScheduleRUOnboardingFlowModel.move(step,"next");savePlannerState();renderOnboarding();});document.getElementById("onboardingNext").onclick=()=>{if(activeStep==="review")ST.onboarding.completed=true;else ST.onboarding.step=ScheduleRUOnboardingFlowModel.move(step,"next");savePlannerState();renderOnboarding();renderAll();};};
-  if(activeStep==="welcome")return layout("Welcome to ScheduleRU","Build your plan locally in this browser. You can add an account later when sign-in is available.",`<button class="choice-btn secondary onboarding-coming-soon" type="button" disabled>Create account · Coming soon</button>`,{next:"Continue locally"});
+  if(activeStep==="welcome")return layout("Welcome to ScheduleRU","Build your plan locally in this browser. You can add an account later.",`<button class="choice-btn secondary onboarding-coming-soon" type="button" disabled>Create account (not working)</button>`,{next:"Continue locally"});
   if(activeStep==="programs"){
     const roleRows=ScheduleRUOnboardingFlowModel.programRoleRows({programs:selectedProgramRows(),primaryId:ST.primaryProgramId,secondaryId:ST.secondaryProgramId});
     return layout("Choose programs of study","Start with your home school, primary major, optional second major, and minors.",`<div class="onboarding-fields"><label>Home school<select id="onboardingHomeSchool">${(ST.availableSchools||[]).map(school=>`<option value="${html(school.slug)}" ${school.slug===ST.homeSchoolSlug?"selected":""}>${html(school.name||school.short_name||school.slug)}</option>`).join("")}</select></label></div><div class="onboarding-review">${roleRows.map(program=>`<div><strong>${html(program.name)}</strong><span>${html(program.role)}</span></div>`).join("")||"<div>No program selected yet.</div>"}</div><button class="choice-btn secondary" id="onboardingPrograms">Add program of study</button>`);
   }
+  if(activeStep==="position"){
+    const position=ST.academicPosition||{year:1,startingSemester:"fall"};
+    return layout("Where are you starting?","We’ll show only the semesters you still have through senior spring.",`<div class="onboarding-fields"><label>Academic year<select id="onboardingAcademicYear">${[1,2,3,4].map(year=>`<option value="${year}" ${Number(position.year)===year?"selected":""}>${html(academicYearLabel(year))}</option>`).join("")}</select></label><label>Next semester<select id="onboardingStartingSemester"><option value="fall" ${position.startingSemester!=="spring"?"selected":""}>Fall</option><option value="spring" ${position.startingSemester==="spring"?"selected":""}>Spring</option></select></label></div>`);
+  }
   if(activeStep==="coursework"){
     const terms=ScheduleRUOnboardingFlowModel.courseworkTerms();
-    return layout("Add completed coursework","Add verified Rutgers courses manually. Transcript parsing is not available yet.",`<button class="choice-btn secondary onboarding-coming-soon" type="button" disabled>Transcript upload · Coming soon</button><div class="onboarding-fields onboarding-course-search"><label for="recordCourseTerm">Term completed</label><select id="recordCourseTerm">${terms.map(term=>`<option value="${term}">${term}</option>`).join("")}</select><label for="recordCourseSearch">Course code or search</label><input id="recordCourseSearch" autocomplete="off" aria-controls="recordCourseSearchResults" aria-autocomplete="list" placeholder="01:198:111 or Introduction to Computer Science"/><span id="recordCourseSearchStatus" class="onboarding-search-status" aria-live="polite">Start typing to search the Rutgers catalog.</span><div id="recordCourseSearchResults" class="onboarding-course-results" role="listbox" aria-label="Verified Rutgers course matches"></div></div><button class="choice-btn secondary" id="addCourseRecord">Add course</button><div class="onboarding-records">${records.filter(record=>record.type!=="ap").map(record=>`<div class="onboarding-record"><span><small>${html(record.completedTerm||"Term not set")}</small> ${html(record.courseCode)}${record.title?` · ${html(record.title)}`:""}</span><button class="choice-btn secondary" data-remove-record="${html(record.id)}">Remove</button></div>`).join("")}</div>`,{skip:true});
+    return layout("Add completed coursework","Add verified Rutgers courses manually.",`<button class="choice-btn secondary onboarding-coming-soon" type="button" disabled>Upload transcript (not working)</button><div class="onboarding-fields onboarding-course-search"><label for="recordCourseTerm">Term completed</label><select id="recordCourseTerm">${terms.map(term=>`<option value="${term}">${term}</option>`).join("")}</select><label for="recordCourseSearch">Course code or search</label><input id="recordCourseSearch" autocomplete="off" aria-controls="recordCourseSearchResults" aria-autocomplete="list" placeholder="01:198:111 or Introduction to Computer Science"/><span id="recordCourseSearchStatus" class="onboarding-search-status" aria-live="polite">Start typing to search the Rutgers catalog.</span><div id="recordCourseSearchResults" class="onboarding-course-results" role="listbox" aria-label="Verified Rutgers course matches"></div></div><button class="choice-btn secondary" id="addCourseRecord">Add course</button><div class="onboarding-records">${records.filter(record=>record.type!=="ap").map(record=>`<div class="onboarding-record"><span><small>${html(record.completedTerm||"Term not set")}</small> ${html(record.courseCode)}${record.title?` · ${html(record.title)}`:""}</span><button class="choice-btn secondary" data-remove-record="${html(record.id)}">Remove</button></div>`).join("")}</div>`,{skip:true});
   }
   if(activeStep==="ap"){
     const choices=AP.length?AP.map(ap=>{const score=ap.minimumScore===ap.maximumScore?String(ap.minimumScore):`${ap.minimumScore}-${ap.maximumScore}`;return `<label class="onboarding-record"><span><input type="checkbox" data-onboarding-ap="${html(ap.id)}" ${ST.apOn?.[ap.id]?"checked":""}/> ${html(ap.name)} (${html(score)})</span><span>${html(ap.credits)} credits</span></label>`;}).join(""):"<div class=\"onboarding-note\">Reviewed AP choices are loading.</div>";
-    return layout("Add AP credit","Scores of 4 or 5 may count when a reviewed Rutgers equivalency applies.",`<button class="choice-btn secondary onboarding-coming-soon" type="button" disabled>AP score report upload · Coming soon</button><div class="onboarding-records onboarding-records-scroll">${choices}</div>`,{skip:true});
+    return layout("Add AP credit","Scores of 4 or 5 may count when a reviewed Rutgers equivalency applies.",`<button class="choice-btn secondary onboarding-coming-soon" type="button" disabled>Upload AP score report (not working)</button><div class="onboarding-records onboarding-records-scroll">${choices}</div>`,{skip:true});
   }
   return layout("Review your setup","Confirm the basics before opening your planner.",`<div class="onboarding-review"><div><strong>Home school</strong><span>${html(activeHomeSchoolLabel())}</span></div><div><strong>Programs</strong><span>${html(selectedProgramRows().length)} selected</span></div><div><strong>Completed courses</strong><span>${html(records.filter(record=>record.type!=="ap").length)} added</span></div><div><strong>AP exams</strong><span>${html(AP.filter(ap=>ST.apOn?.[ap.id]).length)} selected</span></div></div><ul class="onboarding-feature-list"><li>Generate a prerequisite-aware four-year draft.</li><li>Build a semester schedule from verified Rutgers sections.</li><li>Refine schedules with natural-language preferences.</li></ul>`,{next:"Open my planner"});
 }
 function renderOnboarding(){const wasOpen=document.getElementById("onboarding").classList.contains("open");renderOnboardingContent();setOnboardingOpen(!ST.onboarding?.completed,wasOpen);}
-document.addEventListener("change",event=>{if(event.target.matches("[data-onboarding-ap]")){ST.apOn[event.target.dataset.onboardingAp]=event.target.checked;savePlannerState();renderAll();}if(event.target.id==="onboardingHomeSchool")changeHomeSchool(event.target.value);});
+document.addEventListener("change",event=>{if(event.target.matches("[data-onboarding-ap]")){ST.apOn[event.target.dataset.onboardingAp]=event.target.checked;savePlannerState();renderAll();}if(event.target.id==="onboardingHomeSchool")changeHomeSchool(event.target.value);if(event.target.id==="onboardingAcademicYear"||event.target.id==="onboardingStartingSemester"){ST.academicPosition={year:Number(document.getElementById("onboardingAcademicYear")?.value)||1,startingSemester:document.getElementById("onboardingStartingSemester")?.value==="spring"?"spring":"fall"};ST.year=ST.academicPosition.year;savePlannerState();renderAll();}});
 let onboardingCourseMatches=[];
 let onboardingCourseSearchTimer=null;
 let onboardingCourseSearchGeneration=0;
@@ -295,7 +298,7 @@ document.addEventListener("click",event=>{const courseOption=event.target.closes
 document.getElementById("restartSetup").addEventListener("click",openRestartSetupConfirmation);
 document.getElementById("onboardingRestart").addEventListener("click",openRestartSetupConfirmation);
 
-function plannerTermsFromAcademicPosition(){const terms=[];let year=Math.min(4,Math.max(1,Number(ST.academicPosition?.year)||1)),sem=ST.academicPosition?.startingSemester==="spring"?"spring":"fall";while(terms.length<8){terms.push({year,sem});if(sem==="fall")sem="spring";else{year+=1;sem="fall";}}return terms;}
+function plannerTermsFromAcademicPosition(){const terms=[];let year=Math.min(4,Math.max(1,Number(ST.academicPosition?.year)||1)),sem=ST.academicPosition?.startingSemester==="spring"?"spring":"fall";while(year<=4){terms.push({year,sem});if(sem==="fall")sem="spring";else{year+=1;sem="fall";}}return terms;}
 function plannerKnownCourseCodes(){return new Set([...completedAcademicCodes(),...Object.values(ST.schedule||{}).map(entry=>entry.code).filter(Boolean)]);}
 function plannerLeafGroups(tree){return Object.values(tree?.groups||{}).filter(group=>(group.children||[]).length===0||(group.members||[]).length>0);}
 function plannerRequirementInputs(tree,{sourceType,sourceProgram=""}={}){const known=plannerKnownCourseCodes(),selectedByGroup=ST.groupSelections||{},coursesByCode=new Map(),placeholders=[];for(const group of plannerLeafGroups(tree)){const members=group.members||[],selected=members.filter(id=>selectedByGroup[group.id]?.includes(id)||known.has(tree.courses?.[id]?.code)),required=group.rule==="all"?members.length:Math.max(1,Number(group.count)||1),concrete=sourceType==="core"?selected:(group.rule==="all"?members:selected);concrete.forEach(id=>{const course=tree.courses?.[id];if(course?.code&&!known.has(course.code))coursesByCode.set(course.code,course);});if(selected.length<required&&(sourceType==="core"||group.rule!=="all"))placeholders.push({id:group.id,label:groupDisplayName(group),credits:3,sourceType:sourceType||"program",sourceProgram,requirementGroupId:group.id,candidateSelectionContext:{rule:group.rule,required}});}return {courses:[...coursesByCode.values()],placeholders};}
@@ -319,7 +322,10 @@ async function hydratePlannerDecisions(input){
     decisions:input.planningDecisions||[],request:backendFetch,
     normalizeCandidate:course=>backendCourseRecord(course),
   });
-  const codes=[...new Set(decisions.flatMap(decision=>(decision.candidates||[]).map(candidate=>candidate.code)).filter(Boolean))];
+  const codes=[...new Set([
+    ...decisions.flatMap(decision=>(decision.candidates||[]).map(candidate=>candidate.code)),
+    ...completedAcademicCodes(),
+  ].filter(Boolean))];
   for(let index=0;index<codes.length;index+=25)await loadCourseEligibilityForCodes(codes.slice(index,index+25));
   const normalizedDecisions=decisions.map(decision=>({
     ...decision,
@@ -350,7 +356,8 @@ function confirmPlanGenerationPreview(approvedInput){
   });
 }
 function generateApprovedCourseSet(approvedInput){
-  const decision=globalThis.ScheduleRUPlannerUI.approvedGenerationPreflight({coreIncomplete:corePlannerStatus().incomplete});
+  const coreIncomplete=(approvedInput?.unresolvedRequirements||[]).some(requirement=>requirement?.sourceType==="core");
+  const decision=globalThis.ScheduleRUPlannerUI.approvedGenerationPreflight({coreIncomplete});
   if(decision==="generate"){
     finishPlanGenerationPreflight();
     generateFourYearPlan(approvedInput);
@@ -379,16 +386,39 @@ function openGenerationDecisionFlow(input){
   const decisions=flow.decisions();
   if(!decisions.length){confirmPlanGenerationPreview();return;}
   function decisionKey(decision){return decision.decisionId||decision.requirementGroupId;}
+  function coreOptimized(){return flow.preferences()["core-strategy"]?.mode!=="ranked";}
+  function hiddenCoreDecision(decision){return decision?.sourceType==="core"&&!decision?.coreStrategy&&coreOptimized();}
+  function lastVisibleDecisionIndex(){for(let candidate=decisions.length-1;candidate>=0;candidate-=1)if(!hiddenCoreDecision(decisions[candidate]))return candidate;return 0;}
   function moveDecision(direction){
     let next=index+direction;
-    while(next>=0&&next<decisions.length&&direction>0&&flow.unratedCandidates(decisionKey(decisions[next])).length===0)next+=direction;
+    while(next>=0&&next<decisions.length&&(
+      hiddenCoreDecision(decisions[next])
+      ||(direction>0&&!decisions[next].coreStrategy&&flow.unratedCandidates(decisionKey(decisions[next])).length===0)
+    ))next+=direction;
     if(next>=decisions.length){renderRecommendationReview();return;}
     if(next<0){finishPlanGenerationPreflight();modalController.hide?.();return;}
     index=next;renderDecision();
   }
   function optimizedCourseSet(){
+    const treeCourseRecords=[ST.majorRequirementTree,ST.coreRequirementTree]
+      .flatMap(tree=>Object.values(tree?.courses||{}))
+      .flatMap(course=>[course,...(course?.alternatives||[])]);
+    const completedCourses=completedAcademicCodes().map(code=>{
+      const record=treeCourseRecords.find(course=>course?.code===code)
+        ||(ST.backendCourses||[]).map(backendCourseRecord).find(course=>course?.code===code)
+        ||{};
+      const eligibility=ST.courseEligibilityByCode?.[code]||record.eligibility||null;
+      return {
+        code,
+        creditExclusionFamilies:[...new Set([
+          ...(record.creditExclusionFamilies||[]),
+          ...(eligibility?.credit_exclusions||[]).map(policy=>policy?.policy_key),
+        ].filter(Boolean))],
+      };
+    });
     const graph=ScheduleRUCandidateCoverageModel.buildCoverageGraph({
       decisions:input.planningDecisions||[],
+      completedCourses,
       policies:{
         programs:ST.availablePrograms||[],
         doubleCountPolicies:ST.doubleCountPolicies||[],
@@ -409,8 +439,8 @@ function openGenerationDecisionFlow(input){
         ? "There are too many equally valid combinations to recommend one safely. Narrow one or two preferences and try again."
         : labels.length
           ? `We could not complete ${labels.slice(0,3).join(", ")}${labels.length>3?", and other choices":""} from the reviewed options. Go back and mark more courses you would consider.`
-          : "Some required choices do not yet have enough reviewed options for a complete recommendation.";
-      modalController.show({title:"A complete recommendation isn’t ready",body:`<p>${html(message)}</p>`,canDismiss:false,actions:[{label:"Back",secondary:true,close:false,onClick:()=>{index=decisions.length-1;renderDecision();}}]});
+          : "Choose a few more courses you would consider so we can build a complete path.";
+      modalController.show({title:"Choose a few more courses",body:`<p>${html(message)}</p>`,canDismiss:false,actions:[{label:"Back",secondary:true,close:false,onClick:()=>{index=decisions.length-1;renderDecision();}}]});
       return;
     }
     modalController.show({
@@ -418,7 +448,7 @@ function openGenerationDecisionFlow(input){
       body:ScheduleRUGenerationDecisionsView.renderRecommendations({result,requirements:graph.requirements}),
       canDismiss:false,
       actions:[
-        {label:"Back",secondary:true,close:false,onClick:()=>{index=decisions.length-1;renderDecision();}},
+        {label:"Back",secondary:true,close:false,onClick:()=>{index=lastVisibleDecisionIndex();renderDecision();}},
         {label:"Use these courses",className:"push-right",close:false,onClick:()=>generateApprovedCourseSet(ScheduleRUPlannerInput.applyApprovedCourseSet(input,result))},
       ],
     });
@@ -450,6 +480,7 @@ function openGenerationDecisionFlow(input){
       renderDecision();
     }));
     body.querySelector("[data-decision-recommend]")?.addEventListener("click",()=>{flow.chooseForMe(groupId);renderDecision();});
+    body.querySelectorAll("[data-core-mode]").forEach(button=>button.addEventListener("click",()=>{flow.setMode(groupId,button.dataset.coreMode);renderDecision();}));
     body.querySelector("[data-decision-expand]")?.addEventListener("click",()=>{displayByDecision[groupId]={...display,expanded:!display.expanded};renderDecision();});
     body.querySelector("[data-decision-search]")?.addEventListener("input",event=>{
       displayByDecision[groupId]={expanded:true,search:event.target.value};renderDecision();

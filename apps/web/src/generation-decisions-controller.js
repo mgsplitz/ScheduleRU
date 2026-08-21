@@ -7,6 +7,39 @@
 
   function create({ decisions = [], programs = [], initialPreferences = {}, onChange } = {}) {
     const programById = new Map((programs || []).map((program) => [program.id, program]));
+    const numberWord = (value) => ({
+      1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+      7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve",
+    })[Number(value)] || String(value);
+    function semanticLabel(decision) {
+      const label = String(decision?.label || "").replace(/[.]+$/, "").trim();
+      if (decision?.sourceType === "core") return label;
+      const programName = String(programById.get(decision?.sourceProgram)?.name || "").trim();
+      const generic = /^(?:course\s+\d+\s+of\s+\d+\s+for\s+)?(?:elective courses?|choose\s+\d+|courses?)$/i.test(label);
+      if (!generic || !programName) return label;
+      const candidates = decision?.candidates || [];
+      if (Number(decision?.slotCount) === 1 && candidates.length === 2) {
+        return `Choose ${candidates.map((candidate) => candidate.title || candidate.code).join(" or ")}`;
+      }
+      const count = Math.max(1, Number(decision?.slotCount) || 1);
+      return `Choose ${numberWord(count)} ${programName} elective${count === 1 ? "" : "s"}`;
+    }
+    function sharedCoursePhrase(candidates) {
+      const tokenRows = (candidates || []).map((candidate) => String(candidate.title || "")
+        .match(/[A-Za-z]+/g) || []);
+      if (tokenRows.length < 2 || tokenRows.some((row) => !row.length)) return "";
+      const first = tokenRows[0];
+      for (let size = Math.min(4, first.length); size >= 2; size -= 1) {
+        for (let start = 0; start <= first.length - size; start += 1) {
+          const phrase = first.slice(start, start + size);
+          const key = phrase.join(" ").toLowerCase();
+          if (tokenRows.slice(1).every((row) => row.join(" ").toLowerCase().includes(key))) {
+            return phrase.map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase()).join(" ");
+          }
+        }
+      }
+      return "";
+    }
     const expanded = (decisions || []).flatMap((decision) => {
       const families = new Map();
       (decision.candidates || []).filter((candidate) => candidate.optionFamily).forEach((candidate) => {
@@ -18,7 +51,9 @@
       const stages = [...families].filter(([, candidates]) => candidates.length > 1).map(([family, candidates]) => ({
         ...decision,
         decisionId: `${decision.decisionId || decision.requirementGroupId}:option:${family}`,
-        label: `Choose at most one alternative for ${decision.label || "this requirement"}`,
+        label: sharedCoursePhrase(candidates)
+          ? `Choose one ${sharedCoursePhrase(candidates)} course`
+          : `Choose one option for ${semanticLabel(decision) || "this requirement"}`,
         slotCount: 1,
         candidates,
         guidanceOnly: true,
@@ -27,8 +62,8 @@
       }));
       const remaining = (decision.candidates || []).filter((candidate) => !familyCandidates.has(candidate.code));
       return [...stages, ...(remaining.length ? [{ ...decision, candidates: remaining }] : [])];
-    });
-    const ordered = expanded
+    }).map((decision) => ({ ...decision, label: semanticLabel(decision) }));
+    const sorted = expanded
       .filter((decision) => ["sequence_critical", "guided_flexible"].includes(decision?.planningMode))
       .map((decision) => copy(decision))
       .sort((left, right) => {
@@ -44,6 +79,20 @@
           || String(left.label || "").localeCompare(String(right.label || ""))
           || String(left.requirementGroupId || "").localeCompare(String(right.requirementGroupId || ""));
       });
+    const firstCoreIndex = sorted.findIndex((decision) => decision.sourceType === "core");
+    const coreStrategy = firstCoreIndex < 0 ? null : {
+      decisionId: "core-strategy",
+      requirementGroupId: "core-strategy",
+      sourceProgram: "core",
+      sourceType: "core",
+      coreStrategy: true,
+      label: "How should we handle Core courses?",
+      planningMode: "guided_flexible",
+      candidates: [],
+    };
+    const ordered = coreStrategy
+      ? [...sorted.slice(0, firstCoreIndex), coreStrategy, ...sorted.slice(firstCoreIndex)]
+      : sorted;
     const decisionKey = (decision) => decision.decisionId || decision.requirementGroupId;
     const known = new Map(ordered.map((decision) => [
       decisionKey(decision),
@@ -61,6 +110,7 @@
       });
       if (saved.mode === "recommend_for_me") preference.mode = "recommend_for_me";
       if (saved.mode === "deferred" && decision.canDefer) preference.mode = "deferred";
+      if (decision.coreStrategy && saved.mode !== "ranked") preference.mode = "recommend_for_me";
       preferences[key] = preference;
     });
     const globalPreference = { interested: [], maybe: [], avoid: [] };
@@ -101,6 +151,14 @@
       emit();
       return true;
     }
+    function setMode(identifier, mode) {
+      const key = resolveKey(identifier);
+      const decision = ordered.find((item) => decisionKey(item) === key);
+      if (!decision?.coreStrategy || !["ranked", "recommend_for_me"].includes(mode)) return false;
+      preferences[key].mode = mode;
+      emit();
+      return true;
+    }
     function defer(identifier) {
       const key = resolveKey(identifier);
       const decision = ordered.find((item) => decisionKey(item) === key);
@@ -113,13 +171,13 @@
       const key = resolveKey(identifier);
       const preference = preferences[key];
       if (!preference) return false;
+      const decision = ordered.find((item) => decisionKey(item) === key);
+      if (decision?.coreStrategy) return true;
       if (preference.mode === "recommend_for_me") return true;
       if (preference.mode === "deferred") {
-        const decision = ordered.find((item) => decisionKey(item) === key);
         return decision?.canDefer === true || decision?.canSkip === true;
       }
       if (BUCKETS.some((bucket) => preference[bucket].length > 0)) return true;
-      const decision = ordered.find((item) => decisionKey(item) === key);
       const candidateCodes = new Set((decision?.candidates || []).map((candidate) => candidate.code));
       return BUCKETS.some((bucket) => (preferences.__global[bucket] || []).some((code) => candidateCodes.has(code)));
     }
@@ -137,6 +195,7 @@
       preferences: () => copy(preferences),
       setInterest,
       chooseForMe,
+      setMode,
       defer,
       canAdvance,
       unratedCandidates,

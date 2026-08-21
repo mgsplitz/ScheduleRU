@@ -16,7 +16,7 @@
     const code = issueCode(issue);
     if (code === "backend_not_found") return presentation(issue, {
       title: "We couldn't find that information",
-      message: "It may have moved or may not be available yet. Your saved plan has not changed.",
+      message: "The requested Rutgers record was not found. Your saved plan has not changed.",
       primaryAction: "Try again",
       secondaryAction: "Return to planner",
     });
@@ -88,9 +88,9 @@
       secondaryAction: "Ask advising",
     });
     if (code === "eligibility_rule_unresolved") return presentation(issue, {
-      title: "Eligibility needs review",
-      message: `${issue?.courseCode || "This course"} has a restriction that ScheduleRU cannot confirm for you.`,
-      primaryAction: "Review eligibility",
+      title: "Check this course before registration",
+      message: `${issue?.courseCode || "This course"} has a Rutgers enrollment condition that requires direct confirmation.`,
+      primaryAction: "Check course details",
     });
     if (code === "optional_courses_unplaced") return presentation(issue, {
       title: "Some wishlist courses were left out",

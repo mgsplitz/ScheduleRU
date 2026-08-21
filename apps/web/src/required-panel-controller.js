@@ -88,6 +88,8 @@
         current.requiredProgramTab = tabs[0]?.id || "";
       }
       const activeTab = tabs.find((tab) => tab.id === current.requiredProgramTab);
+      const activeTabIndex = tabs.findIndex((tab) => tab.id === current.requiredProgramTab);
+      const nextTab = activeTabIndex >= 0 ? tabs[activeTabIndex + 1] : null;
       const subtabs = tabs.map((tab) => `<button class="program-subtab ${tab.id === current.requiredProgramTab ? "active" : ""} ${tab.minor ? "program-subtab-minor" : ""}" data-required-program="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("");
       const selectedMajorIds = programs.filter((program) => program.type === "major").map((program) => program.id);
       const groups = rootGroups.filter((group) => activeTab?.kind === "shared"
@@ -101,14 +103,16 @@
       })));
       const firstActionableId = actions[0]?.id || "";
       let content = groups.map((group) => {
-        const defaultOpen = group.id === firstActionableId
-          && !shouldAutoCollapseSharedGroup({ group, selectedMajorIds });
+        const defaultOpen = activeTab?.kind === "shared"
+          || (group.id === firstActionableId && !shouldAutoCollapseSharedGroup({ group, selectedMajorIds }));
         const open = expansionOpen({ stored: current.requiredRootOpen[group.id], defaultOpen });
         return rootGroupMarkup(group, !open);
       }).join("");
-      if (!content) content = `<div class="empty" style="margin-top:30px;">No reviewed requirements are available for this program yet.</div>`;
-      const nextUp = actions.length
-        ? `<section class="required-next"><strong>Next up</strong><ol>${actions.map((action) => `<li>${escapeHtml(action.label)}</li>`).join("")}</ol></section>`
+      if (!content) content = `<div class="api-status err" style="margin-top:30px;"><strong>We couldn't display these requirements</strong><span>Refresh the page or reopen Programs. Your saved plan has not changed.</span></div>`;
+      const nextUp = nextTab
+        ? `<section class="required-next"><button type="button" data-required-next-tab="${escapeHtml(nextTab.id)}"><strong>Next up</strong><span>Required ${escapeHtml(nextTab.label)} courses</span><span aria-hidden="true">→</span></button></section>`
+        : actions.length
+          ? `<section class="required-next"><strong>Next up</strong><ol>${actions.map((action) => `<li>${escapeHtml(action.label)}</li>`).join("")}</ol></section>`
         : `<section class="required-next complete"><strong>You're caught up here</strong><span>No unfinished reviewed requirement is visible in this tab.</span></section>`;
       return `<div class="required-tools"><button class="issues-btn" id="issuesBtn">Issues · ${count}</button></div><div class="subtabs">${subtabs}</div>${nextUp}${content}<div class="planning-disclaimer">ScheduleRU is a planning aid, not an official degree audit.</div>`;
     }
@@ -127,6 +131,7 @@
       const current = state();
       attachCardEvents(panel);
       panel.querySelectorAll("[data-required-program]").forEach((button) => button.addEventListener("click", () => setProgram(button.dataset.requiredProgram)));
+      panel.querySelector("[data-required-next-tab]")?.addEventListener("click", (event) => setProgram(event.currentTarget.dataset.requiredNextTab));
       panel.querySelectorAll("[data-required-root-toggle]").forEach((button) => button.addEventListener("click", () => {
         const groupId = button.dataset.requiredRootToggle;
         const body = panel.querySelector(`#required-root-${groupId}`);

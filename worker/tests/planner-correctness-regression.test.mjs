@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import { compileCourseRules } from "../../packages/catalog/src/course-rule-compiler.ts";
 
 const context = { globalThis: {} };
 for (const file of [
@@ -135,6 +136,80 @@ test("reviewed College Writing stays prerequisite-free through end-to-end genera
         && preview.schedule["01:355:201"].sem === "spring"
       ),
   );
+});
+
+test("canonical prerequisite and standing rules survive the complete planner pipeline", () => {
+  const terms = Array.from({ length: 8 }, (_, index) => ({
+    year: Math.floor(index / 2) + 1,
+    sem: index % 2 ? "spring" : "fall",
+  }));
+  const corporateFinance = {
+    code: "33:390:400", title: "CORPORATE FINANCE", credits: 3,
+    ...compileCourseRules({ code: "33:390:400", catalogRecordAvailable: true }),
+  };
+  const advancedCorporateFinance = {
+    code: "33:390:440", title: "ADVANCED CORPORATE FINANCE", credits: 3,
+    ...compileCourseRules({
+      code: "33:390:440",
+      catalogPrereqs: "33:390:400 CORPORATE FINANCE",
+      catalogRestrictions: "FINANCE MAJORS ONLY; JUNIORS AND SENIORS",
+    }),
+  };
+  const tree = {
+    roots: ["finance"],
+    courses: { corporateFinance, advancedCorporateFinance },
+    groups: {
+      finance: {
+        id: "finance", name: "Finance requirements", rule: "all",
+        members: ["corporateFinance", "advancedCorporateFinance"], children: [],
+      },
+    },
+  };
+
+  const canonical = adapter.buildPlannerInput({
+    terms,
+    requirementTrees: [{ id: "finance", tree }],
+  });
+  const preview = engine.generatePlan(canonical);
+
+  assert.equal(preview.status, "complete");
+  assert.ok(preview.schedule["33:390:440"].year >= 3);
+  const prerequisite = preview.schedule["33:390:400"];
+  const advanced = preview.schedule["33:390:440"];
+  assert.ok(
+    prerequisite.year < advanced.year
+      || (prerequisite.year === advanced.year && prerequisite.sem === "fall" && advanced.sem === "spring"),
+  );
+});
+
+test("canonical alternative prerequisite paths do not collapse into an impossible conjunction", () => {
+  const brainInspired = compileCourseRules({
+    code: "01:198:425",
+    catalogPrereqs: "((01:198:206 INTRODUCTION TO DISCRETE STRUCTURES II or 01:640:477 MATHEMATICAL THEORY OF PROBABILITY) and (01:640:152 CALCULUS II FOR MATHEMATICAL AND PHYSICAL SCIENCES))",
+  });
+  const tree = {
+    roots: ["cs"],
+    courses: {
+      calculus: { code: "01:640:152", title: "CALCULUS II", credits: 4, ...compileCourseRules({ code: "01:640:152", catalogRecordAvailable: true }) },
+      probability: { code: "01:640:477", title: "MATHEMATICAL THEORY OF PROBABILITY", credits: 3, ...compileCourseRules({ code: "01:640:477", catalogRecordAvailable: true }) },
+      brain: { code: "01:198:425", title: "BRAIN-INSPIRED COMPUTING", credits: 4, ...brainInspired },
+    },
+    groups: {
+      cs: { id: "cs", name: "CS path", rule: "all", members: ["calculus", "probability", "brain"], children: [] },
+    },
+  };
+  const canonical = adapter.buildPlannerInput({
+    terms: [
+      { year: 1, sem: "fall" }, { year: 1, sem: "spring" },
+      { year: 2, sem: "fall" }, { year: 2, sem: "spring" },
+    ],
+    requirementTrees: [{ id: "cs", tree }],
+  });
+  const preview = engine.generatePlan(canonical);
+
+  assert.equal(preview.status, "complete");
+  assert.equal(Object.hasOwn(preview.schedule, "01:198:206"), false);
+  assert.ok(preview.schedule["01:198:425"]);
 });
 
 test("a selected Core course replaces its unresolved placeholder in planner input", () => {

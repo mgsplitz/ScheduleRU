@@ -21,6 +21,8 @@ Their previous repository versions remain available in Git history.
   defines the approved requirement-choice, optimization, and student-language design.
 - [`architecture/guided-smart-planning-delivery.md`](architecture/guided-smart-planning-delivery.md)
   divides that design into independently testable releases and acceptance gates.
+- [`architecture/complete-planning-experience.md`](architecture/complete-planning-experience.md)
+  defines the canonical academic-rule and end-to-end student journey contract.
 
 ## Contributor workflows
 

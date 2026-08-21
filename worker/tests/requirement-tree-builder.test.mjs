@@ -149,3 +149,54 @@ test("builder derives only unambiguous prerequisite course IDs that exist in the
   assert.deepEqual(tree.courses["01198206"].prereqs, []);
   assert.equal(builder().requirementCourseId("01:198:111"), "01198111");
 });
+
+test("builder preserves canonical compiled academic rules for courses and alternatives", () => {
+  const compiledRules = {
+    prerequisitePaths: [["33:390:400"]],
+    enforceablePrerequisitePaths: [["33:390:400"]],
+    corequisitePaths: [],
+    minimumPlanYear: 3,
+    minimumPriorCredits: 60,
+    creditExclusionFamilies: ["finance:advanced-elective-alternatives"],
+    ruleCoverage: "catalog_parsed",
+  };
+  const alternativeRules = {
+    prerequisitePaths: [["01:640:251", "01:640:250"]],
+    enforceablePrerequisitePaths: [["01:640:251", "01:640:250"]],
+    corequisitePaths: [],
+    minimumPlanYear: null,
+    minimumPriorCredits: null,
+    creditExclusionFamilies: ["rutgers-nb-differential-equations-credit"],
+    ruleCoverage: "reviewed",
+  };
+  const requirements = [{
+    id: "root",
+    name: "Required",
+    rule: "all",
+    courses: [{
+      course_code: "33:390:440",
+      source_title: "ADV CORP FINANCE",
+      compiled_rules: compiledRules,
+      alternatives: [{
+        equivalent_course_code: "01:640:252",
+        source_title: "ELEMENTARY DIFFERENTIAL EQUATIONS",
+        compiled_rules: alternativeRules,
+      }],
+    }],
+    children: [],
+  }];
+
+  const tree = plain(builder().build(requirements));
+  const course = tree.courses["33390440"];
+
+  assert.deepEqual(course.prerequisitePaths, compiledRules.prerequisitePaths);
+  assert.deepEqual(course.enforceablePrerequisitePaths, compiledRules.enforceablePrerequisitePaths);
+  assert.deepEqual(course.corequisitePaths, []);
+  assert.equal(course.minimumPlanYear, 3);
+  assert.equal(course.minimumPriorCredits, 60);
+  assert.equal(course.ruleCoverage, "catalog_parsed");
+  assert.deepEqual(course.creditExclusionFamilies, compiledRules.creditExclusionFamilies);
+  assert.deepEqual(course.alternatives[0].prerequisitePaths, alternativeRules.prerequisitePaths);
+  assert.deepEqual(course.alternatives[0].creditExclusionFamilies, alternativeRules.creditExclusionFamilies);
+  assert.equal(course.alternatives[0].ruleCoverage, "reviewed");
+});

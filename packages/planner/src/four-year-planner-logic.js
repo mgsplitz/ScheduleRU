@@ -850,7 +850,7 @@
       placeholders,
       issues,
       assumptions: [
-        "Reviewed and selected-plan catalog prerequisite paths are enforced; unresolved catalog eligibility remains visible as a warning.",
+        "Official catalog and reviewed prerequisite, standing, and exclusion rules are enforced.",
         `Automatic planning uses a ${normalized.maxCredits}-credit hard cap per term.`,
         `Automatic planning uses a ${normalized.maxCoursesPerTerm}-course hard cap per term.`,
         `Automatic planning targets ${normalized.targetCredits} credits per term.`,

@@ -28,6 +28,23 @@
           .join(":");
     }
 
+    function academicRuleFields(course) {
+      if (!course || !course.ruleCoverage) return {};
+      return {
+        prerequisitePaths: Array.isArray(course.prerequisitePaths) ? course.prerequisitePaths : [],
+        enforceablePrerequisitePaths: Array.isArray(course.enforceablePrerequisitePaths)
+          ? course.enforceablePrerequisitePaths
+          : [],
+        corequisitePaths: Array.isArray(course.corequisitePaths) ? course.corequisitePaths : [],
+        minimumPlanYear: Number(course.minimumPlanYear) || null,
+        minimumPriorCredits: Number(course.minimumPriorCredits) || null,
+        creditExclusionFamilies: Array.isArray(course.creditExclusionFamilies)
+          ? course.creditExclusionFamilies
+          : [],
+        ruleCoverage: course.ruleCoverage,
+      };
+    }
+
     function requirementCourseRecord(id) {
       const course = requirementCourses()[id];
       if (!course) return null;
@@ -47,6 +64,7 @@
         requirementId: id,
         eligibility: course.eligibility || null,
         catalogRecordAvailable: course.catalogRecordAvailable === true,
+        ...academicRuleFields(course),
       };
     }
 
@@ -71,6 +89,7 @@
         attributes: Array.isArray(course.attributes) ? [...course.attributes] : [],
         eligibility: current.courseEligibilityByCode?.[code] || course.eligibility || null,
         catalogRecordAvailable: true,
+        ...academicRuleFields(course),
       };
     }
 
