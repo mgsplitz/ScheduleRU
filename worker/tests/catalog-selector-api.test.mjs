@@ -178,6 +178,23 @@ test("catalog candidates expose the same compiled prerequisite and standing fact
   assert.equal(course.ruleCoverage, "catalog_parsed");
 });
 
+test("catalog search qualifies course columns when canonical metadata is joined", async () => {
+  const db = catalogDb([]);
+  const response = await worker.fetch(
+    new Request("https://example.test/api/courses?search=advanced%20finance&limit=25&offset=0"),
+    { DB: db, CURRENT_YEAR: "2026", CURRENT_TERM: "9" },
+    {},
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(db.calls.length, 2);
+  assert.doesNotMatch(db.calls[0].sql, /LOWER\(title\)/);
+  assert.doesNotMatch(db.calls[1].sql, /LOWER\(title\)/);
+  assert.match(db.calls[0].sql, /LOWER\(c\.title\) LIKE \?/);
+  assert.match(db.calls[1].sql, /LOWER\(c\.title\) LIKE \?/);
+  assert.match(db.calls[1].sql, /ORDER BY c\.subject_code, c\.course_number/);
+});
+
 test("catalog and guided selectors use only the configured planning term", async () => {
   const db = catalogDb([]);
   const response = await worker.fetch(
