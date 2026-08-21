@@ -138,6 +138,8 @@
     decisions.flatMap((decision) => decision?.prerequisiteCourses || []).forEach((record) => {
       const code = text(record?.code);
       if (!code || byCanonical.has(code)) return;
+      const prerequisitePaths = (record?.prerequisitePaths || []).map((path) => uniqueSorted((path || []).map(text))).filter((path) => path.length);
+      const enforceablePrerequisitePaths = (record?.enforceablePrerequisitePaths || []).map((path) => uniqueSorted((path || []).map(text))).filter((path) => path.length);
       byCanonical.set(code, {
         code,
         title: text(record?.title) || "Course title unavailable",
@@ -146,14 +148,16 @@
         equivalentCourseCodes: [code],
         coverageRequirementIds: [],
         reviewedEquivalentRequirementIds: [],
-        prerequisitePaths: [],
-        enforceablePrerequisitePaths: [],
-        prerequisiteClosure: [],
+        prerequisitePaths,
+        enforceablePrerequisitePaths,
+        prerequisiteClosure: uniqueSorted(prerequisitePaths.flat()),
         attributes: [],
         creditExclusionFamilies: [],
         offeringEvidence: null,
-        minimumPlanYear: null,
-        minimumPriorCredits: null,
+        minimumPlanYear: Number(record?.minimumPlanYear) || null,
+        minimumPriorCredits: Number(record?.minimumPriorCredits) || null,
+        ruleCoverage: text(record?.ruleCoverage) || "unresolved",
+        corequisitePaths: (record?.corequisitePaths || []).map((path) => uniqueSorted((path || []).map(text))).filter((path) => path.length),
       });
     });
 

@@ -336,7 +336,11 @@ async function hydratePlannerDecisions(input){
       attributes:[...(candidate.attributes||[])],
     })),
   }));
-  return {...input,planningDecisions:await ScheduleRUPlanningDecisionLoader.hydratePrerequisiteMetadata({decisions:normalizedDecisions,request:backendFetch})};
+  return {...input,planningDecisions:await ScheduleRUPlanningDecisionLoader.hydratePrerequisiteMetadata({
+    decisions:normalizedDecisions,
+    seedCourses:input.courses||[],
+    request:backendFetch,
+  })};
 }
 const checkedGeneratePlanButton=document.getElementById("generatePlanBtn"),coreAwareGeneratePlanButton=checkedGeneratePlanButton.cloneNode(true);checkedGeneratePlanButton.replaceWith(coreAwareGeneratePlanButton);
 function finishPlanGenerationPreflight(){ST.planGenerationPending=false;coreAwareGeneratePlanButton.disabled=false;}
@@ -388,6 +392,8 @@ function openGenerationDecisionFlow(input){
   function decisionKey(decision){return decision.decisionId||decision.requirementGroupId;}
   function coreOptimized(){return flow.preferences()["core-strategy"]?.mode!=="ranked";}
   function hiddenCoreDecision(decision){return decision?.sourceType==="core"&&!decision?.coreStrategy&&coreOptimized();}
+  function visibleDecisionIndexes(){return decisions.map((_decision,candidate)=>candidate)
+    .filter(candidate=>!hiddenCoreDecision(decisions[candidate]));}
   function lastVisibleDecisionIndex(){for(let candidate=decisions.length-1;candidate>=0;candidate-=1)if(!hiddenCoreDecision(decisions[candidate]))return candidate;return 0;}
   function moveDecision(direction){
     let next=index+direction;
@@ -461,11 +467,12 @@ function openGenerationDecisionFlow(input){
     const previous=document.querySelector(".generation-decision")?.dataset?.decisionGroup;
     if(previous)scrollByDecision[previous]=ScheduleRUGenerationDecisionsView.captureListScroll(document);
     const decision=decisions[index],groupId=decisionKey(decision);
+    const visibleIndexes=visibleDecisionIndexes(),visibleIndex=Math.max(0,visibleIndexes.indexOf(index));
     const preference=flow.preferences()[groupId]||{};
     const display=displayByDecision[groupId]||{expanded:false,search:""};
     modalController.show({
       title:"Plan your course choices",
-      body:ScheduleRUGenerationDecisionsView.renderDecision({decision,preference,globalPreference:flow.preferences().__global,index,total:decisions.length,...display}),
+      body:ScheduleRUGenerationDecisionsView.renderDecision({decision,preference,globalPreference:flow.preferences().__global,index:visibleIndex,total:visibleIndexes.length,...display}),
       canDismiss:false,
       actions:[
         {label:"Back",secondary:true,close:index===0,onClick:()=>{if(index===0)finishPlanGenerationPreflight();else moveDecision(-1);}},

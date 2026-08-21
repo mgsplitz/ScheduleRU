@@ -53,6 +53,28 @@ test("chooses one legal overlapping course before two redundant courses", () => 
   assert.deepEqual(plain(result.selectedCourses[0].coverageRequirementIds), ["core", "major"]);
 });
 
+test("a nested upper-level subset never reduces a six-course minor to three courses", () => {
+  const requirements = [
+    requirement("philosophy-total", { slotCount: 6 }),
+    requirement("philosophy-upper", { slotCount: 3 }),
+  ];
+  const candidates = [
+    candidate("01:730:301", ["philosophy-total", "philosophy-upper"]),
+    candidate("01:730:302", ["philosophy-total", "philosophy-upper"]),
+    candidate("01:730:303", ["philosophy-total", "philosophy-upper"]),
+    candidate("01:730:103", ["philosophy-total"]),
+    candidate("01:730:104", ["philosophy-total"]),
+    candidate("01:730:218", ["philosophy-total"]),
+  ];
+
+  const result = optimizer().optimizeCourseSet({ requirements, candidates, conflicts: [] });
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.selectedCourses.length, 6);
+  assert.equal(result.selectedCourses.filter((course) =>
+    course.coverageRequirementIds.includes("philosophy-upper")).length, 3);
+});
+
 test("respects Core allocation-family and zero-overlap conflicts", () => {
   const result = optimizer().optimizeCourseSet({
     requirements: [

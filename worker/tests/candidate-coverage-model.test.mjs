@@ -248,6 +248,31 @@ test("canonical prerequisite records keep prerequisite-only recommendations read
   assert.deepEqual(plain(prerequisite.coverageRequirementIds), []);
 });
 
+test("canonical prerequisite records preserve their own recursive academic rules", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [{
+      ...decision("advanced", "sasnb-example", [candidate("01:640:244", {
+        prerequisitePaths: [["01:640:251"]],
+      })]),
+      prerequisiteCourses: [
+        { code: "01:640:251", title: "Multivariable Calculus", credits: 4, prerequisitePaths: [["01:640:152"]], enforceablePrerequisitePaths: [["01:640:152"]], ruleCoverage: "catalog_parsed" },
+        { code: "01:640:152", title: "Calculus II", credits: 4, prerequisitePaths: [["01:640:151"]], enforceablePrerequisitePaths: [["01:640:151"]], ruleCoverage: "catalog_parsed" },
+      ],
+    }],
+  });
+
+  const multivariable = graph.candidates.find((course) => course.code === "01:640:251");
+  assert.deepEqual(plain(multivariable.prerequisitePaths), [["01:640:152"]]);
+  assert.deepEqual(plain(multivariable.enforceablePrerequisitePaths), [["01:640:152"]]);
+  assert.deepEqual(plain(multivariable.prerequisiteClosure), ["01:640:152"]);
+  assert.equal(multivariable.ruleCoverage, "catalog_parsed");
+
+  const result = context.globalThis.ScheduleRUCourseSetOptimizer.optimizeCourseSet(graph);
+  assert.deepEqual(plain(result.selectedCourses.map((course) => course.code)), [
+    "01:640:151", "01:640:152", "01:640:244", "01:640:251",
+  ]);
+});
+
 test("the coverage-to-optimizer boundary keeps prerequisite alternatives exclusive", () => {
   const graph = model().buildCoverageGraph({
     decisions: [{
