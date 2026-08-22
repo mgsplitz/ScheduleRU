@@ -719,7 +719,7 @@ test("generic choose labels inherit meaningful parent requirement context", () =
   assert.equal(result.unresolvedRequirements[0].label, "Business Core option");
 });
 
-test("raw off-universe prerequisites stay advisory while in-plan chains remain ordered", () => {
+test("raw off-universe prerequisites stay advisory without silently choosing a requirement option", () => {
   const tree = {
     roots: ["root"],
     courses: {
@@ -766,23 +766,17 @@ test("raw off-universe prerequisites stay advisory while in-plan chains remain o
 
   const input = build({ requirementTrees: [{ id: "bait", tree }] });
   const calculus = input.courses.find((course) => course.code === "01:640:135");
-  assert.ok(calculus, "the prerequisite choice should be promoted into the concrete plan");
-  assert.equal(calculus.ruleCoverage, "unresolved");
-  assert.deepEqual(plain(input.prerequisitePathsByCode["01:640:135"]), [
-    ["01:640:025"],
-    ["01:640:026"],
-  ]);
+  assert.equal(calculus, undefined);
   assert.equal(input.enforceablePrerequisitePathsByCode["01:640:135"], undefined);
   assert.deepEqual(plain(input.prerequisitePathsByCode["33:136:385"]), [
     ["01:640:135", "01:960:285"],
   ]);
-  assert.equal(input.unresolvedRequirements.some((item) => item.requirementGroupId === "calculusChoice"), false);
+  assert.equal(input.enforceablePrerequisitePathsByCode["33:136:385"], undefined);
+  assert.equal(input.unresolvedRequirements.some((item) => item.requirementGroupId === "calculusChoice"), true);
 
   const result = planner.generatePlan(input);
   assert.equal(result.status, "complete");
   const ordinal = (entry) => (entry.year - 1) * 2 + (entry.sem === "spring" ? 1 : 0);
-  assert.ok(ordinal(result.schedule["01:640:135"]) < ordinal(result.schedule["33:136:385"]));
-  assert.ok(ordinal(result.schedule["01:960:285"]) < ordinal(result.schedule["33:136:385"]));
   assert.ok(ordinal(result.schedule["33:136:385"]) < ordinal(result.schedule["33:136:485"]));
 });
 
@@ -794,7 +788,15 @@ test("a required downstream course promotes one reviewed prerequisite choice wit
         code: "33:136:470",
         title: "Business Data Management",
         credits: "3",
-        catalogPrereqs: "((33:136:370 MANAGEMENT INFORMATION SYSTEMS or 33:010:458 ACCTNG INFORM SYSTS) and (33:136:388 FOUNDATIONS OF BUSINESS PROGRAMMING))",
+        prerequisitePaths: [
+          ["33:136:370", "33:136:388"],
+          ["33:010:458", "33:136:388"],
+        ],
+        enforceablePrerequisitePaths: [
+          ["33:136:370", "33:136:388"],
+          ["33:010:458", "33:136:388"],
+        ],
+        ruleCoverage: "reviewed",
       },
       programming: {
         code: "33:136:388",
@@ -1070,8 +1072,114 @@ test("raw prerequisite leaves outside reviewed plan data stay advisory during pr
   const result = build({ requirementTrees: [{ id: "bait", tree }] });
   const codes = new Set(result.courses.map((course) => course.code));
 
-  assert.equal(codes.has("01:640:112"), true);
+  assert.equal(codes.has("01:640:112"), false);
   assert.equal(codes.has("33:136:385"), false);
-  assert.equal(result.courses.find((course) => course.code === "01:640:112")?.ruleCoverage, "unresolved");
   assert.equal(result.enforceablePrerequisitePathsByCode["01:640:112"], undefined);
+  assert.equal(result.unresolvedRequirements.some((item) => item.requirementGroupId === "preparation"), true);
+});
+
+test("an unselected Core alternative cannot become required through a catalog-parsed prerequisite", () => {
+  const tree = {
+    roots: ["root"],
+    courses: {
+      calculusForMath: {
+        code: "01:640:151",
+        title: "Calculus I for Mathematical and Physical Sciences",
+        credits: "4",
+      },
+      calculusForBusiness: {
+        code: "01:640:135",
+        title: "Calculus I for the Life and Social Sciences",
+        credits: "4",
+      },
+      statistics: {
+        code: "01:960:285",
+        title: "Introductory Statistics for Business",
+        credits: "3",
+      },
+      methods: {
+        code: "33:136:385",
+        title: "Statistical Methods in Business",
+        credits: "3",
+        prerequisitePaths: [["01:640:135", "01:960:285"]],
+        enforceablePrerequisitePaths: [["01:640:135", "01:960:285"]],
+        ruleCoverage: "catalog_parsed",
+      },
+    },
+    groups: {
+      root: {
+        id: "root",
+        name: "Combined requirements",
+        rule: "all",
+        members: ["calculusForMath", "statistics", "methods"],
+        children: ["businessCalculusChoice"],
+      },
+      businessCalculusChoice: {
+        id: "businessCalculusChoice",
+        name: "Calculus I (choose 1)",
+        rule: "min",
+        count: 1,
+        members: ["calculusForBusiness", "calculusForMath"],
+        children: [],
+        parentId: "root",
+      },
+    },
+  };
+
+  const result = build({ requirementTrees: [{ id: "combined", tree }] });
+
+  assert.equal(result.courses.some((course) => course.code === "01:640:135"), false);
+  assert.equal(result.unresolvedRequirements.some((item) => item.requirementGroupId === "businessCalculusChoice"), false);
+  assert.equal(result.enforceablePrerequisitePathsByCode["33:136:385"], undefined);
+  assert.deepEqual(plain(result.prerequisitePathsByCode["33:136:385"]), [
+    ["01:640:135", "01:960:285"],
+  ]);
+});
+
+test("approved catalog choices enforce prerequisite paths only when every course was selected", () => {
+  const result = plannerInput().applyApprovedCourseSet({
+    courses: [
+      {
+        code: "01:640:151",
+        title: "Calculus I for Mathematical and Physical Sciences",
+        credits: 4,
+        prerequisitePaths: [["01:640:112"]],
+        enforceablePrerequisitePaths: [["01:640:112"]],
+        ruleCoverage: "catalog_parsed",
+      },
+    ],
+    completedCourseCodes: [],
+    unresolvedRequirements: [{
+      sourceType: "core",
+      sourceProgram: "core",
+      requirementGroupId: "science",
+    }],
+    prerequisitePathsByCode: { "01:640:151": [["01:640:112"]] },
+    enforceablePrerequisitePathsByCode: { "01:640:151": [["01:640:112"]] },
+  }, {
+    status: "complete",
+    selectedCourses: [
+      {
+        code: "01:119:115",
+        title: "General Biology I",
+        credits: 4,
+        prerequisitePaths: [],
+        enforceablePrerequisitePaths: [],
+        ruleCoverage: "catalog_parsed",
+        prerequisiteOnly: true,
+      },
+      {
+        code: "01:119:116",
+        title: "General Biology II",
+        credits: 4,
+        prerequisitePaths: [["01:119:115"]],
+        enforceablePrerequisitePaths: [["01:119:115"]],
+        ruleCoverage: "catalog_parsed",
+        coverageRequirementIds: ["core:core:science"],
+      },
+    ],
+  });
+
+  assert.equal(result.enforceablePrerequisitePathsByCode["01:640:151"], undefined);
+  assert.deepEqual(plain(result.enforceablePrerequisitePathsByCode["01:119:116"]), [["01:119:115"]]);
 });
