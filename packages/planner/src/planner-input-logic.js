@@ -57,14 +57,20 @@
     const authoritativePrerequisitePaths = normalizedCoursePaths(course?.prerequisitePaths);
     const authoritativeEnforceablePaths = normalizedCoursePaths(course?.enforceablePrerequisitePaths);
     const authoritativeCorequisitePaths = normalizedCoursePaths(course?.corequisitePaths);
-    const hasAuthoritativeCoverage = ["reviewed", "catalog_parsed"].includes(text(course?.ruleCoverage));
+    const authoritativeCoverage = text(course?.ruleCoverage);
+    const hasAuthoritativeCoverage = ["reviewed", "catalog_parsed"].includes(authoritativeCoverage);
+    const enforceableAuthoritativePaths = authoritativeCoverage === "catalog_parsed" && hasPlanningUniverse
+      ? (authoritativeEnforceablePaths.length ? authoritativeEnforceablePaths : authoritativePrerequisitePaths)
+        .filter((path) => !path.includes(text(course?.code)) && path.every((code) =>
+          knownCourseCodes.has(code) || completedCourseCodes?.has?.(code)))
+      : authoritativeEnforceablePaths.length ? authoritativeEnforceablePaths : authoritativePrerequisitePaths;
     const prerequisitePaths = hasAuthoritativeCoverage
       ? authoritativePrerequisitePaths
       : reviewedNoConditions
       ? []
       : reviewedPaths.length ? reviewedPaths : directPaths[0]?.length ? directPaths : catalog.reviewable ? campusCatalogPaths : [];
     const enforceablePrerequisitePaths = hasAuthoritativeCoverage
-      ? authoritativeEnforceablePaths.length ? authoritativeEnforceablePaths : authoritativePrerequisitePaths
+      ? enforceableAuthoritativePaths
       : reviewedNoConditions
       ? []
       : reviewedPaths.length ? reviewedPaths : directPaths[0]?.length ? directPaths : catalog.reviewable ? enforceableCatalogPaths : [];
