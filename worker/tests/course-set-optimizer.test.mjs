@@ -225,6 +225,8 @@ test("adds missing prerequisite support for fixed courses already required by th
       candidate("01:640:151", [], {
         title: "Calculus I",
         prerequisitePaths: [["01:640:115"]],
+        enforceablePrerequisitePaths: [["01:640:115"]],
+        ruleCoverage: "reviewed",
         prerequisiteClosure: ["01:640:115"],
       }),
     ],
@@ -238,6 +240,50 @@ test("adds missing prerequisite support for fixed courses already required by th
     "01:640:115",
   ]);
   assert.equal(result.selectedCourses.find((item) => item.code === "01:640:115")?.prerequisiteOnly, true);
+});
+
+test("does not invent off-plan preparation from a catalog-parsed fixed course", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("writing")],
+    candidates: [
+      candidate("01:355:101", ["writing"], { title: "College Writing" }),
+      candidate("01:640:112", [], { title: "Precalculus Part II", ruleCoverage: "catalog_parsed" }),
+      candidate("01:640:151", [], {
+        title: "Calculus I",
+        prerequisitePaths: [["01:640:112"]],
+        enforceablePrerequisitePaths: [["01:640:112"]],
+        ruleCoverage: "catalog_parsed",
+        prerequisiteClosure: ["01:640:112"],
+      }),
+    ],
+    conflicts: [],
+    plannedCourseCodes: ["01:640:151"],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), ["01:355:101"]);
+});
+
+test("catalog-parsed prerequisites already required by the plan still establish the sequence", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("writing")],
+    candidates: [
+      candidate("01:355:101", ["writing"], { title: "College Writing" }),
+      candidate("01:640:151", [], { title: "Calculus I", ruleCoverage: "catalog_parsed" }),
+      candidate("01:640:152", [], {
+        title: "Calculus II",
+        prerequisitePaths: [["01:640:151"]],
+        enforceablePrerequisitePaths: [["01:640:151"]],
+        ruleCoverage: "catalog_parsed",
+        prerequisiteClosure: ["01:640:151"],
+      }),
+    ],
+    conflicts: [],
+    plannedCourseCodes: ["01:640:151", "01:640:152"],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), ["01:355:101"]);
 });
 
 test("does not auto-enroll a student in an unrequested honors shortcut", () => {

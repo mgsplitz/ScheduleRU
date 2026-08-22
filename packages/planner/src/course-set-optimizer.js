@@ -303,7 +303,7 @@
 
     function selectedWithPrerequisites(selectedCodes) {
       const result = new Set();
-      function expandCandidate(candidate, code, ancestors, selected, forceSelected = false) {
+      function expandCandidate(candidate, code, ancestors, selected, forceSelected = false, fixedRoot = false) {
         const selectedCode = candidate?.code || code;
         if (!selectedCode || candidateIsCompleted(candidate, selectedCode)) return;
         if (!forceSelected && candidateIsPlanned(candidate, selectedCode)) return;
@@ -311,19 +311,34 @@
         if (!candidate || ancestors.has(selectedCode)) return;
         const nextAncestors = new Set(ancestors);
         nextAncestors.add(selectedCode);
-        const explicitPaths = candidate.enforceablePrerequisitePaths?.length
+        const authoritativePaths = candidate.enforceablePrerequisitePaths?.length
           ? candidate.enforceablePrerequisitePaths
           : candidate.prerequisitePaths;
+        // A fixed degree course may have a catalog prerequisite whose published
+        // text omits a placement, permission, or other non-course route. Those
+        // catalog paths still order courses that are already in the student's
+        // plan, but only reviewed academic facts may introduce additional
+        // preparation on behalf of a fixed course. User-selected electives keep
+        // their complete prerequisite expansion so necessary gateways are added.
+        const fixedCatalogFact = fixedRoot && candidate.ruleCoverage !== "reviewed";
+        const explicitPaths = fixedCatalogFact
+          ? (authoritativePaths || []).filter((path) => path.every((prerequisiteCode) => {
+            const prerequisite = candidateByAlias.get(prerequisiteCode);
+            return candidateIsCompleted(prerequisite, prerequisiteCode)
+              || candidateIsPlanned(prerequisite, prerequisiteCode);
+          }))
+          : authoritativePaths;
         const paths = explicitPaths?.length
           ? explicitPaths
-          : candidate.prerequisiteClosure?.length ? [candidate.prerequisiteClosure] : [];
+          : fixedCatalogFact ? []
+            : candidate.prerequisiteClosure?.length ? [candidate.prerequisiteClosure] : [];
         if (!paths.length) return;
         const options = paths.map((path, index) => {
           const expanded = new Set(selected);
           path.forEach((prerequisiteCode) => {
             const prerequisite = candidateByAlias.get(prerequisiteCode);
             const canonical = prerequisite?.code || prerequisiteCode;
-            expandCandidate(prerequisite, canonical, nextAncestors, expanded, false);
+            expandCandidate(prerequisite, canonical, nextAncestors, expanded, false, fixedRoot);
           });
           const additions = [...expanded].filter((candidateCode) => !selected.has(candidateCode));
           return {
@@ -355,12 +370,12 @@
         const candidate = candidateByAlias.get(code);
         const canonical = candidate?.code || code;
         plannedCanonicalCodes.add(canonical);
-        expandCandidate(candidate, canonical, new Set(), result, true);
+        expandCandidate(candidate, canonical, new Set(), result, true, true);
       });
       plannedCanonicalCodes.forEach((code) => result.delete(code));
       [...selectedCodes].sort().forEach((code) => {
         const candidate = candidateByAlias.get(code);
-        expandCandidate(candidate, candidate?.code || code, new Set(), result, true);
+        expandCandidate(candidate, candidate?.code || code, new Set(), result, true, false);
       });
       return result;
     }

@@ -52,6 +52,23 @@ test("Risk Modeling requires the reviewed RBS concentration prerequisite", () =>
   );
 });
 
+test("RBS methods courses preserve every published Calculus I substitute", () => {
+  const methods = Object.fromEntries(conditions("33:136:385").map((row) => [
+    row.condition_key,
+    row.condition_value.any_of_course_codes,
+  ]));
+  const operations = Object.fromEntries(conditions("33:136:386").map((row) => [
+    row.condition_key,
+    row.condition_value.any_of_course_codes,
+  ]));
+
+  assert.deepEqual(methods["calculus-i"], ["01:640:130", "01:640:135", "01:640:151"]);
+  assert.deepEqual(methods.statistics, ["01:960:285"]);
+  assert.deepEqual(operations["calculus-i"], ["01:640:130", "01:640:135", "01:640:151"]);
+  assert.match(review("33:136:385").source_url, /business\.rutgers\.edu/);
+  assert.match(review("33:136:386").source_url, /business\.rutgers\.edu/);
+});
+
 test("College Writing has a source-backed placement review, not a false prerequisite", () => {
   const collegeWriting = review("01:355:101");
   assert.equal(collegeWriting.no_known_conditions, true);

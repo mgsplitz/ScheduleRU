@@ -18,6 +18,7 @@ const cases = [
   [{ code: "invalid_response", detail: "<html>proxy error</html>" }, "We couldn't read the latest data", "Try again"],
   [{ code: "plan_capacity_exceeded", overByCredits: 9 }, "This plan needs more room", "Review selections"],
   [{ code: "plan_sequence_capacity_exceeded", courseCodes: ["01:198:112"] }, "A course sequence needs more time", "Review course order"],
+  [{ code: "cyclic_prerequisite", courseCodes: ["01:198:111"] }, "A prerequisite loop needs attention", "Review course details"],
   [{ code: "locked_prerequisite_violation", courseCode: "01:198:112" }, "A pinned course is too early", "Review pinned courses"],
   [{ code: "source_conflict", sourceCount: 2 }, "Rutgers sources disagree", "Review source details"],
   [{ code: "something_new", detail: "stack trace" }, "Something went wrong", "Try again"],
@@ -46,4 +47,3 @@ test("repeated issues are grouped by the action a student can take", () => {
   assert.equal(groups.length, 3);
   assert.equal(groups.find((group) => group.primaryAction === "Review pinned courses").count, 2);
 });
-

@@ -66,6 +66,12 @@
       message: `${issue?.courseCode || "A course"} is pinned before a required earlier course can be completed.`,
       primaryAction: "Review pinned courses",
     });
+    if (code === "cyclic_prerequisite") return presentation(issue, {
+      title: "A prerequisite loop needs attention",
+      message: `${issue?.courseCodes?.length ? issue.courseCodes.join(", ") : "Two or more courses"} refer to one another in a way that prevents a safe order.`,
+      primaryAction: "Review course details",
+      secondaryAction: "Review selections",
+    });
     if (code === "courses_unplaced") return presentation(issue, {
       title: "Some required courses could not be placed",
       message: "Their prerequisites, timing, or semester limits conflict with the current plan.",
