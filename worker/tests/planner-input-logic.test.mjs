@@ -71,6 +71,47 @@ test("normalizing an authoritative course fact record is lossless", () => {
   ]);
 });
 
+test("catalog-parsed facts outside the active degree path remain advisory", () => {
+  const normalized = plannerInput().normalizedCourse({
+    code: "01:640:151",
+    title: "Calculus I",
+    credits: 4,
+    prerequisitePaths: [["01:640:115"], ["01:640:112"]],
+    enforceablePrerequisitePaths: [["01:640:115"], ["01:640:112"]],
+    ruleCoverage: "catalog_parsed",
+  }, {
+    knownCourseCodes: new Set(["01:640:151", "01:640:152"]),
+    completedCourseCodes: new Set(),
+  });
+
+  assert.deepEqual(plain(normalized.prerequisitePaths), [["01:640:115"], ["01:640:112"]]);
+  assert.deepEqual(plain(normalized.enforceablePrerequisitePaths), []);
+});
+
+test("catalog-parsed facts enforce only complete paths available in the active degree plan", () => {
+  const normalized = plannerInput().normalizedCourse({
+    code: "01:640:300",
+    title: "Introduction to Mathematical Reasoning",
+    credits: 3,
+    prerequisitePaths: [["01:640:250"], ["01:640:350"], ["21:640:350"]],
+    enforceablePrerequisitePaths: [["01:640:250"], ["01:640:350"], ["21:640:350"]],
+    ruleCoverage: "catalog_parsed",
+  }, {
+    knownCourseCodes: new Set(["01:640:250", "01:640:300", "01:640:350"]),
+    completedCourseCodes: new Set(),
+  });
+
+  assert.deepEqual(plain(normalized.prerequisitePaths), [
+    ["01:640:250"],
+    ["01:640:350"],
+    ["21:640:350"],
+  ]);
+  assert.deepEqual(plain(normalized.enforceablePrerequisitePaths), [
+    ["01:640:250"],
+    ["01:640:350"],
+  ]);
+});
+
 test("reviewed credit exclusions become planner constraint families", () => {
   const normalized = plannerInput().normalizedCourse({
     code: "01:640:252",

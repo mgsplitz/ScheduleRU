@@ -40,6 +40,17 @@ test("keeps only New Brunswick Differential Equations alternatives", () => {
   ]);
 });
 
+test("discards impossible self-referential catalog prerequisite alternatives", () => {
+  const result = compileCourseRules({
+    code: "01:640:350",
+    catalogPrereqs: "(01:640:250 and 01:640:300 and 01:640:251) OR (01:640:350 and 01:640:300 and 01:640:291)",
+  });
+
+  assert.deepEqual(result.prerequisitePaths, [
+    ["01:640:250", "01:640:300", "01:640:251"],
+  ]);
+});
+
 test("does not interpret conjunctions inside course titles as grammar", () => {
   const result = compileCourseRules({
     code: "01:999:401",

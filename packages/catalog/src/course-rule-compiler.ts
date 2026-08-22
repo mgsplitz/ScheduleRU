@@ -149,8 +149,9 @@ function campusForCourse(code: string): "new_brunswick" | "newark" | "camden" | 
 
 function campusRelevantPaths(courseCode: string, paths: string[][]): string[][] {
   const campus = campusForCourse(courseCode);
-  if (!campus) return paths;
-  return paths.filter((path) => path.every((code) => campusForCourse(code) === campus));
+  return paths.filter((path) =>
+    !path.includes(courseCode)
+      && (!campus || path.every((code) => campusForCourse(code) === campus)));
 }
 
 function conditionValue(condition: ReviewedCondition): Record<string, unknown> | null {
