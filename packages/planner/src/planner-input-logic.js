@@ -130,6 +130,16 @@
     };
   }
 
+  function reconcileEnforceablePaths(coursesByCode, completedCourseCodes = new Set()) {
+    const activeCourseCodes = new Set(coursesByCode.keys());
+    coursesByCode.forEach((course, code) => {
+      if (course.ruleCoverage === "reviewed") return;
+      course.enforceablePrerequisitePaths = normalizedCoursePaths(course.enforceablePrerequisitePaths)
+        .filter((path) => !path.includes(code) && path.every((prerequisiteCode) =>
+          activeCourseCodes.has(prerequisiteCode) || completedCourseCodes.has(prerequisiteCode)));
+    });
+  }
+
   function parsedGroupSelectors(group) {
     return (group?.courseSelectors || []).map((entry) => {
       const raw = entry?.selector_json ?? entry;
@@ -485,6 +495,7 @@
       course.code,
       normalizedCourse(course, planningContext),
     ));
+    reconcileEnforceablePaths(normalizedByCode, completed);
 
     // A required downstream course may depend on one option from an unresolved
     // reviewed choice group. Promote the first complete, deterministic path
@@ -526,7 +537,7 @@
       if (prerequisiteVisited.has(code)) continue;
       prerequisiteVisited.add(code);
       const course = normalizedByCode.get(code);
-      const paths = course?.prerequisitePaths || [];
+      const paths = course?.enforceablePrerequisitePaths || [];
       const path = paths.map((candidate, index) => ({ candidate, index }))
         .filter(({ candidate }) => candidate.every((prerequisiteCode) =>
           prerequisiteCanBePlanned(prerequisiteCode)))
@@ -570,6 +581,8 @@
         ));
       }
     });
+
+    reconcileEnforceablePaths(normalizedByCode, completed);
 
     const prerequisitePathsByCode = {};
     const enforceablePrerequisitePathsByCode = {};
@@ -622,12 +635,13 @@
       remainingAllocations.set(decisionId, remaining - 1);
       return false;
     });
-    const byCode = new Map((input.courses || []).map((course) => [course.code, course]));
+    const byCode = new Map((input.courses || []).map((course) => [course.code, { ...course }]));
     (optimization.selectedCourses || []).forEach((course) => {
       if (validCode(course?.code)) byCode.set(course.code, { ...course });
     });
-    const prerequisitePathsByCode = { ...(input.prerequisitePathsByCode || {}) };
-    const enforceablePrerequisitePathsByCode = { ...(input.enforceablePrerequisitePathsByCode || {}) };
+    reconcileEnforceablePaths(byCode, new Set(input.completedCourseCodes || []));
+    const prerequisitePathsByCode = {};
+    const enforceablePrerequisitePathsByCode = {};
     byCode.forEach((course) => {
       if (course.prerequisitePaths?.length) prerequisitePathsByCode[course.code] = course.prerequisitePaths;
       if (course.enforceablePrerequisitePaths?.length) {
