@@ -727,6 +727,55 @@
       "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-concentration"
     },
     {
+      "condition_key": "calculus-i",
+      "condition_type": "prerequisite_course",
+      "condition_value": {
+        "any_of_course_codes": [
+          "01:640:130",
+          "01:640:135",
+          "01:640:151"
+        ]
+      },
+      "course_code": "33:136:385",
+      "review_status": "reviewed",
+      "reviewed_at": 1787371200000,
+      "source_date": "2026-08-22",
+      "source_label": "RBS New Brunswick BAIT Requirements",
+      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
+    },
+    {
+      "condition_key": "statistics",
+      "condition_type": "prerequisite_course",
+      "condition_value": {
+        "any_of_course_codes": [
+          "01:960:285"
+        ]
+      },
+      "course_code": "33:136:385",
+      "review_status": "reviewed",
+      "reviewed_at": 1787371200000,
+      "source_date": "2026-08-22",
+      "source_label": "RBS New Brunswick BAIT Requirements",
+      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
+    },
+    {
+      "condition_key": "calculus-i",
+      "condition_type": "prerequisite_course",
+      "condition_value": {
+        "any_of_course_codes": [
+          "01:640:130",
+          "01:640:135",
+          "01:640:151"
+        ]
+      },
+      "course_code": "33:136:386",
+      "review_status": "reviewed",
+      "reviewed_at": 1787371200000,
+      "source_date": "2026-08-22",
+      "source_label": "RBS New Brunswick BAIT Requirements",
+      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
+    },
+    {
       "condition_key": "statistics",
       "condition_type": "prerequisite_course",
       "condition_value": {
@@ -755,6 +804,30 @@
       "source_date": "2026-07-19",
       "source_label": "RBS New Brunswick Business Analytics Concentration",
       "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-concentration"
+    },
+    {
+      "campus_slug": "rbsnb",
+      "catalog_year": "25-26",
+      "course_code": "33:136:385",
+      "no_known_conditions": false,
+      "note": "RBS lists Introductory Statistics for Business and Calculus I, with 01:640:130 or 01:640:151 accepted in place of 01:640:135.",
+      "review_status": "reviewed",
+      "reviewed_at": 1787371200000,
+      "source_date": "2026-08-22",
+      "source_label": "RBS New Brunswick BAIT Requirements",
+      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
+    },
+    {
+      "campus_slug": "rbsnb",
+      "catalog_year": "25-26",
+      "course_code": "33:136:386",
+      "no_known_conditions": false,
+      "note": "RBS lists Calculus I, with 01:640:130 or 01:640:151 accepted in place of 01:640:135.",
+      "review_status": "reviewed",
+      "reviewed_at": 1787371200000,
+      "source_date": "2026-08-22",
+      "source_label": "RBS New Brunswick BAIT Requirements",
+      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
     },
     {
       "campus_slug": "sasnb",
