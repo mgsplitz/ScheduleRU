@@ -393,7 +393,8 @@
 
     function score(state) {
       const completeCodes = selectedWithPrerequisites(state.selected);
-      const records = [...completeCodes].map((code) => candidateByAlias.get(code)).filter(Boolean);
+      const records = [...completeCodes].map((code) => candidateByAlias.get(code)).filter((candidate) =>
+        candidate && !candidateIsPlanned(candidate, candidate.code));
       const credits = records.reduce((sum, item) => sum + (Number(item.credits) || 3), 0);
       const coverageUnits = [...state.allocations.values()].reduce((sum, ids) => sum + ids.length, 0);
       let interest = 0;
@@ -462,7 +463,8 @@
       const available = (candidateByRequirement.get(requirement.id) || [])
         .filter((candidate) => candidateCanCoverRequirement(candidate, requirement, state))
         .sort((left, right) =>
-          preferenceRank(left, requirement, preferences) - preferenceRank(right, requirement, preferences)
+          Number(!candidateIsPlanned(left, left.code)) - Number(!candidateIsPlanned(right, right.code))
+          || preferenceRank(left, requirement, preferences) - preferenceRank(right, requirement, preferences)
           || right.coverageRequirementIds.filter((id) => (state.counts.get(id) || 0) > 0).length
             - left.coverageRequirementIds.filter((id) => (state.counts.get(id) || 0) > 0).length
           || (unlockCounts.get(right.code) || 0) - (unlockCounts.get(left.code) || 0)
@@ -533,7 +535,7 @@
         coverageRequirementIds: [...(chosen.allocations.get(candidate.code) || [])].sort(),
         prerequisiteOnly: !chosen.selected.has(candidate.code),
       };
-    });
+    }).filter((candidate) => !candidateIsPlanned(candidate, candidate.code));
     const explanations = [];
     selectedCourses.filter((item) => item.prerequisiteOnly).forEach((item) => {
       const aliases = item.equivalentCourseCodes || [item.code];
