@@ -216,6 +216,46 @@ test("reuses a course already in the four-year plan instead of adding a duplicat
   assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), ["01:640:152"]);
 });
 
+test("a course already required by the degree satisfies an overlapping Core choice at zero added cost", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [{ id: "core:qq", label: "Quantitative Information", slotCount: 1 }],
+    candidates: [
+      {
+        code: "01:640:112",
+        title: "Precalculus Part II",
+        credits: 2,
+        equivalentCourseCodes: ["01:640:112"],
+        coverageRequirementIds: ["core:qq"],
+        prerequisitePaths: [["01:640:111"]],
+        prerequisiteClosure: ["01:640:111"],
+      },
+      {
+        code: "01:640:151",
+        title: "Calculus I",
+        credits: 4,
+        equivalentCourseCodes: ["01:640:151"],
+        coverageRequirementIds: ["core:qq"],
+        prerequisitePaths: [],
+        prerequisiteClosure: [],
+      },
+      {
+        code: "01:640:111",
+        title: "Precalculus Part I",
+        credits: 2,
+        equivalentCourseCodes: ["01:640:111"],
+        coverageRequirementIds: [],
+        prerequisitePaths: [],
+        prerequisiteClosure: [],
+      },
+    ],
+    conflicts: [],
+    plannedCourseCodes: ["01:640:151"],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses), []);
+});
+
 test("adds missing prerequisite support for fixed courses already required by the degree", () => {
   const result = optimizer().optimizeCourseSet({
     requirements: [requirement("writing")],

@@ -439,3 +439,37 @@ test("the browser-to-optimizer boundary preserves courses already placed in the 
 
   assert.deepEqual(plain(graph.plannedCourseCodes), ["01:640:151"]);
 });
+
+test("the coverage-to-optimizer boundary applies an already-required course to Core without adding a cheaper duplicate path", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [{
+      ...decision("core-quantitative", "rutgers-nb-core", [
+        candidate("01:640:112", {
+          title: "Precalculus Part II",
+          prerequisitePaths: [["01:640:111"]],
+          enforceablePrerequisitePaths: [["01:640:111"]],
+          ruleCoverage: "catalog_parsed",
+        }),
+        candidate("01:640:151", {
+          title: "Calculus I",
+          prerequisitePaths: [],
+          enforceablePrerequisitePaths: [],
+          ruleCoverage: "catalog_parsed",
+        }),
+      ]),
+      sourceType: "core",
+      prerequisiteCourses: [candidate("01:640:111", {
+        title: "Precalculus Part I",
+        prerequisitePaths: [],
+        enforceablePrerequisitePaths: [],
+        ruleCoverage: "catalog_parsed",
+      })],
+    }],
+    plannedCourseCodes: ["01:640:151"],
+  });
+
+  const result = context.globalThis.ScheduleRUCourseSetOptimizer.optimizeCourseSet(graph);
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses), []);
+});
