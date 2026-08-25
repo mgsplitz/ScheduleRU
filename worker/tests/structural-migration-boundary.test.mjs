@@ -8,7 +8,7 @@ test("all maintained SQL lives in the root structural migration boundary", async
   const files = (await readdir(new URL("migrations/", ROOT)))
     .filter((name) => name.endsWith(".sql"))
     .sort();
-  assert.equal(files.length, 28);
+  assert.equal(files.length, 29);
   await assert.rejects(access(new URL("worker/schema/", ROOT)));
 });
 

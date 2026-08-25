@@ -20,6 +20,7 @@ export interface ReferenceDataPublishResult {
     double_count_policies: number;
     double_count_exceptions: number;
     requirement_course_equivalencies: number;
+    course_prerequisite_substitutions: number;
     ap_equivalencies: number;
     course_eligibility_reviews: number;
     course_eligibility_conditions: number;
@@ -54,6 +55,7 @@ export async function publishReferenceDataBundle(
     statement(database, "DELETE FROM course_eligibility_conditions"),
     statement(database, "DELETE FROM course_eligibility_reviews"),
     statement(database, "DELETE FROM ap_equivalencies"),
+    statement(database, "DELETE FROM course_prerequisite_substitutions"),
     statement(database, "DELETE FROM requirement_course_equivalencies"),
     statement(database, "DELETE FROM double_count_exceptions"),
     statement(database, "DELETE FROM double_count_policies"),
@@ -197,6 +199,26 @@ export async function publishReferenceDataBundle(
       row.review_status,
     ));
   }
+  for (const row of ordered(bundle.course_prerequisite_substitutions)) {
+    statements.push(statement(
+      database,
+      `INSERT INTO course_prerequisite_substitutions (
+         required_course_code, satisfying_course_code, campus_slug,
+         catalog_year, note, source_url, source_label, source_date,
+         review_status, reviewed_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      row.required_course_code,
+      row.satisfying_course_code,
+      row.campus_slug,
+      row.catalog_year,
+      row.note,
+      row.source_url,
+      row.source_label,
+      row.source_date,
+      row.review_status,
+      row.reviewed_at,
+    ));
+  }
   for (const row of ordered(bundle.ap_equivalencies)) {
     statements.push(statement(
       database,
@@ -298,6 +320,8 @@ export async function publishReferenceDataBundle(
       double_count_exceptions: bundle.double_count_exceptions.length,
       requirement_course_equivalencies:
         bundle.requirement_course_equivalencies.length,
+      course_prerequisite_substitutions:
+        bundle.course_prerequisite_substitutions.length,
       ap_equivalencies: bundle.ap_equivalencies.length,
       course_eligibility_reviews: bundle.course_eligibility_reviews.length,
       course_eligibility_conditions: bundle.course_eligibility_conditions.length,

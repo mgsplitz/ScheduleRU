@@ -117,6 +117,18 @@ function rows(): Record<string, Row[]> {
       review_status: "reviewed",
       verified_at: 1785456000000,
     }],
+    "prerequisite-substitutions": [{
+      required_course_code: "01:999:201",
+      satisfying_course_code: "01:999:202",
+      campus_slug: "new-brunswick",
+      catalog_year: "2026-2027",
+      note: "Approved prerequisite substitution.",
+      source_url: "https://example.rutgers.edu/course",
+      source_label: "Example course page",
+      source_date: "2026-08-01",
+      review_status: "reviewed",
+      reviewed_at: 1785542400000,
+    }],
     equivalencies: [{
       program_id: "example-major",
       requirement_course_code: "01:999:101",
@@ -198,6 +210,10 @@ test("exports all cross-program datasets and decodes stored JSON", async () => {
     value.double_count_exceptions[0]!.allowed_course_codes,
     ["01:999:301"],
   );
+  assert.equal(
+    value.course_prerequisite_substitutions[0]!.satisfying_course_code,
+    "01:999:202",
+  );
   assert.deepEqual(value.ap_equivalencies[0]!.equivalent_course_codes, [
     "01:999:101",
   ]);
@@ -220,6 +236,7 @@ test("exports all cross-program datasets and decodes stored JSON", async () => {
     "double-count-policies",
     "double-count-exceptions",
     "equivalencies",
+    "prerequisite-substitutions",
     "ap-equivalencies",
     "course-eligibility-reviews",
     "course-eligibility-conditions",

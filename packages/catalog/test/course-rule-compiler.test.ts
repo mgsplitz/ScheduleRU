@@ -28,6 +28,23 @@ test("preserves Brain-Inspired Computing prerequisite alternatives", () => {
   ]);
 });
 
+test("a reviewed directed substitution expands every matching prerequisite path", () => {
+  const result = compileCourseRules({
+    code: "01:198:999",
+    catalogPrereqs: "01:198:206 INTRODUCTION TO DISCRETE STRUCTURES II and 01:640:152 CALCULUS II",
+    prerequisiteSubstitutions: [{
+      required_course_code: "01:198:206",
+      satisfying_course_code: "01:640:477",
+      review_status: "reviewed",
+    }],
+  });
+
+  assert.deepEqual(result.prerequisitePaths, [
+    ["01:198:206", "01:640:152"],
+    ["01:640:477", "01:640:152"],
+  ]);
+});
+
 test("keeps only New Brunswick Differential Equations alternatives", () => {
   const result = compileCourseRules({
     code: "01:640:252",
@@ -58,6 +75,16 @@ test("does not interpret conjunctions inside course titles as grammar", () => {
   });
 
   assert.deepEqual(result.prerequisitePaths, [["01:640:136", "01:960:285"]]);
+});
+
+test("does not turn an equal-or-greater placement threshold into an exact prerequisite course", () => {
+  const result = compileCourseRules({
+    code: "01:640:250",
+    catalogPrereqs: "Any Course EQUAL or GREATER Than: 01:640:112 PRECALCULUS PART II",
+  });
+
+  assert.deepEqual(result.prerequisitePaths, []);
+  assert.deepEqual(result.enforceablePrerequisitePaths, []);
 });
 
 test("reviewed conditions override catalog wording and carry exclusion families", () => {

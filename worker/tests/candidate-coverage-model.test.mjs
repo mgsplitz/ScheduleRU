@@ -29,6 +29,7 @@ const candidate = (code, extras = {}) => ({
   title: `Course ${code}`,
   credits: 3,
   prerequisitePaths: [],
+  ruleCoverage: "catalog_parsed",
   ...extras,
 });
 
@@ -239,7 +240,12 @@ test("canonical prerequisite records keep prerequisite-only recommendations read
         title: "Logic of Decision",
         prerequisitePaths: [["01:730:407"]],
       })]),
-      prerequisiteCourses: [{ code: "01:730:407", title: "Intermediate Logic I", credits: 3 }],
+      prerequisiteCourses: [{
+        code: "01:730:407",
+        title: "Intermediate Logic I",
+        credits: 3,
+        ruleCoverage: "catalog_parsed",
+      }],
     }],
   });
 
@@ -319,6 +325,24 @@ test("publication readiness excludes a selectable course when every prerequisite
   assert.deepEqual(plain(graph.publicationIssues), [{
     candidateCode: "01:830:322",
     missingCourseCodes: ["01:830:300"],
+    type: "candidate_not_publication_ready",
+  }]);
+});
+
+test("publication readiness excludes a selectable course whose academic rules are unresolved", () => {
+  const graph = model().buildCoverageGraph({
+    decisions: [decision("cs-elective", "sasnb-computer-science-minor", [candidate("01:198:411", {
+      title: "Computer Architecture II",
+      prerequisitePaths: [],
+      enforceablePrerequisitePaths: [],
+      ruleCoverage: "unresolved",
+    })])],
+  });
+
+  assert.equal(graph.candidates.some((course) => course.code === "01:198:411"), false);
+  assert.deepEqual(plain(graph.publicationIssues), [{
+    candidateCode: "01:198:411",
+    missingCourseCodes: [],
     type: "candidate_not_publication_ready",
   }]);
 });
@@ -413,9 +437,9 @@ test("the coverage-to-optimizer boundary keeps prerequisite alternatives exclusi
         prerequisitePaths: [["01:355:101"], ["01:355:103"], ["01:355:104"]],
       })]),
       prerequisiteCourses: [
-        { code: "01:355:101", title: "College Writing", credits: 3 },
-        { code: "01:355:103", title: "Exposition and Argument", credits: 3 },
-        { code: "01:355:104", title: "College Writing Extended", credits: 4.5 },
+        { code: "01:355:101", title: "College Writing", credits: 3, ruleCoverage: "catalog_parsed" },
+        { code: "01:355:103", title: "Exposition and Argument", credits: 3, ruleCoverage: "catalog_parsed" },
+        { code: "01:355:104", title: "College Writing Extended", credits: 4.5, ruleCoverage: "catalog_parsed" },
       ],
     }],
   });

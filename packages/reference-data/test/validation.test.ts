@@ -50,6 +50,24 @@ test("rejects duplicate natural keys and malformed course codes", () => {
   assert.ok(result.issues.some(({ code }) => code === "invalid_course_code"));
 });
 
+test("directed prerequisite substitutions require distinct course codes and reviewed provenance", () => {
+  const value = bundle();
+  const substitutions = value.course_prerequisite_substitutions as Array<Record<string, unknown>>;
+  substitutions[0]!.satisfying_course_code = substitutions[0]!.required_course_code;
+  substitutions[0]!.source_url = "https://example.com/not-rutgers";
+
+  const result = validateReferenceDataBundle(value);
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.deepEqual(
+    result.issues.map(({ path }) => path),
+    [
+      "course_prerequisite_substitutions[0].source_url",
+      "course_prerequisite_substitutions[0]",
+    ],
+  );
+});
+
 test("validates school-wide double-count policy scopes and caps", () => {
   const value = bundle();
   const rows = value.double_count_policies as Array<Record<string, unknown>>;

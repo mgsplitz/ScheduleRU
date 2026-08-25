@@ -78,6 +78,18 @@ export function bundle(): Record<string, unknown> {
       source_label: "Degree Navigator",
       review_status: "reviewed",
     }],
+    course_prerequisite_substitutions: [{
+      required_course_code: "01:999:201",
+      satisfying_course_code: "01:999:202",
+      campus_slug: "new-brunswick",
+      catalog_year: "2026-2027",
+      note: "The second course satisfies prerequisites that name the first course.",
+      source_url: "https://example.rutgers.edu/course",
+      source_label: "Example course page",
+      source_date: "2026-08-01",
+      review_status: "reviewed",
+      reviewed_at: 1785542400000,
+    }],
     ap_equivalencies: [{
       id: "ap-example",
       exam_name: "Example Studies",

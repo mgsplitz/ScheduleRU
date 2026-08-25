@@ -28,6 +28,10 @@ test("site configuration separates production, branch, and local storage", () =>
     client.siteConfig({ hostname: "localhost" }).defaultUrl,
     "https://rutgers-course-sync-dev.housselllaura.workers.dev",
   );
+  assert.equal(
+    client.siteConfig({ hostname: "[::1]" }).defaultUrl,
+    "https://rutgers-course-sync-dev.housselllaura.workers.dev",
+  );
 });
 
 test("backend URL persistence normalizes the value and tolerates unavailable storage", () => {

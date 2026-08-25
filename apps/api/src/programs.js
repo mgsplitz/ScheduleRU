@@ -83,7 +83,7 @@ import { compileCourseRules } from "../../../packages/catalog/src/course-rule-co
 
 export { parseBizTable, groupAppliesToSelection, allocationForConditions };
 
-export function compilePublicCourseRules(row = {}) {
+export function compilePublicCourseRules(row = {}, prerequisiteSubstitutions = []) {
   return compileCourseRules({
     code: row.course_code || row.equivalent_course_code,
     catalogRecordAvailable: !!(row.catalog_title || row.catalog_record_available),
@@ -91,7 +91,20 @@ export function compilePublicCourseRules(row = {}) {
     catalogRestrictions: row.section_restrictions || row.catalog_restrictions,
     requirementNotes: [row.note].filter(Boolean),
     reviewedEligibility: row.eligibility,
+    prerequisiteSubstitutions,
   });
+}
+
+export async function getReviewedPrerequisiteSubstitutions(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT required_course_code, satisfying_course_code, campus_slug,
+            catalog_year, note, source_url, source_label, source_date,
+            review_status, reviewed_at
+     FROM course_prerequisite_substitutions
+     WHERE review_status = 'reviewed'
+     ORDER BY required_course_code, satisfying_course_code`
+  ).bind().all();
+  return results || [];
 }
 
 function normalizedCatalogText(value) {
@@ -458,6 +471,7 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
      LEFT JOIN course_reference cr ON cr.course_code = e.equivalent_course_code
      WHERE e.program_id IN (${placeholders}) AND e.review_status = 'reviewed'`
   ).bind(...ownerIds).all();
+  const prerequisiteSubstitutions = await getReviewedPrerequisiteSubstitutions(env);
   const eligibilityByCode = await getReviewedCourseEligibility(env, [
     ...courses.map((course) => course.course_code),
     ...alternatives.map((course) => course.equivalent_course_code),
@@ -465,7 +479,7 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
   const alternativesByRequirement = {};
   for (const alternative of alternatives) {
     alternative.eligibility = eligibilityByCode[alternative.equivalent_course_code] || null;
-    alternative.compiled_rules = compilePublicCourseRules(alternative);
+    alternative.compiled_rules = compilePublicCourseRules(alternative, prerequisiteSubstitutions);
     const key = `${alternative.program_id}::${alternative.requirement_course_code}`;
     (alternativesByRequirement[key] ||= []).push(alternative);
   }
@@ -474,7 +488,7 @@ async function getRequirementTree(env, programId, selectedProgramIds = [programI
   for (const c of courses) {
     c.alternatives = alternativesByRequirement[`${c.owner_program_id}::${c.course_code}`] || [];
     c.eligibility = eligibilityByCode[c.course_code] || null;
-    c.compiled_rules = compilePublicCourseRules(c);
+    c.compiled_rules = compilePublicCourseRules(c, prerequisiteSubstitutions);
     (byGroup[c.group_id] ||= []).push(c);
   }
   const allocationsByGroup = Object.fromEntries(visibleGroups.map((group) => [

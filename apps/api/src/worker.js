@@ -44,6 +44,7 @@
 
 import {
   compilePublicCourseRules,
+  getReviewedPrerequisiteSubstitutions,
   getReviewedCourseEligibility,
   handleProgramsApi,
 } from "./programs.js";
@@ -575,6 +576,7 @@ async function handleApi(request, env, ctx) {
     const eligibilityByCode = typeof env.DB.batch === "function"
       ? await getReviewedCourseEligibility(env, codes)
       : {};
+    const prerequisiteSubstitutions = await getReviewedPrerequisiteSubstitutions(env);
     return json({ courses: (results || []).map((course) => {
       const eligibility = eligibilityByCode[course.course_code] || null;
       return {
@@ -585,7 +587,7 @@ async function handleApi(request, env, ctx) {
           catalog_title: course.title,
           catalog_record_available: true,
           eligibility,
-        }),
+        }, prerequisiteSubstitutions),
       };
     }) });
   }
@@ -695,6 +697,7 @@ async function handleApi(request, env, ctx) {
     const eligibilityByCode = typeof env.DB.batch === "function"
       ? await getReviewedCourseEligibility(env, codes)
       : {};
+    const prerequisiteSubstitutions = await getReviewedPrerequisiteSubstitutions(env);
     const courses = results.map((course) => {
       let attributes = [];
       try { attributes = JSON.parse(course.attributes_json || "[]"); } catch (_) { attributes = []; }
@@ -712,7 +715,7 @@ async function handleApi(request, env, ctx) {
         catalog_prereqs: canonicalPrereqs,
         catalog_restrictions: canonicalRestrictions,
         eligibility,
-      });
+      }, prerequisiteSubstitutions);
       const academicRules = compiledRules.ruleCoverage !== "unresolved"
         || compiledRules.creditExclusionFamilies.length
         ? compiledRules

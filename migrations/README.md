@@ -44,6 +44,7 @@ Then apply the additive files needed by the current application:
 18. `schema_ap_equivalencies.sql`
 19. `schema_course_requirement_attributes.sql`
 20. `schema_course_credit_exclusions.sql`
+21. `schema_course_prerequisite_substitutions.sql`
 
 `schema_requirement_context_and_overlap_exceptions.sql` is retained for older
 databases; its tables are already present in the current base program schema.

@@ -33,6 +33,11 @@ type CompileCourseRulesInput = {
   catalogRestrictions?: string;
   requirementNotes?: string[];
   reviewedEligibility?: ReviewedEligibility;
+  prerequisiteSubstitutions?: Array<{
+    required_course_code?: string;
+    satisfying_course_code?: string;
+    review_status?: string;
+  }>;
 };
 
 type Token = { type: "course" | "(" | ")" | "and" | "or"; value: string };
@@ -67,6 +72,31 @@ function combinePaths(left: string[][], right: string[][]): string[][] {
   return left.flatMap((leftPath) => right.map((rightPath) => unique([...leftPath, ...rightPath])));
 }
 
+function expandPrerequisiteSubstitutions(
+  paths: string[][],
+  substitutions: CompileCourseRulesInput["prerequisiteSubstitutions"],
+): string[][] {
+  const satisfyingByRequired = new Map<string, string[]>();
+  for (const row of substitutions || []) {
+    if (row.review_status !== "reviewed") continue;
+    const required = String(row.required_course_code || "");
+    const satisfying = String(row.satisfying_course_code || "");
+    if (!COURSE_CODE.test(required) || !COURSE_CODE.test(satisfying) || required === satisfying) continue;
+    satisfyingByRequired.set(required, unique([
+      ...(satisfyingByRequired.get(required) || []),
+      satisfying,
+    ]).sort());
+  }
+  if (!satisfyingByRequired.size) return paths;
+  return deduplicatePaths(paths.flatMap((path) => path.reduce(
+    (expanded, code) => combinePaths(
+      expanded,
+      [code, ...(satisfyingByRequired.get(code) || [])].map((choice) => [choice]),
+    ),
+    [[]] as string[][],
+  )));
+}
+
 function expressionTokens(raw: string): Token[] {
   return [...cleanText(raw).matchAll(/\b\d{2}:\d{3}:\d{3}\b|\(|\)|\b(?:and|or)\b(?=\s*(?:\(|\d{2}:\d{3}:\d{3}\b))/gi)]
     .map((match) => {
@@ -79,7 +109,11 @@ function expressionTokens(raw: string): Token[] {
 }
 
 function parsedCatalogPaths(raw: string): string[][] {
-  const tokens = expressionTokens(raw);
+  const normalized = cleanText(raw);
+  if (/\b(?:equal\s+or\s+greater|permission|consent|placement|major|minor|standing|gpa|grade|credits?|co-?requisite)\b/i.test(normalized)) {
+    return [];
+  }
+  const tokens = expressionTokens(normalized);
   if (!tokens.some((token) => token.type === "course")) return [];
   let position = 0;
   const peek = () => tokens[position];
@@ -224,9 +258,13 @@ export function compileCourseRules(input: CompileCourseRulesInput = {}): Compile
   const verifiedNoConditions = reviewed
     && Number(eligibility?.review?.no_known_conditions) === 1
     && conditions.length === 0;
-  const prerequisitePaths = reviewedPrerequisites.length
+  const basePrerequisitePaths = reviewedPrerequisites.length
     ? reviewedPrerequisites
     : verifiedNoConditions ? [] : catalogPaths.length ? catalogPaths : requirementNotePaths;
+  const prerequisitePaths = expandPrerequisiteSubstitutions(
+    basePrerequisitePaths,
+    input.prerequisiteSubstitutions,
+  );
   const creditExclusionFamilies = unique((eligibility?.credit_exclusions || [])
     .map((policy) => cleanText(policy.policy_key))
     .filter(Boolean))

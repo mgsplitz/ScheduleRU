@@ -846,6 +846,55 @@ test("a required downstream course promotes one reviewed prerequisite choice wit
   assert.deepEqual(plain(result.unresolvedRequirements), []);
 });
 
+test("a catalog-parsed downstream course restores a prerequisite path after its course is explicitly added", () => {
+  const tree = {
+    roots: ["root"],
+    courses: {
+      dataManagement: {
+        code: "33:136:470",
+        title: "Business Data Management",
+        credits: "3",
+        prerequisitePaths: [["33:136:370", "33:136:388"]],
+        enforceablePrerequisitePaths: [["33:136:370", "33:136:388"]],
+        ruleCoverage: "catalog_parsed",
+      },
+      programming: {
+        code: "33:136:388",
+        title: "Foundations of Business Programming",
+        credits: "3",
+      },
+      informationSystems: {
+        code: "33:136:370",
+        title: "Management Information Systems",
+        credits: "3",
+      },
+    },
+    groups: {
+      root: {
+        id: "root",
+        name: "Business requirements",
+        rule: "all",
+        members: ["dataManagement", "programming"],
+        children: [],
+      },
+    },
+  };
+
+  const input = build({
+    requirementTrees: [{ id: "rbsnb-bait", tree }],
+    wishlistCourses: [tree.courses.informationSystems],
+  });
+
+  assert.deepEqual(plain(input.courses.map((course) => course.code).sort()), [
+    "33:136:370",
+    "33:136:388",
+    "33:136:470",
+  ]);
+  assert.deepEqual(plain(input.enforceablePrerequisitePathsByCode["33:136:470"]), [
+    ["33:136:370", "33:136:388"],
+  ]);
+});
+
 test("a wishlist alternative fulfills its canonical requirement without scheduling both courses", () => {
   const tree = sampleTree();
   tree.courses.businessComputer = {
@@ -968,6 +1017,37 @@ test("unresolved elective slots retain the prerequisite paths of their finite ca
 
   assert.equal(slots.length, 4);
   assert.ok(slots.every((slot) => slot.prerequisitePaths.some((path) => path.includes("01:640:251"))));
+});
+
+test("guided elective candidates retain canonical credit-exclusion families", () => {
+  const family = "rutgers-nb-differential-equations-credit";
+  const tree = {
+    roots: ["mathElectives"],
+    courses: {
+      engineering: {
+        code: "01:640:244", title: "Differential Equations for Engineering", credits: 3,
+        ruleCoverage: "reviewed", creditExclusionFamilies: [family],
+      },
+      elementary: {
+        code: "01:640:252", title: "Elementary Differential Equations", credits: 3,
+        ruleCoverage: "reviewed", creditExclusionFamilies: [family],
+      },
+    },
+    groups: {
+      mathElectives: {
+        id: "mathElectives", name: "Four Mathematics electives", rule: "min", count: 4,
+        members: ["engineering", "elementary"], children: [], sourceProgramId: "sasnb-mathematics-minor",
+      },
+    },
+  };
+
+  const result = build({ requirementTrees: [{ id: "sasnb-mathematics-minor", tree }] });
+  const decision = result.planningDecisions.find((item) => item.requirementGroupId === "mathElectives");
+  assert.ok(decision);
+  assert.deepEqual(
+    plain(decision.candidates.map((candidate) => candidate.creditExclusionFamilies)),
+    [[family], [family]],
+  );
 });
 
 test("prerequisite promotion prefers a path already required by the plan", () => {

@@ -300,7 +300,9 @@
       const normalizedCode = text(code);
       if (completedCodeSet.has(normalizedCode)) return true;
       const candidate = candidateByCode.get(normalizedCode);
-      if (!candidate || !studentReadyTitle(candidate.title)) return false;
+      if (!candidate
+        || !studentReadyTitle(candidate.title)
+        || ruleCoverageRank(candidate.ruleCoverage) === 0) return false;
       if (readiness.has(candidate.code)) return readiness.get(candidate.code);
       if (visiting.has(candidate.code)) return false;
       const nextVisiting = new Set(visiting).add(candidate.code);
