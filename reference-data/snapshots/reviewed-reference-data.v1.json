@@ -629,6 +629,10 @@
   "contract_version": 1,
   "course_credit_exclusion_members": [
     {
+      "course_code": "01:198:206",
+      "policy_key": "rutgers-nb-probability-credit"
+    },
+    {
       "course_code": "01:355:101",
       "policy_key": "rutgers-nb-college-writing-credit"
     },
@@ -651,6 +655,18 @@
     {
       "course_code": "01:640:292",
       "policy_key": "rutgers-nb-differential-equations-credit"
+    },
+    {
+      "course_code": "01:640:477",
+      "policy_key": "rutgers-nb-probability-credit"
+    },
+    {
+      "course_code": "01:960:381",
+      "policy_key": "rutgers-nb-probability-credit"
+    },
+    {
+      "course_code": "14:332:226",
+      "policy_key": "rutgers-nb-probability-credit"
     }
   ],
   "course_credit_exclusion_policies": [
@@ -658,13 +674,13 @@
       "campus_slug": "new-brunswick",
       "catalog_year": null,
       "max_courses": 1,
-      "note": "Students may receive degree credit for only one of College Writing, Exposition and Argument, or College Writing Extended.",
-      "policy_key": "rutgers-nb-college-writing-credit",
+      "note": "Students may receive credit for at most one course in this published probability family.",
+      "policy_key": "rutgers-nb-probability-credit",
       "review_status": "reviewed",
-      "reviewed_at": 1787205600000,
-      "source_date": "2026-08-20",
-      "source_label": "Rutgers Writing Program: College Writing",
-      "source_url": "https://wp.rutgers.edu/academics/undergraduate/courses/355-101"
+      "reviewed_at": 1787544000000,
+      "source_date": "2026-08-24",
+      "source_label": "Rutgers Mathematics: Mathematical Theory of Probability",
+      "source_url": "https://math.rutgers.edu/academics/undergraduate/course-descriptions/989-01-640-477-mathematical-theory-of-probability"
     },
     {
       "campus_slug": "new-brunswick",
@@ -677,9 +693,55 @@
       "source_date": "2026-08-20",
       "source_label": "Rutgers Mathematics: Elementary Differential Equations",
       "source_url": "https://www.math.rutgers.edu/academics/undergraduate/course-descriptions/950-01-640-252-elementary-differential-equations"
+    },
+    {
+      "campus_slug": "new-brunswick",
+      "catalog_year": null,
+      "max_courses": 1,
+      "note": "Students may receive degree credit for only one of College Writing, Exposition and Argument, or College Writing Extended.",
+      "policy_key": "rutgers-nb-college-writing-credit",
+      "review_status": "reviewed",
+      "reviewed_at": 1787205600000,
+      "source_date": "2026-08-20",
+      "source_label": "Rutgers Writing Program: College Writing",
+      "source_url": "https://wp.rutgers.edu/academics/undergraduate/courses/355-101"
     }
   ],
   "course_eligibility_conditions": [
+    {
+      "condition_key": "calculus-i",
+      "condition_type": "prerequisite_course",
+      "condition_value": {
+        "any_of_course_codes": [
+          "01:640:130",
+          "01:640:135",
+          "01:640:151"
+        ]
+      },
+      "course_code": "33:136:385",
+      "review_status": "reviewed",
+      "reviewed_at": 1787371200000,
+      "source_date": "2026-08-22",
+      "source_label": "RBS New Brunswick BAIT Requirements",
+      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
+    },
+    {
+      "condition_key": "calculus-i",
+      "condition_type": "prerequisite_course",
+      "condition_value": {
+        "any_of_course_codes": [
+          "01:640:130",
+          "01:640:135",
+          "01:640:151"
+        ]
+      },
+      "course_code": "33:136:386",
+      "review_status": "reviewed",
+      "reviewed_at": 1787371200000,
+      "source_date": "2026-08-22",
+      "source_label": "RBS New Brunswick BAIT Requirements",
+      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
+    },
     {
       "condition_key": "calculus-ii",
       "condition_type": "prerequisite_course",
@@ -727,55 +789,6 @@
       "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-concentration"
     },
     {
-      "condition_key": "calculus-i",
-      "condition_type": "prerequisite_course",
-      "condition_value": {
-        "any_of_course_codes": [
-          "01:640:130",
-          "01:640:135",
-          "01:640:151"
-        ]
-      },
-      "course_code": "33:136:385",
-      "review_status": "reviewed",
-      "reviewed_at": 1787371200000,
-      "source_date": "2026-08-22",
-      "source_label": "RBS New Brunswick BAIT Requirements",
-      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
-    },
-    {
-      "condition_key": "statistics",
-      "condition_type": "prerequisite_course",
-      "condition_value": {
-        "any_of_course_codes": [
-          "01:960:285"
-        ]
-      },
-      "course_code": "33:136:385",
-      "review_status": "reviewed",
-      "reviewed_at": 1787371200000,
-      "source_date": "2026-08-22",
-      "source_label": "RBS New Brunswick BAIT Requirements",
-      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
-    },
-    {
-      "condition_key": "calculus-i",
-      "condition_type": "prerequisite_course",
-      "condition_value": {
-        "any_of_course_codes": [
-          "01:640:130",
-          "01:640:135",
-          "01:640:151"
-        ]
-      },
-      "course_code": "33:136:386",
-      "review_status": "reviewed",
-      "reviewed_at": 1787371200000,
-      "source_date": "2026-08-22",
-      "source_label": "RBS New Brunswick BAIT Requirements",
-      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
-    },
-    {
       "condition_key": "statistics",
       "condition_type": "prerequisite_course",
       "condition_value": {
@@ -790,21 +803,24 @@
       "source_date": "2026-07-19",
       "source_label": "Rutgers Economics: Economics of Uncertainty",
       "source_url": "https://economics.rutgers.edu/academics/undergraduate/course-descriptions/course-details/223-upper-level-electives/861-01-220-481-economics-of-uncertainty-3"
+    },
+    {
+      "condition_key": "statistics",
+      "condition_type": "prerequisite_course",
+      "condition_value": {
+        "any_of_course_codes": [
+          "01:960:285"
+        ]
+      },
+      "course_code": "33:136:385",
+      "review_status": "reviewed",
+      "reviewed_at": 1787371200000,
+      "source_date": "2026-08-22",
+      "source_label": "RBS New Brunswick BAIT Requirements",
+      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
     }
   ],
   "course_eligibility_reviews": [
-    {
-      "campus_slug": "rbsnb",
-      "catalog_year": "Current RBS concentration page (catalog year not stated)",
-      "course_code": "33:136:405",
-      "no_known_conditions": false,
-      "note": "The RBS concentration page lists 33:136:386 as the prerequisite for Risk Modeling.",
-      "review_status": "reviewed",
-      "reviewed_at": 1784419200000,
-      "source_date": "2026-07-19",
-      "source_label": "RBS New Brunswick Business Analytics Concentration",
-      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-concentration"
-    },
     {
       "campus_slug": "rbsnb",
       "catalog_year": "25-26",
@@ -830,6 +846,18 @@
       "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-information-technology"
     },
     {
+      "campus_slug": "rbsnb",
+      "catalog_year": "Current RBS concentration page (catalog year not stated)",
+      "course_code": "33:136:405",
+      "no_known_conditions": false,
+      "note": "The RBS concentration page lists 33:136:386 as the prerequisite for Risk Modeling.",
+      "review_status": "reviewed",
+      "reviewed_at": 1784419200000,
+      "source_date": "2026-07-19",
+      "source_label": "RBS New Brunswick Business Analytics Concentration",
+      "source_url": "https://www.business.rutgers.edu/undergraduate-new-brunswick/business-analytics-concentration"
+    },
+    {
       "campus_slug": "sasnb",
       "catalog_year": "Current department page (catalog year not stated)",
       "course_code": "01:220:481",
@@ -852,6 +880,20 @@
       "source_date": "2026-07-29",
       "source_label": "Rutgers SAS Core: Writing and Communication",
       "source_url": "https://www.sasundergrad.rutgers.edu/majors-and-core-curriculum/core/cognitive-skills-and-processes-writing-and-communication"
+    }
+  ],
+  "course_prerequisite_substitutions": [
+    {
+      "campus_slug": "new-brunswick",
+      "catalog_year": null,
+      "note": "Mathematical Theory of Probability satisfies prerequisite paths that name Introduction to Discrete Structures II; this direction does not assert symmetric course equivalency.",
+      "required_course_code": "01:198:206",
+      "review_status": "reviewed",
+      "reviewed_at": 1787544000000,
+      "satisfying_course_code": "01:640:477",
+      "source_date": "2026-08-24",
+      "source_label": "Rutgers Degree Navigator prerequisite rule",
+      "source_url": "https://dn.rutgers.edu/"
     }
   ],
   "double_count_exceptions": [

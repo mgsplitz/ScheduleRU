@@ -95,6 +95,19 @@ export interface RequirementCourseEquivalency {
   review_status: "reviewed" | "needs_review";
 }
 
+export interface CoursePrerequisiteSubstitution {
+  required_course_code: string;
+  satisfying_course_code: string;
+  campus_slug: string;
+  catalog_year: string | null;
+  note: string;
+  source_url: string;
+  source_label: string;
+  source_date: string | null;
+  review_status: CourseEligibilityReviewStatus;
+  reviewed_at: number | null;
+}
+
 export interface ApEquivalency {
   id: string;
   exam_name: string;
@@ -170,6 +183,7 @@ export interface ReferenceDataBundle {
   double_count_policies: DoubleCountPolicy[];
   double_count_exceptions: DoubleCountException[];
   requirement_course_equivalencies: RequirementCourseEquivalency[];
+  course_prerequisite_substitutions: CoursePrerequisiteSubstitution[];
   ap_equivalencies: ApEquivalency[];
   course_eligibility_reviews: CourseEligibilityReview[];
   course_eligibility_conditions: CourseEligibilityCondition[];

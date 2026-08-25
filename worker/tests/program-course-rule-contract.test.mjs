@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { compilePublicCourseRules } from "../../apps/api/src/programs.js";
+import {
+  compilePublicCourseRules,
+  getReviewedPrerequisiteSubstitutions,
+} from "../../apps/api/src/programs.js";
 
 test("program API compiles its database row into the canonical academic-rule contract", () => {
   const rules = compilePublicCourseRules({
@@ -50,4 +53,43 @@ test("program API uses an official prerequisite note when archived catalog metad
     ["33:136:370"],
     ["33:010:458"],
   ]);
+});
+
+test("program API compiles reviewed directed prerequisite substitutions", () => {
+  const rules = compilePublicCourseRules({
+    course_code: "01:198:999",
+    catalog_title: "ADVANCED COMPUTER SCIENCE",
+    catalog_prereqs: "01:198:206 INTRODUCTION TO DISCRETE STRUCTURES II",
+  }, [{
+    required_course_code: "01:198:206",
+    satisfying_course_code: "01:640:477",
+    review_status: "reviewed",
+  }]);
+
+  assert.deepEqual(rules.prerequisitePaths, [
+    ["01:198:206"],
+    ["01:640:477"],
+  ]);
+});
+
+test("program API loads only reviewed directed prerequisite substitutions", async () => {
+  const rows = [{
+    required_course_code: "01:198:206",
+    satisfying_course_code: "01:640:477",
+    review_status: "reviewed",
+  }];
+  const env = {
+    DB: {
+      prepare(sql) {
+        assert.match(sql, /FROM course_prerequisite_substitutions/);
+        assert.match(sql, /review_status = 'reviewed'/);
+        return {
+          bind() { return this; },
+          async all() { return { results: rows }; },
+        };
+      },
+    },
+  };
+
+  assert.deepEqual(await getReviewedPrerequisiteSubstitutions(env), rows);
 });

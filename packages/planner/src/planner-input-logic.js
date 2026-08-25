@@ -134,7 +134,7 @@
     const activeCourseCodes = new Set(coursesByCode.keys());
     coursesByCode.forEach((course, code) => {
       if (course.ruleCoverage === "reviewed") return;
-      course.enforceablePrerequisitePaths = normalizedCoursePaths(course.enforceablePrerequisitePaths)
+      course.enforceablePrerequisitePaths = normalizedCoursePaths(course.prerequisitePaths)
         .filter((path) => !path.includes(code) && path.every((prerequisiteCode) =>
           activeCourseCodes.has(prerequisiteCode) || completedCourseCodes.has(prerequisiteCode)));
     });
@@ -212,6 +212,13 @@
           minimumPlanYear: eligibility.minimumPlanYear,
           minimumPriorCredits: eligibility.minimumPriorCredits,
           ruleCoverage: eligibility.ruleCoverage,
+          optionFamily: text(candidate.optionFamily) || null,
+          creditExclusionFamilies: unique([
+            ...(Array.isArray(candidate.creditExclusionFamilies) ? candidate.creditExclusionFamilies : []),
+            ...(Array.isArray(candidate?.eligibility?.credit_exclusions)
+              ? candidate.eligibility.credit_exclusions.map((policy) => policy?.policy_key)
+              : []),
+          ].map(text).filter(Boolean)),
           attributes: unique([
             ...(course.attributes || []),
             ...(group.rule === "distinct" ? (group.children || []).flatMap((childId) => {

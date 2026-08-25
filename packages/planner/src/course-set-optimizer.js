@@ -232,10 +232,19 @@
             (supporting.equivalentCourseCodes || [supporting.code]).forEach((code) => includedCodes.add(code));
             prerequisiteQueue.push(...(supporting.prerequisiteClosure || []));
           }
-          const candidateCodes = new Set([...componentCandidates, ...supportingCandidates].map((candidate) => candidate.code));
+          const scopedCandidates = [...componentCandidates, ...supportingCandidates].map((candidate) => ({
+            ...candidate,
+            // A planned or prerequisite-supporting course can be present in
+            // more than one disconnected component. Keep only coverage that
+            // belongs to this component so the recursive graph remains
+            // internally referentially complete.
+            coverageRequirementIds: (candidate.coverageRequirementIds || [])
+              .filter((id) => idSet.has(id)),
+          }));
+          const candidateCodes = new Set(scopedCandidates.map((candidate) => candidate.code));
           return optimizeCourseSet({
             requirements: requirements.filter((item) => idSet.has(item.id)),
-            candidates: [...componentCandidates, ...supportingCandidates],
+            candidates: scopedCandidates,
             conflicts: (graph.conflicts || []).filter((item) => candidateCodes.has(item.candidateCode)),
             completedCourseCodes: [...completedCourseCodes],
             plannedCourseCodes: [...plannedCourseCodes],
@@ -301,6 +310,17 @@
       return (candidate?.equivalentCourseCodes || [code]).some((alias) => plannedCourseCodes.has(alias));
     }
 
+    function creditExclusionConflictCount(codes) {
+      const familyCounts = new Map();
+      [...codes].forEach((code) => {
+        const candidate = candidateByAlias.get(code);
+        (candidate?.creditExclusionFamilies || []).forEach((family) => {
+          familyCounts.set(family, (familyCounts.get(family) || 0) + 1);
+        });
+      });
+      return [...familyCounts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
+    }
+
     function selectedWithPrerequisites(selectedCodes) {
       const result = new Set();
       function expandCandidate(candidate, code, ancestors, selected, forceSelected = false, fixedRoot = false) {
@@ -346,6 +366,7 @@
             index,
             expanded,
             additions: uniqueSorted(additions),
+            exclusionConflicts: creditExclusionConflictCount(expanded),
             unresolved: uniqueSorted(additions).filter((prerequisiteCode) =>
               !candidateByAlias.has(prerequisiteCode)).length,
             unrequestedHonors: uniqueSorted(additions).filter((prerequisiteCode) => {
@@ -356,7 +377,8 @@
               sum + (Number(candidateByAlias.get(prerequisiteCode)?.credits) || 3), 0),
           };
         }).sort((left, right) =>
-          left.unresolved - right.unresolved
+          left.exclusionConflicts - right.exclusionConflicts
+          || left.unresolved - right.unresolved
           || left.unrequestedHonors - right.unrequestedHonors
           || left.additions.length - right.additions.length
           || left.credits - right.credits
@@ -370,11 +392,19 @@
         const candidate = candidateByAlias.get(code);
         const canonical = candidate?.code || code;
         plannedCanonicalCodes.add(canonical);
-        expandCandidate(candidate, canonical, new Set(), result, true, true);
+      });
+      plannedCanonicalCodes.forEach((code) => result.add(code));
+      const selectedCanonicalCodes = [...selectedCodes].sort().map((code) =>
+        candidateByAlias.get(code)?.code || code);
+      selectedCanonicalCodes.forEach((code) => result.add(code));
+      [...plannedCourseCodes].sort().forEach((code) => {
+        const candidate = candidateByAlias.get(code);
+        expandCandidate(candidate, candidate?.code || code, new Set(), result, true, true);
       });
       plannedCanonicalCodes.forEach((code) => result.delete(code));
-      [...selectedCodes].sort().forEach((code) => {
+      selectedCanonicalCodes.forEach((code) => {
         const candidate = candidateByAlias.get(code);
+        if (candidateIsPlanned(candidate, code)) return;
         expandCandidate(candidate, candidate?.code || code, new Set(), result, true, false);
       });
       return result;
@@ -425,6 +455,7 @@
     }
 
     function consider(state) {
+      if (creditExclusionConflictCount(selectedWithPrerequisites(state.selected)) > 0) return;
       const candidate = { state, score: score(state) };
       if (!best || compareScore(candidate.score, best.score) < 0) best = candidate;
     }

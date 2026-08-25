@@ -43,12 +43,19 @@
       }
       return "";
     }
-    const expanded = (decisions || []).flatMap((decision) => {
+    const publicationReadyDecisions = (decisions || []).map((decision) => ({
+      ...decision,
+      candidates: (decision.candidates || []).filter((candidate) => candidate?.ruleCoverage !== "unresolved"),
+    }));
+    const expanded = publicationReadyDecisions.flatMap((decision) => {
       const families = new Map();
-      (decision.candidates || []).filter((candidate) => candidate.optionFamily).forEach((candidate) => {
-        const rows = families.get(candidate.optionFamily) || [];
+      (decision.candidates || []).forEach((candidate) => {
+        const family = candidate.optionFamily
+          || [...(candidate.creditExclusionFamilies || [])].filter(Boolean).sort()[0];
+        if (!family) return;
+        const rows = families.get(family) || [];
         rows.push(candidate);
-        families.set(candidate.optionFamily, rows);
+        families.set(family, rows);
       });
       const familyCandidates = new Set([...families.values()].flat().map((candidate) => candidate.code));
       const stages = [...families].filter(([, candidates]) => candidates.length > 1).map(([family, candidates]) => ({

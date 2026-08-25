@@ -59,6 +59,24 @@ test("Business decisions come first and Core decisions come last", () => {
   ]);
 });
 
+test("courses with unresolved academic rules never enter student guidance", () => {
+  const flow = modules().controller.create({
+    decisions: [{
+      requirementGroupId: "cs-electives",
+      sourceProgram: "sasnb-computer-science-minor",
+      sourceType: "program",
+      label: "Computer Science electives",
+      planningMode: "guided_flexible",
+      candidates: [
+        { code: "01:198:411", title: "Computer Architecture II", ruleCoverage: "unresolved" },
+        { code: "01:198:213", title: "Software Methodology", ruleCoverage: "catalog_parsed" },
+      ],
+    }],
+  });
+
+  assert.deepEqual(plain(flow.decisions()[0].candidates.map((course) => course.code)), ["01:198:213"]);
+});
+
 test("Core guidance begins with one consolidated optimization choice", () => {
   const flow = modules().controller.create({ decisions: decisions(), programs: [] });
   const coreStrategy = flow.decisions().find((item) => item.coreStrategy);
@@ -127,6 +145,26 @@ test("interchangeable alternatives receive a focused screen before the remaining
   assert.equal(ordered[0].label, "Choose one Differential Equations course");
   assert.deepEqual(plain(ordered[0].candidates.map(({ code }) => code)), ["01:640:244", "01:640:252"]);
   assert.deepEqual(plain(ordered[1].candidates.map(({ code }) => code)), ["01:640:300"]);
+});
+
+test("canonical credit-exclusion families create the focused alternative screen without UI hardcoding", () => {
+  const family = "rutgers-nb-differential-equations-credit";
+  const flow = modules().controller.create({ decisions: [{
+    decisionId: "math-electives", requirementGroupId: "math-electives",
+    sourceProgram: "mathematics", sourceType: "program", label: "Four Mathematics electives",
+    planningMode: "guided_flexible", slotCount: 4,
+    candidates: [
+      { code: "01:640:244", title: "Differential Equations for Engineering", creditExclusionFamilies: [family] },
+      { code: "01:640:252", title: "Elementary Differential Equations", creditExclusionFamilies: [family] },
+      { code: "01:640:300", title: "Introduction to Mathematical Reasoning", creditExclusionFamilies: [] },
+    ],
+  }] });
+
+  assert.deepEqual(
+    plain(flow.decisions()[0].candidates.map(({ code }) => code)),
+    ["01:640:244", "01:640:252"],
+  );
+  assert.equal(flow.decisions()[0].guidanceOnly, true);
 });
 
 test("interest buckets are exclusive and persist through a restarted flow", () => {

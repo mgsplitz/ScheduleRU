@@ -21,6 +21,33 @@ function catalogDb(results = []) {
   };
 }
 
+function catalogDbWithPrerequisiteSubstitution(courseRows) {
+  const calls = [];
+  return {
+    calls,
+    prepare(sql) {
+      return {
+        bind(...values) {
+          calls.push({ sql, values });
+          return {
+            async first() { return { n: courseRows.length }; },
+            async all() {
+              if (sql.includes("FROM course_prerequisite_substitutions")) {
+                return { results: [{
+                  required_course_code: "01:198:206",
+                  satisfying_course_code: "01:640:477",
+                  review_status: "reviewed",
+                }] };
+              }
+              return { results: courseRows };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
 test("catalog exposes reviewed leaf Core attributes for the standard filter", async () => {
   const db = catalogDb([{ attribute_code: "AH" }, { attribute_code: "AHp" }, { attribute_code: "WCr" }]);
   const response = await worker.fetch(new Request("https://example.test/api/course-attributes"), { DB: db }, {});
@@ -75,6 +102,46 @@ test("canonical metadata exposes the exact planner rule contract", async () => {
   assert.deepEqual(course.compiled_rules.enforceablePrerequisitePaths, [["33:390:400"]]);
   assert.equal(course.compiled_rules.minimumPlanYear, 3);
   assert.equal(course.compiled_rules.ruleCoverage, "catalog_parsed");
+});
+
+test("canonical metadata and selector candidates apply the same directed prerequisite substitutions", async () => {
+  const metadataDb = catalogDbWithPrerequisiteSubstitution([{
+    course_code: "01:198:425",
+    title: "Brain-Inspired Computing",
+    credits: "4",
+    catalog_prereqs: "(01:198:206 INTRODUCTION TO DISCRETE STRUCTURES II) and (01:640:152 CALCULUS II)",
+    catalog_restrictions: "",
+  }]);
+  const metadataResponse = await worker.fetch(
+    new Request("https://example.test/api/course-metadata?codes=01%3A198%3A425"),
+    { DB: metadataDb },
+    {},
+  );
+  const [metadataCourse] = (await metadataResponse.json()).courses;
+  assert.deepEqual(metadataCourse.compiled_rules.prerequisitePaths, [
+    ["01:198:206", "01:640:152"],
+    ["01:640:477", "01:640:152"],
+  ]);
+
+  const selectorDb = catalogDbWithPrerequisiteSubstitution([{
+    id: "01:198:425:2026:9",
+    school: "01",
+    subject_code: "198",
+    course_number: "425",
+    title: "BRAIN-INSPIRED COMPUTING",
+    canonical_prereqs: "(01:198:206 INTRODUCTION TO DISCRETE STRUCTURES II) and (01:640:152 CALCULUS II)",
+    canonical_restrictions: "",
+    attributes_json: "[]",
+  }]);
+  const selectorResponse = await worker.fetch(
+    new Request("https://example.test/api/courses?limit=25&offset=0"),
+    { DB: selectorDb },
+    {},
+  );
+  const [selectorCourse] = (await selectorResponse.json()).courses;
+  assert.deepEqual(selectorCourse.prerequisitePaths, metadataCourse.compiled_rules.prerequisitePaths);
+  assert.ok(metadataDb.calls.some(({ sql }) => sql.includes("FROM course_prerequisite_substitutions")));
+  assert.ok(selectorDb.calls.some(({ sql }) => sql.includes("FROM course_prerequisite_substitutions")));
 });
 
 test("canonical metadata gives a reviewed no-condition fact precedence over raw catalog prerequisites", async () => {
@@ -194,13 +261,14 @@ test("catalog selector filtering happens in D1 before limit and offset", async (
     creditExclusionFamilies: [],
     ruleCoverage: "catalog_parsed",
   }]);
-  assert.equal(db.calls.length, 2);
+  assert.equal(db.calls.length, 3);
   assert.match(db.calls[0].sql, /FROM courses c WHERE/);
   assert.match(db.calls[0].sql, /CAST\(c\.course_number AS INTEGER\) BETWEEN \? AND \?/);
   assert.match(db.calls[0].sql, /NOT IN \(SELECT value FROM json_each\(\?\)\)/);
   assert.match(db.calls[1].sql, /LIMIT \? OFFSET \?$/);
   assert.deepEqual(db.calls[0].values, ["01", "640", 300, 499, '["01:640:491"]']);
   assert.deepEqual(db.calls[1].values, ["01", "640", 300, 499, '["01:640:491"]', 25, 0]);
+  assert.match(db.calls[2].sql, /FROM course_prerequisite_substitutions/);
 });
 
 test("catalog candidates expose the same compiled prerequisite and standing facts as the planner", async () => {
@@ -237,12 +305,13 @@ test("catalog search qualifies course columns when canonical metadata is joined"
   );
 
   assert.equal(response.status, 200);
-  assert.equal(db.calls.length, 2);
+  assert.equal(db.calls.length, 3);
   assert.doesNotMatch(db.calls[0].sql, /LOWER\(title\)/);
   assert.doesNotMatch(db.calls[1].sql, /LOWER\(title\)/);
   assert.match(db.calls[0].sql, /LOWER\(c\.title\) LIKE \?/);
   assert.match(db.calls[1].sql, /LOWER\(c\.title\) LIKE \?/);
   assert.match(db.calls[1].sql, /ORDER BY c\.subject_code, c\.course_number/);
+  assert.match(db.calls[2].sql, /FROM course_prerequisite_substitutions/);
 });
 
 test("catalog and guided selectors use only the configured planning term", async () => {

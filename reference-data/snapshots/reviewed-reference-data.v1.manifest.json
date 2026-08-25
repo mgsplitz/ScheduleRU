@@ -10,11 +10,12 @@
     "double_count_policies": 2,
     "double_count_exceptions": 2,
     "requirement_course_equivalencies": 4,
+    "course_prerequisite_substitutions": 1,
     "ap_equivalencies": 37,
     "course_eligibility_reviews": 5,
     "course_eligibility_conditions": 7,
-    "course_credit_exclusion_policies": 2,
-    "course_credit_exclusion_members": 6
+    "course_credit_exclusion_policies": 3,
+    "course_credit_exclusion_members": 10
   },
-  "sha256": "431c34a8b8376e02fee82929f6f98b588497972ece4b1f0d6a7213c569ff7f05"
+  "sha256": "153c3a53f5bdfc2f627ee9446fb1565ac961096ea9f035f7238d26f012df18f7"
 }

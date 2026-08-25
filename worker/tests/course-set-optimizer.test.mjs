@@ -216,6 +216,26 @@ test("reuses a course already in the four-year plan instead of adding a duplicat
   assert.deepEqual(plain(result.selectedCourses.map((item) => item.code)), ["01:640:152"]);
 });
 
+test("planned courses shared across disconnected components keep component-local coverage", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("major-elective"), requirement("minor-elective")],
+    candidates: [
+      candidate("01:100:200", ["major-elective"]),
+      candidate("01:200:200", ["minor-elective"]),
+      candidate("01:999:100", ["major-elective", "minor-elective"]),
+    ],
+    conflicts: [{
+      type: "allocation_family",
+      candidateCode: "01:999:100",
+      requirementIds: ["major-elective", "minor-elective"],
+    }],
+    plannedCourseCodes: ["01:999:100"],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.issues.length, 0);
+});
+
 test("a course already required by the degree satisfies an overlapping Core choice at zero added cost", () => {
   const result = optimizer().optimizeCourseSet({
     requirements: [{ id: "core:qq", label: "Quantitative Information", slotCount: 1 }],
@@ -250,6 +270,50 @@ test("a course already required by the degree satisfies an overlapping Core choi
     ],
     conflicts: [],
     plannedCourseCodes: ["01:640:151"],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses), []);
+});
+
+test("a planned course covering Core is not re-expanded as a new elective with catalog-only preparation", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [{ id: "core:qq", label: "Quantitative Information", slotCount: 1 }],
+    candidates: [
+      candidate("01:640:001", []),
+      candidate("01:640:025", [], {
+        prerequisitePaths: [["01:640:001"]],
+        enforceablePrerequisitePaths: [["01:640:001"]],
+        prerequisiteClosure: ["01:640:001"],
+        ruleCoverage: "catalog_parsed",
+      }),
+      candidate("01:640:026", [], {
+        prerequisitePaths: [["01:640:025"]],
+        enforceablePrerequisitePaths: [["01:640:025"]],
+        prerequisiteClosure: ["01:640:001", "01:640:025"],
+        ruleCoverage: "catalog_parsed",
+      }),
+      candidate("01:640:111", [], {
+        prerequisitePaths: [["01:640:026"]],
+        enforceablePrerequisitePaths: [["01:640:026"]],
+        prerequisiteClosure: ["01:640:001", "01:640:025", "01:640:026"],
+        ruleCoverage: "catalog_parsed",
+      }),
+      candidate("01:640:112", [], {
+        prerequisitePaths: [["01:640:111"]],
+        enforceablePrerequisitePaths: [["01:640:111"]],
+        prerequisiteClosure: ["01:640:001", "01:640:025", "01:640:026", "01:640:111"],
+        ruleCoverage: "catalog_parsed",
+      }),
+      candidate("01:640:250", ["core:qq"], {
+        prerequisitePaths: [["01:640:112"]],
+        enforceablePrerequisitePaths: [["01:640:112"]],
+        prerequisiteClosure: ["01:640:001", "01:640:025", "01:640:026", "01:640:111", "01:640:112"],
+        ruleCoverage: "catalog_parsed",
+      }),
+    ],
+    conflicts: [],
+    plannedCourseCodes: ["01:640:250"],
   });
 
   assert.equal(result.status, "complete");
@@ -461,6 +525,25 @@ test("one plan respects authoritative credit-exclusion families across requireme
     1,
   );
   assert.equal(result.selectedCourses.some(({ code }) => code === "01:355:201"), true);
+});
+
+test("prerequisite expansion cannot add a course excluded by another selected course", () => {
+  const family = ["probability-route"];
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("math-elective"), requirement("cs-elective")],
+    candidates: [
+      candidate("01:640:477", ["math-elective"], { creditExclusionFamilies: family }),
+      candidate("01:198:206", [], { creditExclusionFamilies: family }),
+      candidate("01:198:425", ["cs-elective"], {
+        prerequisitePaths: [["01:198:206"], ["01:640:477"]],
+        prerequisiteClosure: ["01:198:206", "01:640:477"],
+      }),
+    ],
+    conflicts: [],
+  });
+
+  assert.equal(result.status, "complete");
+  assert.deepEqual(plain(result.selectedCourses.map(({ code }) => code)), ["01:198:425", "01:640:477"]);
 });
 
 test("completed equivalent credit blocks every duplicate option before optimization", () => {

@@ -5,7 +5,7 @@
   const PRODUCTION_PAGES_HOST = "scheduleru-9fb.pages.dev";
 
   function normalizedHostname(value) {
-    return String(value || "").trim().toLowerCase();
+    return String(value || "").trim().toLowerCase().replace(/^\[|\]$/g, "");
   }
 
   function siteConfig({ hostname = "", storage = null } = {}) {

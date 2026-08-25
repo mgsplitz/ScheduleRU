@@ -373,6 +373,32 @@ class Validator {
       },
     );
 
+    this.array(
+      value.course_prerequisite_substitutions,
+      "course_prerequisite_substitutions",
+      (row, path) => {
+        for (const field of ["required_course_code", "satisfying_course_code"] as const) {
+          if (typeof row[field] !== "string" || !COURSE_CODE_RE.test(row[field])) {
+            this.issue(`${path}.${field}`, "invalid_course_code", "must use NN:NNN:NNN");
+          }
+        }
+        this.identifier(row.campus_slug, `${path}.campus_slug`);
+        this.nullableString(row.catalog_year, `${path}.catalog_year`);
+        this.string(row.note, `${path}.note`);
+        this.sourceUrl(row.source_url, `${path}.source_url`);
+        this.string(row.source_label, `${path}.source_label`);
+        this.nullableString(row.source_date, `${path}.source_date`);
+        if (!COURSE_ELIGIBILITY_STATUSES.includes(String(row.review_status))) {
+          this.issue(`${path}.review_status`, "invalid_review_status", "must be draft, reviewed, or stale");
+        }
+        this.timestamp(row.reviewed_at, `${path}.reviewed_at`, true);
+        if (row.required_course_code === row.satisfying_course_code) {
+          this.issue(path, "self_substitution", "required and satisfying courses must be different");
+        }
+        return `${String(row.required_course_code)}:${String(row.satisfying_course_code)}`;
+      },
+    );
+
     this.array(value.ap_equivalencies, "ap_equivalencies", (row, path) => {
       const id = this.identifier(row.id, `${path}.id`) ? String(row.id) : "";
       this.string(row.exam_name, `${path}.exam_name`);
