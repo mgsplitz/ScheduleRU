@@ -277,7 +277,44 @@
     candidates.forEach((candidate) => candidate.coverageRequirementIds.forEach((id) => {
       if (candidateByRequirement.has(id)) candidateByRequirement.get(id).push(candidate);
     }));
+    const optionsByConstraintFamily = new Map();
+    candidateByRequirement.forEach((requirementCandidates, requirementId) => {
+      requirementCandidates.forEach((candidate) => {
+        const families = [
+          ...(candidate.optionFamily ? [`option:${candidate.optionFamily}`] : []),
+          ...(candidate.creditExclusionFamilies || []).map((family) => `exclusion:${family}`),
+        ];
+        families.forEach((family) => {
+          if (!optionsByConstraintFamily.has(family)) optionsByConstraintFamily.set(family, new Map());
+          const optionsByRequirement = optionsByConstraintFamily.get(family);
+          if (!optionsByRequirement.has(requirementId)) optionsByRequirement.set(requirementId, new Set());
+          optionsByRequirement.get(requirementId).add(candidate.code);
+        });
+      });
+    });
+    const constraintCountsByCandidate = new Map(candidates.map((candidate) => {
+      const constrainedByRequirement = new Map();
+      const families = [
+        ...(candidate.optionFamily ? [`option:${candidate.optionFamily}`] : []),
+        ...(candidate.creditExclusionFamilies || []).map((family) => `exclusion:${family}`),
+      ];
+      families.forEach((family) => {
+        (optionsByConstraintFamily.get(family) || new Map()).forEach((codes, requirementId) => {
+          if (!constrainedByRequirement.has(requirementId)) {
+            constrainedByRequirement.set(requirementId, new Set());
+          }
+          codes.forEach((code) => {
+            if (code !== candidate.code) constrainedByRequirement.get(requirementId).add(code);
+          });
+        });
+      });
+      return [candidate.code, new Map([...constrainedByRequirement]
+        .map(([requirementId, codes]) => [requirementId, codes.size]))];
+    }));
     const nodeLimit = options.nodeLimit === undefined ? 10000 : Math.max(0, Number(options.nodeLimit) || 0);
+    const refinementNodeLimit = options.refinementNodeLimit === undefined
+      ? Math.min(500, nodeLimit)
+      : Math.max(0, Number(options.refinementNodeLimit) || 0);
     if (nodeLimit === 0) return {
       status: "indeterminate", selectedCourses: [], deferredRequirements, explanations: [],
       issues: [{ type: "optimizer_limit", nodeLimit }],
@@ -285,6 +322,8 @@
 
     let nodes = 0;
     let exhausted = false;
+    let refinementStopped = false;
+    let completeAtNode = null;
     let best = null;
     const seenStates = new Set();
 
@@ -458,6 +497,7 @@
       if (creditExclusionConflictCount(selectedWithPrerequisites(state.selected)) > 0) return;
       const candidate = { state, score: score(state) };
       if (!best || compareScore(candidate.score, best.score) < 0) best = candidate;
+      if (remainingSlots(state.counts) === 0 && completeAtNode === null) completeAtNode = nodes;
     }
 
     function candidateCanCoverRequirement(candidate, requirement, state) {
@@ -472,6 +512,14 @@
       const used = state.distinctUsed.get(requirement.id) || new Set();
       return (candidate.attributes || []).some((attribute) =>
         allowed.includes(attribute) && !used.has(attribute));
+    }
+
+    function candidateConstraintPressure(candidate, activeRequirement, state) {
+      return [...(constraintCountsByCandidate.get(candidate.code) || new Map())]
+        .reduce((pressure, [requirementId, count]) =>
+          requirementId !== activeRequirement.id && (state.counts.get(requirementId) || 0) > 0
+            ? pressure + count
+            : pressure, 0);
     }
 
     function nextRequirement(state) {
@@ -489,15 +537,23 @@
       seenStates.add(key);
       nodes += 1;
       if (nodes > nodeLimit) { exhausted = true; return; }
+      if (completeAtNode !== null && nodes > completeAtNode + refinementNodeLimit) {
+        refinementStopped = true;
+        return;
+      }
       const requirement = nextRequirement(state);
       if (!requirement) { consider(state); return; }
       const available = (candidateByRequirement.get(requirement.id) || [])
-        .filter((candidate) => candidateCanCoverRequirement(candidate, requirement, state))
-        .sort((left, right) =>
+        .filter((candidate) => candidateCanCoverRequirement(candidate, requirement, state));
+      const constraintPressure = new Map(available.map((candidate) => [
+        candidate.code, candidateConstraintPressure(candidate, requirement, state),
+      ]));
+      available.sort((left, right) =>
           Number(!candidateIsPlanned(left, left.code)) - Number(!candidateIsPlanned(right, right.code))
-          || preferenceRank(left, requirement, preferences) - preferenceRank(right, requirement, preferences)
           || right.coverageRequirementIds.filter((id) => (state.counts.get(id) || 0) > 0).length
             - left.coverageRequirementIds.filter((id) => (state.counts.get(id) || 0) > 0).length
+          || constraintPressure.get(left.code) - constraintPressure.get(right.code)
+          || preferenceRank(left, requirement, preferences) - preferenceRank(right, requirement, preferences)
           || (unlockCounts.get(right.code) || 0) - (unlockCounts.get(left.code) || 0)
           || left.prerequisiteClosure.length - right.prerequisiteClosure.length
           || (Number(left.credits) || 3) - (Number(right.credits) || 3)
@@ -539,7 +595,7 @@
             const sharedCounts = new Map(state.sharedCounts);
             sharedPairs.forEach((item) => sharedCounts.set(item.key, (sharedCounts.get(item.key) || 0) + 1));
             visit({ counts, selected, allocations, sharedCounts, distinctUsed: distinctOption.used });
-            if (exhausted) return;
+            if (exhausted || refinementStopped) return;
           }
         }
       }

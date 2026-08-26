@@ -655,6 +655,54 @@ test("keeps a complete policy-valid result found before the optimizer safety lim
   assert.equal(result.issues[0]?.type, "optimizer_limit_reached_after_complete_result");
 });
 
+test("tries the least-constraining valid course before exhausting the search budget", () => {
+  const requirements = Array.from({ length: 9 }, (_, index) => requirement(`r${index}`));
+  const candidates = [];
+  const addCandidate = (requirementId, family, suffix) => {
+    const code = `01:${String(requirementId.slice(1)).padStart(3, "0")}:${String(suffix).padStart(3, "0")}`;
+    candidates.push(candidate(code, [requirementId], { optionFamily: `family-${family}` }));
+    return code;
+  };
+
+  // r0 can either consume the option family every other requirement needs or
+  // use a non-competing alternative. Trying the shared family first creates
+  // more than 10,000 dead-end permutations even though a complete result is
+  // available immediately through the non-competing course.
+  const preferredButBlockingCode = addCandidate("r0", 0, 0);
+  addCandidate("r0", 8, 8);
+  for (let requirementIndex = 1; requirementIndex < 9; requirementIndex += 1) {
+    for (let family = 0; family < 8; family += 1) {
+      addCandidate(`r${requirementIndex}`, family, family);
+    }
+  }
+
+  const result = optimizer().optimizeCourseSet(
+    { requirements, candidates, conflicts: [] },
+    { r0: { interested: [preferredButBlockingCode], maybe: [], avoid: [] } },
+    { nodeLimit: 10_000, component: true },
+  );
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.selectedCourses.some((course) => course.optionFamily === "family-8"), true);
+});
+
+test("returns the first complete legal recommendation when its refinement budget is spent", () => {
+  const result = optimizer().optimizeCourseSet({
+    requirements: [requirement("r0"), requirement("r1")],
+    candidates: [
+      candidate("01:000:101", ["r0"], { credits: 4 }),
+      candidate("01:000:102", ["r0"], { credits: 3 }),
+      candidate("01:000:201", ["r1"]),
+      candidate("01:000:202", ["r1"], { prerequisiteClosure: ["01:000:101"] }),
+    ],
+    conflicts: [],
+  }, {}, { nodeLimit: 10_000, refinementNodeLimit: 0, component: true });
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.selectedCourses.some((course) => course.code === "01:000:101"), true);
+  assert.deepEqual(plain(result.issues), []);
+});
+
 test("collapses redundant large pools while preserving a later interested choice", () => {
   const requirements = Array.from({ length: 8 }, (_, index) => requirement(`r${index}`));
   const candidates = requirements.flatMap((item, requirementIndex) =>
